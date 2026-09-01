@@ -27,6 +27,14 @@ removed — paste that file's contents into any site.
 Copy `pieces/_template/` to `pieces/<your-piece-name>/` (kebab-case) and
 follow the comments in its `index.html`.
 
+## Known limitations
+
+- "Baked HTML" export currently hardcodes parameter values and removes the
+  control panel, but still references `shared/*.js` via relative imports —
+  the baked file must stay inside the `pieces/<name>/` folder structure (or
+  you copy `shared/` alongside it) to run standalone. Full single-file
+  inlining of shared modules is planned for a follow-up.
+
 ## License
 
 MIT
