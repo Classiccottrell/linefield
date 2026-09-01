@@ -101,11 +101,13 @@
         ctx.shadowBlur = 0;
       }
 
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(nx, ny);
-      ctx.stroke();
-      paths.push([[p.x, p.y], [nx, ny]]);
+      if (values.mode) {
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(nx, ny);
+        ctx.stroke();
+        paths.push([[p.x, p.y], [nx, ny]]);
+      }
 
       p.x = nx;
       p.y = ny;
@@ -113,11 +115,22 @@
       if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
         p.x = Math.random() * canvas.width;
         p.y = Math.random() * canvas.height;
+        p.trail = [];
       }
 
       if (!values.mode) {
         p.trail.push([p.x, p.y]);
-        if (p.trail.length > 20) p.trail.shift();
+        if (p.trail.length > 40) p.trail.shift();
+
+        if (p.trail.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(p.trail[0][0], p.trail[0][1]);
+          for (let i = 1; i < p.trail.length; i++) {
+            ctx.lineTo(p.trail[i][0], p.trail[i][1]);
+          }
+          ctx.stroke();
+          paths.push(p.trail.slice());
+        }
       }
     }
   }
