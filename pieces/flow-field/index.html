@@ -53,13 +53,15 @@
   seedParticles();
   window.addEventListener('resize', seedParticles);
 
-  const panel = createControlPanel({
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
     onChange: () => {},
     extraControls: [
       { name: 'mode', label: 'Particle mode', type: 'checkbox', default: true },
     ],
   });
+  const currentValues = baked || panel.values;
 
   function fieldAngle(x, y, elapsed, values) {
     const noiseScale = 0.002 * (0.2 + values.scale);
@@ -137,17 +139,17 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      drawFrame(dt, elapsed, panel.values);
+      drawFrame(dt, elapsed, currentValues);
     },
   });
   loop.start();
 
-  document.getElementById('btn-png').addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
-  document.getElementById('btn-svg').addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
-  document.getElementById('btn-baked').addEventListener('click', () => {
+  document.getElementById('btn-png')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values });
   });
-  document.getElementById('btn-prompt').addEventListener('click', () => {
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });
   });
 </script>
