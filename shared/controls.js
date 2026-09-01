@@ -4,8 +4,8 @@ const SHARED_CONTROLS = [
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
-  { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
-  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 2, step: 0.01, default: 0.6 },
+  { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
+  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6 },
   { name: 'hue', label: 'Hue', type: 'range', min: 0, max: 360, step: 1, default: 200 },
   { name: 'hueB', label: 'Hue B', type: 'range', min: 0, max: 360, step: 1, default: 280 },
   { name: 'glow', label: 'Glow', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
@@ -55,6 +55,7 @@ export function createControlPanel({ pieceId, onChange, extraControls = [] }) {
 
   const panel = document.createElement('div');
   panel.className = 'lf-panel' + (collapsed ? ' collapsed' : '');
+  panel.setAttribute('data-lf-panel', '');
 
   const heading = document.createElement('h3');
   heading.textContent = 'controls ▾';
@@ -71,7 +72,7 @@ export function createControlPanel({ pieceId, onChange, extraControls = [] }) {
 
   const inputs = {};
 
-  function buildRow(spec) {
+  function buildRow(spec, beforeEl) {
     const row = document.createElement('div');
     row.className = 'lf-row';
     const label = document.createElement('label');
@@ -105,7 +106,8 @@ export function createControlPanel({ pieceId, onChange, extraControls = [] }) {
 
     inputs[spec.name] = input;
     row.appendChild(input);
-    body.appendChild(row);
+    if (beforeEl) body.insertBefore(row, beforeEl);
+    else body.appendChild(row);
   }
 
   for (const spec of allSpecs) buildRow(spec);
@@ -137,7 +139,8 @@ export function createControlPanel({ pieceId, onChange, extraControls = [] }) {
     addControl(spec) {
       allSpecs.push(spec);
       if (!(spec.name in values)) values[spec.name] = spec.default;
-      buildRow(spec);
+      buildRow(spec, resetBtn);
+      persist();
     },
   };
 }
