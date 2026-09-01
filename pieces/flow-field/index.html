@@ -76,15 +76,19 @@
     const [r, g, b] = hslToRgb(values.hue, values.saturation, 0.55);
     const [rB, gB, bB] = hslToRgb(values.hueB, values.saturation, 0.55);
 
-    ctx.fillStyle = values.invert ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,13,0.08)';
+    // Low fade alpha: each frame only partially clears, so the streaks a
+    // particle leaves behind persist long enough to read as flowing lines.
+    ctx.fillStyle = values.invert ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,13,0.045)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     paths = [];
-    const lineWidth = 0.5 + values.stroke * 2;
+    const lineWidth = 0.3 + values.stroke * 1.2;
 
     for (const p of particles) {
       const angle = fieldAngle(p.x, p.y, elapsed, values);
-      const speed = 40 * values.speed * (dt || 0.016);
+      // Base px/sec must stay well above lineWidth, or each frame's segment is
+      // shorter than the stroke is wide and renders as a dot, not a line.
+      const speed = 260 * values.speed * (dt || 0.016);
       const nx = p.x + Math.cos(angle) * speed;
       const ny = p.y + Math.sin(angle) * speed;
 
