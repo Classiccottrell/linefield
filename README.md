@@ -1,0 +1,32 @@
+# linefield
+
+Open-source, self-hosted generative line-art backgrounds. Paste a single
+HTML file into any site to get an interactive, animated line-art
+background — no dependencies, no build step.
+
+## Usage
+
+Open `pieces/<name>/index.html` directly, or serve the folder with any
+static file server (required for ES module imports to work over `file://`
+in some browsers):
+
+```bash
+npx serve pieces/flow-field
+```
+
+Use the on-screen control panel to tune the piece, then click "Baked HTML"
+to export a standalone file with your settings hardcoded and the panel
+removed — paste that file's contents into any site.
+
+## Pieces
+
+- `flow-field` — organic flowing lines following a simplex-noise vector field
+
+## Adding a new piece
+
+Copy `pieces/_template/` to `pieces/<your-piece-name>/` (kebab-case) and
+follow the comments in its `index.html`.
+
+## License
+
+MIT
