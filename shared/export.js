@@ -39,12 +39,15 @@ export function exportSvg(paths, { width = 800, height = 600 } = {}) {
 }
 
 export function bakeHtml({ sourceHtml, values }) {
-  const withoutPanel = sourceHtml.replace(
-    /<[^>]+data-lf-panel[^>]*>[\s\S]*?<\/[^>]+>\s*/g,
-    ''
-  );
-  const inject = `<script>window.__LF_BAKED_VALUES__ = ${JSON.stringify(values)};</script>\n`;
-  const baked = withoutPanel.replace('</head>', `${inject}</head>`);
+  const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
+  doc.querySelectorAll('[data-lf-panel]').forEach((el) => el.remove());
+
+  const safeJson = JSON.stringify(values).replace(/</g, '\\u003c');
+  const inject = doc.createElement('script');
+  inject.textContent = `window.__LF_BAKED_VALUES__ = ${safeJson};`;
+  doc.head.appendChild(inject);
+
+  const baked = `<!doctype html>\n${doc.documentElement.outerHTML}`;
   const blob = new Blob([baked], { type: 'text/html' });
   download('linefield-baked.html', blob);
   return baked;
