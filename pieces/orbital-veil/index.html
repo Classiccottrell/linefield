@@ -67,8 +67,8 @@
     // Tilt squashes the rings vertically, giving the orb its 3D read.
     const tilt = 0.35 + 0.65 * Math.abs(Math.cos((values.angle * Math.PI) / 180));
 
-    ctx.lineWidth = 0.4 + values.stroke * 1.2;
-    ctx.shadowBlur = values.glow > 0 ? values.glow * 8 : 0;
+    const lineWidth = 0.4 + values.stroke * 1.2;
+    ctx.lineWidth = lineWidth;
 
     const light = values.invert ? 0.35 : 0.6;
 
@@ -88,7 +88,6 @@
         light
       );
       ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-      if (values.glow > 0) ctx.shadowColor = `rgba(${r},${g},${b},0.6)`;
 
       const pts = [];
       ctx.beginPath();
@@ -99,6 +98,13 @@
         if (s === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
+      }
+      if (values.glow > 0) {
+        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.globalAlpha = values.glow * 0.25;
+        ctx.stroke();
+        ctx.lineWidth = lineWidth;
+        ctx.globalAlpha = 1;
       }
       ctx.stroke();
       paths.push(pts);

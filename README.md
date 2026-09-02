@@ -6,13 +6,17 @@ background — no dependencies, no build step.
 
 ## Usage
 
-Open `pieces/<name>/index.html` directly, or serve the folder with any
-static file server (required for ES module imports to work over `file://`
-in some browsers):
+Serve the repo root with any static file server (required — ES module
+scripts fail over `file://` in every browser) and open a piece from there,
+not from inside its own folder, since pieces import shared code via
+`../../shared/*.js`:
 
 ```bash
-npx serve pieces/flow-field
+npx serve .
 ```
+
+Then open `http://localhost:<port>/pieces/flow-field/` (swap in any piece
+name).
 
 Use the on-screen control panel to tune the piece, then click "Baked HTML"
 to export a standalone file with your settings hardcoded and the panel
@@ -37,6 +41,10 @@ follow the comments in its `index.html`.
 
 ## Known limitations
 
+- Piece defaults (including the default palette) can change between
+  versions, but a saved localStorage value always outranks the piece's
+  default. If a piece looks different from its documented palette, click
+  "Reset to defaults" in its control panel to pick up the current default.
 - "Baked HTML" export currently hardcodes parameter values and removes the
   control panel, but still references `shared/*.js` via relative imports —
   the baked file must stay inside the `pieces/<name>/` folder structure (or

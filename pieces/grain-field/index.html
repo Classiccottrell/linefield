@@ -85,8 +85,8 @@
     const len = values.grain;
     const light = values.invert ? 0.4 : 0.62;
 
-    ctx.lineWidth = 0.3 + values.stroke * 0.9;
-    ctx.shadowBlur = values.glow > 0 ? values.glow * 5 : 0;
+    const lineWidth = 0.3 + values.stroke * 0.9;
+    ctx.lineWidth = lineWidth;
 
     for (const gr of grains) {
       const n = simplex2(gr.x * noiseScale + values.phase, gr.y * noiseScale + t);
@@ -108,13 +108,19 @@
         light
       );
       ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-      if (values.glow > 0) ctx.shadowColor = `rgba(${r},${g},${b},0.5)`;
 
       const ex = gr.x + Math.cos(a) * len;
       const ey = gr.y + Math.sin(a) * len;
       ctx.beginPath();
       ctx.moveTo(gr.x, gr.y);
       ctx.lineTo(ex, ey);
+      if (values.glow > 0) {
+        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.globalAlpha = values.glow * 0.25;
+        ctx.stroke();
+        ctx.lineWidth = lineWidth;
+        ctx.globalAlpha = 1;
+      }
       ctx.stroke();
       paths.push([[gr.x, gr.y], [ex, ey]]);
     }

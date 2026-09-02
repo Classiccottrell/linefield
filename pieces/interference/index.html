@@ -58,7 +58,7 @@
   function drawFamily(cx, cy, rings, spacing, rgb, values) {
     const [r, g, b] = rgb;
     ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-    if (values.glow > 0) ctx.shadowColor = `rgba(${r},${g},${b},0.6)`;
+    const lineWidth = ctx.lineWidth;
 
     for (let i = 1; i <= rings; i++) {
       const radius = i * spacing;
@@ -71,6 +71,13 @@
         if (s === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
+      }
+      if (values.glow > 0) {
+        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.globalAlpha = values.glow * 0.25;
+        ctx.stroke();
+        ctx.lineWidth = lineWidth;
+        ctx.globalAlpha = 1;
       }
       ctx.stroke();
       paths.push(pts);
@@ -88,7 +95,6 @@
     const t = elapsed * values.speed * 0.4 * values.motion;
 
     ctx.lineWidth = 0.4 + values.stroke * 0.9;
-    ctx.shadowBlur = values.glow > 0 ? values.glow * 7 : 0;
 
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;

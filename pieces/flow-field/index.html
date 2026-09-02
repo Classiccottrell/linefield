@@ -109,17 +109,20 @@
 
       ctx.strokeStyle = `rgba(${fr | 0},${fg | 0},${fb | 0},${values.opacity})`;
       ctx.lineWidth = lineWidth;
-      if (values.glow > 0) {
-        ctx.shadowBlur = values.glow * 8;
-        ctx.shadowColor = `rgba(${fr | 0},${fg | 0},${fb | 0},0.6)`;
-      } else {
-        ctx.shadowBlur = 0;
-      }
 
       if (values.mode) {
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(nx, ny);
+        if (values.glow > 0) {
+          // Underlay pass: wider, dimmer stroke approximates bloom cheaply
+          // (canvas shadowBlur costs 5-10x per draw call at this element count).
+          ctx.lineWidth = lineWidth + values.glow * 3;
+          ctx.globalAlpha = values.glow * 0.25;
+          ctx.stroke();
+          ctx.lineWidth = lineWidth;
+          ctx.globalAlpha = 1;
+        }
         ctx.stroke();
         paths.push([[p.x, p.y], [nx, ny]]);
       }
@@ -142,6 +145,13 @@
           ctx.moveTo(p.trail[0][0], p.trail[0][1]);
           for (let i = 1; i < p.trail.length; i++) {
             ctx.lineTo(p.trail[i][0], p.trail[i][1]);
+          }
+          if (values.glow > 0) {
+            ctx.lineWidth = lineWidth + values.glow * 3;
+            ctx.globalAlpha = values.glow * 0.25;
+            ctx.stroke();
+            ctx.lineWidth = lineWidth;
+            ctx.globalAlpha = 1;
           }
           ctx.stroke();
           paths.push(p.trail.slice());

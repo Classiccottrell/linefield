@@ -65,12 +65,8 @@
     const amplitude = 46 * values.relief;
     const t = elapsed * values.speed * 0.12 * values.motion;
 
-    ctx.lineWidth = 0.4 + values.stroke * 1.1;
-    if (values.glow > 0) {
-      ctx.shadowBlur = values.glow * 7;
-    } else {
-      ctx.shadowBlur = 0;
-    }
+    const lineWidth = 0.4 + values.stroke * 1.1;
+    ctx.lineWidth = lineWidth;
 
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -90,7 +86,6 @@
         values.invert ? 0.35 : 0.6
       );
       ctx.strokeStyle = `rgba(${r},${g},${bl},${values.opacity})`;
-      if (values.glow > 0) ctx.shadowColor = `rgba(${r},${g},${bl},0.6)`;
 
       const pts = [];
       ctx.beginPath();
@@ -103,6 +98,13 @@
         if (x === -margin) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
+      }
+      if (values.glow > 0) {
+        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.globalAlpha = values.glow * 0.25;
+        ctx.stroke();
+        ctx.lineWidth = lineWidth;
+        ctx.globalAlpha = 1;
       }
       ctx.stroke();
       paths.push(pts);
