@@ -32,6 +32,7 @@ PNG export offers 2x and 4x resolution buttons.
 - `interference` — two concentric ring families crossing to produce moiré
 - `orbital-veil` — concentric orbital arcs with differential rotation
 - `grain-field` — fine drifting grain, the subtlest piece; good behind text
+- `wireframe-lattice` — rigid 3D wireframe grid rippling in perspective
 
 Every piece shares 13 controls (scale, speed, stroke, opacity, saturation,
 hue, hue B, glow, angle, motion, phase, invert, density) plus its own
