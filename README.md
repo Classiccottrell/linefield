@@ -36,6 +36,7 @@ PNG export offers 2x and 4x resolution buttons.
 - `meridian` — a dozen long ribbons sweeping the full width
 - `synapse` — drifting nodes wired to their neighbours, pulsing
 - `accretion` — matter spiralling inward to a bright core
+- `tether` — a few heavy cables strung taut and swaying
 
 Every piece shares 13 controls (scale, speed, stroke, opacity, saturation,
 hue, hue B, glow, angle, motion, phase, invert, density) plus its own
