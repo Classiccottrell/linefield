@@ -121,7 +121,7 @@
         const droop = 4 * u * (1 - u) * sag;
         // A little high-frequency shiver, like a plucked string.
         const shiver =
-          simplex2(u * noiseScale + c.j, t * 1.6) * 6 * values.motion * (4 * u * (1 - u));
+          simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
         const py = y + droop + shiver;
         if (s === 0) ctx.moveTo(x, py);
         else ctx.lineTo(x, py);
