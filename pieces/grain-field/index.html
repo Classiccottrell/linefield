@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>linefield — grain-field</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-png">PNG</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb } from '../../shared/color.js';
+  import { simplex2 } from '../../shared/noise.js';
+  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'grain-field';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Persistent particle array — must re-seed when density changes.
+  // Count is high because each mark is tiny and low-contrast: at 1400 the field
+  // read as sparse dust rather than grain. Density still scales it down to 0.1x.
+  const BASE_COUNT = 3200;
+  let grains = [];
+  let paths = [];
+
+  function seedGrains(count) {
+    grains = Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      // Per-grain jitter so they don't all move in lockstep.
+      j: Math.random() * Math.PI * 2,
+    }));
+  }
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    onChange: (name, value, values) => {
+      if (name === 'density') seedGrains(Math.round(BASE_COUNT * values.density));
+    },
+    extraControls: [
+      { name: 'grain', label: 'Grain length', type: 'range', min: 0.5, max: 6, step: 0.1, default: 2.2 },
+    ],
+  });
+  const currentValues = baked || panel.values;
+
+  seedGrains(Math.round(BASE_COUNT * currentValues.density));
+  window.addEventListener('resize', () =>
+    seedGrains(Math.round(BASE_COUNT * currentValues.density))
+  );
+
+  function drawFrame(dt, elapsed, values) {
+    // Full repaint each frame — grain should not smear into trails.
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    paths = [];
+    const noiseScale = 0.004 * (0.3 + values.scale);
+    const t = elapsed * 0.25 * values.motion;
+    const drift = 14 * values.speed * (dt || 0.016);
+    const len = values.grain;
+    const light = values.invert ? 0.4 : 0.62;
+
+    ctx.lineWidth = 0.3 + values.stroke * 0.9;
+    ctx.shadowBlur = values.glow > 0 ? values.glow * 5 : 0;
+
+    for (const gr of grains) {
+      const n = simplex2(gr.x * noiseScale + values.phase, gr.y * noiseScale + t);
+      const a = n * Math.PI * 2 + (values.angle * Math.PI) / 180 + gr.j * 0.15;
+
+      gr.x += Math.cos(a) * drift;
+      gr.y += Math.sin(a) * drift;
+
+      // Wrap rather than respawn, so the field stays evenly populated.
+      if (gr.x < 0) gr.x += canvas.width;
+      if (gr.x > canvas.width) gr.x -= canvas.width;
+      if (gr.y < 0) gr.y += canvas.height;
+      if (gr.y > canvas.height) gr.y -= canvas.height;
+
+      const mix = (Math.sin(gr.j + elapsed * 0.15) + 1) / 2;
+      const [r, g, b] = hslToRgb(
+        values.hue + (values.hueB - values.hue) * mix,
+        values.saturation,
+        light
+      );
+      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
+      if (values.glow > 0) ctx.shadowColor = `rgba(${r},${g},${b},0.5)`;
+
+      const ex = gr.x + Math.cos(a) * len;
+      const ey = gr.y + Math.sin(a) * len;
+      ctx.beginPath();
+      ctx.moveTo(gr.x, gr.y);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      paths.push([[gr.x, gr.y], [ex, ey]]);
+    }
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values });
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
