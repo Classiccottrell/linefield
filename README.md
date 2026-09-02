@@ -33,7 +33,7 @@ PNG export offers 2x and 4x resolution buttons.
 - `orbital-veil` — concentric orbital arcs with differential rotation
 - `grain-field` — fine drifting grain, the subtlest piece; good behind text
 - `wireframe-lattice` — rigid 3D wireframe grid rippling in perspective
-- `meridian` — a dozen long ribbons sweeping the full width
+- `meridian` — seven long ribbons sweeping the full width
 - `synapse` — drifting nodes wired to their neighbours, pulsing
 - `accretion` — matter spiralling inward to a bright core
 - `tether` — a few heavy cables strung taut and swaying

@@ -65,6 +65,11 @@
       // In particle mode it renders short dashes that read too much like grain-field.
       { name: 'mode', label: 'Particle mode', type: 'checkbox', default: false },
     ],
+    // Pinned deliberately, not inherited. These happen to equal the shared
+    // control defaults, but stating them here is what makes 200/280 visible as
+    // TAKEN to the next contributor grepping pieces' `defaults` blocks for a
+    // free hue — and keeps flow-field's violet if the shared defaults ever move.
+    defaults: { hue: 200, hueB: 280, saturation: 0.6 },
   });
   const currentValues = baked || panel.values;
 
