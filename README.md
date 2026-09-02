@@ -19,8 +19,11 @@ Then open `http://localhost:<port>/pieces/flow-field/` (swap in any piece
 name).
 
 Use the on-screen control panel to tune the piece, then click "Baked HTML"
-to export a standalone file with your settings hardcoded and the panel
-removed — paste that file's contents into any site.
+to export a standalone file with your settings hardcoded, the panel
+removed, and all shared code inlined — paste that file's contents into any
+site with no other files required.
+
+PNG export offers 2x and 4x resolution buttons.
 
 ## Pieces
 
@@ -36,8 +39,7 @@ piece-specific control. `density` multiplies the piece's base element count.
 
 ## Adding a new piece
 
-Copy `pieces/_template/` to `pieces/<your-piece-name>/` (kebab-case) and
-follow the comments in its `index.html`.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Known limitations
 
@@ -45,11 +47,6 @@ follow the comments in its `index.html`.
   versions, but a saved localStorage value always outranks the piece's
   default. If a piece looks different from its documented palette, click
   "Reset to defaults" in its control panel to pick up the current default.
-- "Baked HTML" export currently hardcodes parameter values and removes the
-  control panel, but still references `shared/*.js` via relative imports —
-  the baked file must stay inside the `pieces/<name>/` folder structure (or
-  you copy `shared/` alongside it) to run standalone. Full single-file
-  inlining of shared modules is planned for a follow-up.
 
 ## License
 
