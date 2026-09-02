@@ -13,6 +13,7 @@ const SHARED_CONTROLS = [
   { name: 'motion', label: 'Motion', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'phase', label: 'Phase', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
   { name: 'invert', label: 'Invert', type: 'checkbox', default: false },
+  { name: 'density', label: 'Density', type: 'range', min: 0.1, max: 2, step: 0.01, default: 1 },
 ];
 
 const PANEL_CSS = `

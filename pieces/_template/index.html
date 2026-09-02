@@ -74,18 +74,27 @@
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
     const radius = 100 * values.scale;
-    const angle = elapsed * values.speed + values.phase;
-    const x = cx + Math.cos(angle) * radius;
-    const y = cy + Math.sin(angle) * radius;
+
+    // Effective element count = base * density. Pieces holding a persistent
+    // particle array must instead re-seed it in the panel's onChange (see
+    // pieces/flow-field/index.html); a derived count like this needs no re-seed.
+    const BASE_SPOKES = 12;
+    const count = Math.round(BASE_SPOKES * values.density);
 
     ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
     ctx.lineWidth = 1 + values.stroke * 3;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(x, y);
-    ctx.stroke();
 
-    paths.push([[cx, cy], [x, y]]);
+    for (let i = 0; i < count; i++) {
+      const angle =
+        elapsed * values.speed + values.phase + (i / count) * Math.PI * 2;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      paths.push([[cx, cy], [x, y]]);
+    }
   }
 
   loop.start();

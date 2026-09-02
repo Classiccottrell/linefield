@@ -39,29 +39,36 @@
   window.addEventListener('resize', resize);
   resize();
 
-  const PARTICLE_COUNT = 800;
+  // Base count is deliberately modest so the default reads as a background;
+  // the Density slider is what makes it loud (up to 2x).
+  const BASE_COUNT = 500;
   let particles = [];
   let paths = [];
 
-  function seedParticles() {
-    particles = Array.from({ length: PARTICLE_COUNT }, () => ({
+  function seedParticles(count) {
+    particles = Array.from({ length: count }, () => ({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
       trail: [],
     }));
   }
-  seedParticles();
-  window.addEventListener('resize', seedParticles);
 
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
-    onChange: () => {},
+    onChange: (name, value, values) => {
+      if (name === 'density') seedParticles(Math.round(BASE_COUNT * values.density));
+    },
     extraControls: [
       { name: 'mode', label: 'Particle mode', type: 'checkbox', default: true },
     ],
   });
   const currentValues = baked || panel.values;
+
+  seedParticles(Math.round(BASE_COUNT * currentValues.density));
+  window.addEventListener('resize', () =>
+    seedParticles(Math.round(BASE_COUNT * currentValues.density))
+  );
 
   function fieldAngle(x, y, elapsed, values) {
     const noiseScale = 0.002 * (0.2 + values.scale);
