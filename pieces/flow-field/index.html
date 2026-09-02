@@ -60,7 +60,9 @@
       if (name === 'density') seedParticles(Math.round(BASE_COUNT * values.density));
     },
     extraControls: [
-      { name: 'mode', label: 'Particle mode', type: 'checkbox', default: true },
+      // Defaults off: continuous mode's long ribbons are this piece's identity.
+      // In particle mode it renders short dashes that read too much like grain-field.
+      { name: 'mode', label: 'Particle mode', type: 'checkbox', default: false },
     ],
   });
   const currentValues = baked || panel.values;
