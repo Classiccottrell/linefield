@@ -24,6 +24,11 @@ removed — paste that file's contents into any site.
 - `contour-grid` — topographic contour bands undulating like breathing terrain
 - `interference` — two concentric ring families crossing to produce moiré
 - `orbital-veil` — concentric orbital arcs with differential rotation
+- `grain-field` — fine drifting grain, the subtlest piece; good behind text
+
+Every piece shares 13 controls (scale, speed, stroke, opacity, saturation,
+hue, hue B, glow, angle, motion, phase, invert, density) plus its own
+piece-specific control. `density` multiplies the piece's base element count.
 
 ## Adding a new piece
 
