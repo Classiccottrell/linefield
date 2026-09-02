@@ -37,6 +37,7 @@ PNG export offers 2x and 4x resolution buttons.
 - `synapse` — drifting nodes wired to their neighbours, pulsing
 - `accretion` — matter spiralling inward to a bright core
 - `tether` — a few heavy cables strung taut and swaying
+- `event-horizon` — a polar grid bent inward by a gravity well
 
 Every piece shares 13 controls (scale, speed, stroke, opacity, saturation,
 hue, hue B, glow, angle, motion, phase, invert, density) plus its own

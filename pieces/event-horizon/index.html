@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>linefield — event-horizon</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb } from '../../shared/color.js';
+  import { createCamera } from '../../shared/project.js';
+  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'event-horizon';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Ring and spoke counts derive per frame from density — no persistent array.
+  const BASE_RINGS = 40;
+  const SEG = 96;   // segments per ring
+  const SPOKES = 36;
+  let paths = [];
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    onChange: () => {},
+    extraControls: [
+      { name: 'mass', label: 'Mass', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+    ],
+    defaults: { hue: 285, hueB: 230, saturation: 0.6 },
+  });
+  const currentValues = baked || panel.values;
+
+  const camera = createCamera({ fov: 700 });
+
+  function strokePts(pts, values, lineWidth, rgb) {
+    const usable = pts.filter((p) => p.scale > 0);
+    if (usable.length < 2) return;
+    const [r, g, b] = rgb;
+
+    ctx.beginPath();
+    ctx.moveTo(usable[0].x, usable[0].y);
+    for (let i = 1; i < usable.length; i++) ctx.lineTo(usable[i].x, usable[i].y);
+
+    ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
+    if (values.glow > 0) {
+      ctx.lineWidth = lineWidth + values.glow * 3;
+      ctx.globalAlpha = values.glow * 0.25;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+
+    paths.push(usable.map((p) => [p.x, p.y]));
+  }
+
+  function drawFrame(dt, elapsed, values) {
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    paths = [];
+    const rings = Math.max(6, Math.round(BASE_RINGS * values.density));
+    const extent = Math.min(canvas.width, canvas.height) * 0.85 * (0.4 + values.scale * 0.6);
+    // The horizon: nothing is drawn inside it, which is the void at the centre.
+    const horizon = 40 + 70 * values.mass;
+    const t = elapsed * values.speed * 0.25;
+    const light = values.invert ? 0.35 : 0.62;
+    const lineWidth = 0.3 + values.stroke * 1.0;
+
+    camera.set({
+      tilt: 0.55 + 0.35 * Math.sin((values.angle * Math.PI) / 180),
+      yaw: t * values.motion * 0.35 + values.phase,
+      cx: canvas.width / 2,
+      cy: canvas.height / 2,
+    });
+
+    // Lensing: rings bunch just outside the horizon and spread further out.
+    // u is 0 at the horizon and 1 at the outer extent.
+    const radiusAt = (u) => horizon + (extent - horizon) * Math.pow(u, 1 + values.mass * 0.9);
+
+    // Concentric rings, drawn on the XZ plane so the camera's tilt makes a disc.
+    for (let i = 1; i <= rings; i++) {
+      const u = i / rings;
+      const R = radiusAt(u);
+      const [r, g, b] = hslToRgb(
+        values.hue + (values.hueB - values.hue) * u,
+        values.saturation,
+        light
+      );
+
+      const pts = [];
+      for (let s = 0; s <= SEG; s++) {
+        const a = (s / SEG) * Math.PI * 2;
+        pts.push([Math.cos(a) * R, 0, Math.sin(a) * R]);
+      }
+      strokePts(camera.projectPath(pts), values, lineWidth, [r, g, b]);
+    }
+
+    // Radial spokes, from the horizon outward.
+    const spokes = Math.max(4, Math.round(SPOKES * values.density));
+    for (let k = 0; k < spokes; k++) {
+      const a = (k / spokes) * Math.PI * 2;
+      const [r, g, b] = hslToRgb(values.hueB, values.saturation, light * 0.85);
+
+      const pts = [];
+      for (let s = 0; s <= 24; s++) {
+        const R = radiusAt(s / 24);
+        pts.push([Math.cos(a) * R, 0, Math.sin(a) * R]);
+      }
+      strokePts(camera.projectPath(pts), values, lineWidth * 0.7, [r, g, b]);
+    }
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
