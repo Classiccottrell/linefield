@@ -36,13 +36,15 @@ function injectCss() {
   document.head.appendChild(style);
 }
 
-export function createControlPanel({ pieceId, onChange, extraControls = [] }) {
+export function createControlPanel({ pieceId, onChange, extraControls = [], defaults: defaultOverrides = {} }) {
   injectCss();
 
   const storageKey = `linefield:${pieceId}`;
   const allSpecs = [...SHARED_CONTROLS, ...extraControls];
   const defaults = {};
-  for (const spec of allSpecs) defaults[spec.name] = spec.default;
+  for (const spec of allSpecs) {
+    defaults[spec.name] = spec.name in defaultOverrides ? defaultOverrides[spec.name] : spec.default;
+  }
 
   let saved = {};
   try {
@@ -118,11 +120,12 @@ export function createControlPanel({ pieceId, onChange, extraControls = [] }) {
   resetBtn.textContent = 'Reset to defaults';
   resetBtn.addEventListener('click', () => {
     for (const spec of allSpecs) {
-      values[spec.name] = spec.default;
+      const def = defaults[spec.name];
+      values[spec.name] = def;
       const input = inputs[spec.name];
-      if (spec.type === 'checkbox') input.checked = spec.default;
-      else input.value = spec.default;
-      onChange(spec.name, spec.default, values);
+      if (spec.type === 'checkbox') input.checked = def;
+      else input.value = def;
+      onChange(spec.name, def, values);
     }
     persist();
   });
