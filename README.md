@@ -34,6 +34,7 @@ PNG export offers 2x and 4x resolution buttons.
 - `grain-field` — fine drifting grain, the subtlest piece; good behind text
 - `wireframe-lattice` — rigid 3D wireframe grid rippling in perspective
 - `meridian` — a dozen long ribbons sweeping the full width
+- `synapse` — drifting nodes wired to their neighbours, pulsing
 
 Every piece shares 13 controls (scale, speed, stroke, opacity, saturation,
 hue, hue B, glow, angle, motion, phase, invert, density) plus its own
