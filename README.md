@@ -22,6 +22,7 @@ removed — paste that file's contents into any site.
 
 - `flow-field` — organic flowing lines following a simplex-noise vector field
 - `contour-grid` — topographic contour bands undulating like breathing terrain
+- `interference` — two concentric ring families crossing to produce moiré
 
 ## Adding a new piece
 
