@@ -38,14 +38,54 @@ export function exportSvg(paths, { width = 800, height = 600 } = {}) {
   download('linefield.svg', blob);
 }
 
-export function bakeHtml({ sourceHtml, values }) {
+// Shared modules a piece's inline <script type="module"> may import from.
+// Order matters: modules with no internal deps first is not required since
+// they're pure functions, but we keep a stable, readable order.
+const SHARED_MODULE_PATHS = [
+  '../../shared/noise.js',
+  '../../shared/color.js',
+  '../../shared/anim.js',
+  '../../shared/controls.js',
+  '../../shared/export.js',
+];
+
+function stripExports(src) {
+  // `export function foo` / `export const foo` -> drop the `export ` keyword.
+  return src.replace(/^export\s+/gm, '');
+}
+
+async function inlineSharedModules(pieceScriptSrc) {
+  // Strip the piece's own import lines pulling from shared/*.js.
+  const strippedPieceSrc = pieceScriptSrc.replace(
+    /^\s*import\s*\{[^}]*\}\s*from\s*['"]\.\.\/\.\.\/shared\/[^'"]+\.js['"];?\s*$/gm,
+    ''
+  );
+
+  const bodies = await Promise.all(
+    SHARED_MODULE_PATHS.map(async (path) => {
+      const res = await fetch(path);
+      const src = await res.text();
+      return `// --- inlined: ${path} ---\n${stripExports(src)}`;
+    })
+  );
+
+  return `${bodies.join('\n\n')}\n\n// --- piece script ---\n${strippedPieceSrc}`;
+}
+
+export async function bakeHtml({ sourceHtml, values }) {
   const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
   doc.querySelectorAll('[data-lf-panel]').forEach((el) => el.remove());
 
+  const pieceScript = doc.querySelector('script[type="module"]');
+  const pieceScriptSrc = pieceScript ? pieceScript.textContent : '';
+  if (pieceScript) pieceScript.remove();
+
+  const inlinedSrc = await inlineSharedModules(pieceScriptSrc);
+
   const safeJson = JSON.stringify(values).replace(/</g, '\\u003c');
   const inject = doc.createElement('script');
-  inject.textContent = `window.__LF_BAKED_VALUES__ = ${safeJson};`;
-  doc.head.appendChild(inject);
+  inject.textContent = `window.__LF_BAKED_VALUES__ = ${safeJson};\n${inlinedSrc}`;
+  doc.body.appendChild(inject);
 
   const baked = `<!doctype html>\n${doc.documentElement.outerHTML}`;
   const blob = new Blob([baked], { type: 'text/html' });
