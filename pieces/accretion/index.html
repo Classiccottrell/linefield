@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>linefield — accretion</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'accretion';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Persistent particle array — must re-seed when density changes.
+  const BASE_COUNT = 900;
+  const CORE = 18; // world radius of the core; particles respawn on reaching it
+  let motes = [];
+  let paths = [];
+
+  function maxRadius() {
+    return Math.min(canvas.width, canvas.height) * 0.46;
+  }
+
+  function seedMotes(count) {
+    const rim = maxRadius();
+    motes = Array.from({ length: count }, () => ({
+      a: Math.random() * Math.PI * 2,
+      r: CORE + Math.random() * (rim - CORE),
+      j: Math.random(), // per-mote colour/rate jitter
+    }));
+  }
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    onChange: (name, value, values) => {
+      if (name === 'density') seedMotes(Math.max(20, Math.round(BASE_COUNT * values.density)));
+    },
+    extraControls: [
+      { name: 'spin', label: 'Spin', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+    ],
+    defaults: { hue: 10, hueB: 40, saturation: 0.8 },
+  });
+  const currentValues = baked || panel.values;
+
+  seedMotes(Math.max(20, Math.round(BASE_COUNT * currentValues.density)));
+  window.addEventListener('resize', () =>
+    seedMotes(Math.max(20, Math.round(BASE_COUNT * currentValues.density)))
+  );
+
+  function drawFrame(dt, elapsed, values) {
+    // Partial clear leaves short motion trails behind each mote.
+    ctx.fillStyle = values.invert ? 'rgba(242,242,244,0.14)' : 'rgba(10,10,13,0.14)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    paths = [];
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const rim = maxRadius() * (0.4 + values.scale * 0.6);
+    const step = dt || 0.016;
+    const light = values.invert ? 0.4 : 0.6;
+    const lineWidth = 0.4 + values.stroke * 1.4;
+    const baseAngle = (values.angle * Math.PI) / 180;
+
+    const [r0, g0, b0] = hslToRgb(values.hue, values.saturation, light);
+    const [r1, g1, b1] = hslToRgb(values.hueB, values.saturation, light);
+
+    for (const m of motes) {
+      const prevA = m.a;
+      const prevR = m.r;
+
+      // Angular velocity rises as radius falls — the spiral tightens inward.
+      const omega = (900 / (m.r + 40)) * 0.05 * values.speed * (0.4 + values.spin * 1.2);
+      m.a += omega * step * (0.75 + m.j * 0.5);
+      // Inward drift.
+      m.r -= (14 + 40 / (m.r / 60 + 1)) * values.motion * step;
+
+      let respawned = false;
+      if (m.r <= CORE) {
+        m.a = Math.random() * Math.PI * 2;
+        m.r = rim;
+        m.j = Math.random();
+        respawned = true;
+      }
+
+      // On respawn, don't connect the old near-core point to the new rim point —
+      // that would draw a long spoke across the whole disc every respawn.
+      const startA = respawned ? m.a : prevA;
+      const startR = respawned ? m.r : prevR;
+      const x0 = cx + Math.cos(startA + baseAngle + values.phase) * startR;
+      const y0 = cy + Math.sin(startA + baseAngle + values.phase) * startR;
+      const x1 = cx + Math.cos(m.a + baseAngle + values.phase) * m.r;
+      const y1 = cy + Math.sin(m.a + baseAngle + values.phase) * m.r;
+
+      // Hot near the core, cooler at the rim.
+      const heat = 1 - Math.min(1, (m.r - CORE) / Math.max(1, rim - CORE));
+      const cr = r0 + (r1 - r0) * (1 - heat);
+      const cg = g0 + (g1 - g0) * (1 - heat);
+      const cb = b0 + (b1 - b0) * (1 - heat);
+
+      ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${values.opacity})`;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      if (values.glow > 0) {
+        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.globalAlpha = values.glow * 0.25;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+      paths.push([[x0, y0], [x1, y1]]);
+    }
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
