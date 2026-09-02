@@ -21,6 +21,7 @@ removed — paste that file's contents into any site.
 ## Pieces
 
 - `flow-field` — organic flowing lines following a simplex-noise vector field
+- `contour-grid` — topographic contour bands undulating like breathing terrain
 
 ## Adding a new piece
 
