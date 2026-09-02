@@ -90,6 +90,19 @@ module, add its path to `SHARED_MODULE_PATHS` in `bakeHtml()` and make sure
 its top-level names don't collide with any other shared module's top-level
 names (`bakeHtml` concatenates all of them into one scope).
 
+## 3D pieces
+
+`shared/project.js` is where 3D capability lives and grows. It exposes
+`createCamera({ tilt, yaw, fov, cx, cy })` returning `.project(x, y, z)`,
+`.projectPath(points)` and `.set(partialOptions)`, plus a standalone
+`rotatePoint`. A projected point carries a `scale` — the perspective
+divisor — so pieces can thin or fade distant geometry; `scale === 0` means
+the point is at or behind the camera and must be skipped.
+
+Extend it by adding a camera *option*, not by changing call signatures, so
+existing pieces keep working. Deliberately absent today: depth sorting and
+occlusion, matrix stacks, lighting, mesh loading, and an orthographic mode.
+
 ## No build step, no automated tests
 
 There's no bundler, transpiler, or test runner in this repo. Canvas
