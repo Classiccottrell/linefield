@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — generative line-art backgrounds</title>
+<style>
+  :root{
+    --ground:#0a0a0d;
+    --surface:#131319;
+    --line:#26262f;
+    --text:#e8e8ec;
+    --muted:#7c7c8c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--ground);color:var(--text);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:0 24px 96px;
+  }
+  .wrap{max-width:1180px;margin:0 auto}
+
+  header{padding:80px 0 40px}
+  h1{font-size:clamp(32px,5vw,46px);font-weight:600;letter-spacing:-.02em;margin:0 0 14px}
+  .lede{color:var(--muted);font-size:18px;margin:0;max-width:60ch}
+  .lede code{font-size:15px;background:var(--surface);padding:2px 6px;border-radius:3px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;padding:24px 0 32px;border-bottom:1px solid var(--line)}
+  .chip{
+    font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+    color:var(--muted);background:transparent;border:1px solid var(--line);
+    padding:8px 13px;border-radius:2px;cursor:pointer;text-transform:uppercase;
+  }
+  .chip:hover{color:var(--text);border-color:#3a3a46}
+  .chip[aria-pressed="true"]{color:var(--ground);background:var(--text);border-color:var(--text)}
+  .chip:focus-visible{outline:2px solid #6fb4c9;outline-offset:2px}
+
+  .grid{
+    display:grid;gap:28px;padding:36px 0 0;
+    grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  }
+  .card{display:flex;flex-direction:column;gap:0}
+  .card[hidden]{display:none}
+
+  .frame{
+    position:relative;aspect-ratio:16/10;overflow:hidden;border-radius:3px;
+    background:var(--ground);border:1px solid var(--line);display:block;
+    text-decoration:none;
+  }
+  .frame img,.frame iframe{
+    position:absolute;inset:0;width:100%;height:100%;border:0;display:block;
+  }
+  .frame img{object-fit:cover}
+  .frame:focus-visible{outline:2px solid var(--accent,#6fb4c9);outline-offset:3px}
+
+  .meta{padding:14px 2px 0}
+  .name{
+    display:flex;align-items:baseline;gap:10px;margin:0 0 4px;
+    font-size:17px;font-weight:600;letter-spacing:-.01em;
+  }
+  .swatch{width:22px;height:3px;border-radius:2px;flex:none}
+  .blurb{color:var(--muted);font-size:14.5px;margin:0 0 12px}
+
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+  .tag{
+    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9a9aa8;
+    border:1px solid var(--line);padding:4px 8px;border-radius:2px;
+  }
+
+  .actions{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{
+    font:500 12.5px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
+    padding:8px 12px;border-radius:3px;cursor:pointer;text-decoration:none;
+  }
+  .btn:hover{color:var(--text);border-color:#3a3a46}
+  .btn:focus-visible{outline:2px solid #6fb4c9;outline-offset:2px}
+
+  .note{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+
+  footer{padding:72px 0 0;color:var(--muted);font-size:14px;border-top:1px solid var(--line);margin-top:72px}
+  footer a{color:#9fd0dd}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>linefield</h1>
+  <p class="lede">Eleven generative line-art backgrounds. Every piece is one self-contained file with no dependencies — tune it, then export a standalone <code>.html</code> you can paste into any site.</p>
+</header>
+
+<div class="chips" id="chips" role="group" aria-label="Filter pieces by category"></div>
+
+<div class="grid" id="grid">
+  <article class="card" data-tags="flow" style="--accent:hsl(200 60% 60%)">
+    <a class="frame" href="pieces/flow-field/" data-src="pieces/flow-field/" aria-label="Open Flow Field">
+      <img src="thumbs/flow-field.png" alt="Flow Field preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(200 60% 60%),hsl(280 60% 60%))"></span>
+        Flow Field
+      </h2>
+      <p class="blurb">Organic ribbons drifting along a simplex-noise vector field.</p>
+      <div class="tags"><span class="tag">flow</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/flow-field/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/flow-field/">Copy embed</button>
+        <a class="btn" href="downloads/flow-field.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="geometric" style="--accent:hsl(35 50% 60%)">
+    <a class="frame" href="pieces/contour-grid/" data-src="pieces/contour-grid/" aria-label="Open Contour Grid">
+      <img src="thumbs/contour-grid.png" alt="Contour Grid preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(35 50% 60%),hsl(15 50% 60%))"></span>
+        Contour Grid
+      </h2>
+      <p class="blurb">Topographic bands undulating like breathing terrain.</p>
+      <div class="tags"><span class="tag">geometric</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/contour-grid/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/contour-grid/">Copy embed</button>
+        <a class="btn" href="downloads/contour-grid.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="optical" style="--accent:hsl(185 75% 60%)">
+    <a class="frame" href="pieces/interference/" data-src="pieces/interference/" aria-label="Open Interference">
+      <img src="thumbs/interference.png" alt="Interference preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(185 75% 60%),hsl(320 75% 60%))"></span>
+        Interference
+      </h2>
+      <p class="blurb">Two concentric ring families crossing into moiré.</p>
+      <div class="tags"><span class="tag">optical</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/interference/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/interference/">Copy embed</button>
+        <a class="btn" href="downloads/interference.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="orb" style="--accent:hsl(265 55% 60%)">
+    <a class="frame" href="pieces/orbital-veil/" data-src="pieces/orbital-veil/" aria-label="Open Orbital Veil">
+      <img src="thumbs/orbital-veil.png" alt="Orbital Veil preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(265 55% 60%),hsl(330 55% 60%))"></span>
+        Orbital Veil
+      </h2>
+      <p class="blurb">Concentric arcs turning at different rates around one centre.</p>
+      <div class="tags"><span class="tag">orb</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/orbital-veil/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/orbital-veil/">Copy embed</button>
+        <a class="btn" href="downloads/orbital-veil.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="grain" style="--accent:hsl(30 12% 60%)">
+    <a class="frame" href="pieces/grain-field/" data-src="pieces/grain-field/" aria-label="Open Grain Field">
+      <img src="thumbs/grain-field.png" alt="Grain Field preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(30 12% 60%),hsl(210 12% 60%))"></span>
+        Grain Field
+      </h2>
+      <p class="blurb">Fine drifting grain — the quietest piece, good behind text.</p>
+      <div class="tags"><span class="tag">grain</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/grain-field/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/grain-field/">Copy embed</button>
+        <a class="btn" href="downloads/grain-field.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="geometric 3d" style="--accent:hsl(190 35% 60%)">
+    <a class="frame" href="pieces/wireframe-lattice/" data-src="pieces/wireframe-lattice/" aria-label="Open Wireframe Lattice">
+      <img src="thumbs/wireframe-lattice.png" alt="Wireframe Lattice preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(190 35% 60%),hsl(205 35% 60%))"></span>
+        Wireframe Lattice
+      </h2>
+      <p class="blurb">A rigid 3D grid rippling in perspective.</p>
+      <div class="tags"><span class="tag">geometric</span><span class="tag">3d</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/wireframe-lattice/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/wireframe-lattice/">Copy embed</button>
+        <a class="btn" href="downloads/wireframe-lattice.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="flow sparse" style="--accent:hsl(150 50% 60%)">
+    <a class="frame" href="pieces/meridian/" data-src="pieces/meridian/" aria-label="Open Meridian">
+      <img src="thumbs/meridian.png" alt="Meridian preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(150 50% 60%),hsl(180 50% 60%))"></span>
+        Meridian
+      </h2>
+      <p class="blurb">Seven long ribbons sweeping the full width.</p>
+      <div class="tags"><span class="tag">flow</span><span class="tag">sparse</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/meridian/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/meridian/">Copy embed</button>
+        <a class="btn" href="downloads/meridian.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="network dense" style="--accent:hsl(75 70% 60%)">
+    <a class="frame" href="pieces/synapse/" data-src="pieces/synapse/" aria-label="Open Synapse">
+      <img src="thumbs/synapse.png" alt="Synapse preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(75 70% 60%),hsl(45 70% 60%))"></span>
+        Synapse
+      </h2>
+      <p class="blurb">Drifting nodes wired to their neighbours, pulsing.</p>
+      <div class="tags"><span class="tag">network</span><span class="tag">dense</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/synapse/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/synapse/">Copy embed</button>
+        <a class="btn" href="downloads/synapse.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="orb dense" style="--accent:hsl(10 80% 60%)">
+    <a class="frame" href="pieces/accretion/" data-src="pieces/accretion/" aria-label="Open Accretion">
+      <img src="thumbs/accretion.png" alt="Accretion preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(10 80% 60%),hsl(40 80% 60%))"></span>
+        Accretion
+      </h2>
+      <p class="blurb">Matter spiralling inward to a bright core.</p>
+      <div class="tags"><span class="tag">orb</span><span class="tag">dense</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/accretion/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/accretion/">Copy embed</button>
+        <a class="btn" href="downloads/accretion.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="sparse" style="--accent:hsl(220 25% 60%)">
+    <a class="frame" href="pieces/tether/" data-src="pieces/tether/" aria-label="Open Tether">
+      <img src="thumbs/tether.png" alt="Tether preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(220 25% 60%),hsl(250 25% 60%))"></span>
+        Tether
+      </h2>
+      <p class="blurb">Six heavy cables strung taut and swaying.</p>
+      <div class="tags"><span class="tag">sparse</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/tether/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/tether/">Copy embed</button>
+        <a class="btn" href="downloads/tether.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="3d orb" style="--accent:hsl(285 60% 60%)">
+    <a class="frame" href="pieces/event-horizon/" data-src="pieces/event-horizon/" aria-label="Open Event Horizon">
+      <img src="thumbs/event-horizon.png" alt="Event Horizon preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(285 60% 60%),hsl(230 60% 60%))"></span>
+        Event Horizon
+      </h2>
+      <p class="blurb">A polar grid bent inward by a gravity well.</p>
+      <div class="tags"><span class="tag">3d</span><span class="tag">orb</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/event-horizon/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/event-horizon/">Copy embed</button>
+        <a class="btn" href="downloads/event-horizon.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+</div>
+
+<footer>
+  <p>MIT licensed. Canvas 2D, no dependencies, no build step — for the pieces themselves.</p>
+</footer>
+
+</div>
+
+<script>
+const PIECES = [
+  {
+    "slug": "flow-field",
+    "title": "Flow Field",
+    "blurb": "Organic ribbons drifting along a simplex-noise vector field.",
+    "tags": [
+      "flow"
+    ],
+    "hue": 200,
+    "hueB": 280,
+    "saturation": 0.6
+  },
+  {
+    "slug": "contour-grid",
+    "title": "Contour Grid",
+    "blurb": "Topographic bands undulating like breathing terrain.",
+    "tags": [
+      "geometric"
+    ],
+    "hue": 35,
+    "hueB": 15,
+    "saturation": 0.5
+  },
+  {
+    "slug": "interference",
+    "title": "Interference",
+    "blurb": "Two concentric ring families crossing into moiré.",
+    "tags": [
+      "optical"
+    ],
+    "hue": 185,
+    "hueB": 320,
+    "saturation": 0.75
+  },
+  {
+    "slug": "orbital-veil",
+    "title": "Orbital Veil",
+    "blurb": "Concentric arcs turning at different rates around one centre.",
+    "tags": [
+      "orb"
+    ],
+    "hue": 265,
+    "hueB": 330,
+    "saturation": 0.55
+  },
+  {
+    "slug": "grain-field",
+    "title": "Grain Field",
+    "blurb": "Fine drifting grain — the quietest piece, good behind text.",
+    "tags": [
+      "grain"
+    ],
+    "hue": 30,
+    "hueB": 210,
+    "saturation": 0.12
+  },
+  {
+    "slug": "wireframe-lattice",
+    "title": "Wireframe Lattice",
+    "blurb": "A rigid 3D grid rippling in perspective.",
+    "tags": [
+      "geometric",
+      "3d"
+    ],
+    "hue": 190,
+    "hueB": 205,
+    "saturation": 0.35
+  },
+  {
+    "slug": "meridian",
+    "title": "Meridian",
+    "blurb": "Seven long ribbons sweeping the full width.",
+    "tags": [
+      "flow",
+      "sparse"
+    ],
+    "hue": 150,
+    "hueB": 180,
+    "saturation": 0.5
+  },
+  {
+    "slug": "synapse",
+    "title": "Synapse",
+    "blurb": "Drifting nodes wired to their neighbours, pulsing.",
+    "tags": [
+      "network",
+      "dense"
+    ],
+    "hue": 75,
+    "hueB": 45,
+    "saturation": 0.7
+  },
+  {
+    "slug": "accretion",
+    "title": "Accretion",
+    "blurb": "Matter spiralling inward to a bright core.",
+    "tags": [
+      "orb",
+      "dense"
+    ],
+    "hue": 10,
+    "hueB": 40,
+    "saturation": 0.8
+  },
+  {
+    "slug": "tether",
+    "title": "Tether",
+    "blurb": "Six heavy cables strung taut and swaying.",
+    "tags": [
+      "sparse"
+    ],
+    "hue": 220,
+    "hueB": 250,
+    "saturation": 0.25
+  },
+  {
+    "slug": "event-horizon",
+    "title": "Event Horizon",
+    "blurb": "A polar grid bent inward by a gravity well.",
+    "tags": [
+      "3d",
+      "orb"
+    ],
+    "hue": 285,
+    "hueB": 230,
+    "saturation": 0.6
+  }
+];
+
+/* ---- Filtering ---------------------------------------------------------- */
+const grid = document.getElementById('grid');
+const chipRow = document.getElementById('chips');
+const allTags = [...new Set(PIECES.flatMap(p => p.tags))].sort();
+let active = null;
+
+function renderChips(){
+  // Built once. apply() only ever toggles aria-pressed on these same
+  // buttons — replacing them on every click would drop keyboard focus
+  // back to <body> on each filter change, which is the same class of
+  // defect as a hover-only preview.
+  const mk = (label, value) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.type = 'button';
+    b.textContent = label;
+    b.dataset.value = value === null ? '' : value;
+    b.setAttribute('aria-pressed', String(active === value));
+    b.addEventListener('click', () => { active = value; apply(); });
+    return b;
+  };
+  chipRow.replaceChildren(mk('All', null), ...allTags.map(t => mk(t, t)));
+}
+
+function apply(){
+  for (const card of grid.children){
+    const tags = card.dataset.tags.split(' ');
+    card.hidden = active !== null && !tags.includes(active);
+  }
+  for (const chip of chipRow.children){
+    const value = chip.dataset.value || null;
+    chip.setAttribute('aria-pressed', String(active === value));
+  }
+}
+
+/* ---- Live preview on hover and keyboard focus ---------------------------
+   Exactly one iframe exists at a time. A stale iframe keeps its animation
+   loop running, and eleven concurrent loops is the whole reason the grid
+   uses stills. Touch devices never reach this code — see the media query
+   below — so tapping a card just opens the piece.                          */
+const canHover = window.matchMedia('(hover: hover)').matches;
+let liveFrame = null;
+let liveTimer = null;
+
+function goLive(frame){
+  if (!canHover || liveFrame === frame) return;
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(() => {
+    clearLive();
+    const iframe = document.createElement('iframe');
+    iframe.src = frame.dataset.src;
+    iframe.setAttribute('tabindex', '-1');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.setAttribute('loading', 'eager');
+    frame.appendChild(iframe);
+    liveFrame = frame;
+  }, 120);
+}
+
+function clearLive(){
+  clearTimeout(liveTimer);
+  if (!liveFrame) return;
+  const iframe = liveFrame.querySelector('iframe');
+  if (iframe) iframe.remove();
+  liveFrame = null;
+}
+
+for (const frame of grid.querySelectorAll('.frame')){
+  frame.addEventListener('mouseenter', () => goLive(frame));
+  frame.addEventListener('mouseleave', clearLive);
+  // Keyboard users get the same preview. Hover-only interactivity is
+  // invisible to them, and this is one extra event pair.
+  frame.addEventListener('focus', () => goLive(frame));
+  frame.addEventListener('blur', clearLive);
+}
+
+/* ---- Copy embed --------------------------------------------------------- */
+for (const btn of document.querySelectorAll('[data-embed]')){
+  btn.addEventListener('click', async () => {
+    const url = new URL(btn.dataset.embed, location.href).href;
+    const snippet = '<iframe src="' + url + '" style="border:0;width:100%;height:100%"></iframe>';
+    try {
+      await navigator.clipboard.writeText(snippet);
+      const original = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = original; }, 1400);
+    } catch {
+      btn.textContent = 'Copy failed';
+    }
+  });
+}
+
+renderChips();
+</script>
+</body>
+</html>

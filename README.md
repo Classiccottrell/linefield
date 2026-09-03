@@ -62,9 +62,13 @@ npm run build    # verify, then regenerate thumbs/ and downloads/
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
-canvas) and `downloads/<slug>.html` (each piece's own "Baked HTML" output,
-captured by clicking that piece's real export button, never reimplemented)
-for all eleven pieces. Both directories are committed.
+canvas, captured at 640×400) and `downloads/<slug>.html` (each piece's own
+"Baked HTML" output, captured by clicking that piece's real export button,
+never reimplemented) for all eleven pieces, then renders `index.html` at
+the repo root from `tools/templates/gallery.html` and the manifest — the
+gallery page itself, with live hover/keyboard previews, tag filtering, and
+per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
+`downloads/`, `index.html`) are committed.
 
 ## Known limitations
 

@@ -142,6 +142,10 @@ async function withPage(browser, url, fn) {
   // active page in it, so nothing is ever backgrounded.
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
+    // Halves the raster of every screenshot (thumbs and downloads share this
+    // context factory) without touching the CSS viewport the pieces lay
+    // their composition out against.
+    deviceScaleFactor: 0.5,
     acceptDownloads: true,
   });
   const page = await context.newPage();
@@ -197,6 +201,45 @@ export async function captureDownloads(browser, manifest, base) {
   }
 }
 
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function cardHtml(p) {
+  const accent = `hsl(${p.hue} ${Math.round(p.saturation * 100)}% 60%)`;
+  const accentB = `hsl(${p.hueB} ${Math.round(p.saturation * 100)}% 60%)`;
+  const tags = p.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+  return `  <article class="card" data-tags="${escapeHtml(p.tags.join(' '))}" style="--accent:${accent}">
+    <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
+      <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,${accent},${accentB})"></span>
+        ${escapeHtml(p.title)}
+      </h2>
+      <p class="blurb">${escapeHtml(p.blurb)}</p>
+      <div class="tags">${tags}</div>
+      <div class="actions">
+        <a class="btn" href="pieces/${p.slug}/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/${p.slug}/">Copy embed</button>
+        <a class="btn" href="downloads/${p.slug}.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>`;
+}
+
+export function buildGallery(manifest) {
+  const template = readFileSync(join(ROOT, 'tools', 'templates', 'gallery.html'), 'utf8');
+  const cards = manifest.map(cardHtml).join('\n');
+  const out = template
+    .replace('<!--CARDS-->', cards)
+    .replace('/*PIECES*/[]', JSON.stringify(manifest, null, 2));
+  writeFileSync(join(ROOT, 'index.html'), out);
+  console.log(`  gallery: index.html (${manifest.length} cards)`);
+}
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   const manifest = verifyManifest();
@@ -212,6 +255,8 @@ if (isMain) {
     await captureThumbnails(browser, manifest, base);
     console.log('Baking downloads...');
     await captureDownloads(browser, manifest, base);
+    console.log('Building gallery...');
+    buildGallery(manifest);
   } finally {
     await browser.close();
     server.close();
