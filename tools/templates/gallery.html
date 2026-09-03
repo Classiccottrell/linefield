@@ -163,10 +163,22 @@ function goLive(frame){
   liveTimer = setTimeout(() => {
     clearLive();
     const iframe = document.createElement('iframe');
-    iframe.src = frame.dataset.src;
+    // preview=1: shared/controls.js skips reading (and writing) the
+    // viewer's own saved localStorage settings for this piece, so the
+    // hover preview always renders defaults — never a tuned session's
+    // values leaking into the still-image swap.
+    const src = new URL(frame.dataset.src, location.href);
+    src.searchParams.set('preview', '1');
+    iframe.src = src.href;
     iframe.setAttribute('tabindex', '-1');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.setAttribute('loading', 'eager');
+    // Kept invisible (inline style, set before append — no window where an
+    // unhidden panel could paint) until the panel-hiding style is injected
+    // below. The still image sits behind the whole time, so the viewer only
+    // ever sees still -> artwork, never a flash of the piece's own chrome.
+    iframe.style.opacity = '0';
+    iframe.style.transition = 'opacity 160ms ease';
     // Gallery and pieces are served same-origin, so the iframe's own
     // document is reachable: hide its control panel from inside, the same
     // way the thumbnail capture does. visibility (not display:none) so a
@@ -174,10 +186,17 @@ function goLive(frame){
     // trail-accumulated render.
     iframe.addEventListener('load', () => {
       const doc = iframe.contentDocument;
+      // If the document isn't reachable for any reason, fail hidden — never
+      // reveal an iframe whose chrome we couldn't confirm is suppressed.
       if (!doc) return;
       const style = doc.createElement('style');
       style.textContent = '[data-lf-panel] { visibility: hidden; }';
       doc.head.appendChild(style);
+      // Two rAFs: one to let the injected style actually apply/paint, one
+      // more as margin, before the reveal.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        iframe.style.opacity = '1';
+      }));
     });
     frame.appendChild(iframe);
     liveFrame = frame;

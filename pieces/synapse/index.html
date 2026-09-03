@@ -87,7 +87,15 @@
     const t = elapsed * 0.2 * values.motion;
     const stepDt = dt || 0.016;
     const drift = 18 * values.speed * stepDt;
-    const pull = 0.5; // per-second return-to-home rate, keeps wander bounded
+    // Scale sets how far a node can wander from its seeded home before the
+    // spring pulls it back — 0 pins nodes to a crisp, evenly-spread lattice;
+    // 2 lets them roam far enough for the noise field's spatial frequency
+    // (see noiseScale above) to actually show up as clumps/filaments/voids.
+    // pull is derived from it, not hardcoded, so the equilibrium radius
+    // stays ~wanderRadius regardless of speed (speed only affects how fast
+    // nodes approach that radius, not how far they get).
+    const wanderRadius = 4 + values.scale * 80;
+    const pull = (18 * values.speed) / wanderRadius; // per-second return-to-home rate
     const light = values.invert ? 0.35 : 0.62;
     const lineWidth = 0.25 + values.stroke * 0.8;
     ctx.lineWidth = lineWidth;

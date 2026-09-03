@@ -5,7 +5,8 @@
   "description": "Build tooling for the linefield gallery. The pieces themselves have no dependencies and no build step.",
   "scripts": {
     "build": "node tools/build.mjs",
-    "verify": "node tools/build.mjs --verify-only"
+    "verify": "node tools/build.mjs --verify-only",
+    "audit-controls": "node tools/audit-controls.mjs"
   },
   "devDependencies": {
     "playwright": "^1.49.0"

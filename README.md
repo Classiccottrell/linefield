@@ -69,8 +69,9 @@ assets:
 ```bash
 npm install
 npx playwright install chromium   # one-time, for headless capture
-npm run verify   # check pieces.json / pieces/ / README agree; no generation
-npm run build    # verify, then regenerate thumbs/ and downloads/
+npm run verify          # check pieces.json / pieces/ / README agree; no generation
+npm run build            # verify, then regenerate thumbs/ and downloads/
+npm run audit-controls   # empirically check every shared+piece control moves pixels
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
@@ -81,6 +82,23 @@ the repo root from `tools/templates/gallery.html` and the manifest — the
 gallery page itself, with live hover/keyboard previews, tag filtering, and
 per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
 `downloads/`, `index.html`) are committed.
+
+`tools/audit-controls.mjs` drives every control on every piece between
+points across its full range with a seeded RNG and a manually-stepped
+clock (so two identical-settings renders are pixel-identical — no noise
+floor to reason about), then diffs sampled canvas pixels. It flags a
+control DEAD if no pair of test points produces a visible change. Two
+pieces have shipped a control that read a value but changed nothing
+(`tether` and `synapse`'s Scale) — both passed per-piece review by
+inspection alone, which is why this exists as a script instead of a
+one-off check.
+
+The gallery's live hover/keyboard preview loads pieces with `?preview=1`.
+`shared/controls.js` checks for that flag and, when present, skips both
+reading and writing `localStorage:<pieceId>` — so the preview always
+renders a piece's defaults, never a visitor's own tuned settings from a
+direct visit to that piece. A piece opened directly, with no query string,
+persists exactly as before.
 
 ## Known limitations
 

@@ -39,6 +39,13 @@ function injectCss() {
 export function createControlPanel({ pieceId, onChange, extraControls = [], defaults: defaultOverrides = {} }) {
   injectCss();
 
+  // Gallery preview iframes load pieces with ?preview=1: same-origin means
+  // they'd otherwise read (and, on interaction, overwrite) the viewer's own
+  // localStorage:<pieceId> — showing a hovered card's saved tuning instead
+  // of its defaults. Under this flag we neither read nor write it. A piece
+  // opened directly, with no query string, is completely unaffected.
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+
   const storageKey = `linefield:${pieceId}`;
   const allSpecs = [...SHARED_CONTROLS, ...extraControls];
   const defaults = {};
@@ -47,10 +54,12 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   }
 
   let saved = {};
-  try {
-    saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
-  } catch {
-    saved = {};
+  if (!isPreview) {
+    try {
+      saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    } catch {
+      saved = {};
+    }
   }
 
   const values = { ...defaults, ...saved.values };
@@ -134,6 +143,7 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   document.body.appendChild(panel);
 
   function persist() {
+    if (isPreview) return;
     localStorage.setItem(storageKey, JSON.stringify({ collapsed, values }));
   }
 
