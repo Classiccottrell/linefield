@@ -20,12 +20,13 @@ Filament.
 - No build step for individual pieces
 
 ## Acceptance Criteria
-- [x] shared/ modules implemented (noise, color, anim, controls, export)
+- [x] shared/ modules implemented (noise, color, anim, project, controls, export)
 - [x] pieces/_template runs standalone with all 13 shared controls (incl. density) + exports
 - [x] pieces/flow-field runs at target frame rate, both line/particle modes work
-- [x] Baked HTML export opens standalone with panel removed (see Known limitations
-      in README.md: baked files still reference `shared/*.js` via relative paths
-      rather than being fully self-contained — inlining is deferred to a follow-up)
+- [x] Baked HTML export opens standalone with panel removed: `bakeHtml()` inlines
+      every shared module into one `<script>`, so the downloaded file has zero
+      external references and runs from anywhere, including outside this repo
 
 ## Status
-**shipped** (sub-project 1: foundation, template, flow-field)
+**shipped** — eleven pieces across three sub-projects (foundation/flow-field;
+noise/particle pieces; 3D camera + geometric pieces)

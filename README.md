@@ -53,6 +53,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
   versions, but a saved localStorage value always outranks the piece's
   default. If a piece looks different from its documented palette, click
   "Reset to defaults" in its control panel to pick up the current default.
+- SVG export doesn't reflect the Angle control for pieces that rotate the
+  whole scene via a canvas transform (`contour-grid`, `meridian`, `tether`):
+  their path points are recorded before that rotation is applied, so the
+  exported SVG shows the unrotated geometry. Use PNG export if you need the
+  rotated view.
 
 ## License
 
