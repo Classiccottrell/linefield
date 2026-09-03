@@ -564,7 +564,10 @@ function describeForAI({ pieceName, values }) {
     const ribbons = Math.max(3, Math.round(BASE_RIBBONS * values.density));
     const noiseScale = 0.0009 * (0.25 + values.scale);
     const t = elapsed * values.speed * 0.12;
-    const amp = canvas.height * 0.22 * values.sweep;
+    // sweep owns the ribbon's signature broad excursion; motion owns a
+    // separate, independently-scaled flutter layer — no longer the same term.
+    const sweepAmp = canvas.height * 0.165 * values.sweep;
+    const flutterAmp = canvas.height * 0.055 * values.motion;
     const light = values.invert ? 0.35 : 0.6;
     const lineWidth = 2.2 + values.stroke * 3.6; // heavy; only tether is heavier
 
@@ -591,10 +594,9 @@ function describeForAI({ pieceName, values }) {
       ctx.beginPath();
       for (let x = -margin; x <= canvas.width + margin; x += STEP_PX) {
         // Two octaves so the sweep is broad but not mechanical.
-        const n =
-          simplex2(x * noiseScale + values.phase, f * 3 + t) * 0.75 +
-          simplex2(x * noiseScale * 2.7, f * 3 + t * 1.4) * 0.25;
-        const y = baseY + n * amp * values.motion;
+        const n1 = simplex2(x * noiseScale + values.phase, f * 3 + t);
+        const n2 = simplex2(x * noiseScale * 2.7 + values.phase, f * 3 + t * 1.4);
+        const y = baseY + n1 * sweepAmp + n2 * flutterAmp;
         if (x === -margin) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);

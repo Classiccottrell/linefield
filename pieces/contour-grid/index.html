@@ -63,8 +63,12 @@
     paths = [];
     const bands = Math.max(2, Math.round(BASE_BANDS * values.density));
     const noiseScale = 0.0016 * (0.25 + values.scale);
-    const amplitude = 46 * values.relief;
-    const t = elapsed * values.speed * 0.12 * values.motion;
+    // relief sets the static terrain height; motion layers a second,
+    // independently-amplitude'd wobble on top; speed is purely the rate that
+    // wobble evolves at (not its size) — the three no longer collapse to one knob.
+    const baseAmp = 30 * values.relief;
+    const moveAmp = 16 * values.motion;
+    const t = elapsed * values.speed * 0.12;
 
     const lineWidth = 0.4 + values.stroke * 1.1;
     ctx.lineWidth = lineWidth;
@@ -91,11 +95,9 @@
       const pts = [];
       ctx.beginPath();
       for (let x = -margin; x <= canvas.width + margin; x += STEP_PX) {
-        const n = simplex2(
-          x * noiseScale + values.phase,
-          baseY * noiseScale + t
-        );
-        const y = baseY + n * amplitude;
+        const n1 = simplex2(x * noiseScale + values.phase, baseY * noiseScale);
+        const n2 = simplex2(x * noiseScale + values.phase + 137, baseY * noiseScale + t);
+        const y = baseY + n1 * baseAmp + n2 * moveAmp;
         if (x === -margin) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
