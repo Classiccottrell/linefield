@@ -102,21 +102,29 @@
     const rings = Math.max(6, Math.round(BASE_RINGS * values.density));
     const extent = Math.min(canvas.width, canvas.height) * 0.85 * (0.4 + values.scale * 0.6);
     // The horizon: nothing is drawn inside it, which is the void at the centre.
-    const horizon = 40 + 70 * values.mass;
+    // Clamped so it can never swallow the whole disc on a small viewport
+    // (e.g. a phone in portrait), which would collapse the void entirely.
+    const horizon = Math.min(40 + 70 * values.mass, extent * 0.6);
     const t = elapsed * values.speed * 0.25;
     const light = values.invert ? 0.35 : 0.62;
     const lineWidth = 0.3 + values.stroke * 1.0;
 
     camera.set({
       tilt: 0.55 + 0.35 * Math.sin((values.angle * Math.PI) / 180),
-      yaw: t * values.motion * 0.35 + values.phase,
+      yaw: t * values.motion * 0.35,
       cx: canvas.width / 2,
       cy: canvas.height / 2,
     });
 
     // Lensing: rings bunch just outside the horizon and spread further out.
     // u is 0 at the horizon and 1 at the outer extent.
-    const radiusAt = (u) => horizon + (extent - horizon) * Math.pow(u, 1 + values.mass * 0.9);
+    // Phase warps the radial mapping (not yaw — a constant yaw offset is
+    // imperceptible on a figure this rotationally symmetric and already
+    // spinning). The warp vanishes at u=0 and u=1 so the void and outer
+    // extent are untouched, and stays monotonic in u so rings never cross.
+    const phaseWobble = Math.sin(values.phase * Math.PI * 1.5);
+    const warpU = (u) => Math.max(0, Math.min(1, u + 0.4 * u * (1 - u) * phaseWobble));
+    const radiusAt = (u) => horizon + (extent - horizon) * Math.pow(warpU(u), 1 + values.mass * 0.9);
 
     // Concentric rings, drawn on the XZ plane so the camera's tilt makes a disc.
     for (let i = 1; i <= rings; i++) {
