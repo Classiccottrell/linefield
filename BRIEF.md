@@ -28,5 +28,4 @@ Filament.
       external references and runs from anywhere, including outside this repo
 
 ## Status
-**shipped** — eleven pieces across three sub-projects (foundation/flow-field;
-noise/particle pieces; 3D camera + geometric pieces)
+**shipped** — eleven pieces across three sub-projects
