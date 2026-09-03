@@ -60,14 +60,29 @@
   const camera = createCamera({ fov: 700 });
 
   function strokePts(pts, values, lineWidth, rgb) {
-    const usable = pts.filter((p) => p.scale > 0);
-    if (usable.length < 2) return;
-    const [r, g, b] = rgb;
-
+    // Walk in order and break the run at any point behind the camera
+    // (scale <= 0) instead of filtering — a skipped interior point must
+    // start a new subpath, not get bridged over by a single polyline.
+    let anyRun = false;
     ctx.beginPath();
-    ctx.moveTo(usable[0].x, usable[0].y);
-    for (let i = 1; i < usable.length; i++) ctx.lineTo(usable[i].x, usable[i].y);
+    let run = [];
+    const flushRun = () => {
+      if (run.length >= 2) {
+        anyRun = true;
+        ctx.moveTo(run[0].x, run[0].y);
+        for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
+        paths.push(run.map((p) => [p.x, p.y]));
+      }
+      run = [];
+    };
+    for (const p of pts) {
+      if (p.scale > 0) run.push(p);
+      else flushRun();
+    }
+    flushRun();
+    if (!anyRun) return;
 
+    const [r, g, b] = rgb;
     ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
     if (values.glow > 0) {
       ctx.lineWidth = lineWidth + values.glow * 3;
@@ -77,8 +92,6 @@
     }
     ctx.lineWidth = lineWidth;
     ctx.stroke();
-
-    paths.push(usable.map((p) => [p.x, p.y]));
   }
 
   function drawFrame(dt, elapsed, values) {
