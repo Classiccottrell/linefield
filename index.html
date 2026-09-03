@@ -52,6 +52,9 @@
     position:absolute;inset:0;width:100%;height:100%;border:0;display:block;
   }
   .frame img{object-fit:cover}
+  /* The iframe sits topmost in the anchor; without this, every click is
+     consumed by the iframe and never reaches the enclosing <a>. */
+  .frame iframe{pointer-events:none}
   .frame:focus-visible{outline:2px solid var(--accent,#6fb4c9);outline-offset:3px}
 
   .meta{padding:14px 2px 0}
@@ -499,6 +502,18 @@ function goLive(frame){
     iframe.setAttribute('tabindex', '-1');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.setAttribute('loading', 'eager');
+    // Gallery and pieces are served same-origin, so the iframe's own
+    // document is reachable: hide its control panel from inside, the same
+    // way the thumbnail capture does. visibility (not display:none) so a
+    // piece resizing its canvas on layout change never disturbs a
+    // trail-accumulated render.
+    iframe.addEventListener('load', () => {
+      const doc = iframe.contentDocument;
+      if (!doc) return;
+      const style = doc.createElement('style');
+      style.textContent = '[data-lf-panel] { visibility: hidden; }';
+      doc.head.appendChild(style);
+    });
     frame.appendChild(iframe);
     liveFrame = frame;
   }, 120);

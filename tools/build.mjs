@@ -136,7 +136,12 @@ function serveRepo(port) {
 // misrepresents them. Wait long enough for the image to establish.
 const SETTLE_MS = 4000;
 
-async function withPage(browser, url, fn) {
+// `render` returns either a plain result, or `{ result, commit }` where
+// `commit` performs the actual filesystem write. When given, the write is
+// deferred until AFTER the console-error check below, so a piece that logs
+// an error never leaves a corrupt/partial file on disk. Either way the
+// context is always closed, including on the error path.
+async function withPage(browser, url, render) {
   // Backgrounded tabs throttle requestAnimationFrame, which starves the
   // trail-accumulating pieces. Each page gets its own context and is the
   // active page in it, so nothing is ever backgrounded.
@@ -148,24 +153,37 @@ async function withPage(browser, url, fn) {
     deviceScaleFactor: 0.5,
     acceptDownloads: true,
   });
-  const page = await context.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('console', (m) => {
-    if (m.type() === 'error' && !m.text().includes('favicon')) errors.push(m.text());
-  });
-  await page.goto(url, { waitUntil: 'load' });
-  // Stale saved values outrank a piece's defaults, so clear and reload.
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(SETTLE_MS);
-  const result = await fn(page);
-  if (errors.length) {
-    throw new Error(`${url} reported console errors:\n  ${errors.join('\n  ')}`);
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => {
+      if (m.type() === 'error' && !m.text().includes('favicon')) errors.push(m.text());
+    });
+    await page.goto(url, { waitUntil: 'load' });
+    // Stale saved values outrank a piece's defaults, so clear and reload.
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForTimeout(SETTLE_MS);
+    const out = await render(page);
+    if (errors.length) {
+      throw new Error(`${url} reported console errors:\n  ${errors.join('\n  ')}`);
+    }
+    if (out && typeof out === 'object' && typeof out.commit === 'function') {
+      await out.commit();
+      return out.result;
+    }
+    return out;
+  } finally {
+    await context.close();
   }
-  await context.close();
-  return result;
 }
+
+// Minimum luminance variance (0-255 scale, squared) a sampled canvas must
+// show to count as "rendered". A blank/near-uniform frame — the piece
+// failed to render, or the settle wait was too short — sits near 0; any
+// piece with actual line-art clears this by a wide margin.
+const BLANK_VARIANCE_THRESHOLD = 4;
 
 export async function captureThumbnails(browser, manifest, base) {
   mkdirSync(join(ROOT, 'thumbs'), { recursive: true });
@@ -178,8 +196,37 @@ export async function captureThumbnails(browser, manifest, base) {
       // trail-accumulated image on canvas survives untouched.
       await page.addStyleTag({ content: '[data-lf-panel] { visibility: hidden; }' });
       await page.waitForTimeout(100);
+
+      const panelStillVisible = await page.evaluate(() => {
+        const el = document.querySelector('[data-lf-panel]');
+        return el ? getComputedStyle(el).visibility !== 'hidden' : null;
+      });
+      if (panelStillVisible === null) {
+        throw new Error(`${p.slug}: no [data-lf-panel] element found to hide before capture`);
+      }
+      if (panelStillVisible) {
+        throw new Error(`${p.slug}: [data-lf-panel] is still visible at capture time`);
+      }
+
+      const variance = await page.evaluate(() => {
+        const canvas = document.querySelector('#canvas');
+        const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+        let sum = 0, sumSq = 0, n = 0;
+        for (let i = 0; i < data.length; i += 4 * 37) {
+          const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          sum += lum; sumSq += lum * lum; n++;
+        }
+        const mean = sum / n;
+        return sumSq / n - mean * mean;
+      });
+      if (variance < BLANK_VARIANCE_THRESHOLD) {
+        throw new Error(
+          `${p.slug}: thumbnail canvas looks blank (pixel variance ${variance.toFixed(2)} < ${BLANK_VARIANCE_THRESHOLD}) — piece may not have rendered or settle wait was too short`
+        );
+      }
+
       const buf = await page.locator('#canvas').screenshot();
-      writeFileSync(join(ROOT, 'thumbs', `${p.slug}.png`), buf);
+      return { commit: () => writeFileSync(join(ROOT, 'thumbs', `${p.slug}.png`), buf) };
     });
     console.log(`  thumb: ${p.slug}`);
   }
@@ -195,7 +242,7 @@ export async function captureDownloads(browser, manifest, base) {
         page.waitForEvent('download'),
         page.click('#btn-baked'),
       ]);
-      await download.saveAs(join(ROOT, 'downloads', `${p.slug}.html`));
+      return { commit: () => download.saveAs(join(ROOT, 'downloads', `${p.slug}.html`)) };
     });
     console.log(`  download: ${p.slug}`);
   }
@@ -233,9 +280,15 @@ function cardHtml(p) {
 export function buildGallery(manifest) {
   const template = readFileSync(join(ROOT, 'tools', 'templates', 'gallery.html'), 'utf8');
   const cards = manifest.map(cardHtml).join('\n');
+  // Function replacers so a literal `$&`/`$'`/`` $` ``/`$$` in card markup or
+  // JSON is never interpreted as a String.replace substitution pattern.
+  // `<` is escaped to `<` (same fix as shared/export.js's bakeHtml) so
+  // a title/blurb containing `</script>` can't close the injected script
+  // element early.
+  const pieceJson = JSON.stringify(manifest, null, 2).replace(/</g, '\\u003c');
   const out = template
-    .replace('<!--CARDS-->', cards)
-    .replace('/*PIECES*/[]', JSON.stringify(manifest, null, 2));
+    .replace('<!--CARDS-->', () => cards)
+    .replace('/*PIECES*/[]', () => pieceJson);
   writeFileSync(join(ROOT, 'index.html'), out);
   console.log(`  gallery: index.html (${manifest.length} cards)`);
 }
