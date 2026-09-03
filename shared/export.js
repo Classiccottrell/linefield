@@ -45,6 +45,7 @@ const SHARED_MODULE_PATHS = [
   '../../shared/noise.js',
   '../../shared/color.js',
   '../../shared/anim.js',
+  '../../shared/project.js',
   '../../shared/controls.js',
   '../../shared/export.js',
 ];
