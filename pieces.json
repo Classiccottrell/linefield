@@ -1,0 +1,79 @@
+[
+  {
+    "slug": "flow-field",
+    "title": "Flow Field",
+    "blurb": "Organic ribbons drifting along a simplex-noise vector field.",
+    "tags": ["flow"],
+    "hue": 200, "hueB": 280, "saturation": 0.6
+  },
+  {
+    "slug": "contour-grid",
+    "title": "Contour Grid",
+    "blurb": "Topographic bands undulating like breathing terrain.",
+    "tags": ["geometric"],
+    "hue": 35, "hueB": 15, "saturation": 0.5
+  },
+  {
+    "slug": "interference",
+    "title": "Interference",
+    "blurb": "Two concentric ring families crossing into moiré.",
+    "tags": ["optical"],
+    "hue": 185, "hueB": 320, "saturation": 0.75
+  },
+  {
+    "slug": "orbital-veil",
+    "title": "Orbital Veil",
+    "blurb": "Concentric arcs turning at different rates around one centre.",
+    "tags": ["orb"],
+    "hue": 265, "hueB": 330, "saturation": 0.55
+  },
+  {
+    "slug": "grain-field",
+    "title": "Grain Field",
+    "blurb": "Fine drifting grain — the quietest piece, good behind text.",
+    "tags": ["grain"],
+    "hue": 30, "hueB": 210, "saturation": 0.12
+  },
+  {
+    "slug": "wireframe-lattice",
+    "title": "Wireframe Lattice",
+    "blurb": "A rigid 3D grid rippling in perspective.",
+    "tags": ["geometric", "3d"],
+    "hue": 190, "hueB": 205, "saturation": 0.35
+  },
+  {
+    "slug": "meridian",
+    "title": "Meridian",
+    "blurb": "Seven long ribbons sweeping the full width.",
+    "tags": ["flow", "sparse"],
+    "hue": 150, "hueB": 180, "saturation": 0.5
+  },
+  {
+    "slug": "synapse",
+    "title": "Synapse",
+    "blurb": "Drifting nodes wired to their neighbours, pulsing.",
+    "tags": ["network", "dense"],
+    "hue": 75, "hueB": 45, "saturation": 0.7
+  },
+  {
+    "slug": "accretion",
+    "title": "Accretion",
+    "blurb": "Matter spiralling inward to a bright core.",
+    "tags": ["orb", "dense"],
+    "hue": 10, "hueB": 40, "saturation": 0.8
+  },
+  {
+    "slug": "tether",
+    "title": "Tether",
+    "blurb": "Six heavy cables strung taut and swaying.",
+    "tags": ["sparse"],
+    "hue": 220, "hueB": 250, "saturation": 0.25
+  },
+  {
+    "slug": "event-horizon",
+    "title": "Event Horizon",
+    "blurb": "A polar grid bent inward by a gravity well.",
+    "tags": ["3d", "orb"],
+    "hue": 285, "hueB": 230, "saturation": 0.6
+  }
+]

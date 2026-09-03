@@ -1,0 +1,13 @@
+{
+  "name": "linefield",
+  "private": true,
+  "type": "module",
+  "description": "Build tooling for the linefield gallery. The pieces themselves have no dependencies and no build step.",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "verify": "node tools/build.mjs --verify-only"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
