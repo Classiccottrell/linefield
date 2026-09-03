@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>linefield — event-horizon</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+<style id="lf-panel-css">
+.lf-panel { position: fixed; bottom: 12px; right: 12px; width: 240px;
+  background: rgba(20,20,24,0.92); color: #e8e8e8; font: 12px/1.4 -apple-system,sans-serif;
+  border-radius: 8px; padding: 10px 12px; z-index: 9999; max-height: 80vh; overflow-y: auto; }
+.lf-panel.collapsed .lf-body { display: none; }
+.lf-panel h3 { margin: 0 0 8px; font-size: 12px; display: flex; justify-content: space-between; cursor: pointer; }
+.lf-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.lf-row label { flex: 1; }
+.lf-row input[type=range] { flex: 1.4; }
+.lf-reset { width: 100%; margin-top: 6px; background: #333; color: #eee; border: none; border-radius: 4px; padding: 4px; cursor: pointer; }
+</style></head>
+<body>
+<canvas id="canvas" width="1280" height="800"></canvas>
+
+
+
+
+
+
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.6,"hue":285,"hueB":230,"glow":0,"angle":0,"motion":1,"phase":0,"invert":false,"density":1,"mass":1};
+// --- inlined: ../../shared/noise.js ---
+// shared/noise.js
+// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
+// reference algorithm (Stefan Gustavson).
+
+const GRAD = [
+  [1, 1], [-1, 1], [1, -1], [-1, -1],
+  [1, 0], [-1, 0], [1, 0], [-1, 0],
+  [0, 1], [0, -1], [0, 1], [0, -1],
+];
+
+function buildPermutation(seed = 1337) {
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  let s = seed;
+  const rand = () => {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  const perm = new Uint8Array(512);
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  return perm;
+}
+
+const perm = buildPermutation();
+
+function dot(g, x, y) {
+  return g[0] * x + g[1] * y;
+}
+
+const F2 = 0.5 * (Math.sqrt(3) - 1);
+const G2 = (3 - Math.sqrt(3)) / 6;
+
+function simplex2(xin, yin) {
+  const s = (xin + yin) * F2;
+  const i = Math.floor(xin + s);
+  const j = Math.floor(yin + s);
+  const t = (i + j) * G2;
+  const X0 = i - t;
+  const Y0 = j - t;
+  const x0 = xin - X0;
+  const y0 = yin - Y0;
+
+  let i1, j1;
+  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
+
+  const x1 = x0 - i1 + G2;
+  const y1 = y0 - j1 + G2;
+  const x2 = x0 - 1 + 2 * G2;
+  const y2 = y0 - 1 + 2 * G2;
+
+  const ii = i & 255;
+  const jj = j & 255;
+  const gi0 = perm[ii + perm[jj]] % 12;
+  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
+  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
+
+  let n0 = 0, n1 = 0, n2 = 0;
+
+  let t0 = 0.5 - x0 * x0 - y0 * y0;
+  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
+
+  let t1 = 0.5 - x1 * x1 - y1 * y1;
+  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
+
+  let t2 = 0.5 - x2 * x2 - y2 * y2;
+  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
+
+  return 70 * (n0 + n1 + n2);
+}
+
+
+// --- inlined: ../../shared/color.js ---
+// shared/color.js
+
+function hslToRgb(h, s, l) {
+  h = ((h % 360) + 360) % 360 / 360;
+  s = Math.min(1, Math.max(0, s));
+  l = Math.min(1, Math.max(0, l));
+
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+
+  const r = hue2rgb(p, q, h + 1 / 3);
+  const g = hue2rgb(p, q, h);
+  const b = hue2rgb(p, q, h - 1 / 3);
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function hueShift(h, degrees) {
+  return ((h + degrees) % 360 + 360) % 360;
+}
+
+function invertRgb(r, g, b) {
+  return [255 - r, 255 - g, 255 - b];
+}
+
+
+// --- inlined: ../../shared/anim.js ---
+// shared/anim.js
+
+function createLoop({ onFrame, speed = 1 }) {
+  let running = false;
+  let lastTime = 0;
+  let elapsed = 0;
+  let rafId = null;
+  let currentSpeed = speed;
+
+  function tick(now) {
+    if (!running) return;
+    const dt = lastTime ? (now - lastTime) / 1000 : 0;
+    lastTime = now;
+    const scaledDt = dt * currentSpeed;
+    elapsed += scaledDt;
+    onFrame(scaledDt, elapsed);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  return {
+    start() {
+      if (running) return;
+      running = true;
+      lastTime = 0;
+      rafId = requestAnimationFrame(tick);
+    },
+    stop() {
+      running = false;
+      if (rafId) cancelAnimationFrame(rafId);
+    },
+    setSpeed(n) {
+      currentSpeed = n;
+    },
+    get isRunning() {
+      return running;
+    },
+  };
+}
+
+
+// --- inlined: ../../shared/project.js ---
+// shared/project.js
+// 3D -> 2D projection for pieces that want perspective geometry.
+//
+// Shaped as an extension point: behaviour is configured through an options
+// bag on a camera object, so future capability (roll, camera position, an
+// orthographic mode) arrives as a new option that existing callers ignore,
+// rather than a changed signature at every call site.
+//
+// Deliberately absent, by choice rather than oversight: depth sorting and
+// occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
+
+// Rotate a point: yaw about the Y axis, then tilt about the X axis.
+function rotatePoint(x, y, z, { tilt = 0, yaw = 0 } = {}) {
+  const cyaw = Math.cos(yaw);
+  const syaw = Math.sin(yaw);
+  const rx = x * cyaw - z * syaw;
+  let rz = x * syaw + z * cyaw;
+
+  const ct = Math.cos(tilt);
+  const st = Math.sin(tilt);
+  const ry = y * ct - rz * st;
+  rz = y * st + rz * ct;
+
+  return { x: rx, y: ry, z: rz };
+}
+
+function createCamera({ tilt = 0, yaw = 0, fov = 600, cx = 0, cy = 0 } = {}) {
+  const opt = { tilt, yaw, fov, cx, cy };
+
+  function project(x, y, z) {
+    const r = rotatePoint(x, y, z, opt);
+    const denom = opt.fov + r.z;
+    // Near plane sits at 20% of the fov ahead of the lens (not at the lens
+    // itself), capping scale at 1/0.2 = 5x. Without this, points just past
+    // the lens (denom -> 0) blow up toward arbitrary magnification, which
+    // canvas draw calls and exported paths share the same coordinates for —
+    // canvas just clips silently at the screen edge, export doesn't. A
+    // blown-up point lands off the visible frame whenever the near-plane
+    // crossing is off the camera's optical axis, which any meaningful tilt
+    // guarantees; a tilt at or near zero (camera roughly in the plane of
+    // the geometry) is the degenerate exception where a dropped point can
+    // still be near-frame, and dropping it can visibly change the render.
+    // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
+    // steps) at which event-horizon's SVG export at Scale 2, an angle
+    // exposing the near plane, has no coordinate over magnitude 5000. At
+    // or beyond the near plane there is no meaningful projection; scale 0
+    // is the caller's signal to skip this point.
+    const nearPlane = opt.fov * 0.2;
+    if (denom <= nearPlane) return { x: 0, y: 0, scale: 0 };
+    const scale = opt.fov / denom;
+    return { x: opt.cx + r.x * scale, y: opt.cy + r.y * scale, scale };
+  }
+
+  return {
+    project,
+    projectPath(points) {
+      return points.map((p) => project(p[0], p[1], p[2]));
+    },
+    set(partial) {
+      Object.assign(opt, partial);
+    },
+  };
+}
+
+
+// --- inlined: ../../shared/controls.js ---
+// shared/controls.js
+
+const SHARED_CONTROLS = [
+  { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
+  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6 },
+  { name: 'hue', label: 'Hue', type: 'range', min: 0, max: 360, step: 1, default: 200 },
+  { name: 'hueB', label: 'Hue B', type: 'range', min: 0, max: 360, step: 1, default: 280 },
+  { name: 'glow', label: 'Glow', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
+  { name: 'angle', label: 'Angle', type: 'range', min: 0, max: 360, step: 1, default: 0 },
+  { name: 'motion', label: 'Motion', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'phase', label: 'Phase', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
+  { name: 'invert', label: 'Invert', type: 'checkbox', default: false },
+  { name: 'density', label: 'Density', type: 'range', min: 0.1, max: 2, step: 0.01, default: 1 },
+];
+
+const PANEL_CSS = `
+.lf-panel { position: fixed; bottom: 12px; right: 12px; width: 240px;
+  background: rgba(20,20,24,0.92); color: #e8e8e8; font: 12px/1.4 -apple-system,sans-serif;
+  border-radius: 8px; padding: 10px 12px; z-index: 9999; max-height: 80vh; overflow-y: auto; }
+.lf-panel.collapsed .lf-body { display: none; }
+.lf-panel h3 { margin: 0 0 8px; font-size: 12px; display: flex; justify-content: space-between; cursor: pointer; }
+.lf-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.lf-row label { flex: 1; }
+.lf-row input[type=range] { flex: 1.4; }
+.lf-reset { width: 100%; margin-top: 6px; background: #333; color: #eee; border: none; border-radius: 4px; padding: 4px; cursor: pointer; }
+`;
+
+function injectCss() {
+  if (document.getElementById('lf-panel-css')) return;
+  const style = document.createElement('style');
+  style.id = 'lf-panel-css';
+  style.textContent = PANEL_CSS;
+  document.head.appendChild(style);
+}
+
+function createControlPanel({ pieceId, onChange, extraControls = [], defaults: defaultOverrides = {} }) {
+  injectCss();
+
+  const storageKey = `linefield:${pieceId}`;
+  const allSpecs = [...SHARED_CONTROLS, ...extraControls];
+  const defaults = {};
+  for (const spec of allSpecs) {
+    defaults[spec.name] = spec.name in defaultOverrides ? defaultOverrides[spec.name] : spec.default;
+  }
+
+  let saved = {};
+  try {
+    saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+  } catch {
+    saved = {};
+  }
+
+  const values = { ...defaults, ...saved.values };
+  let collapsed = saved.collapsed || false;
+
+  const panel = document.createElement('div');
+  panel.className = 'lf-panel' + (collapsed ? ' collapsed' : '');
+  panel.setAttribute('data-lf-panel', '');
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'controls ▾';
+  heading.addEventListener('click', () => {
+    collapsed = !collapsed;
+    panel.classList.toggle('collapsed', collapsed);
+    persist();
+  });
+  panel.appendChild(heading);
+
+  const body = document.createElement('div');
+  body.className = 'lf-body';
+  panel.appendChild(body);
+
+  const inputs = {};
+
+  function buildRow(spec, beforeEl) {
+    const row = document.createElement('div');
+    row.className = 'lf-row';
+    const label = document.createElement('label');
+    label.textContent = spec.label;
+    row.appendChild(label);
+
+    let input;
+    if (spec.type === 'checkbox') {
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!values[spec.name];
+    } else if (spec.type === 'color') {
+      input = document.createElement('input');
+      input.type = 'color';
+      input.value = values[spec.name];
+    } else {
+      input = document.createElement('input');
+      input.type = 'range';
+      input.min = spec.min;
+      input.max = spec.max;
+      input.step = spec.step;
+      input.value = values[spec.name];
+    }
+
+    input.addEventListener('input', () => {
+      const v = spec.type === 'checkbox' ? input.checked : parseFloat(input.value);
+      values[spec.name] = v;
+      persist();
+      onChange(spec.name, v, values);
+    });
+
+    inputs[spec.name] = input;
+    row.appendChild(input);
+    if (beforeEl) body.insertBefore(row, beforeEl);
+    else body.appendChild(row);
+  }
+
+  for (const spec of allSpecs) buildRow(spec);
+
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'lf-reset';
+  resetBtn.textContent = 'Reset to defaults';
+  resetBtn.addEventListener('click', () => {
+    for (const spec of allSpecs) {
+      const def = defaults[spec.name];
+      values[spec.name] = def;
+      const input = inputs[spec.name];
+      if (spec.type === 'checkbox') input.checked = def;
+      else input.value = def;
+      onChange(spec.name, def, values);
+    }
+    persist();
+  });
+  body.appendChild(resetBtn);
+
+  document.body.appendChild(panel);
+
+  function persist() {
+    localStorage.setItem(storageKey, JSON.stringify({ collapsed, values }));
+  }
+
+  return {
+    values,
+    el: panel,
+    addControl(spec) {
+      allSpecs.push(spec);
+      if (!(spec.name in values)) values[spec.name] = spec.default;
+      buildRow(spec, resetBtn);
+      persist();
+    },
+  };
+}
+
+
+// --- inlined: ../../shared/export.js ---
+// shared/export.js
+
+function download(filename, blobOrUrl, mime) {
+  const url = blobOrUrl instanceof Blob ? URL.createObjectURL(blobOrUrl) : blobOrUrl;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if (blobOrUrl instanceof Blob) URL.revokeObjectURL(url);
+}
+
+function exportPng(canvas, { multiplier = 1 } = {}) {
+  if (multiplier === 1) {
+    canvas.toBlob((blob) => download('linefield.png', blob), 'image/png');
+    return;
+  }
+  const scaled = document.createElement('canvas');
+  scaled.width = canvas.width * multiplier;
+  scaled.height = canvas.height * multiplier;
+  const ctx = scaled.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+  scaled.toBlob((blob) => download('linefield.png', blob), 'image/png');
+}
+
+function exportSvg(paths, { width = 800, height = 600 } = {}) {
+  const polylines = paths
+    .map((pts) => {
+      const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+      return `<polyline points="${pointsAttr}" fill="none" stroke="black" stroke-width="1" />`;
+    })
+    .join('\n');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}\n</svg>`;
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  download('linefield.svg', blob);
+}
+
+// Shared modules a piece's inline <script type="module"> may import from.
+// Order matters: modules with no internal deps first is not required since
+// they're pure functions, but we keep a stable, readable order.
+const SHARED_MODULE_PATHS = [
+  '../../shared/noise.js',
+  '../../shared/color.js',
+  '../../shared/anim.js',
+  '../../shared/project.js',
+  '../../shared/controls.js',
+  '../../shared/export.js',
+];
+
+function stripExports(src) {
+  // `export function foo` / `export const foo` -> drop the `export ` keyword.
+  return src.replace(/^export\s+/gm, '');
+}
+
+async function inlineSharedModules(pieceScriptSrc) {
+  // Strip the piece's own import lines pulling from shared/*.js.
+  const strippedPieceSrc = pieceScriptSrc.replace(
+    /^\s*import\s*\{[^}]*\}\s*from\s*['"]\.\.\/\.\.\/shared\/[^'"]+\.js['"];?\s*$/gm,
+    ''
+  );
+
+  const bodies = await Promise.all(
+    SHARED_MODULE_PATHS.map(async (path) => {
+      const res = await fetch(path);
+      const src = await res.text();
+      return `// --- inlined: ${path} ---\n${stripExports(src)}`;
+    })
+  );
+
+  return `${bodies.join('\n\n')}\n\n// --- piece script ---\n${strippedPieceSrc}`;
+}
+
+async function bakeHtml({ sourceHtml, values }) {
+  const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
+  doc.querySelectorAll('[data-lf-panel]').forEach((el) => el.remove());
+
+  const pieceScript = doc.querySelector('script[type="module"]');
+  const pieceScriptSrc = pieceScript ? pieceScript.textContent : '';
+  if (pieceScript) pieceScript.remove();
+
+  const inlinedSrc = await inlineSharedModules(pieceScriptSrc);
+
+  const safeJson = JSON.stringify(values).replace(/</g, '\\u003c');
+  const inject = doc.createElement('script');
+  inject.textContent = `window.__LF_BAKED_VALUES__ = ${safeJson};\n${inlinedSrc}`;
+  doc.body.appendChild(inject);
+
+  const baked = `<!doctype html>\n${doc.documentElement.outerHTML}`;
+  const blob = new Blob([baked], { type: 'text/html' });
+  download('linefield-baked.html', blob);
+  return baked;
+}
+
+function describeForAI({ pieceName, values }) {
+  const parts = Object.entries(values)
+    .map(([k, v]) => `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`)
+    .join(', ');
+  const text = `A generative line-art background piece called "${pieceName}", rendered on an HTML canvas with parameters: ${parts}.`;
+  if (navigator.clipboard) navigator.clipboard.writeText(text);
+  return text;
+}
+
+
+// --- piece script ---
+
+
+
+
+
+  const PIECE_ID = 'event-horizon';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Ring and spoke counts derive per frame from density — no persistent array.
+  const BASE_RINGS = 40;
+  const SEG = 96;   // segments per ring
+  const SPOKES = 36;
+  let paths = [];
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    onChange: () => {},
+    extraControls: [
+      { name: 'mass', label: 'Mass', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+    ],
+    defaults: { hue: 285, hueB: 230, saturation: 0.6 },
+  });
+  const currentValues = baked || panel.values;
+
+  const camera = createCamera({ fov: 700 });
+
+  function strokePts(pts, values, lineWidth, rgb) {
+    // Walk in order and break the run at any point behind the camera
+    // (scale <= 0) instead of filtering — a skipped interior point must
+    // start a new subpath, not get bridged over by a single polyline.
+    let anyRun = false;
+    ctx.beginPath();
+    let run = [];
+    const flushRun = () => {
+      if (run.length >= 2) {
+        anyRun = true;
+        ctx.moveTo(run[0].x, run[0].y);
+        for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
+        paths.push(run.map((p) => [p.x, p.y]));
+      }
+      run = [];
+    };
+    for (const p of pts) {
+      if (p.scale > 0) run.push(p);
+      else flushRun();
+    }
+    flushRun();
+    if (!anyRun) return;
+
+    const [r, g, b] = rgb;
+    ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
+    if (values.glow > 0) {
+      ctx.lineWidth = lineWidth + values.glow * 3;
+      ctx.globalAlpha = values.glow * 0.25;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
+
+  function drawFrame(dt, elapsed, values) {
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    paths = [];
+    const rings = Math.max(6, Math.round(BASE_RINGS * values.density));
+    const extent = Math.min(canvas.width, canvas.height) * 0.85 * (0.4 + values.scale * 0.6);
+    // The horizon: nothing is drawn inside it, which is the void at the centre.
+    // Clamped so it can never swallow the whole disc on a small viewport
+    // (e.g. a phone in portrait), which would collapse the void entirely.
+    const horizon = Math.min(40 + 70 * values.mass, extent * 0.6);
+    const t = elapsed * values.speed * 0.25;
+    const light = values.invert ? 0.35 : 0.62;
+    const lineWidth = 0.3 + values.stroke * 1.0;
+
+    camera.set({
+      tilt: 0.55 + 0.35 * Math.sin((values.angle * Math.PI) / 180),
+      yaw: t * values.motion * 0.35,
+      cx: canvas.width / 2,
+      cy: canvas.height / 2,
+    });
+
+    // Lensing: rings bunch just outside the horizon and spread further out.
+    // u is 0 at the horizon and 1 at the outer extent.
+    // Phase warps the radial mapping (not yaw — a constant yaw offset is
+    // imperceptible on a figure this rotationally symmetric and already
+    // spinning). The warp vanishes at u=0 and u=1 so the void and outer
+    // extent are untouched, and stays monotonic in u so rings never cross.
+    const phaseWobble = Math.sin(values.phase * Math.PI * 1.5);
+    const warpU = (u) => Math.max(0, Math.min(1, u + 0.4 * u * (1 - u) * phaseWobble));
+    const radiusAt = (u) => horizon + (extent - horizon) * Math.pow(warpU(u), 1 + values.mass * 0.9);
+
+    // Concentric rings, drawn on the XZ plane so the camera's tilt makes a disc.
+    for (let i = 1; i <= rings; i++) {
+      const u = i / rings;
+      const R = radiusAt(u);
+      const [r, g, b] = hslToRgb(
+        values.hue + (values.hueB - values.hue) * u,
+        values.saturation,
+        light
+      );
+
+      const pts = [];
+      for (let s = 0; s <= SEG; s++) {
+        const a = (s / SEG) * Math.PI * 2;
+        pts.push([Math.cos(a) * R, 0, Math.sin(a) * R]);
+      }
+      strokePts(camera.projectPath(pts), values, lineWidth, [r, g, b]);
+    }
+
+    // Radial spokes, from the horizon outward.
+    const spokes = Math.max(4, Math.round(SPOKES * values.density));
+    for (let k = 0; k < spokes; k++) {
+      const a = (k / spokes) * Math.PI * 2;
+      const [r, g, b] = hslToRgb(values.hueB, values.saturation, light * 0.85);
+
+      const pts = [];
+      for (let s = 0; s <= 24; s++) {
+        const R = radiusAt(s / 24);
+        pts.push([Math.cos(a) * R, 0, Math.sin(a) * R]);
+      }
+      strokePts(camera.projectPath(pts), values, lineWidth * 0.7, [r, g, b]);
+    }
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script></body></html>

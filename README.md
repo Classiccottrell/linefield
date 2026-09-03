@@ -47,6 +47,25 @@ piece-specific control. `density` multiplies the piece's base element count.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Gallery build tooling
+
+`pieces.json` is the manifest driving the gallery microsite (title, blurb,
+tags, and the palette defaults each piece must match). `tools/build.mjs`
+verifies it against `pieces/` and this README, then generates gallery
+assets:
+
+```bash
+npm install
+npx playwright install chromium   # one-time, for headless capture
+npm run verify   # check pieces.json / pieces/ / README agree; no generation
+npm run build    # verify, then regenerate thumbs/ and downloads/
+```
+
+`npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
+canvas) and `downloads/<slug>.html` (each piece's own "Baked HTML" output,
+captured by clicking that piece's real export button, never reimplemented)
+for all eleven pieces. Both directories are committed.
+
 ## Known limitations
 
 - Piece defaults (including the default palette) can change between
