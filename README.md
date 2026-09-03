@@ -100,6 +100,12 @@ renders a piece's defaults, never a visitor's own tuned settings from a
 direct visit to that piece. A piece opened directly, with no query string,
 persists exactly as before.
 
+## Roadmap
+
+[ROADMAP.md](ROADMAP.md) records what is deliberately not built yet and why,
+the limitations accepted along the way, and the constraints any new piece
+inherits.
+
 ## Known limitations
 
 - Piece defaults (including the default palette) can change between

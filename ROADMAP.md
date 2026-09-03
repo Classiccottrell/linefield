@@ -85,8 +85,9 @@ be misread as a piece claim. Both fail loudly, neither fails silently.
 roughly 95–135 is open, and it abuts `meridian`. A twelfth piece should
 differentiate on **form or density**, not expect a free colour.
 
-**`meridian` and `tether` are the weakest pair.** Two independent
-reviews reached this by different methods. Their motion energy (0.174 vs
+**`meridian` and `tether` are the weakest pair.** Found twice, by
+different methods — once by comparing rendered frames pixel-by-pixel, once
+by looking at all eleven side by side. Their motion energy (0.174 vs
 0.176) and ink coverage (0.058 vs 0.060) measure nearly identical, and the
 6-vs-7 element difference is invisible because tether's heavier stroke
 cancels its lower count. They are separated by hue and by crossing-versus-
