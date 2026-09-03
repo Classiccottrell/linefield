@@ -30,9 +30,23 @@ export function createCamera({ tilt = 0, yaw = 0, fov = 600, cx = 0, cy = 0 } = 
   function project(x, y, z) {
     const r = rotatePoint(x, y, z, opt);
     const denom = opt.fov + r.z;
-    // At or behind the camera plane there is no meaningful projection.
-    // scale 0 is the caller's signal to skip this point.
-    if (denom <= 1) return { x: 0, y: 0, scale: 0 };
+    // Near plane sits at 20% of the fov ahead of the lens (not at the lens
+    // itself), capping scale at 1/0.2 = 5x. Without this, points just past
+    // the lens (denom -> 0) blow up toward arbitrary magnification, which
+    // canvas draw calls and exported paths share the same coordinates for —
+    // canvas just clips silently at the screen edge, export doesn't. A
+    // blown-up point lands off the visible frame whenever the near-plane
+    // crossing is off the camera's optical axis, which any meaningful tilt
+    // guarantees; a tilt at or near zero (camera roughly in the plane of
+    // the geometry) is the degenerate exception where a dropped point can
+    // still be near-frame, and dropping it can visibly change the render.
+    // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
+    // steps) at which event-horizon's SVG export at Scale 2, an angle
+    // exposing the near plane, has no coordinate over magnitude 5000. At
+    // or beyond the near plane there is no meaningful projection; scale 0
+    // is the caller's signal to skip this point.
+    const nearPlane = opt.fov * 0.2;
+    if (denom <= nearPlane) return { x: 0, y: 0, scale: 0 };
     const scale = opt.fov / denom;
     return { x: opt.cx + r.x * scale, y: opt.cy + r.y * scale, scale };
   }

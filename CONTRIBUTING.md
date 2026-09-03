@@ -97,7 +97,8 @@ names (`bakeHtml` concatenates all of them into one scope).
 `.projectPath(points)` and `.set(partialOptions)`, plus a standalone
 `rotatePoint`. A projected point carries a `scale` — the perspective
 divisor — so pieces can thin or fade distant geometry; `scale === 0` means
-the point is at or behind the camera and must be skipped.
+the point is at or beyond the camera's near plane (20% of `fov` ahead of
+the lens, capping scale at 5x) and must be skipped.
 
 Extend it by adding a camera *option*, not by changing call signatures, so
 existing pieces keep working. Deliberately absent today: depth sorting and
