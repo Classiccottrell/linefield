@@ -46,6 +46,10 @@ check without regenerating.
 
 Re-run `npm run build` whenever you tune a piece: thumbnails and downloads
 are captured from the live piece, so they go stale when it changes.
+Thumbnail capture pins `Math.random` and the animation clock (same
+seeded-RNG/manually-stepped-clock approach as `audit-controls.mjs`), so an
+unrelated `npm run build` is a byte-identical no-op — only pieces you
+actually touched will show a diff in `thumbs/`.
 
 ## Serving the project
 
