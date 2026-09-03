@@ -13,6 +13,7 @@ import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from 
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { DETERMINISTIC_INIT, stepFrames } from './deterministic.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -141,7 +142,7 @@ const SETTLE_MS = 4000;
 // deferred until AFTER the console-error check below, so a piece that logs
 // an error never leaves a corrupt/partial file on disk. Either way the
 // context is always closed, including on the error path.
-async function withPage(browser, url, render) {
+async function withPage(browser, url, render, { deterministic = false } = {}) {
   // Backgrounded tabs throttle requestAnimationFrame, which starves the
   // trail-accumulating pieces. Each page gets its own context and is the
   // active page in it, so nothing is ever backgrounded.
@@ -153,6 +154,12 @@ async function withPage(browser, url, render) {
     deviceScaleFactor: 0.5,
     acceptDownloads: true,
   });
+  // Freezes Math.random and the rAF clock (see tools/deterministic.mjs) so
+  // repeated captures of an unchanged piece are byte-identical instead of
+  // landing on an arbitrary animation frame — this is capture-only and never
+  // touches the piece files themselves. addInitScript re-runs on the reload
+  // below, so the seed/clock reset with it.
+  if (deterministic) await context.addInitScript(DETERMINISTIC_INIT);
   try {
     const page = await context.newPage();
     const errors = [];
@@ -164,7 +171,8 @@ async function withPage(browser, url, render) {
     // Stale saved values outrank a piece's defaults, so clear and reload.
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'load' });
-    await page.waitForTimeout(SETTLE_MS);
+    if (deterministic) await stepFrames(page);
+    else await page.waitForTimeout(SETTLE_MS);
     const out = await render(page);
     if (errors.length) {
       throw new Error(`${url} reported console errors:\n  ${errors.join('\n  ')}`);
@@ -227,7 +235,7 @@ export async function captureThumbnails(browser, manifest, base) {
 
       const buf = await page.locator('#canvas').screenshot();
       return { commit: () => writeFileSync(join(ROOT, 'thumbs', `${p.slug}.png`), buf) };
-    });
+    }, { deterministic: true });
     console.log(`  thumb: ${p.slug}`);
   }
 }

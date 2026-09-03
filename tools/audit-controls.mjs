@@ -21,6 +21,7 @@ import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { chromium } from 'playwright';
+import { DETERMINISTIC_INIT, STEPS, stepFrames } from './deterministic.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8'));
@@ -46,26 +47,6 @@ function serveRepo(port) {
     res.end(readFileSync(path));
   });
   return new Promise((resolve) => server.listen(port, () => resolve(server)));
-}
-
-// Injected before any page script runs. Freezes randomness and the clock so
-// two identical-settings renders are pixel-identical.
-const DETERMINISTIC_INIT = `(() => {
-  let s = 12345;
-  Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-  let t = 0; const q = [];
-  window.requestAnimationFrame = (cb) => { q.push(cb); return q.length; };
-  window.cancelAnimationFrame = () => {};
-  performance.now = () => t;
-  window.__step = (ms) => { t += ms; const cbs = q.splice(0); for (const cb of cbs) cb(t); };
-})();`;
-
-const STEPS = 250; // 250 * 16ms = 4000ms, matches build.mjs's SETTLE_MS
-
-async function stepFrames(page) {
-  await page.evaluate((n) => {
-    for (let i = 0; i < n; i++) window.__step(16);
-  }, STEPS);
 }
 
 async function getRows(page) {
