@@ -6,9 +6,10 @@ HTML pieces usable as interactive website backgrounds. Free alternative to
 Filament.
 
 ## Non-Goals
-- Gallery site (later sub-project)
 - Framework wrappers, WebGL, community submissions (out of scope for now)
-- Build tooling / bundler — pieces must stay standalone
+- Build tooling / bundler for the pieces themselves — a piece must stay
+  standalone; the gallery microsite's own build tooling (`tools/build.mjs`)
+  is a separate concern that never touches a piece
 
 ## Constraints
 - Zero runtime dependencies

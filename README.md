@@ -25,6 +25,18 @@ site with no other files required.
 
 PNG export offers 2x and 4x resolution buttons.
 
+## Gallery
+
+`index.html` at the repo root shows all eleven pieces with live previews,
+filtering, and per-piece downloads. Serve the repo and open `/`:
+
+```bash
+npx serve .
+```
+
+It is generated from `pieces.json` by `npm run build` — see "Gallery build
+tooling" below and CONTRIBUTING.md.
+
 ## Pieces
 
 - `flow-field` — organic flowing lines following a simplex-noise vector field
