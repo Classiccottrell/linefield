@@ -96,6 +96,13 @@ new in the sparse, heavy-stroked territory has to work harder.
 
 ---
 
+## More pieces
+
+[INSPIRATION.md](INSPIRATION.md) stubs out candidate pieces grouped by the
+technique each needs — halftone (mark size encodes a field), masking (the
+silhouette carries the composition), and radial fibre are the three the
+library cannot currently do, and each would yield more than one piece.
+
 ## Later, if ever
 
 - Framework wrappers (React / Vue / Svelte components)
