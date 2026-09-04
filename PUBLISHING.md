@@ -10,7 +10,7 @@ The repository has no remote. Everything is committed on `main`.
 - [ ] Two consecutive `npm run build` runs leave the tree clean
 - [ ] `LICENSE` names the right copyright holder and year
 - [ ] No absolute filesystem paths in tracked files:
-      `git grep -n "/Users/" -- . ':!*.png'` returns nothing
+      `git grep -n "/Users/" -- . ':!*.png' ':!PUBLISHING.md'` returns nothing
 - [ ] `CHANGELOG.md` describes what is actually in this release
 
 ## Creating the repository and pushing
@@ -41,8 +41,8 @@ The gallery is then at `https://<owner>.github.io/linefield/`.
 ```bash
 git tag -a v1.0.0 -m "linefield v1.0.0"
 git push origin v1.0.0
-npm run pack   # produces linefield-<version>.zip, from package.json's "version"
-gh release create v1.0.0 linefield-<version>.zip --notes-file CHANGELOG.md
+npm run pack   # produces linefield-1.0.0.zip, named from package.json's "version"
+gh release create v1.0.0 linefield-1.0.0.zip --notes-file CHANGELOG.md
 ```
 
 Tag version and `package.json`'s `version` field should match.

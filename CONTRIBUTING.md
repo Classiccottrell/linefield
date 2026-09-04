@@ -51,6 +51,19 @@ seeded-RNG/manually-stepped-clock approach as `audit-controls.mjs`), so an
 unrelated `npm run build` is a byte-identical no-op — only pieces you
 actually touched will show a diff in `thumbs/`.
 
+**CI will not catch a forgotten rebuild.** CI (`.github/workflows/checks.yml`)
+runs `npm run verify` (manifest vs. pieces vs. README agreement) and
+`npm run audit-controls` (every control has a visible effect). It
+deliberately does not run `npm run build`, because the gallery, thumbnails
+and downloads are committed and GitHub Pages serves them directly —
+rebuilding in CI would rewrite those committed artifacts on every run and
+undo the determinism work above. This is an accepted gap, not an oversight:
+if you tune a piece and forget to re-run `npm run build`, the committed
+thumbnail and baked download for that piece go stale, `npm run verify`
+still passes (it checks the manifest, not pixels), and CI stays green.
+There is no automated check for this — re-running the build after any
+visual change is on you.
+
 ## Serving the project
 
 Serve the **repo root** with any static file server — pieces import shared
