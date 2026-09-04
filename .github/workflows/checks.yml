@@ -1,0 +1,38 @@
+# .github/workflows/checks.yml
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm ci
+
+      - name: Install Chromium for the control audit
+        run: npx playwright install --with-deps chromium
+
+      # The manifest against the pieces and the README. Catches a piece
+      # whose palette was tuned without updating pieces.json, and a README
+      # that disagrees with either.
+      - name: Verify manifest
+        run: npm run verify
+
+      # Every piece x control combination, diffing rendered frames. Catches
+      # a control that reads a value and changes nothing — a defect that has
+      # shipped twice in this project and passed human review both times.
+      - name: Audit controls
+        run: npm run audit-controls
+
+      # Deliberately not building here. The gallery, thumbnails and
+      # downloads are committed, and GitHub Pages serves them directly.
+      # Rebuilding in CI would rewrite committed artifacts for no benefit.
