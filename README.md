@@ -25,6 +25,79 @@ site with no other files required.
 
 PNG export offers 2x and 4x resolution buttons.
 
+## Using a piece in your own site
+
+Three routes, in the order most people want them.
+
+### 1. Bake it (recommended)
+
+Open a piece, tune it with the control panel, then click **Baked HTML**. You
+get a single self-contained `.html` file with your settings hardcoded, the
+control panel removed, and every shared module inlined. No dependencies, no
+build step, nothing else to copy. Paste its contents into a page, or serve
+the file as-is.
+
+This is the primary path and the one the project is designed around.
+
+### 2. Embed an iframe
+
+If the piece is hosted somewhere, point at it:
+
+```html
+<iframe src="https://example.com/pieces/flow-field/"
+        style="border:0;width:100%;height:100%"></iframe>
+```
+
+The gallery's **Copy embed** button produces exactly this. The piece stays
+updatable and fully isolated from your page's CSS — but it is a frame, with
+a frame's layout and accessibility implications.
+
+### 3. Copy the folder
+
+Take `pieces/<name>/` and `shared/`, keeping their relative positions, and
+host both. Most control, most files. Useful if you intend to modify the
+piece rather than just use it.
+
+## Configuring a piece without the control panel
+
+A piece checks for `window.__LF_BAKED_VALUES__` before it builds its control
+panel. If that global is set, the piece renders with those values and no
+control panel.
+
+This is exactly what the Baked HTML export does, and you can do it by hand.
+Open a piece's `index.html` (or a baked file) and add one script **above**
+the existing `<script type="module">`:
+
+```html
+<script>
+  window.__LF_BAKED_VALUES__ = {
+    scale: 1, speed: 0.6, stroke: 1, opacity: 1,
+    saturation: 0.5, hue: 210, hueB: 260,
+    glow: 0, angle: 0, motion: 1, phase: 0,
+    invert: false, density: 0.8,
+  };
+</script>
+```
+
+It has to come first: the piece reads the global while its module script is
+evaluating, so a script placed after it runs too late.
+
+The global suppresses the control panel only. A piece's export-button row
+(`Baked HTML`, `PNG`, `SVG`, `Copy AI Prompt`) is static markup in
+`index.html`, so hand-setting the global leaves it on screen — the Baked
+HTML export removes it separately, along with anything else marked
+`data-lf-panel`. Delete or hide that `<div class="lf-export-row">` if you
+are configuring a piece by hand and don't want it visible.
+
+Every one of the 13 shared controls may be set this way, plus any
+piece-specific control — check that piece's `extraControls` for its names.
+But unlike the real Baked HTML export, which always writes every control's
+current value, a hand-written object is used as-is: it is not merged with
+the piece's defaults. Any control you omit reads as `undefined`, which
+breaks rendering (an untuned canvas, no visible strokes) rather than
+falling back to a default. Set every control the piece defines — copy the
+full list above and edit values, don't trim it. Unknown keys are ignored.
+
 ## Gallery
 
 `index.html` at the repo root shows all eleven pieces with live previews,
@@ -105,6 +178,29 @@ persists exactly as before.
 [ROADMAP.md](ROADMAP.md) records what is deliberately not built yet and why,
 the limitations accepted along the way, and the constraints any new piece
 inherits.
+
+## Performance
+
+All pieces hold 60fps at their default settings on ordinary hardware. The
+two heaviest were measured at their worst case — `synapse` at density 2.0
+with reach 200, and `accretion` at density 2.0 — and both held 60fps.
+
+What costs the most, in order:
+
+- **Density** multiplies element count directly and is the control most
+  likely to cost you frames.
+- **Glow** draws each stroke twice. It used to use canvas `shadowBlur`,
+  which costs a blur pass per draw call and took `grain-field` from 60fps to
+  2.7fps; it is now a wider, dimmer underlay stroke instead, which is
+  cheap enough to leave on.
+- **Connection-based pieces** — `synapse` links each node to its neighbours.
+  It uses a uniform spatial grid rather than checking every pair, without
+  which it would degrade quadratically as density rises.
+
+One thing that is not a performance problem but looks like one: browsers
+throttle animation in background tabs, so pieces that build their image from
+accumulated trails — `flow-field`, `accretion` — look wrong if you switch
+away and back. They recover within a second.
 
 ## Browser support
 
