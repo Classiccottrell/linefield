@@ -106,6 +106,42 @@ persists exactly as before.
 the limitations accepted along the way, and the constraints any new piece
 inherits.
 
+## Browser support
+
+Tested by loading every piece and the gallery in each engine and checking
+that the canvas draws, keeps changing, and logs no errors. Run via
+`node tools/browser-matrix.mjs`; see that script for exactly what it checks.
+
+| Engine | Version tested | Pieces | Gallery |
+|---|---|---|---|
+| Chromium | 151.0.7922.34 | 11/11 | 11 cards, 10 chips, hover-query=true, clipboard=true, 0 errors |
+| Firefox | 153.0 | 11/11 | 11 cards, 10 chips, hover-query=true, clipboard=true, 0 errors |
+| WebKit | 26.5 | 11/11 | 11 cards, 10 chips, hover-query=true, clipboard=true, 0 errors |
+
+All three engines were installed locally and actually launched — nothing in
+this table is inferred. Measured with Playwright's bundled engine builds,
+headless, on macOS arm64, served over `http://localhost`. Playwright's
+WebKit is a WebKit checkout, not Safari, and its Chromium is not a Chrome
+release build — read the rows as engine-level evidence, not as a claim
+about a specific shipped browser.
+
+Not tested, but inferred from what the code uses — Canvas 2D, ES modules,
+`URLSearchParams`, `matchMedia('(hover: hover)')` — any browser released
+since roughly 2020 should work. Older browsers without ES module support
+will not.
+
+Two things to know:
+
+- **Copy embed needs a secure context.** `navigator.clipboard` is
+  unavailable over plain `http://` on a non-localhost host, so the gallery's
+  copy button will not work on an insecurely served deployment. (Tested here
+  over `http://localhost`, which counts as a secure context — that's why
+  `clipboard=true` above; a non-localhost `http://` deployment was not
+  tested and would show `clipboard=false`.)
+- **A piece opened directly from the filesystem will not run.** ES module
+  imports are blocked over `file://` in every browser. Serve the folder — a
+  baked export has no such problem, since it inlines everything.
+
 ## Known limitations
 
 - Piece defaults (including the default palette) can change between
