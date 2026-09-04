@@ -1,12 +1,14 @@
 {
   "name": "linefield",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Build tooling for the linefield gallery. The pieces themselves have no dependencies and no build step.",
   "scripts": {
     "build": "node tools/build.mjs",
     "verify": "node tools/build.mjs --verify-only",
-    "audit-controls": "node tools/audit-controls.mjs"
+    "audit-controls": "node tools/audit-controls.mjs",
+    "pack": "git archive --format=zip --prefix=linefield/ -o linefield-1.0.0.zip HEAD"
   },
   "devDependencies": {
     "playwright": "^1.49.0"

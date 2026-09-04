@@ -105,6 +105,11 @@ library cannot currently do, and each would yield more than one piece.
 
 ## Later, if ever
 
+- Publishing `shared/` to npm. Considered and declined for v1.0.0: six small
+  dependency-free modules that pieces already inline, weighed against
+  permanent version discipline and a second install path, for an audience
+  that mostly wants to paste one HTML file. The modules are plain ES modules
+  with no build step, so anyone who wants them can copy the folder.
 - Framework wrappers (React / Vue / Svelte components)
 - Framer and Webflow embed instructions
 - Live parameter sharing via URL hash — a tuned piece becomes a link
