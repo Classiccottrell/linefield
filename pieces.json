@@ -75,5 +75,12 @@
     "blurb": "A polar grid bent inward by a gravity well.",
     "tags": ["3d", "orb"],
     "hue": 285, "hueB": 230, "saturation": 0.6
+  },
+  {
+    "slug": "rainfall",
+    "title": "Rainfall",
+    "blurb": "Sparse vertical streaks falling at their own speed, each with a brighter head.",
+    "tags": ["sparse"],
+    "hue": 205, "hueB": 195, "saturation": 0.18
   }
 ]

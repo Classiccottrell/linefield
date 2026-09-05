@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-09-04
+
+### Added
+
+- **`rainfall`**, a twelfth piece: sparse vertical streaks descending at
+  per-drop speeds and lengths, each fading from a bright head to a
+  transparent tail, with an optional soft head glint. It is the first piece
+  whose motion has a single clear direction rather than drifting or
+  orbiting, and its near-achromatic palette fills the library's one
+  remaining gap on the hue wheel.
+
 ## [1.0.0] — 2026-09-04
 
 First public release.

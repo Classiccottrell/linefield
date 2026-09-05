@@ -29,4 +29,4 @@ Filament.
       external references and runs from anywhere, including outside this repo
 
 ## Status
-**shipped** — eleven pieces, six shared modules, and a gallery
+**shipped** — twelve pieces, six shared modules, and a gallery

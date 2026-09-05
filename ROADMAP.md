@@ -78,23 +78,44 @@ be misread as a piece claim. Both fail loudly, neither fails silently.
 
 ---
 
-## Collection constraints for a twelfth piece
+## Collection constraints for a thirteenth piece
 
-**The hue wheel is nearly full.** Measured mean hues across the eleven:
-24, 26, 55, 136 (achromatic), 165, 199, 236, 247, 257, 273, 306. Only
-roughly 95–135 is open, and it abuts `meridian`. A twelfth piece should
-differentiate on **form or density**, not expect a free colour.
+Measured across the twelve shipped pieces, from their generated thumbnails:
+mean rendered hue (weighted by colourfulness), mean saturation, and ink
+coverage — the fraction of pixels the piece actually marks.
 
-**`meridian` and `tether` are the weakest pair.** Found twice, by
-different methods — once by comparing rendered frames pixel-by-pixel, once
-by looking at all eleven side by side. Their motion energy (0.174 vs
-0.176) and ink coverage (0.058 vs 0.060) measure nearly identical, and the
-6-vs-7 element difference is invisible because tether's heavier stroke
-cancels its lower count. They are separated by hue and by crossing-versus-
-parallel line structure — and hue is a slider a viewer can move. Anything
-new in the sparse, heavy-stroked territory has to work harder.
+| Hue | Sat | Ink | Piece |
+|---:|---:|---:|---|
+| 21 | 0.49 | 0.043 | `accretion` |
+| 24 | 0.42 | 0.048 | `contour-grid` |
+| 54 | 0.30 | 0.047 | `synapse` |
+| 166 | 0.48 | 0.073 | `meridian` |
+| 177 | 0.12 | 0.035 | `grain-field` |
+| 200 | 0.34 | 0.107 | `wireframe-lattice` |
+| 213 | 0.12 | 0.011 | `rainfall` |
+| 235 | 0.24 | 0.066 | `tether` |
+| 247 | 0.51 | 0.195 | `event-horizon` |
+| 254 | 0.58 | 0.318 | `interference` |
+| 261 | 0.90 | 0.341 | `flow-field` |
+| 305 | 0.48 | 0.096 | `orbital-veil` |
 
----
+**The hue wheel is nearly full.** Roughly 95–135 is the only open band, and it
+abuts `meridian`. A new piece should differentiate on **form or density**, not
+expect a free colour. `rainfall` is the worked example: it landed at hue 213,
+in the most crowded band in the table, and still reads as distinct because at
+saturation 0.12 the hue barely registers and its ink coverage is a third of
+the next-sparsest piece.
+
+**Ink coverage is the axis with the most room left.** Eight of the twelve sit
+between 0.04 and 0.11. `rainfall` at 0.011 and `flow-field` at 0.341 are the
+poles, and almost nothing occupies the middle-high range between 0.11 and
+0.19.
+
+**`meridian` and `tether` remain the weakest pair.** Found twice, by different
+methods — once by comparing rendered frames pixel-by-pixel, once by looking at
+every piece side by side. They are separated by hue and by crossing-versus-
+parallel line structure, and hue is a slider a viewer can move. Anything new
+in the sparse, heavy-stroked territory has to work harder.
 
 ## More pieces
 
@@ -131,6 +152,12 @@ touching any piece.
 microsite has tooling; the pieces do not, and nothing in `pieces/` or
 `shared/` may import anything generated. That boundary is what makes a baked
 export paste-and-run.
+
+**The skill file exists in two places and nothing keeps them in sync.**
+`skills/building-generative-backgrounds/SKILL.md` ships with this repo, and a
+byte-identical copy lives in the maintainer's personal skills directory so it
+loads automatically outside this project. Edit one, copy to the other, and
+`diff` them. If they ever drift, the repo copy is the source of truth.
 
 **Judge the collection, not just the piece.** The library once shipped five
 pieces that were each individually correct and collectively looked like one

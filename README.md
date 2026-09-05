@@ -100,7 +100,7 @@ full list above and edit values, don't trim it. Unknown keys are ignored.
 
 ## Gallery
 
-`index.html` at the repo root shows all eleven pieces with live previews,
+`index.html` at the repo root shows all twelve pieces with live previews,
 filtering, and per-piece downloads. Serve the repo and open `/`:
 
 ```bash
@@ -123,6 +123,7 @@ tooling" below and CONTRIBUTING.md.
 - `accretion` — matter spiralling inward to a bright core
 - `tether` — a few heavy cables strung taut and swaying
 - `event-horizon` — a polar grid bent inward by a gravity well
+- `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
 
 Every piece shares 13 controls (scale, speed, stroke, opacity, saturation,
 hue, hue B, glow, angle, motion, phase, invert, density) plus its own
@@ -150,7 +151,7 @@ npm run audit-controls   # empirically check every shared+piece control moves pi
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
 canvas, captured at 640×400) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
-never reimplemented) for all eleven pieces, then renders `index.html` at
+never reimplemented) for all twelve pieces, then renders `index.html` at
 the repo root from `tools/templates/gallery.html` and the manifest — the
 gallery page itself, with live hover/keyboard previews, tag filtering, and
 per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
@@ -210,9 +211,9 @@ that the canvas draws, keeps changing, and logs no errors. Run via
 
 | Engine | Version tested | Pieces | Gallery |
 |---|---|---|---|
-| Chromium | 151.0.7922.34 | 11/11 | 11 cards, 10 chips, hover-query=true, clipboard=true, 0 errors |
-| Firefox | 153.0 | 11/11 | 11 cards, 10 chips, hover-query=true, clipboard=true, 0 errors |
-| WebKit | 26.5 | 11/11 | 11 cards, 10 chips, hover-query=true, clipboard=true, 0 errors |
+| Chromium | 151.0.7922.34 | 12/12 | 12 cards, 10 chips, hover-query=true, clipboard=true, 0 errors |
+| Firefox | 153.0 | 12/12 | 12 cards, 10 chips, hover-query=true, clipboard=true, 0 errors |
+| WebKit | 26.5 | 12/12 | 12 cards, 10 chips, hover-query=true, clipboard=true, 0 errors |
 
 All three engines were installed locally and actually launched — nothing in
 this table is inferred. Measured with Playwright's bundled engine builds,

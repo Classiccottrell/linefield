@@ -2,6 +2,12 @@
 
 ## Adding a new piece
 
+Before you start, read [`skills/building-generative-backgrounds/SKILL.md`](skills/building-generative-backgrounds/SKILL.md).
+It carries the constants that render wrong, what counts as verification, and
+the collection gate. Everything in it was learned by shipping a piece that
+looked fine on paper and wrong on screen.
+
+
 1. Copy the whole `pieces/_template/` folder to `pieces/<your-piece-name>/`,
    using kebab-case for the folder name (e.g. `flow-field`, `contour-grid`).
 2. Update the `<title>` and `PIECE_ID` in the new `index.html`.

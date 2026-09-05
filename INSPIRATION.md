@@ -88,10 +88,8 @@ choice — it is a network first and a sphere second.
 
 ### Sparse / motion family
 
-- **`rainfall`** — vertical streaks descending at varying speeds and
-  lengths, each with a brighter head. Very sparse, very calm, and unlike
-  anything currently here in that its motion has a clear direction rather
-  than drifting or orbiting.
+`rainfall` shipped from this family in 1.1.0.
+
 - **`vortex-polygon`** — a polygon rotated and scaled incrementally so its
   edges trace a spiral. Pure straight lines producing an apparently curved
   form, which no current piece does.
@@ -103,15 +101,17 @@ choice — it is a network first and a sphere second.
 From `ROADMAP.md`, repeated here because they bite hardest when adding
 pieces:
 
-**The hue wheel is nearly full.** Measured mean hues across the current
-eleven leave only roughly 95–135 open, and that abuts `meridian`. A new
-piece should differentiate on **form or density**, not expect a free colour.
+**The hue wheel is still nearly full.** Roughly 95–135 remains the only open
+band, and it abuts `meridian` at 166. `rainfall` did not take it — it went
+near-achromatic (sat 0.12) and differentiated on density instead, which is
+exactly what this constraint asks a new piece to do. Differentiate on **form
+or density**, not on a free colour.
 
 **Every shared control must visibly affect every new piece.** Two pieces have
 shipped with a control that read a value and changed nothing, both passing
 review because the arithmetic looked right. Run `npm run audit-controls`.
 
-**Judge it against the other eleven, not just against its own intent.** That
+**Judge it against the other twelve, not just against its own intent.** That
 is the check that catches a piece which is individually good and
 collectively redundant.
 
@@ -125,9 +125,8 @@ If the goal is maximum variety per unit of work:
    existing particle piece
 2. **`halftone-sphere`** — new mark vocabulary, and the dot-grid renderer
    pays for itself twice
-3. **`rainfall`** — genuinely new motion character, low complexity
-4. **`corridor`** — strong distinct silhouette, reuses the camera
-5. **`filament-ring`** — striking, but density tuning will be fussy
-6. **`vortex-polygon`** — curves from straight lines is a good trick
-7. **`node-sphere`** — only if the orb crowding is accepted deliberately
-8. **`drape`** — likely too close to `wireframe-lattice` to earn a slot
+3. **`corridor`** — strong distinct silhouette, reuses the camera
+4. **`filament-ring`** — striking, but density tuning will be fussy
+5. **`vortex-polygon`** — curves from straight lines is a good trick
+6. **`node-sphere`** — only if the orb crowding is accepted deliberately
+7. **`drape`** — likely too close to `wireframe-lattice` to earn a slot

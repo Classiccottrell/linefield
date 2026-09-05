@@ -95,7 +95,7 @@
 
 <header>
   <h1>linefield</h1>
-  <p class="lede">Eleven generative line-art backgrounds. Every piece is one self-contained file with no dependencies — tune it, then export a standalone <code>.html</code> you can paste into any site.</p>
+  <p class="lede">Twelve generative line-art backgrounds. Every piece is one self-contained file with no dependencies — tune it, then export a standalone <code>.html</code> you can paste into any site.</p>
 </header>
 
 <div class="chips" id="chips" role="group" aria-label="Filter pieces by category"></div>
@@ -310,6 +310,25 @@
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
+  <article class="card" data-tags="sparse" style="--accent:hsl(205 18% 60%)">
+    <a class="frame" href="pieces/rainfall/" data-src="pieces/rainfall/" aria-label="Open Rainfall">
+      <img src="thumbs/rainfall.png" alt="Rainfall preview" loading="lazy" width="640" height="400" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(205 18% 60%),hsl(195 18% 60%))"></span>
+        Rainfall
+      </h2>
+      <p class="blurb">Sparse vertical streaks falling at their own speed, each with a brighter head.</p>
+      <div class="tags"><span class="tag">sparse</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/rainfall/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/rainfall/">Copy embed</button>
+        <a class="btn" href="downloads/rainfall.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
 </div>
 
 <footer>
@@ -445,6 +464,17 @@ const PIECES = [
     "hue": 285,
     "hueB": 230,
     "saturation": 0.6
+  },
+  {
+    "slug": "rainfall",
+    "title": "Rainfall",
+    "blurb": "Sparse vertical streaks falling at their own speed, each with a brighter head.",
+    "tags": [
+      "sparse"
+    ],
+    "hue": 205,
+    "hueB": 195,
+    "saturation": 0.18
   }
 ];
 
@@ -485,7 +515,7 @@ function apply(){
 
 /* ---- Live preview on hover and keyboard focus ---------------------------
    Exactly one iframe exists at a time. A stale iframe keeps its animation
-   loop running, and eleven concurrent loops is the whole reason the grid
+   loop running, and twelve concurrent loops is the whole reason the grid
    uses stills. Touch devices never reach this code — see the media query
    below — so tapping a card just opens the piece.                          */
 const canHover = window.matchMedia('(hover: hover)').matches;
