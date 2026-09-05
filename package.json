@@ -1,6 +1,6 @@
 {
   "name": "linefield",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Build tooling for the linefield gallery. The pieces themselves have no dependencies and no build step.",

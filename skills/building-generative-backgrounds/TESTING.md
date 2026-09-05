@@ -32,6 +32,11 @@ identical task (build an animated generative line-art background as one
 self-contained HTML file with live controls), differing only in whether
 they loaded this skill.
 
+One limit worth naming: the skill arm's prompt told it to invoke the skill
+by name. That isolates the value of the content, which is what these runs
+were for, but it means discovery was not tested. Whether the description
+field alone would pull this skill in unprompted is still an open question.
+
 **Control arm.** Proved its controls worked by setting each slider and
 reading the stored parameter back:
 
