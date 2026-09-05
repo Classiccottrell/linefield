@@ -133,6 +133,26 @@ piece-specific control. `density` multiplies the piece's base element count.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## The skill
+
+The craft this library was built on ships with it, as a Claude Code skill:
+the constants that render wrong with their real numbers, what counts as
+verifying a piece rather than reasoning about it, and the gate for judging a
+collection instead of one piece at a time.
+
+Install it:
+
+```bash
+mkdir -p ~/.claude/skills/building-generative-backgrounds && \
+  curl -fsSL https://raw.githubusercontent.com/Classiccottrell/linefield/main/skills/building-generative-backgrounds/SKILL.md \
+  -o ~/.claude/skills/building-generative-backgrounds/SKILL.md
+```
+
+Read it at [skills/building-generative-backgrounds/SKILL.md](skills/building-generative-backgrounds/SKILL.md),
+and see [TESTING.md](skills/building-generative-backgrounds/TESTING.md) for the
+runs it was written against. It applies to generative canvas work anywhere,
+not only to this repo.
+
 ## Gallery build tooling
 
 `pieces.json` is the manifest driving the gallery microsite (title, blurb,
