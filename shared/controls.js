@@ -14,6 +14,7 @@ const SHARED_CONTROLS = [
   { name: 'phase', label: 'Phase', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
   { name: 'invert', label: 'Invert', type: 'checkbox', default: false },
   { name: 'density', label: 'Density', type: 'range', min: 0.1, max: 2, step: 0.01, default: 1 },
+  { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
 ];
 
 // The shared preset vocabulary. Every piece declares all five; the names mean

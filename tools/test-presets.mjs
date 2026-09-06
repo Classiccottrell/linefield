@@ -53,7 +53,8 @@ async function open(query = '') {
   // 2. A preset map is partial — at least one preset omits at least one control.
   const partial = await page.evaluate(() => {
     const p = window.__LF_PRESETS__;
-    return Object.values(p).some((m) => Object.keys(m).length < 13);
+    const total = (window.__LF_SPECS__ || []).length;
+    return Object.values(p).every((m) => Object.keys(m).length < total);
   });
   check('preset maps are partial, not full snapshots', partial);
   await ctx.close();

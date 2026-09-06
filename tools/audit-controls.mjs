@@ -1,6 +1,6 @@
 // tools/audit-controls.mjs
 //
-// Empirically checks every control (13 shared + each piece's own) on every
+// Empirically checks every control (14 shared + each piece's own) on every
 // piece: drive it between its extremes, render a fixed number of
 // deterministic frames, and diff sampled canvas pixels. A dead control
 // (reads a value, changes nothing visible) shows ~zero diff; a live one
@@ -118,6 +118,19 @@ const LIVE_THRESHOLD = 0.05; // % of sampled pixels changed, below this = no vis
 async function renderVariant(page, base, slug, rowIndex, value) {
   await page.goto(`${base}/pieces/${slug}/?preview=1`, { waitUntil: 'load' });
   await page.waitForSelector('.lf-panel .lf-row');
+  // No cursor exists in a headless audit, so pointer response would measure
+  // as DEAD on every piece. Place one at a fixed canvas-relative position —
+  // a constant, so two runs stay pixel-identical — and let influence settle.
+  await page.evaluate(() => {
+    const c = document.querySelector('#canvas');
+    const r = c.getBoundingClientRect();
+    c.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }));
+    c.dispatchEvent(new PointerEvent('pointermove', {
+      bubbles: true,
+      clientX: r.left + r.width * 0.35,
+      clientY: r.top + r.height * 0.4,
+    }));
+  });
   if (rowIndex !== null) await setRow(page, rowIndex, value);
   await stepFrames(page);
   return sample(page);

@@ -28,6 +28,7 @@
   import { hslToRgb } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'flow-field';
   const canvas = document.getElementById('canvas');
@@ -81,6 +82,7 @@
     defaults: { hue: 200, hueB: 280, saturation: 0.6 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   seedParticles(Math.round(BASE_COUNT * currentValues.density));
   window.addEventListener('resize', () =>
@@ -109,7 +111,17 @@
     const lineWidth = 0.3 + values.stroke * 1.2;
 
     for (const p of particles) {
-      const angle = fieldAngle(p.x, p.y, elapsed, values);
+      let angle = fieldAngle(p.x, p.y, elapsed, values);
+
+      // Multiplied by BOTH the control and influence: off at pointer 0, and
+      // eased rather than snapped when the cursor leaves.
+      const k = values.pointer * pointer.influence;
+      if (k) {
+        const f = pointer.falloff(p.x, p.y, 260);
+        const away = Math.atan2(p.y - pointer.y, p.x - pointer.x);
+        angle += (away - angle) * f * k * 0.6;
+      }
+
       // Base px/sec must stay well above lineWidth, or each frame's segment is
       // shorter than the stroke is wide and renders as a dot, not a line.
       const speed = 260 * values.speed * (dt || 0.016);
@@ -177,6 +189,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
