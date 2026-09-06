@@ -19,6 +19,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`tools/preset-sheet.mjs`**, a contact-sheet tool that renders one piece's
   presets side by side for curation review. It fails loudly on a panel that
   did not hide, a preset that throws, and a canvas that rendered blank.
+- **A blank-canvas check on the swatch capture path.** `captureThumbnails`
+  had one and so did the curation tool, but `captureSwatches` — which writes
+  the sixty images the gallery displays — did not, so three black-tile
+  swatches were produced with every gate reporting green.
 - **Range validation** in `tools/test-presets.mjs`. A preset value outside its
   control's declared `min`/`max` was previously written straight into render
   state while the slider clamped only its own display, so the piece rendered
@@ -26,6 +30,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Preset curation now measures at 1280x800, the viewport the build ships.
+  `tools/preset-sheet.mjs` had rendered at 640x400, where a sparse piece is
+  roughly four times denser, so every preset was accepted against images that
+  did not represent the shipped swatch. Nine pieces were retuned against
+  measurements at the correct viewport.
 - The build reads each piece's presets and default palette off the running
   page rather than parsing HTML. `readPieceDefaults`'s key-order-locked regex
   remains only as the fallback for `--verify-only`, which exits before a

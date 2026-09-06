@@ -152,6 +152,21 @@ byte-identical copy lives in the maintainer's personal skills directory so it
 loads automatically outside this project. Edit one, copy to the other, and
 `diff` them. If they ever drift, the repo copy is the source of truth.
 
+**Judge at the viewport that ships.** `tools/preset-sheet.mjs` originally
+rendered at 640x400 while `tools/build.mjs` renders at 1280x800. Pieces size
+their canvas from `window.innerWidth` with a fixed base element count, so a
+sparse piece is roughly four times denser in ink coverage at the smaller
+viewport. Every one of the sixty presets was visually accepted against images
+that did not represent the shipped swatch: `synapse`'s `whisper` measured 37.9
+in the curation tool and 1.7 in the build, and three swatches shipped as black
+tiles with every gate green. An instrument whose conditions differ from
+production reports confidently and is wrong. Both now use 1280x800.
+
+**Gate the path that ships, not just the path you look at.**
+`captureThumbnails` had a blank-canvas variance check and so did the curation
+tool, but `captureSwatches` — the path writing the sixty images the gallery
+actually displays — did not. The check now lives in one helper called by both.
+
 **A preset is judged by looking.** Sixty configurations were authored from
 each piece's defaults and most were revised after seeing them rendered. Every
 visual failure had the same shape: two presets differing only in degree.
@@ -159,6 +174,10 @@ visual failure had the same shape: two presets differing only in degree.
 `whisper`/`drift`/`dense` all three on `grain-field`. The fix is never a bigger
 gap on one axis, it is a second axis. A preset that reads like its neighbour
 is the same defect as a control that reads a value and changes nothing.
+
+Measured luminance variance at the shipping viewport is the floor the curation
+targets: every preset clears 12, three times the blank-canvas threshold of 4.
+Tuning to just clear the gate is how the defect shipped the first time.
 
 **A preset needing a control pinned at its limit is wrong, not tight.**
 `grain-field`'s `whisper` sat at maximum density purely to clear the
