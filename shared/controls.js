@@ -208,6 +208,9 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   // instead of regex-parsing the HTML, so there is no second copy of the
   // preset data to drift out of sync.
   window.__LF_PRESETS__ = presets;
+  // The resolved control specs (name/type/min/max/step), for gate scripts that
+  // need to validate preset values against declared ranges without parsing HTML.
+  window.__LF_SPECS__ = allSpecs;
   // The live value object, for gate scripts. Same reference the panel mutates.
   window.__LF_VALUES__ = values;
 

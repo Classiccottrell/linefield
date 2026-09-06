@@ -151,6 +151,33 @@ async function open(query = '') {
   await ctx.close();
 }
 
+// 8. Every preset value names a real control and sits within its declared
+// range. applyValues writes the raw preset number straight into the values
+// object the render reads; the range input only clamps its own displayed
+// position, so a preset can silently draw past what the control claims is
+// possible unless something checks this independently of the panel UI.
+{
+  const { ctx, page } = await open();
+  const violations = await page.evaluate(() => {
+    const specs = window.__LF_SPECS__ || [];
+    const specByName = Object.fromEntries(specs.map((s) => [s.name, s]));
+    const out = [];
+    for (const [presetName, map] of Object.entries(window.__LF_PRESETS__ || {})) {
+      for (const [key, value] of Object.entries(map)) {
+        const spec = specByName[key];
+        if (!spec) { out.push(`${presetName}.${key}: no control named "${key}"`); continue; }
+        if (typeof value === 'number' && (value < spec.min || value > spec.max)) {
+          out.push(`${presetName}.${key}=${value} outside [${spec.min}, ${spec.max}]`);
+        }
+      }
+    }
+    return out;
+  });
+  check('preset values are within control ranges', violations.length === 0,
+    violations.map((v) => `${slug}.${v}`).join('; '));
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 console.log(failures.length ? `\n${failures.length} FAILED` : '\nall preset checks passed');

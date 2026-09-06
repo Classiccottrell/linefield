@@ -130,6 +130,14 @@ so the panel stops claiming a configuration it no longer matches. See
 `pieces/flow-field/index.html` for a worked
 example.
 
+A preset value that exceeds its control's declared `min`/`max` still
+renders — `applyValues` writes it straight into the values object the
+render reads, and the range input only clamps its own displayed position.
+`node tools/test-presets.mjs <slug>` checks every preset value against
+`window.__LF_SPECS__` (the resolved control specs) and fails naming the
+offending piece/preset/control/value/range, but keep values in range by
+construction rather than relying on the gate to catch it after the fact.
+
 ## Density convention
 
 If your piece renders a countable number of elements (particles, lines,
