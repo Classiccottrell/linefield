@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-09-06
+
+### Added
+
+- **Five curated presets on every piece** — `whisper`, `ink`, `neon`, `drift`,
+  `dense` — as a chip row at the top of each control panel. A preset map is
+  partial and composes over the piece's own defaults, so switching between two
+  presets never strands a control at the previous one's value.
+- **`?preset=<name>`** opens a piece at a named preset. An unknown name is
+  ignored and the piece opens normally.
+- **A preset swatch strip on every gallery card**, five labelled links to that
+  piece at that preset, captured at 240x150.
+- **`tools/preset-sheet.mjs`**, a contact-sheet tool that renders one piece's
+  presets side by side for curation review. It fails loudly on a panel that
+  did not hide, a preset that throws, and a canvas that rendered blank.
+- **Range validation** in `tools/test-presets.mjs`. A preset value outside its
+  control's declared `min`/`max` was previously written straight into render
+  state while the slider clamped only its own display, so the piece rendered
+  past what the control claimed was possible and every gate passed it.
+
+### Changed
+
+- The build reads each piece's presets and default palette off the running
+  page rather than parsing HTML. `readPieceDefaults`'s key-order-locked regex
+  remains only as the fallback for `--verify-only`, which exits before a
+  browser is launched.
+
 ## [1.1.0] — 2026-09-04
 
 ### Added
