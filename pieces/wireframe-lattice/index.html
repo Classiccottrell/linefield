@@ -46,9 +46,18 @@
   const SPAN = 900; // world-space width/depth of the sheet
   let paths = [];
 
+  const PRESETS = {
+    whisper: { opacity: 0.3, stroke: 1.1, density: 0.6, saturation: 0.05, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.7, density: 0.8, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.95, glow: 1.1 },
+    drift:   { opacity: 0.5, stroke: 0.8, density: 0.7, speed: 0.35, motion: 1.8 },
+    dense:   { opacity: 0.6, stroke: 0.6, density: 1.8, speed: 0.8, glow: 0 },
+  };
+
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
+    presets: PRESETS,
     onChange: () => {},
     extraControls: [
       { name: 'tilt', label: 'Tilt', type: 'range', min: 0, max: 1.2, step: 0.01, default: 0.55 },

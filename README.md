@@ -98,6 +98,28 @@ breaks rendering (an untuned canvas, no visible strokes) rather than
 falling back to a default. Set every control the piece defines — copy the
 full list above and edit values, don't trim it. Unknown keys are ignored.
 
+## Presets
+
+Every piece ships five curated starting points, shown as a chip row at the top
+of its control panel: whisper, ink, neon, drift, dense. The names mean the same
+intent on every piece; the values are tuned per piece, because a saturation
+that flatters `grain-field` is wrong for `flow-field`.
+
+A preset is a partial set of controls composed over that piece's own defaults,
+not a full snapshot. Anything a preset does not name falls back to the piece's
+default, so switching between two presets never leaves a control stranded at
+the previous one's value. This is deliberately the opposite of
+`window.__LF_BAKED_VALUES__`, which is used exactly as given.
+
+Open a piece at a preset directly with `?preset=<name>`, for example
+`pieces/meridian/?preset=ink`. An unknown name is ignored and the piece opens
+normally, so a stale link still works. Moving any slider clears the active
+chip, since the configuration is no longer that preset. Picking a preset
+persists like any manual tuning, and "Reset to defaults" still returns to the
+piece's own defaults.
+
+The gallery shows all five as a strip of labelled swatches under each card.
+
 ## Gallery
 
 `index.html` at the repo root shows all twelve pieces with live previews,
@@ -166,10 +188,13 @@ npx playwright install chromium   # one-time, for headless capture
 npm run verify          # check pieces.json / pieces/ / README agree; no generation
 npm run build            # verify, then regenerate thumbs/ and downloads/
 npm run audit-controls   # empirically check every shared+piece control moves pixels
+node tools/test-presets.mjs <slug>   # preset mechanism + value range gate
+node tools/preset-sheet.mjs <slug>   # render a piece's presets for review
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
-canvas, captured at 640×400) and `downloads/<slug>.html` (each piece's own
+canvas, captured at 640×400), `thumbs/<slug>.<preset>.png` (sixty preset
+swatches at 240×150) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
 never reimplemented) for all twelve pieces, then renders `index.html` at
 the repo root from `tools/templates/gallery.html` and the manifest — the

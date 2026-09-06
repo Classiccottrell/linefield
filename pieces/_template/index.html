@@ -57,9 +57,23 @@
 
   let paths = [];
 
+  // Every piece ships the same five preset names; the values differ per
+  // piece. These are placeholders — tune them with
+  // `node tools/preset-sheet.mjs <slug>` and look at the sheet. A preset
+  // that renders like its neighbour is the same defect as a control that
+  // reads a value and changes nothing.
+  const PRESETS = {
+    whisper: { opacity: 0.2, stroke: 0.5, density: 0.5, saturation: 0.05, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.8, density: 0.8, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 1, density: 1.2, saturation: 0.95, glow: 1.1 },
+    drift:   { opacity: 0.5, stroke: 0.8, density: 0.7, speed: 0.3, motion: 1.6 },
+    dense:   { opacity: 0.6, stroke: 0.6, density: 2, speed: 0.8 },
+  };
+
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
+    presets: PRESETS,
     onChange: () => {},
     // Every piece must pick its own palette here. shared/controls.js's own
     // fallback defaults (hue 200 / hueB 280) belong to flow-field — a piece

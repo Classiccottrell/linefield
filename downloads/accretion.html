@@ -19,6 +19,13 @@
 .lf-row label { flex: 1; }
 .lf-row input[type=range] { flex: 1.4; }
 .lf-reset { width: 100%; margin-top: 6px; background: #333; color: #eee; border: none; border-radius: 4px; padding: 4px; cursor: pointer; }
+.lf-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+.lf-chip { flex: 1 1 auto; background: #2a2a32; color: #c9c9d4; border: 1px solid #3a3a46;
+  border-radius: 3px; padding: 4px 6px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.lf-chip:hover { color: #fff; border-color: #55556a; }
+.lf-chip[aria-pressed="true"] { background: #e8e8ec; color: #16161a; border-color: #e8e8ec; }
+.lf-chip:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 1px; }
 </style></head>
 <body>
 <canvas id="canvas" width="1280" height="800"></canvas>
@@ -272,6 +279,12 @@ const SHARED_CONTROLS = [
   { name: 'density', label: 'Density', type: 'range', min: 0.1, max: 2, step: 0.01, default: 1 },
 ];
 
+// The shared preset vocabulary. Every piece declares all five; the names mean
+// the same intent everywhere, the values differ per piece. Exported so a
+// future verifier (e.g. tools/build.mjs) can check a piece's presets against
+// this set instead of hardcoding it a second time.
+const PRESET_NAMES = ['whisper', 'ink', 'neon', 'drift', 'dense'];
+
 const PANEL_CSS = `
 .lf-panel { position: fixed; bottom: 12px; right: 12px; width: 240px;
   background: rgba(20,20,24,0.92); color: #e8e8e8; font: 12px/1.4 -apple-system,sans-serif;
@@ -282,6 +295,13 @@ const PANEL_CSS = `
 .lf-row label { flex: 1; }
 .lf-row input[type=range] { flex: 1.4; }
 .lf-reset { width: 100%; margin-top: 6px; background: #333; color: #eee; border: none; border-radius: 4px; padding: 4px; cursor: pointer; }
+.lf-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+.lf-chip { flex: 1 1 auto; background: #2a2a32; color: #c9c9d4; border: 1px solid #3a3a46;
+  border-radius: 3px; padding: 4px 6px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.lf-chip:hover { color: #fff; border-color: #55556a; }
+.lf-chip[aria-pressed="true"] { background: #e8e8ec; color: #16161a; border-color: #e8e8ec; }
+.lf-chip:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 1px; }
 `;
 
 function injectCss() {
@@ -292,7 +312,7 @@ function injectCss() {
   document.head.appendChild(style);
 }
 
-function createControlPanel({ pieceId, onChange, extraControls = [], defaults: defaultOverrides = {} }) {
+function createControlPanel({ pieceId, onChange, extraControls = [], defaults: defaultOverrides = {}, presets = {} }) {
   injectCss();
 
   // Gallery preview iframes load pieces with ?preview=1: same-origin means
@@ -368,6 +388,7 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
     input.addEventListener('input', () => {
       const v = spec.type === 'checkbox' ? input.checked : parseFloat(input.value);
       values[spec.name] = v;
+      setActiveChip(null);
       persist();
       onChange(spec.name, v, values);
     });
@@ -378,21 +399,64 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
     else body.appendChild(row);
   }
 
+  // Presets are the same operation the reset button already performed: write
+  // every control, update its input, fire onChange, persist. The only
+  // difference is which map is written. Composing over `defaults` is what
+  // makes a partial preset safe — a control the preset omits lands on the
+  // piece's own default rather than keeping the previous preset's value.
+  function applyValues(map) {
+    const next = { ...defaults, ...map };
+    for (const spec of allSpecs) {
+      const v = next[spec.name];
+      values[spec.name] = v;
+      const input = inputs[spec.name];
+      if (input) {
+        if (spec.type === 'checkbox') input.checked = v;
+        else input.value = v;
+      }
+      onChange(spec.name, v, values);
+    }
+    persist();
+  }
+
+  const presetNames = Object.keys(presets);
+  let chipRow = null;
+  const chips = {};
+
+  function setActiveChip(name) {
+    for (const [n, el] of Object.entries(chips)) {
+      el.setAttribute('aria-pressed', String(n === name));
+    }
+  }
+
+  if (presetNames.length) {
+    chipRow = document.createElement('div');
+    chipRow.className = 'lf-presets';
+    for (const name of presetNames) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'lf-chip';
+      chip.dataset.preset = name;
+      chip.textContent = name;
+      chip.setAttribute('aria-pressed', 'false');
+      chip.addEventListener('click', () => {
+        applyValues(presets[name]);
+        setActiveChip(name);
+      });
+      chips[name] = chip;
+      chipRow.appendChild(chip);
+    }
+    body.appendChild(chipRow);
+  }
+
   for (const spec of allSpecs) buildRow(spec);
 
   const resetBtn = document.createElement('button');
   resetBtn.className = 'lf-reset';
   resetBtn.textContent = 'Reset to defaults';
   resetBtn.addEventListener('click', () => {
-    for (const spec of allSpecs) {
-      const def = defaults[spec.name];
-      values[spec.name] = def;
-      const input = inputs[spec.name];
-      if (spec.type === 'checkbox') input.checked = def;
-      else input.value = def;
-      onChange(spec.name, def, values);
-    }
-    persist();
+    applyValues(defaults);
+    setActiveChip(null);
   });
   body.appendChild(resetBtn);
 
@@ -401,6 +465,26 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   function persist() {
     if (isPreview) return;
     localStorage.setItem(storageKey, JSON.stringify({ collapsed, values }));
+  }
+
+  // Declared, uncomposed. tools/build.mjs reads this off the loaded page
+  // instead of regex-parsing the HTML, so there is no second copy of the
+  // preset data to drift out of sync.
+  window.__LF_PRESETS__ = presets;
+  // The resolved control specs (name/type/min/max/step), for gate scripts that
+  // need to validate preset values against declared ranges without parsing HTML.
+  window.__LF_SPECS__ = allSpecs;
+  // The live value object, for gate scripts. Same reference the panel mutates.
+  window.__LF_VALUES__ = values;
+
+  // Highest precedence on load: an explicit ?preset= beats saved localStorage,
+  // which beats the piece's defaults. Applied after every row exists so the
+  // inputs are there to update. An unknown name is ignored deliberately — a
+  // stale shared link should open the piece, not break it.
+  const requested = new URLSearchParams(location.search).get('preset');
+  if (requested && requested in presets) {
+    applyValues(presets[requested]);
+    setActiveChip(requested);
   }
 
   return {
@@ -558,9 +642,21 @@ function describeForAI({ pieceName, values }) {
     }));
   }
 
+  // Short partial-clear trails make low-opacity presets read bolder in a
+  // stepped capture than the number alone suggests — judge these on the
+  // rendered sheet, not by arithmetic.
+  const PRESETS = {
+    whisper: { opacity: 0.35, stroke: 1.2, density: 0.55, saturation: 0.06, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.6, density: 0.7, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 0.9, density: 1.2, saturation: 1, glow: 1.2 },
+    drift:   { opacity: 0.55, stroke: 1.3, density: 0.8, speed: 0.25, motion: 1.6 },
+    dense:   { opacity: 0.6, stroke: 0.6, density: 1.8, speed: 0.85 },
+  };
+
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
+    presets: PRESETS,
     onChange: (name, value, values) => {
       if (name === 'density') seedMotes(Math.max(20, Math.round(BASE_COUNT * values.density)));
     },

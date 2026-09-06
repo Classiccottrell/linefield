@@ -71,6 +71,19 @@
     border:1px solid var(--line);padding:4px 8px;border-radius:2px;
   }
 
+  .presets{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:0 0 14px}
+  .pre{display:block;text-decoration:none;border:1px solid var(--line);border-radius:2px;
+    overflow:hidden;background:var(--ground)}
+  /* height:auto is load-bearing: the <img> carries a height attribute as a
+     presentational hint, which outranks aspect-ratio unless height is set. */
+  .pre img{width:100%;height:auto;display:block;aspect-ratio:16/10;object-fit:cover}
+  .pre span{display:block;padding:3px 4px;font:10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+    letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:center}
+  .pre:hover{border-color:#3a3a46}
+  .pre:hover span{color:var(--text)}
+  .pre:focus-visible{outline:2px solid #6fb4c9;outline-offset:2px}
+  @media (max-width:420px){ .presets{grid-template-columns:repeat(3,1fr)} }
+
   .actions{display:flex;flex-wrap:wrap;gap:8px}
   .btn{
     font:500 12.5px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
@@ -137,7 +150,7 @@
 <div class="grid" id="grid">
   <article class="card" data-tags="flow" style="--accent:hsl(200 60% 60%)">
     <a class="frame" href="pieces/flow-field/" data-src="pieces/flow-field/" aria-label="Open Flow Field">
-      <img src="thumbs/flow-field.png" alt="Flow Field preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/flow-field.png" alt="Flow Field preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -146,6 +159,22 @@
       </h2>
       <p class="blurb">Organic ribbons drifting along a simplex-noise vector field.</p>
       <div class="tags"><span class="tag">flow</span></div>
+      <div class="presets"><a class="pre" href="pieces/flow-field/?preset=whisper" title="Flow Field — whisper">
+        <img src="thumbs/flow-field.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/flow-field/?preset=ink" title="Flow Field — ink">
+        <img src="thumbs/flow-field.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/flow-field/?preset=neon" title="Flow Field — neon">
+        <img src="thumbs/flow-field.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/flow-field/?preset=drift" title="Flow Field — drift">
+        <img src="thumbs/flow-field.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/flow-field/?preset=dense" title="Flow Field — dense">
+        <img src="thumbs/flow-field.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/flow-field/">Open</a>
         <button class="btn" type="button" data-embed="pieces/flow-field/">Copy embed</button>
@@ -156,7 +185,7 @@
   </article>
   <article class="card" data-tags="geometric" style="--accent:hsl(35 50% 60%)">
     <a class="frame" href="pieces/contour-grid/" data-src="pieces/contour-grid/" aria-label="Open Contour Grid">
-      <img src="thumbs/contour-grid.png" alt="Contour Grid preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/contour-grid.png" alt="Contour Grid preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -165,6 +194,22 @@
       </h2>
       <p class="blurb">Topographic bands undulating like breathing terrain.</p>
       <div class="tags"><span class="tag">geometric</span></div>
+      <div class="presets"><a class="pre" href="pieces/contour-grid/?preset=whisper" title="Contour Grid — whisper">
+        <img src="thumbs/contour-grid.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/contour-grid/?preset=ink" title="Contour Grid — ink">
+        <img src="thumbs/contour-grid.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/contour-grid/?preset=neon" title="Contour Grid — neon">
+        <img src="thumbs/contour-grid.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/contour-grid/?preset=drift" title="Contour Grid — drift">
+        <img src="thumbs/contour-grid.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/contour-grid/?preset=dense" title="Contour Grid — dense">
+        <img src="thumbs/contour-grid.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/contour-grid/">Open</a>
         <button class="btn" type="button" data-embed="pieces/contour-grid/">Copy embed</button>
@@ -175,7 +220,7 @@
   </article>
   <article class="card" data-tags="optical" style="--accent:hsl(185 75% 60%)">
     <a class="frame" href="pieces/interference/" data-src="pieces/interference/" aria-label="Open Interference">
-      <img src="thumbs/interference.png" alt="Interference preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/interference.png" alt="Interference preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -184,6 +229,22 @@
       </h2>
       <p class="blurb">Two concentric ring families crossing into moiré.</p>
       <div class="tags"><span class="tag">optical</span></div>
+      <div class="presets"><a class="pre" href="pieces/interference/?preset=whisper" title="Interference — whisper">
+        <img src="thumbs/interference.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/interference/?preset=ink" title="Interference — ink">
+        <img src="thumbs/interference.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/interference/?preset=neon" title="Interference — neon">
+        <img src="thumbs/interference.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/interference/?preset=drift" title="Interference — drift">
+        <img src="thumbs/interference.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/interference/?preset=dense" title="Interference — dense">
+        <img src="thumbs/interference.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/interference/">Open</a>
         <button class="btn" type="button" data-embed="pieces/interference/">Copy embed</button>
@@ -194,7 +255,7 @@
   </article>
   <article class="card" data-tags="orb" style="--accent:hsl(265 55% 60%)">
     <a class="frame" href="pieces/orbital-veil/" data-src="pieces/orbital-veil/" aria-label="Open Orbital Veil">
-      <img src="thumbs/orbital-veil.png" alt="Orbital Veil preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/orbital-veil.png" alt="Orbital Veil preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -203,6 +264,22 @@
       </h2>
       <p class="blurb">Concentric arcs turning at different rates around one centre.</p>
       <div class="tags"><span class="tag">orb</span></div>
+      <div class="presets"><a class="pre" href="pieces/orbital-veil/?preset=whisper" title="Orbital Veil — whisper">
+        <img src="thumbs/orbital-veil.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/orbital-veil/?preset=ink" title="Orbital Veil — ink">
+        <img src="thumbs/orbital-veil.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/orbital-veil/?preset=neon" title="Orbital Veil — neon">
+        <img src="thumbs/orbital-veil.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/orbital-veil/?preset=drift" title="Orbital Veil — drift">
+        <img src="thumbs/orbital-veil.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/orbital-veil/?preset=dense" title="Orbital Veil — dense">
+        <img src="thumbs/orbital-veil.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/orbital-veil/">Open</a>
         <button class="btn" type="button" data-embed="pieces/orbital-veil/">Copy embed</button>
@@ -213,7 +290,7 @@
   </article>
   <article class="card" data-tags="grain" style="--accent:hsl(30 12% 60%)">
     <a class="frame" href="pieces/grain-field/" data-src="pieces/grain-field/" aria-label="Open Grain Field">
-      <img src="thumbs/grain-field.png" alt="Grain Field preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/grain-field.png" alt="Grain Field preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -222,6 +299,22 @@
       </h2>
       <p class="blurb">Fine drifting grain — the quietest piece, good behind text.</p>
       <div class="tags"><span class="tag">grain</span></div>
+      <div class="presets"><a class="pre" href="pieces/grain-field/?preset=whisper" title="Grain Field — whisper">
+        <img src="thumbs/grain-field.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/grain-field/?preset=ink" title="Grain Field — ink">
+        <img src="thumbs/grain-field.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/grain-field/?preset=neon" title="Grain Field — neon">
+        <img src="thumbs/grain-field.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/grain-field/?preset=drift" title="Grain Field — drift">
+        <img src="thumbs/grain-field.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/grain-field/?preset=dense" title="Grain Field — dense">
+        <img src="thumbs/grain-field.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/grain-field/">Open</a>
         <button class="btn" type="button" data-embed="pieces/grain-field/">Copy embed</button>
@@ -232,7 +325,7 @@
   </article>
   <article class="card" data-tags="geometric 3d" style="--accent:hsl(190 35% 60%)">
     <a class="frame" href="pieces/wireframe-lattice/" data-src="pieces/wireframe-lattice/" aria-label="Open Wireframe Lattice">
-      <img src="thumbs/wireframe-lattice.png" alt="Wireframe Lattice preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/wireframe-lattice.png" alt="Wireframe Lattice preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -241,6 +334,22 @@
       </h2>
       <p class="blurb">A rigid 3D grid rippling in perspective.</p>
       <div class="tags"><span class="tag">geometric</span><span class="tag">3d</span></div>
+      <div class="presets"><a class="pre" href="pieces/wireframe-lattice/?preset=whisper" title="Wireframe Lattice — whisper">
+        <img src="thumbs/wireframe-lattice.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/wireframe-lattice/?preset=ink" title="Wireframe Lattice — ink">
+        <img src="thumbs/wireframe-lattice.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/wireframe-lattice/?preset=neon" title="Wireframe Lattice — neon">
+        <img src="thumbs/wireframe-lattice.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/wireframe-lattice/?preset=drift" title="Wireframe Lattice — drift">
+        <img src="thumbs/wireframe-lattice.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/wireframe-lattice/?preset=dense" title="Wireframe Lattice — dense">
+        <img src="thumbs/wireframe-lattice.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/wireframe-lattice/">Open</a>
         <button class="btn" type="button" data-embed="pieces/wireframe-lattice/">Copy embed</button>
@@ -251,7 +360,7 @@
   </article>
   <article class="card" data-tags="flow sparse" style="--accent:hsl(150 50% 60%)">
     <a class="frame" href="pieces/meridian/" data-src="pieces/meridian/" aria-label="Open Meridian">
-      <img src="thumbs/meridian.png" alt="Meridian preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/meridian.png" alt="Meridian preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -260,6 +369,22 @@
       </h2>
       <p class="blurb">Seven long ribbons sweeping the full width.</p>
       <div class="tags"><span class="tag">flow</span><span class="tag">sparse</span></div>
+      <div class="presets"><a class="pre" href="pieces/meridian/?preset=whisper" title="Meridian — whisper">
+        <img src="thumbs/meridian.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/meridian/?preset=ink" title="Meridian — ink">
+        <img src="thumbs/meridian.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/meridian/?preset=neon" title="Meridian — neon">
+        <img src="thumbs/meridian.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/meridian/?preset=drift" title="Meridian — drift">
+        <img src="thumbs/meridian.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/meridian/?preset=dense" title="Meridian — dense">
+        <img src="thumbs/meridian.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/meridian/">Open</a>
         <button class="btn" type="button" data-embed="pieces/meridian/">Copy embed</button>
@@ -270,7 +395,7 @@
   </article>
   <article class="card" data-tags="network dense" style="--accent:hsl(75 70% 60%)">
     <a class="frame" href="pieces/synapse/" data-src="pieces/synapse/" aria-label="Open Synapse">
-      <img src="thumbs/synapse.png" alt="Synapse preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/synapse.png" alt="Synapse preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -279,6 +404,22 @@
       </h2>
       <p class="blurb">Drifting nodes wired to their neighbours, pulsing.</p>
       <div class="tags"><span class="tag">network</span><span class="tag">dense</span></div>
+      <div class="presets"><a class="pre" href="pieces/synapse/?preset=whisper" title="Synapse — whisper">
+        <img src="thumbs/synapse.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/synapse/?preset=ink" title="Synapse — ink">
+        <img src="thumbs/synapse.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/synapse/?preset=neon" title="Synapse — neon">
+        <img src="thumbs/synapse.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/synapse/?preset=drift" title="Synapse — drift">
+        <img src="thumbs/synapse.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/synapse/?preset=dense" title="Synapse — dense">
+        <img src="thumbs/synapse.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/synapse/">Open</a>
         <button class="btn" type="button" data-embed="pieces/synapse/">Copy embed</button>
@@ -289,7 +430,7 @@
   </article>
   <article class="card" data-tags="orb dense" style="--accent:hsl(10 80% 60%)">
     <a class="frame" href="pieces/accretion/" data-src="pieces/accretion/" aria-label="Open Accretion">
-      <img src="thumbs/accretion.png" alt="Accretion preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/accretion.png" alt="Accretion preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -298,6 +439,22 @@
       </h2>
       <p class="blurb">Matter spiralling inward to a bright core.</p>
       <div class="tags"><span class="tag">orb</span><span class="tag">dense</span></div>
+      <div class="presets"><a class="pre" href="pieces/accretion/?preset=whisper" title="Accretion — whisper">
+        <img src="thumbs/accretion.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/accretion/?preset=ink" title="Accretion — ink">
+        <img src="thumbs/accretion.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/accretion/?preset=neon" title="Accretion — neon">
+        <img src="thumbs/accretion.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/accretion/?preset=drift" title="Accretion — drift">
+        <img src="thumbs/accretion.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/accretion/?preset=dense" title="Accretion — dense">
+        <img src="thumbs/accretion.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/accretion/">Open</a>
         <button class="btn" type="button" data-embed="pieces/accretion/">Copy embed</button>
@@ -308,7 +465,7 @@
   </article>
   <article class="card" data-tags="sparse" style="--accent:hsl(220 25% 60%)">
     <a class="frame" href="pieces/tether/" data-src="pieces/tether/" aria-label="Open Tether">
-      <img src="thumbs/tether.png" alt="Tether preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/tether.png" alt="Tether preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -317,6 +474,22 @@
       </h2>
       <p class="blurb">Six heavy cables strung taut and swaying.</p>
       <div class="tags"><span class="tag">sparse</span></div>
+      <div class="presets"><a class="pre" href="pieces/tether/?preset=whisper" title="Tether — whisper">
+        <img src="thumbs/tether.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/tether/?preset=ink" title="Tether — ink">
+        <img src="thumbs/tether.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/tether/?preset=neon" title="Tether — neon">
+        <img src="thumbs/tether.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/tether/?preset=drift" title="Tether — drift">
+        <img src="thumbs/tether.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/tether/?preset=dense" title="Tether — dense">
+        <img src="thumbs/tether.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/tether/">Open</a>
         <button class="btn" type="button" data-embed="pieces/tether/">Copy embed</button>
@@ -327,7 +500,7 @@
   </article>
   <article class="card" data-tags="3d orb" style="--accent:hsl(285 60% 60%)">
     <a class="frame" href="pieces/event-horizon/" data-src="pieces/event-horizon/" aria-label="Open Event Horizon">
-      <img src="thumbs/event-horizon.png" alt="Event Horizon preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/event-horizon.png" alt="Event Horizon preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -336,6 +509,22 @@
       </h2>
       <p class="blurb">A polar grid bent inward by a gravity well.</p>
       <div class="tags"><span class="tag">3d</span><span class="tag">orb</span></div>
+      <div class="presets"><a class="pre" href="pieces/event-horizon/?preset=whisper" title="Event Horizon — whisper">
+        <img src="thumbs/event-horizon.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/event-horizon/?preset=ink" title="Event Horizon — ink">
+        <img src="thumbs/event-horizon.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/event-horizon/?preset=neon" title="Event Horizon — neon">
+        <img src="thumbs/event-horizon.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/event-horizon/?preset=drift" title="Event Horizon — drift">
+        <img src="thumbs/event-horizon.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/event-horizon/?preset=dense" title="Event Horizon — dense">
+        <img src="thumbs/event-horizon.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/event-horizon/">Open</a>
         <button class="btn" type="button" data-embed="pieces/event-horizon/">Copy embed</button>
@@ -346,7 +535,7 @@
   </article>
   <article class="card" data-tags="sparse" style="--accent:hsl(205 18% 60%)">
     <a class="frame" href="pieces/rainfall/" data-src="pieces/rainfall/" aria-label="Open Rainfall">
-      <img src="thumbs/rainfall.png" alt="Rainfall preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/rainfall.png" alt="Rainfall preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -355,6 +544,22 @@
       </h2>
       <p class="blurb">Sparse vertical streaks falling at their own speed, each with a brighter head.</p>
       <div class="tags"><span class="tag">sparse</span></div>
+      <div class="presets"><a class="pre" href="pieces/rainfall/?preset=whisper" title="Rainfall — whisper">
+        <img src="thumbs/rainfall.whisper.png" alt="" loading="lazy" width="240" height="150" />
+        <span>whisper</span>
+      </a><a class="pre" href="pieces/rainfall/?preset=ink" title="Rainfall — ink">
+        <img src="thumbs/rainfall.ink.png" alt="" loading="lazy" width="240" height="150" />
+        <span>ink</span>
+      </a><a class="pre" href="pieces/rainfall/?preset=neon" title="Rainfall — neon">
+        <img src="thumbs/rainfall.neon.png" alt="" loading="lazy" width="240" height="150" />
+        <span>neon</span>
+      </a><a class="pre" href="pieces/rainfall/?preset=drift" title="Rainfall — drift">
+        <img src="thumbs/rainfall.drift.png" alt="" loading="lazy" width="240" height="150" />
+        <span>drift</span>
+      </a><a class="pre" href="pieces/rainfall/?preset=dense" title="Rainfall — dense">
+        <img src="thumbs/rainfall.dense.png" alt="" loading="lazy" width="240" height="150" />
+        <span>dense</span>
+      </a></div>
       <div class="actions">
         <a class="btn" href="pieces/rainfall/">Open</a>
         <button class="btn" type="button" data-embed="pieces/rainfall/">Copy embed</button>
@@ -397,7 +602,14 @@ const PIECES = [
     ],
     "hue": 200,
     "hueB": 280,
-    "saturation": 0.6
+    "saturation": 0.6,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "contour-grid",
@@ -408,7 +620,14 @@ const PIECES = [
     ],
     "hue": 35,
     "hueB": 15,
-    "saturation": 0.5
+    "saturation": 0.5,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "interference",
@@ -419,7 +638,14 @@ const PIECES = [
     ],
     "hue": 185,
     "hueB": 320,
-    "saturation": 0.75
+    "saturation": 0.75,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "orbital-veil",
@@ -430,7 +656,14 @@ const PIECES = [
     ],
     "hue": 265,
     "hueB": 330,
-    "saturation": 0.55
+    "saturation": 0.55,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "grain-field",
@@ -441,7 +674,14 @@ const PIECES = [
     ],
     "hue": 30,
     "hueB": 210,
-    "saturation": 0.12
+    "saturation": 0.12,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "wireframe-lattice",
@@ -453,7 +693,14 @@ const PIECES = [
     ],
     "hue": 190,
     "hueB": 205,
-    "saturation": 0.35
+    "saturation": 0.35,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "meridian",
@@ -465,7 +712,14 @@ const PIECES = [
     ],
     "hue": 150,
     "hueB": 180,
-    "saturation": 0.5
+    "saturation": 0.5,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "synapse",
@@ -477,7 +731,14 @@ const PIECES = [
     ],
     "hue": 75,
     "hueB": 45,
-    "saturation": 0.7
+    "saturation": 0.7,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "accretion",
@@ -489,7 +750,14 @@ const PIECES = [
     ],
     "hue": 10,
     "hueB": 40,
-    "saturation": 0.8
+    "saturation": 0.8,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "tether",
@@ -500,7 +768,14 @@ const PIECES = [
     ],
     "hue": 220,
     "hueB": 250,
-    "saturation": 0.25
+    "saturation": 0.25,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "event-horizon",
@@ -512,7 +787,14 @@ const PIECES = [
     ],
     "hue": 285,
     "hueB": 230,
-    "saturation": 0.6
+    "saturation": 0.6,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   },
   {
     "slug": "rainfall",
@@ -523,7 +805,14 @@ const PIECES = [
     ],
     "hue": 205,
     "hueB": 195,
-    "saturation": 0.18
+    "saturation": 0.18,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
   }
 ];
 

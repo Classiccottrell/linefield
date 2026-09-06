@@ -59,9 +59,20 @@
     });
   }
 
+  // connection-based: cost scales with node count x reach, so `dense` is
+  // held at 1.8, not the control max of 2, to protect frame rate.
+  const PRESETS = {
+    whisper: { opacity: 0.5, stroke: 1.6, density: 0.7, saturation: 0.05, glow: 0, reach: 130 },
+    ink:     { opacity: 1, stroke: 1.7, density: 1.3, saturation: 0, glow: 0, reach: 150 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.95, glow: 1.1 },
+    drift:   { opacity: 0.55, stroke: 0.9, density: 0.85, speed: 0.3, motion: 1.7, reach: 140 },
+    dense:   { opacity: 0.62, stroke: 0.65, density: 1.8, speed: 0.8, reach: 105 },
+  };
+
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
+    presets: PRESETS,
     onChange: (name, value, values) => {
       if (name === 'density') seedNodes(Math.max(8, Math.round(BASE_COUNT * values.density)));
     },

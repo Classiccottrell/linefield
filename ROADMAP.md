@@ -31,16 +31,6 @@ The original design called for five export buttons; four shipped. "Source"
 would hand over the piece's unbaked source rather than a baked artifact —
 useful for someone who wants to modify rather than embed.
 
-### Presets
-
-Curated starting points per piece: five or six good-looking configurations a
-viewer can flip through, rather than everyone starting from the same
-defaults and hunting.
-
-Worth being precise about a naming collision: `pieces/_template/` is a
-*code scaffold* for forking a new piece. It is not a preset, and nothing in
-the project currently stores a named set of control values.
-
 ---
 
 ## Known limitations, accepted
@@ -71,7 +61,10 @@ card says so.
 
 **Two parser fragilities in the build.** `readPieceDefaults` is a regex
 locked to the key order `hue, hueB, saturation`; reordering yields a
-confusing "has no defaults block" error rather than a wrong result.
+confusing "has no defaults block" error rather than a wrong result. It is
+now only the fallback for `--verify-only`, which exits before a browser
+exists; a full build reads defaults and presets off the running page via
+`collectPresets`, which is exact.
 `readReadmeSlugs` scans the whole README rather than just the Pieces
 section, so a future limitations bullet leading with a backticked slug would
 be misread as a piece claim. Both fail loudly, neither fails silently.
@@ -158,6 +151,37 @@ export paste-and-run.
 byte-identical copy lives in the maintainer's personal skills directory so it
 loads automatically outside this project. Edit one, copy to the other, and
 `diff` them. If they ever drift, the repo copy is the source of truth.
+
+**Judge at the viewport that ships.** `tools/preset-sheet.mjs` originally
+rendered at 640x400 while `tools/build.mjs` renders at 1280x800. Pieces size
+their canvas from `window.innerWidth` with a fixed base element count, so a
+sparse piece is roughly four times denser in ink coverage at the smaller
+viewport. Every one of the sixty presets was visually accepted against images
+that did not represent the shipped swatch: `synapse`'s `whisper` measured 37.9
+in the curation tool and 1.7 in the build, and three swatches shipped as black
+tiles with every gate green. An instrument whose conditions differ from
+production reports confidently and is wrong. Both now use 1280x800.
+
+**Gate the path that ships, not just the path you look at.**
+`captureThumbnails` had a blank-canvas variance check and so did the curation
+tool, but `captureSwatches` — the path writing the sixty images the gallery
+actually displays — did not. The check now lives in one helper called by both.
+
+**A preset is judged by looking.** Sixty configurations were authored from
+each piece's defaults and most were revised after seeing them rendered. Every
+visual failure had the same shape: two presets differing only in degree.
+`neon` and `dense` on `flow-field`, `drift` and `dense` on `interference`, and
+`whisper`/`drift`/`dense` all three on `grain-field`. The fix is never a bigger
+gap on one axis, it is a second axis. A preset that reads like its neighbour
+is the same defect as a control that reads a value and changes nothing.
+
+Measured luminance variance at the shipping viewport is the floor the curation
+targets: every preset clears 12, three times the blank-canvas threshold of 4.
+Tuning to just clear the gate is how the defect shipped the first time.
+
+**A preset needing a control pinned at its limit is wrong, not tight.**
+`grain-field`'s `whisper` sat at maximum density purely to clear the
+blank-canvas check, which hid the problem instead of fixing it.
 
 **Judge the collection, not just the piece.** The library once shipped five
 pieces that were each individually correct and collectively looked like one

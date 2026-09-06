@@ -14,6 +14,7 @@ import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { DETERMINISTIC_INIT, stepFrames } from './deterministic.mjs';
+import { PRESET_NAMES } from '../shared/controls.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -65,7 +66,9 @@ export function verifyManifest() {
 
   for (const p of manifest) {
     if (!dirs.includes(p.slug)) continue;
-    const actual = readPieceDefaults(p.slug);
+    // Page-derived when available; the regex is the fallback for
+    // --verify-only, which exits before a browser is launched.
+    const actual = p.actualDefaults || readPieceDefaults(p.slug);
     if (!actual) {
       errors.push(`pieces/${p.slug}/index.html has no defaults block`);
       continue;
@@ -142,16 +145,17 @@ const SETTLE_MS = 4000;
 // deferred until AFTER the console-error check below, so a piece that logs
 // an error never leaves a corrupt/partial file on disk. Either way the
 // context is always closed, including on the error path.
-async function withPage(browser, url, render, { deterministic = false } = {}) {
+async function withPage(browser, url, render, { deterministic = false, scale = 0.5 } = {}) {
   // Backgrounded tabs throttle requestAnimationFrame, which starves the
   // trail-accumulating pieces. Each page gets its own context and is the
   // active page in it, so nothing is ever backgrounded.
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
-    // Halves the raster of every screenshot (thumbs and downloads share this
-    // context factory) without touching the CSS viewport the pieces lay
-    // their composition out against.
-    deviceScaleFactor: 0.5,
+    // Scales the raster of every screenshot without touching the CSS viewport
+    // the pieces lay their composition out against. 0.5 gives the 640x400
+    // thumbnails; swatches pass 0.1875 for 240x150, since sixty of them at
+    // full thumbnail size would add ~7MB of committed artifacts.
+    deviceScaleFactor: scale,
     acceptDownloads: true,
   });
   // Freezes Math.random and the rAF clock (see tools/deterministic.mjs) so
@@ -192,6 +196,28 @@ async function withPage(browser, url, render, { deterministic = false } = {}) {
 // failed to render, or the settle wait was too short — sits near 0; any
 // piece with actual line-art clears this by a wide margin.
 const BLANK_VARIANCE_THRESHOLD = 4;
+
+// Shared by both capture paths. captureSwatches originally lacked this, which
+// is how three black-tile swatches shipped with every gate green: the check
+// lived in the thumbnail path and in the curation tool, but not in the path
+// that writes what the gallery actually displays.
+async function assertCanvasRendered(page, label) {
+  const variance = await page.evaluate(() => {
+    const canvas = document.querySelector('#canvas');
+    const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    let sum = 0, sumSq = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4 * 37) {
+      const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      sum += lum; sumSq += lum * lum; n++;
+    }
+    const mean = sum / n;
+    return sumSq / n - mean * mean;
+  });
+  if (variance < BLANK_VARIANCE_THRESHOLD) {
+    throw new Error(`${label}: canvas looks blank (pixel variance ${variance.toFixed(2)} < ${BLANK_VARIANCE_THRESHOLD})`);
+  }
+  return variance;
+}
 
 export async function captureThumbnails(browser, manifest, base) {
   mkdirSync(join(ROOT, 'thumbs'), { recursive: true });
@@ -240,6 +266,87 @@ export async function captureThumbnails(browser, manifest, base) {
   }
 }
 
+// Read each piece's declared presets and its live default palette off the
+// running page. Deliberately NOT parsed out of the HTML: readPieceDefaults is
+// a regex locked to key order, ROADMAP records it as a known fragility, and
+// extending that to sixty nested preset objects would multiply a problem the
+// project already documented. A hand-maintained list that must stay in sync is
+// a silent-failure surface, so derive it from the source.
+export async function collectPresets(browser, manifest, base) {
+  for (const p of manifest) {
+    await withPage(browser, `${base}/pieces/${p.slug}/`, async (page) => {
+      const info = await page.evaluate(() => ({
+        presets: Object.keys(window.__LF_PRESETS__ || {}),
+        values: window.__LF_VALUES__ ? { ...window.__LF_VALUES__ } : null,
+      }));
+      if (!info.presets.length) throw new Error(`${p.slug}: declares no presets`);
+      p.presets = info.presets;
+      if (info.values) {
+        p.actualDefaults = {
+          hue: info.values.hue, hueB: info.values.hueB, saturation: info.values.saturation,
+        };
+      }
+      return null;
+    });
+  }
+}
+
+// verifyManifest() runs before a browser exists, so it cannot see page-derived
+// data. This is the second gate, run once collectPresets has populated it.
+export function verifyPresets(manifest) {
+  const errors = [];
+  for (const p of manifest) {
+    const names = p.presets || [];
+    const missing = PRESET_NAMES.filter((n) => !names.includes(n));
+    const extra = names.filter((n) => !PRESET_NAMES.includes(n));
+    if (missing.length) errors.push(`${p.slug}: missing presets ${missing.join(', ')}`);
+    if (extra.length) errors.push(`${p.slug}: unknown presets ${extra.join(', ')}`);
+    if (p.actualDefaults) {
+      for (const key of ['hue', 'hueB', 'saturation']) {
+        if (p.actualDefaults[key] !== p[key]) {
+          errors.push(`${p.slug}: manifest ${key}=${p[key]} but the running piece has ${key}=${p.actualDefaults[key]}`);
+        }
+      }
+    }
+  }
+  if (errors.length) {
+    console.error('Preset verification failed:\n  ' + errors.join('\n  '));
+    process.exit(1);
+  }
+  console.log(`  presets: ${manifest.length} pieces x ${PRESET_NAMES.length} verified`);
+}
+
+// One swatch per preset. Each gets its own deterministic context rather than
+// clicking chips in a long-lived page: applying a preset mid-animation would
+// capture a transition, and trail-accumulating pieces would still carry ink
+// drawn at the previous settings.
+export async function captureSwatches(browser, manifest, base) {
+  mkdirSync(join(ROOT, 'thumbs'), { recursive: true });
+  for (const p of manifest) {
+    for (const name of p.presets || []) {
+      await withPage(browser, `${base}/pieces/${p.slug}/?preset=${encodeURIComponent(name)}`, async (page) => {
+        await page.addStyleTag({ content: '[data-lf-panel] { visibility: hidden; }' });
+        await page.waitForTimeout(100);
+        const stillVisible = await page.evaluate(() => {
+          const el = document.querySelector('[data-lf-panel]');
+          return el ? getComputedStyle(el).visibility !== 'hidden' : null;
+        });
+        if (stillVisible === null) throw new Error(`${p.slug}/${name}: no [data-lf-panel] found to hide before capture`);
+        if (stillVisible) throw new Error(`${p.slug}/${name}: [data-lf-panel] still visible at capture time`);
+        await assertCanvasRendered(page, `${p.slug}/${name}`);
+        const buf = await page.locator('#canvas').screenshot();
+        return {
+          result: null,
+          commit: () => {
+            writeFileSync(join(ROOT, 'thumbs', `${p.slug}.${name}.png`), buf);
+            console.log(`  swatch: ${p.slug}.${name}`);
+          },
+        };
+      }, { deterministic: true, scale: 0.1875 });
+    }
+  }
+}
+
 export async function captureDownloads(browser, manifest, base) {
   mkdirSync(join(ROOT, 'downloads'), { recursive: true });
   for (const p of manifest) {
@@ -264,9 +371,16 @@ function cardHtml(p) {
   const accent = `hsl(${p.hue} ${Math.round(p.saturation * 100)}% 60%)`;
   const accentB = `hsl(${p.hueB} ${Math.round(p.saturation * 100)}% 60%)`;
   const tags = p.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+  // Swatches are links, not a hover-cycle: the card's main frame already swaps
+  // to a live preview on hover, and cycling here would fight it.
+  const presetStrip = (p.presets || []).map((name) =>
+    `<a class="pre" href="pieces/${p.slug}/?preset=${encodeURIComponent(name)}" title="${escapeHtml(p.title)} \u2014 ${escapeHtml(name)}">
+        <img src="thumbs/${p.slug}.${encodeURIComponent(name)}.png" alt="" loading="lazy" width="240" height="150" />
+        <span>${escapeHtml(name)}</span>
+      </a>`).join('');
   return `  <article class="card" data-tags="${escapeHtml(p.tags.join(' '))}" style="--accent:${accent}">
     <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
-      <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
@@ -275,6 +389,7 @@ function cardHtml(p) {
       </h2>
       <p class="blurb">${escapeHtml(p.blurb)}</p>
       <div class="tags">${tags}</div>
+      <div class="presets">${presetStrip}</div>
       <div class="actions">
         <a class="btn" href="pieces/${p.slug}/">Open</a>
         <button class="btn" type="button" data-embed="pieces/${p.slug}/">Copy embed</button>
@@ -293,7 +408,10 @@ export function buildGallery(manifest) {
   // `<` is escaped to `<` (same fix as shared/export.js's bakeHtml) so
   // a title/blurb containing `</script>` can't close the injected script
   // element early.
-  const pieceJson = JSON.stringify(manifest, null, 2).replace(/</g, '\\u003c');
+  // actualDefaults is build-internal scaffolding; shipping it would publish
+  // it to every visitor. presets are wanted by the cards.
+  const publicManifest = manifest.map(({ actualDefaults, ...rest }) => rest);
+  const pieceJson = JSON.stringify(publicManifest, null, 2).replace(/</g, '\\u003c');
   const out = template
     .replace('<!--CARDS-->', () => cards)
     .replace('/*PIECES*/[]', () => pieceJson);
@@ -312,8 +430,13 @@ if (isMain) {
   const server = await serveRepo(PORT);
   const browser = await chromium.launch();
   try {
+    console.log('Collecting presets...');
+    await collectPresets(browser, manifest, base);
+    verifyPresets(manifest);
     console.log('Capturing thumbnails...');
     await captureThumbnails(browser, manifest, base);
+    console.log('Capturing preset swatches...');
+    await captureSwatches(browser, manifest, base);
     console.log('Baking downloads...');
     await captureDownloads(browser, manifest, base);
     console.log('Building gallery...');
