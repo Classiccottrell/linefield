@@ -8,6 +8,7 @@
     "build": "node tools/build.mjs",
     "verify": "node tools/build.mjs --verify-only",
     "audit-controls": "node tools/audit-controls.mjs",
+    "test-baked": "node tools/test-baked.mjs",
     "pack": "git archive --format=zip --prefix=linefield/ -o linefield-$npm_package_version.zip HEAD"
   },
   "devDependencies": {

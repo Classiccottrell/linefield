@@ -189,6 +189,7 @@ npm run verify          # check pieces.json / pieces/ / README agree; no generat
 npm run build            # verify, then regenerate thumbs/ and downloads/
 npm run audit-controls   # empirically check every shared+piece control moves pixels
 node tools/test-presets.mjs <slug>   # preset mechanism + value range gate
+npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
 node tools/preset-sheet.mjs <slug>   # render a piece's presets for review
 ```
 

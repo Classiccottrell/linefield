@@ -33,6 +33,21 @@ jobs:
       - name: Audit controls
         run: npm run audit-controls
 
+      # Presets are a piece-declared vocabulary; this exercises the
+      # mechanism end to end for one piece. `npm run verify` never runs
+      # this because --verify-only exits before launching a browser.
+      - name: Verify preset mechanism
+        run: node tools/test-presets.mjs synapse
+
+      # Every downloads/*.html loaded over file://, from a directory with
+      # no shared/ sibling — the promise a baked export makes. Catches a
+      # shared module silently missing from the bake, which has shipped
+      # blank exports before while every other gate reported green.
+      - name: Test baked exports
+        run: npm run test-baked
+
       # Deliberately not building here. The gallery, thumbnails and
       # downloads are committed, and GitHub Pages serves them directly.
       # Rebuilding in CI would rewrite committed artifacts for no benefit.
+      # The baked-export gate above runs against those committed
+      # downloads directly, which is the artifact GitHub Pages serves.
