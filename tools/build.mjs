@@ -145,16 +145,17 @@ const SETTLE_MS = 4000;
 // deferred until AFTER the console-error check below, so a piece that logs
 // an error never leaves a corrupt/partial file on disk. Either way the
 // context is always closed, including on the error path.
-async function withPage(browser, url, render, { deterministic = false } = {}) {
+async function withPage(browser, url, render, { deterministic = false, scale = 0.5 } = {}) {
   // Backgrounded tabs throttle requestAnimationFrame, which starves the
   // trail-accumulating pieces. Each page gets its own context and is the
   // active page in it, so nothing is ever backgrounded.
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
-    // Halves the raster of every screenshot (thumbs and downloads share this
-    // context factory) without touching the CSS viewport the pieces lay
-    // their composition out against.
-    deviceScaleFactor: 0.5,
+    // Scales the raster of every screenshot without touching the CSS viewport
+    // the pieces lay their composition out against. 0.5 gives the 640x400
+    // thumbnails; swatches pass 0.1875 for 240x150, since sixty of them at
+    // full thumbnail size would add ~7MB of committed artifacts.
+    deviceScaleFactor: scale,
     acceptDownloads: true,
   });
   // Freezes Math.random and the rAF clock (see tools/deterministic.mjs) so
@@ -318,7 +319,7 @@ export async function captureSwatches(browser, manifest, base) {
             console.log(`  swatch: ${p.slug}.${name}`);
           },
         };
-      }, { deterministic: true });
+      }, { deterministic: true, scale: 0.1875 });
     }
   }
 }
@@ -347,6 +348,13 @@ function cardHtml(p) {
   const accent = `hsl(${p.hue} ${Math.round(p.saturation * 100)}% 60%)`;
   const accentB = `hsl(${p.hueB} ${Math.round(p.saturation * 100)}% 60%)`;
   const tags = p.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+  // Swatches are links, not a hover-cycle: the card's main frame already swaps
+  // to a live preview on hover, and cycling here would fight it.
+  const presetStrip = (p.presets || []).map((name) =>
+    `<a class="pre" href="pieces/${p.slug}/?preset=${encodeURIComponent(name)}" title="${escapeHtml(p.title)} \u2014 ${escapeHtml(name)}">
+        <img src="thumbs/${p.slug}.${encodeURIComponent(name)}.png" alt="" loading="lazy" width="640" height="400" />
+        <span>${escapeHtml(name)}</span>
+      </a>`).join('');
   return `  <article class="card" data-tags="${escapeHtml(p.tags.join(' '))}" style="--accent:${accent}">
     <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
       <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="640" height="400" />
@@ -358,6 +366,7 @@ function cardHtml(p) {
       </h2>
       <p class="blurb">${escapeHtml(p.blurb)}</p>
       <div class="tags">${tags}</div>
+      <div class="presets">${presetStrip}</div>
       <div class="actions">
         <a class="btn" href="pieces/${p.slug}/">Open</a>
         <button class="btn" type="button" data-embed="pieces/${p.slug}/">Copy embed</button>
