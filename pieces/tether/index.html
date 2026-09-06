@@ -57,9 +57,21 @@
     }));
   }
 
+  // Only 6 heavy cables at rest, so `whisper` has to drop stroke hard or it
+  // still reads heavy. stroke's control max is 2 — `ink` is held at 1.9,
+  // not the limit, so the preset isn't pinned to a ceiling.
+  const PRESETS = {
+    whisper: { opacity: 0.22, stroke: 0.3, density: 0.5, saturation: 0.05, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.9, density: 0.8, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 1.2, density: 1.2, saturation: 0.95, glow: 1.2 },
+    drift:   { opacity: 0.5, stroke: 1, density: 0.7, speed: 0.25, motion: 1.7 },
+    dense:   { opacity: 0.6, stroke: 0.7, density: 1.8, speed: 0.8 },
+  };
+
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
+    presets: PRESETS,
     onChange: (name, value, values) => {
       if (name === 'density') seedCables(Math.max(2, Math.round(BASE_COUNT * values.density)));
     },

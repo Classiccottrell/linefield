@@ -166,6 +166,13 @@ async function open(query = '') {
       for (const [key, value] of Object.entries(map)) {
         const spec = specByName[key];
         if (!spec) { out.push(`${presetName}.${key}: no control named "${key}"`); continue; }
+        const hasBounds = typeof spec.min === 'number' && typeof spec.max === 'number';
+        if (!hasBounds) {
+          if (typeof value === 'number') {
+            out.push(`${presetName}.${key}=${value}: control "${key}" declares no numeric min/max, cannot range-check`);
+          }
+          continue;
+        }
         if (typeof value === 'number' && (value < spec.min || value > spec.max)) {
           out.push(`${presetName}.${key}=${value} outside [${spec.min}, ${spec.max}]`);
         }
