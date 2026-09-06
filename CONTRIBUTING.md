@@ -123,10 +123,11 @@ Pass a `presets` object to `createControlPanel({ ... presets })` to add a
 row of chip buttons above the controls. Keys are drawn from the shared
 five-name vocabulary — `whisper`, `ink`, `neon`, `drift`, `dense` — and each
 value is a **partial** map of control name to value; anything a preset
-omits falls back to the piece's own `defaults`. Clicking a chip, loading
-`?preset=<name>`, or moving any slider (which clears the active chip)
-share one apply path, so a preset can never strand a stale value from a
-previous selection. See `pieces/flow-field/index.html` for a worked
+omits falls back to the piece's own `defaults`. Clicking a chip and loading
+`?preset=<name>` share one apply path, so a preset can never strand a stale
+value from a previous selection; moving any slider clears the active chip
+so the panel stops claiming a configuration it no longer matches. See
+`pieces/flow-field/index.html` for a worked
 example.
 
 ## Density convention

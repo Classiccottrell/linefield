@@ -85,18 +85,32 @@ async function open(query = '') {
   await ctx.close();
 }
 
-// 5. Switching A -> B strands no value from A.
+// 5. Switching A -> B strands no value from A. neon and drift have
+// asymmetric key sets (neon declares saturation/glow, which drift omits;
+// drift declares speed/motion, which neon omits), so this is the pair that
+// can actually catch a merge-only `applyValues` that fails to fall back a
+// key the incoming preset omits to the piece's own default.
 {
   const { ctx, page } = await open();
+  await page.click('.lf-reset');
+  await page.waitForTimeout(200);
+  const defaults = await page.evaluate(() => ({ ...window.__LF_VALUES__ }));
   await page.click('.lf-chip[data-preset="neon"]');
   await page.waitForTimeout(300);
-  await page.click('.lf-chip[data-preset="whisper"]');
+  await page.click('.lf-chip[data-preset="drift"]');
   await page.waitForTimeout(300);
-  const stranded = await page.evaluate(() => {
-    const declared = window.__LF_PRESETS__.whisper;
+  const stranded = await page.evaluate((defaults) => {
+    const declaredDrift = window.__LF_PRESETS__.drift;
+    const declaredNeon = window.__LF_PRESETS__.neon;
     const live = window.__LF_VALUES__;
-    return Object.entries(declared).filter(([k, v]) => live[k] !== v).map(([k]) => k);
-  });
+    const wrongApplied = Object.entries(declaredDrift)
+      .filter(([k, v]) => live[k] !== v)
+      .map(([k]) => k);
+    const notReset = Object.keys(declaredNeon)
+      .filter((k) => !(k in declaredDrift))
+      .filter((k) => live[k] !== defaults[k]);
+    return [...wrongApplied, ...notReset];
+  }, defaults);
   check('switching presets strands no control', stranded.length === 0, `stranded: ${stranded}`);
   await ctx.close();
 }
