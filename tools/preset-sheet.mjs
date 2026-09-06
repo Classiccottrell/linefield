@@ -42,7 +42,7 @@ let exitCode = 0;
 // and 4 run this against eleven pieces that declare no presets yet, so the
 // no-presets branch is not a rare edge case; it is most runs.
 try {
-  const ctx0 = await browser.newContext({ viewport: { width: 640, height: 400 } });
+  const ctx0 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const probe = await ctx0.newPage();
   await probe.goto(`http://localhost:${PORT}/pieces/${slug}/`, { waitUntil: 'load' });
   // Saved settings outrank a piece's defaults; clear and reload before
@@ -59,7 +59,7 @@ try {
   } else {
     const shots = [];
     for (const name of names) {
-      const ctx = await browser.newContext({ viewport: { width: 640, height: 400 }, deviceScaleFactor: 1 });
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
       await ctx.addInitScript(DETERMINISTIC_INIT);
       const page = await ctx.newPage();
       const errors = [];

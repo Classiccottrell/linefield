@@ -197,6 +197,28 @@ async function withPage(browser, url, render, { deterministic = false, scale = 0
 // piece with actual line-art clears this by a wide margin.
 const BLANK_VARIANCE_THRESHOLD = 4;
 
+// Shared by both capture paths. captureSwatches originally lacked this, which
+// is how three black-tile swatches shipped with every gate green: the check
+// lived in the thumbnail path and in the curation tool, but not in the path
+// that writes what the gallery actually displays.
+async function assertCanvasRendered(page, label) {
+  const variance = await page.evaluate(() => {
+    const canvas = document.querySelector('#canvas');
+    const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    let sum = 0, sumSq = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4 * 37) {
+      const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      sum += lum; sumSq += lum * lum; n++;
+    }
+    const mean = sum / n;
+    return sumSq / n - mean * mean;
+  });
+  if (variance < BLANK_VARIANCE_THRESHOLD) {
+    throw new Error(`${label}: canvas looks blank (pixel variance ${variance.toFixed(2)} < ${BLANK_VARIANCE_THRESHOLD})`);
+  }
+  return variance;
+}
+
 export async function captureThumbnails(browser, manifest, base) {
   mkdirSync(join(ROOT, 'thumbs'), { recursive: true });
   for (const p of manifest) {
@@ -311,6 +333,7 @@ export async function captureSwatches(browser, manifest, base) {
         });
         if (stillVisible === null) throw new Error(`${p.slug}/${name}: no [data-lf-panel] found to hide before capture`);
         if (stillVisible) throw new Error(`${p.slug}/${name}: [data-lf-panel] still visible at capture time`);
+        await assertCanvasRendered(page, `${p.slug}/${name}`);
         const buf = await page.locator('#canvas').screenshot();
         return {
           result: null,
@@ -352,12 +375,12 @@ function cardHtml(p) {
   // to a live preview on hover, and cycling here would fight it.
   const presetStrip = (p.presets || []).map((name) =>
     `<a class="pre" href="pieces/${p.slug}/?preset=${encodeURIComponent(name)}" title="${escapeHtml(p.title)} \u2014 ${escapeHtml(name)}">
-        <img src="thumbs/${p.slug}.${encodeURIComponent(name)}.png" alt="" loading="lazy" width="640" height="400" />
+        <img src="thumbs/${p.slug}.${encodeURIComponent(name)}.png" alt="" loading="lazy" width="240" height="150" />
         <span>${escapeHtml(name)}</span>
       </a>`).join('');
   return `  <article class="card" data-tags="${escapeHtml(p.tags.join(' '))}" style="--accent:${accent}">
     <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
-      <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="640" height="400" />
+      <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
