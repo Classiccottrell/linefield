@@ -36,10 +36,13 @@ export function createPointer({ canvas, enabled = true }) {
   // is over the canvas and eases back to 0 when it leaves, so a piece never
   // snaps as the cursor exits.
   //
-  // It takes NO dt argument and keeps its own clock, deliberately. The dt a
-  // piece receives from createLoop is `scaledDt` — already multiplied by the
-  // Speed control — so using it would tie cursor response to Speed, and at
-  // Speed 0 dt is 0 and influence would freeze forever.
+  // It takes NO dt argument and keeps its own clock, deliberately. Influence
+  // is a UI-response quantity — how present the cursor is right now — not
+  // an animation quantity, so it should not track animation timing at all.
+  // Accepting a piece's dt would couple the two regardless of how that
+  // piece happens to apply values.speed downstream; keeping its own clock
+  // keeps cursor response independent of any piece's animation rate,
+  // including at Speed 0.
   //
   // performance.now() is safe under the deterministic harness: it is not
   // frozen, it is a controlled clock that stepFrames advances 16ms per frame,
