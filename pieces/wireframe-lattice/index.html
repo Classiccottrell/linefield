@@ -29,6 +29,7 @@
   import { simplex2 } from '../../shared/noise.js';
   import { createCamera } from '../../shared/project.js';
   import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'wireframe-lattice';
   const canvas = document.getElementById('canvas');
@@ -65,6 +66,7 @@
     defaults: { hue: 190, hueB: 205, saturation: 0.35 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   const camera = createCamera({ fov: 620 });
 
@@ -121,9 +123,21 @@
       cy: canvas.height / 2,
     });
 
-    // World-space height of the sheet at (x, z).
-    const heightAt = (x, z) =>
-      simplex2(x * noiseScale + values.phase, z * noiseScale + t) * amp;
+    // Gate: off at pointer 0, eased by influence, local via falloff.
+    const k = values.pointer * pointer.influence;
+
+    // World-space height of the sheet at (x, z). The lift term projects the
+    // (unlifted) point to screen space first to find its distance from the
+    // pointer, then adds a falloff-weighted Z — no term routed through
+    // values.speed, so it survives Speed 0.
+    const heightAt = (x, z) => {
+      const base = simplex2(x * noiseScale + values.phase, z * noiseScale + t) * amp;
+      if (!k) return base;
+      const approx = camera.project(x, 0, z);
+      if (approx.scale <= 0) return base;
+      const f = pointer.falloff(approx.x, approx.y, 220);
+      return base - f * k * 70;
+    };
 
     const half = SPAN / 2;
     const step = SPAN / steps;
@@ -153,6 +167,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });

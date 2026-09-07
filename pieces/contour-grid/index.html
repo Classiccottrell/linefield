@@ -28,6 +28,7 @@
   import { hslToRgb } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'contour-grid';
   const canvas = document.getElementById('canvas');
@@ -64,6 +65,7 @@
     defaults: { hue: 35, hueB: 15, saturation: 0.5 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -81,6 +83,10 @@
 
     const lineWidth = 0.4 + values.stroke * 1.1;
     ctx.lineWidth = lineWidth;
+
+    // Gate: off at pointer 0, eased by influence, local via falloff. Uses no
+    // term scaled by values.speed, so the bulge survives Speed 0.
+    const k = values.pointer * pointer.influence;
 
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -106,7 +112,10 @@
       for (let x = -margin; x <= canvas.width + margin; x += STEP_PX) {
         const n1 = simplex2(x * noiseScale + values.phase, baseY * noiseScale);
         const n2 = simplex2(x * noiseScale + values.phase + 137, baseY * noiseScale + t);
-        const y = baseY + n1 * baseAmp + n2 * moveAmp;
+        // Terrain bulges beneath the pointer: a falloff-weighted offset added
+        // to the height field, independent of the speed-scaled wobble above.
+        const bulge = k ? pointer.falloff(x, baseY, 260) * k * 60 : 0;
+        const y = baseY + n1 * baseAmp + n2 * moveAmp - bulge;
         if (x === -margin) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
@@ -127,6 +136,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });

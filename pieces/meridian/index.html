@@ -28,6 +28,7 @@
   import { hslToRgb } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'meridian';
   const canvas = document.getElementById('canvas');
@@ -64,6 +65,7 @@
     defaults: { hue: 150, hueB: 180, saturation: 0.5 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -79,6 +81,10 @@
     const flutterAmp = canvas.height * 0.055 * values.motion;
     const light = values.invert ? 0.35 : 0.6;
     const lineWidth = 2.2 + values.stroke * 3.6; // heavy; only tether is heavier
+
+    // Gate: off at pointer 0, eased by influence, local via falloff. No term
+    // routed through values.speed, so deflection survives Speed 0.
+    const k = values.pointer * pointer.influence;
 
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -105,7 +111,20 @@
         // Two octaves so the sweep is broad but not mechanical.
         const n1 = simplex2(x * noiseScale + values.phase, f * 3 + t);
         const n2 = simplex2(x * noiseScale * 2.7 + values.phase, f * 3 + t * 1.4);
-        const y = baseY + n1 * sweepAmp + n2 * flutterAmp;
+        let y = baseY + n1 * sweepAmp + n2 * flutterAmp;
+        if (k) {
+          // Ribbons deflect around the pointer as they sweep past it: pushed
+          // away vertically, weighted by falloff.
+          const dist = pointer.falloff(x, y, 240);
+          if (dist) {
+            // Direction keyed off baseY (constant per ribbon), not the
+            // wobbled y — keying off y flips sign at STEP_PX granularity
+            // wherever a ribbon crosses the pointer's y, spiking instead of
+            // bowing.
+            const dir = baseY >= pointer.y ? 1 : -1;
+            y += dir * dist * k * 90;
+          }
+        }
         if (x === -margin) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
@@ -127,6 +146,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });

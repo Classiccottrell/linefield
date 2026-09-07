@@ -27,6 +27,7 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'orbital-veil';
   const canvas = document.getElementById('canvas');
@@ -63,6 +64,7 @@
     defaults: { hue: 265, hueB: 330, saturation: 0.55 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -81,6 +83,14 @@
     ctx.lineWidth = lineWidth;
 
     const light = values.invert ? 0.35 : 0.6;
+
+    // Orb tilts toward the pointer: a per-ring lateral shift driven by
+    // nx/ny, scaled by each ring's own radius so outer rings (the near side
+    // of the tilt) shift further than inner ones. Gated by k alone — no
+    // term routed through values.speed.
+    const k = values.pointer * pointer.influence;
+    const tiltX = pointer.nx * k;
+    const tiltY = pointer.ny * k;
 
     for (let i = 0; i < rings; i++) {
       const f = i / (rings - 1 || 1);
@@ -103,8 +113,8 @@
       ctx.beginPath();
       for (let s = 0; s <= SEG; s++) {
         const a = start + (s / SEG) * sweep;
-        const x = cx + Math.cos(a) * radius;
-        const y = cy + Math.sin(a) * radius * tilt;
+        const x = cx + Math.cos(a) * radius + tiltX * radius * 0.5;
+        const y = cy + Math.sin(a) * radius * tilt + tiltY * radius * 0.5;
         if (s === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
@@ -123,6 +133,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });

@@ -28,6 +28,7 @@
   import { hslToRgb } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'grain-field';
   const canvas = document.getElementById('canvas');
@@ -77,6 +78,7 @@
     defaults: { hue: 30, hueB: 210, saturation: 0.12 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   seedGrains(Math.round(BASE_COUNT * currentValues.density));
   window.addEventListener('resize', () =>
@@ -98,12 +100,28 @@
     const lineWidth = 0.3 + values.stroke * 0.9;
     ctx.lineWidth = lineWidth;
 
+    // Gate: off at pointer 0, eased by influence, local via falloff.
+    const k = values.pointer * pointer.influence;
+
     for (const gr of grains) {
       const n = simplex2(gr.x * noiseScale + values.phase, gr.y * noiseScale + t);
       const a = n * Math.PI * 2 + (values.angle * Math.PI) / 180 + gr.j * 0.15;
 
       gr.x += Math.cos(a) * drift;
       gr.y += Math.sin(a) * drift;
+
+      if (k) {
+        // Grain parts around the pointer: pushed directly away, weighted by
+        // falloff. Uses only dt (real frame time), never values.speed, so
+        // the parting survives Speed 0.
+        const f = pointer.falloff(gr.x, gr.y, 200);
+        if (f) {
+          const away = Math.atan2(gr.y - pointer.y, gr.x - pointer.x);
+          const push = f * k * 140 * (dt || 0.016);
+          gr.x += Math.cos(away) * push;
+          gr.y += Math.sin(away) * push;
+        }
+      }
 
       // Wrap rather than respawn, so the field stays evenly populated.
       if (gr.x < 0) gr.x += canvas.width;
@@ -138,6 +156,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
