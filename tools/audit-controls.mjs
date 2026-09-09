@@ -145,7 +145,9 @@ async function renderVariant(page, base, slug, rowIndex, value) {
 function samplePoints(row) {
   if (row.type === 'checkbox') return [false, true];
   const { min, max } = row;
-  return [0, 0.25, 0.5, 0.75, 1].map((f) => min + f * (max - min));
+  // Uneven fractions avoid aliasing discrete symmetries too: event-horizon's
+  // 36 spokes repeat every 10deg, so quarter-turn samples all looked equal.
+  return [0, 0.19, 0.43, 0.71, 1].map((f) => min + f * (max - min));
 }
 
 async function auditPiece(page, base, p) {

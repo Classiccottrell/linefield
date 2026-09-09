@@ -9,6 +9,9 @@ Seeded by a set of visual references. The motifs are generic (halftone,
 perspective grids, spherical wireframes); the point is the *technique* each
 implies, not reproducing any particular image.
 
+Additional candidates below are interpretations of a handwritten sketch;
+ambiguous labels are kept uncertain rather than treated as specifications.
+
 ---
 
 ## Techniques the library doesn't have yet
@@ -85,6 +88,9 @@ choice — it is a network first and a sphere second.
   cloth. Honestly this is `wireframe-lattice` with a different displacement
   function; worth building only if the fold is dramatic enough to read as
   its own piece.
+- **Hanging perspective strokes (name uncertain)** — chain-like or hanging
+  vertical marks diminishing toward a horizon. The handwriting is ambiguous;
+  intended silhouette and whether strokes connect need clarification.
 
 ### Sparse / motion family
 
@@ -93,6 +99,21 @@ choice — it is a network first and a sphere second.
 - **`vortex-polygon`** — a polygon rotated and scaled incrementally so its
   edges trace a spiral. Pure straight lines producing an apparently curved
   form, which no current piece does.
+- **Ripple rings** — concentric rings pulsing asynchronously rather than as a
+  single synchronized wave. Needs an intended-look spec to distinguish it
+  from `interference` and `orbital-veil`.
+- **Candlestick field** — stock-market-style vertical bodies and wicks across
+  the canvas. Composition, data semantics, and motion are not yet specified.
+
+### Interaction vocabulary from the sketch
+
+The top network drawing suggests four reusable pointer behaviours: repulsor,
+attractor, ripple, and vortex. These are interaction vocabulary, not four
+committed pieces.
+
+Other sketch marks appear to overlap existing candidates: sphere studies map
+to `halftone-sphere` or `node-sphere`, the tunnel maps to `corridor`, and the
+stone-like field may map to `grain-mask`. The last match is uncertain.
 
 ---
 

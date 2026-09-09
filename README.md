@@ -24,6 +24,7 @@ removed, and all shared code inlined — paste that file's contents into any
 site with no other files required.
 
 PNG export offers 2x and 4x resolution buttons.
+"Source" downloads the piece's exact, unbaked `index.html` for modification.
 
 ## Using a piece in your own site
 
@@ -83,7 +84,7 @@ It has to come first: the piece reads the global while its module script is
 evaluating, so a script placed after it runs too late.
 
 The global suppresses the control panel only. A piece's export-button row
-(`Baked HTML`, `PNG`, `SVG`, `Copy AI Prompt`) is static markup in
+(`Baked HTML`, `Source`, `PNG`, `SVG`, `Copy AI Prompt`) is static markup in
 `index.html`, so hand-setting the global leaves it on screen — the Baked
 HTML export removes it separately, along with anything else marked
 `data-lf-panel`. Delete or hide that `<div class="lf-export-row">` if you
@@ -151,9 +152,10 @@ Every piece shares 14 controls (scale, speed, stroke, opacity, saturation,
 hue, hue B, glow, angle, motion, phase, invert, density, pointer) plus its
 own piece-specific control. `density` multiplies the piece's base element
 count. `pointer` scales the piece's cursor response (0 by default, opt-in);
-as of this writing `flow-field`, `contour-grid`, `interference`,
-`orbital-veil`, `grain-field`, `wireframe-lattice`, and `meridian` read it —
-the rest read the value and ignore it until wired.
+each piece maps it to its own visual vocabulary and remains responsive at
+Speed 0. `wireframe-lattice` and `event-horizon` also provide Pitch and Yaw
+controls; Angle is roll, and dragging the canvas orbits the camera on direct
+piece pages. Gallery previews disable drag-to-orbit.
 
 ## Adding a new piece
 
@@ -194,11 +196,13 @@ npm run build            # verify, then regenerate thumbs/ and downloads/
 npm run audit-controls   # empirically check every shared+piece control moves pixels
 node tools/test-presets.mjs <slug>   # preset mechanism + value range gate
 npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
+npm run test-source      # Source buttons download exact unbaked piece files
+npm run test-interactions # pointer, orbit, animation, and baked-artifact browser QA
 node tools/preset-sheet.mjs <slug>   # render a piece's presets for review
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
-canvas, captured at 640×400), `thumbs/<slug>.<preset>.png` (sixty preset
+canvas, captured at 1280×800), `thumbs/<slug>.<preset>.png` (sixty preset
 swatches at 240×150) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
 never reimplemented) for all twelve pieces, then renders `index.html` at

@@ -9,8 +9,8 @@
 // Deliberately absent, by choice rather than oversight: depth sorting and
 // occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
 
-// Rotate a point: yaw about the Y axis, then tilt about the X axis.
-export function rotatePoint(x, y, z, { tilt = 0, yaw = 0 } = {}) {
+// Rotate a point: yaw about Y, pitch about X, then roll about Z.
+export function rotatePoint(x, y, z, { tilt = 0, yaw = 0, roll = 0 } = {}) {
   const cyaw = Math.cos(yaw);
   const syaw = Math.sin(yaw);
   const rx = x * cyaw - z * syaw;
@@ -21,11 +21,13 @@ export function rotatePoint(x, y, z, { tilt = 0, yaw = 0 } = {}) {
   const ry = y * ct - rz * st;
   rz = y * st + rz * ct;
 
-  return { x: rx, y: ry, z: rz };
+  const cr = Math.cos(roll);
+  const sr = Math.sin(roll);
+  return { x: rx * cr - ry * sr, y: rx * sr + ry * cr, z: rz };
 }
 
-export function createCamera({ tilt = 0, yaw = 0, fov = 600, cx = 0, cy = 0 } = {}) {
-  const opt = { tilt, yaw, fov, cx, cy };
+export function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 } = {}) {
+  const opt = { tilt, yaw, roll, fov, cx, cy };
 
   function project(x, y, z) {
     const r = rotatePoint(x, y, z, opt);

@@ -9,27 +9,8 @@ Ordered roughly by how much it would add.
 
 ## Next up
 
-### Pointer interaction and 3D orientation
-
-**Designed, specced, not built.** The cursor becomes a modulation layer over
-the slider state: sliders set the base, the pointer modulates around it. A
-fourteenth shared control (`pointer`, default 0 — off, because these are
-backgrounds) scales the response, and each piece maps the cursor to
-something in its own vocabulary rather than a uniform warp.
-
-The same work replaces the two 3D pieces' overloaded `angle` control with
-proper axis rotation — `angle` becomes roll, `rotX`/`rotY` become pitch and
-yaw — plus drag-to-orbit, disabled inside gallery previews so a drag never
-fights a card's click-to-open.
-
-Deferred so the library could ship first. Adding to something unshipped is
-worth less than shipping it.
-
-### "Source" export button
-
-The original design called for five export buttons; four shipped. "Source"
-would hand over the piece's unbaked source rather than a baked artifact —
-useful for someone who wants to modify rather than embed.
+No scheduled work. Pointer interaction, full 3D orientation, drag-to-orbit,
+and exact Source export shipped in 1.3.0.
 
 ---
 
@@ -48,7 +29,7 @@ before the rotation is applied, so an exported SVG shows unrotated geometry.
 PNG export is unaffected. Fixing it properly means every rotating piece
 baking its transform into stored points.
 
-**`wireframe-lattice` at exactly Tilt 0** loses a little real geometry. The
+**`wireframe-lattice` at exactly Pitch 0** loses a little real geometry. The
 camera's near plane sits at 20% of `fov` to keep SVG coordinates bounded,
 and at a perfectly edge-on view that clips geometry which would otherwise
 draw. Recoverable by making the near plane a per-camera option, which

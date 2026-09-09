@@ -16,6 +16,7 @@
 
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
   <button id="btn-png-2x">PNG 2x</button>
   <button id="btn-png-4x">PNG 4x</button>
   <button id="btn-svg">SVG</button>
@@ -27,7 +28,8 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb } from '../../shared/color.js';
   import { createCamera } from '../../shared/project.js';
-  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createOrbit, createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'event-horizon';
   const canvas = document.getElementById('canvas');
@@ -61,10 +63,14 @@
     onChange: () => {},
     extraControls: [
       { name: 'mass', label: 'Mass', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32 },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0 },
     ],
     defaults: { hue: 285, hueB: 230, saturation: 0.6 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
+  const orbit = createOrbit({ canvas });
 
   const camera = createCamera({ fov: 700 });
 
@@ -119,8 +125,9 @@
     const lineWidth = 0.3 + values.stroke * 1.0;
 
     camera.set({
-      tilt: 0.55 + 0.35 * Math.sin((values.angle * Math.PI) / 180),
-      yaw: t * values.motion * 0.35,
+      tilt: (values.rotX * Math.PI) / 180 + orbit.pitch,
+      yaw: (values.rotY * Math.PI) / 180 + orbit.yaw + t * values.motion * 0.35,
+      roll: (values.angle * Math.PI) / 180,
       cx: canvas.width / 2,
       cy: canvas.height / 2,
     });
@@ -134,6 +141,17 @@
     const phaseWobble = Math.sin(values.phase * Math.PI * 1.5);
     const warpU = (u) => Math.max(0, Math.min(1, u + 0.4 * u * (1 - u) * phaseWobble));
     const radiusAt = (u) => horizon + (extent - horizon) * Math.pow(warpU(u), 1 + values.mass * 0.9);
+    const pointerK = values.pointer * pointer.influence;
+    const projectWithLens = (pts) => {
+      const projected = camera.projectPath(pts);
+      if (!pointerK) return projected;
+      for (const p of projected) {
+        const f = pointer.falloff(p.x, p.y, 260);
+        p.x += (pointer.x - p.x) * f * pointerK * 0.18;
+        p.y += (pointer.y - p.y) * f * pointerK * 0.18;
+      }
+      return projected;
+    };
 
     // Concentric rings, drawn on the XZ plane so the camera's tilt makes a disc.
     for (let i = 1; i <= rings; i++) {
@@ -150,7 +168,7 @@
         const a = (s / SEG) * Math.PI * 2;
         pts.push([Math.cos(a) * R, 0, Math.sin(a) * R]);
       }
-      strokePts(camera.projectPath(pts), values, lineWidth, [r, g, b]);
+      strokePts(projectWithLens(pts), values, lineWidth, [r, g, b]);
     }
 
     // Radial spokes, from the horizon outward.
@@ -164,12 +182,13 @@
         const R = radiusAt(s / 24);
         pts.push([Math.cos(a) * R, 0, Math.sin(a) * R]);
       }
-      strokePts(camera.projectPath(pts), values, lineWidth * 0.7, [r, g, b]);
+      strokePts(projectWithLens(pts), values, lineWidth * 0.7, [r, g, b]);
     }
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
@@ -181,6 +200,9 @@
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
       .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });

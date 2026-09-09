@@ -46,6 +46,12 @@ jobs:
       - name: Test baked exports
         run: npm run test-baked
 
+      - name: Test source exports
+        run: npm run test-source
+
+      - name: Test interactions
+        run: npm run test-interactions
+
       # Deliberately not building here. The gallery, thumbnails and
       # downloads are committed, and GitHub Pages serves them directly.
       # Rebuilding in CI would rewrite committed artifacts for no benefit.

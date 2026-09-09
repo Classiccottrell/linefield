@@ -38,6 +38,15 @@ export function exportSvg(paths, { width = 800, height = 600 } = {}) {
   download('linefield.svg', blob);
 }
 
+export async function exportSource({ filename = 'linefield-source.html' } = {}) {
+  const url = location.href.split(/[?#]/)[0];
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`exportSource: could not fetch source (${res.status})`);
+  const blob = await res.blob();
+  download(filename, blob);
+  return blob;
+}
+
 // The piece's own import statements are the registration. A hand-maintained
 // list is a silent-failure surface: omit an entry and the baked file is
 // valid, loads without error, and renders nothing. That shipped once.

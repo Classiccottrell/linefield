@@ -35,7 +35,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.35,"hue":190,"hueB":205,"glow":0,"angle":0,"motion":1,"phase":0,"invert":false,"density":1,"pointer":0,"tilt":0.55};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.35,"hue":190,"hueB":205,"glow":0,"angle":0,"motion":1,"phase":0,"invert":false,"density":1,"pointer":0,"rotX":32,"rotY":0};
 // --- inlined: ../../shared/controls.js ---
 // shared/controls.js
 
@@ -447,8 +447,8 @@ function simplex2(xin, yin) {
 // Deliberately absent, by choice rather than oversight: depth sorting and
 // occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
 
-// Rotate a point: yaw about the Y axis, then tilt about the X axis.
-function rotatePoint(x, y, z, { tilt = 0, yaw = 0 } = {}) {
+// Rotate a point: yaw about Y, pitch about X, then roll about Z.
+function rotatePoint(x, y, z, { tilt = 0, yaw = 0, roll = 0 } = {}) {
   const cyaw = Math.cos(yaw);
   const syaw = Math.sin(yaw);
   const rx = x * cyaw - z * syaw;
@@ -459,11 +459,13 @@ function rotatePoint(x, y, z, { tilt = 0, yaw = 0 } = {}) {
   const ry = y * ct - rz * st;
   rz = y * st + rz * ct;
 
-  return { x: rx, y: ry, z: rz };
+  const cr = Math.cos(roll);
+  const sr = Math.sin(roll);
+  return { x: rx * cr - ry * sr, y: rx * sr + ry * cr, z: rz };
 }
 
-function createCamera({ tilt = 0, yaw = 0, fov = 600, cx = 0, cy = 0 } = {}) {
-  const opt = { tilt, yaw, fov, cx, cy };
+function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 } = {}) {
+  const opt = { tilt, yaw, roll, fov, cx, cy };
 
   function project(x, y, z) {
     const r = rotatePoint(x, y, z, opt);
@@ -540,6 +542,15 @@ function exportSvg(paths, { width = 800, height = 600 } = {}) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
+}
+
+async function exportSource({ filename = 'linefield-source.html' } = {}) {
+  const url = location.href.split(/[?#]/)[0];
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`exportSource: could not fetch source (${res.status})`);
+  const blob = await res.blob();
+  download(filename, blob);
+  return blob;
 }
 
 // The piece's own import statements are the registration. A hand-maintained
@@ -684,6 +695,49 @@ function createPointer({ canvas, enabled = true }) {
   return p;
 }
 
+function createOrbit({
+  canvas,
+  enabled = new URLSearchParams(location.search).get('preview') !== '1',
+  sensitivity = 0.008,
+} = {}) {
+  const orbit = { pitch: 0, yaw: 0 };
+  let dragging = false;
+  let lastX = 0, lastY = 0;
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+  function onDown(e) {
+    if (e.button !== 0) return;
+    dragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.setPointerCapture?.(e.pointerId);
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    orbit.yaw = clamp(orbit.yaw + (e.clientX - lastX) * sensitivity, -Math.PI, Math.PI);
+    orbit.pitch = clamp(orbit.pitch + (e.clientY - lastY) * sensitivity, -Math.PI / 2, Math.PI / 2);
+    lastX = e.clientX; lastY = e.clientY;
+  }
+  function onUp(e) {
+    dragging = false;
+    canvas.releasePointerCapture?.(e.pointerId);
+  }
+
+  if (enabled) {
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onUp);
+  }
+
+  orbit.destroy = () => {
+    canvas.removeEventListener('pointerdown', onDown);
+    canvas.removeEventListener('pointermove', onMove);
+    canvas.removeEventListener('pointerup', onUp);
+    canvas.removeEventListener('pointercancel', onUp);
+  };
+  return orbit;
+}
+
 
 // --- piece script ---
 
@@ -723,12 +777,14 @@ function createPointer({ canvas, enabled = true }) {
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'tilt', label: 'Tilt', type: 'range', min: 0, max: 1.2, step: 0.01, default: 0.55 },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32 },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0 },
     ],
     defaults: { hue: 190, hueB: 205, saturation: 0.35 },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const orbit = createOrbit({ canvas });
 
   const camera = createCamera({ fov: 620 });
 
@@ -779,8 +835,9 @@ function createPointer({ canvas, enabled = true }) {
     const light = values.invert ? 0.35 : 0.62;
 
     camera.set({
-      tilt: values.tilt,
-      yaw: (values.angle * Math.PI) / 180,
+      tilt: (values.rotX * Math.PI) / 180 + orbit.pitch,
+      yaw: (values.rotY * Math.PI) / 180 + orbit.yaw,
+      roll: (values.angle * Math.PI) / 180,
       cx: canvas.width / 2,
       cy: canvas.height / 2,
     });
@@ -841,6 +898,9 @@ function createPointer({ canvas, enabled = true }) {
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
       .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });

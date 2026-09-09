@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-09-07
+
+### Added
+
+- Pointer response on all twelve pieces, opt-in through the shared Pointer
+  control and independent of animation Speed.
+- Pitch and Yaw controls plus bounded drag-to-orbit on `wireframe-lattice`
+  and `event-horizon`; shared Angle now provides camera roll on both.
+- Source export on every piece, downloading the exact unbaked `index.html`.
+- `npm run test-source`, covering every Source button and byte-comparing its
+  download with the corresponding piece file.
+- `npm run test-interactions`, covering animation, pointer response, orbit
+  controls, and baked-artifact browser behavior.
+
+### Changed
+
+- Gallery preview pages disable drag-to-orbit so card interaction remains
+  unambiguous.
+
 ## [1.2.0] — 2026-09-06
 
 ### Added

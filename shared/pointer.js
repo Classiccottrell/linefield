@@ -76,3 +76,46 @@ export function createPointer({ canvas, enabled = true }) {
 
   return p;
 }
+
+export function createOrbit({
+  canvas,
+  enabled = new URLSearchParams(location.search).get('preview') !== '1',
+  sensitivity = 0.008,
+} = {}) {
+  const orbit = { pitch: 0, yaw: 0 };
+  let dragging = false;
+  let lastX = 0, lastY = 0;
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+  function onDown(e) {
+    if (e.button !== 0) return;
+    dragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.setPointerCapture?.(e.pointerId);
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    orbit.yaw = clamp(orbit.yaw + (e.clientX - lastX) * sensitivity, -Math.PI, Math.PI);
+    orbit.pitch = clamp(orbit.pitch + (e.clientY - lastY) * sensitivity, -Math.PI / 2, Math.PI / 2);
+    lastX = e.clientX; lastY = e.clientY;
+  }
+  function onUp(e) {
+    dragging = false;
+    canvas.releasePointerCapture?.(e.pointerId);
+  }
+
+  if (enabled) {
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onUp);
+  }
+
+  orbit.destroy = () => {
+    canvas.removeEventListener('pointerdown', onDown);
+    canvas.removeEventListener('pointermove', onMove);
+    canvas.removeEventListener('pointerup', onUp);
+    canvas.removeEventListener('pointercancel', onUp);
+  };
+  return orbit;
+}

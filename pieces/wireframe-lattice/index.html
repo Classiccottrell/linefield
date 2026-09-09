@@ -16,6 +16,7 @@
 
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
   <button id="btn-png-2x">PNG 2x</button>
   <button id="btn-png-4x">PNG 4x</button>
   <button id="btn-svg">SVG</button>
@@ -28,8 +29,8 @@
   import { hslToRgb } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { createCamera } from '../../shared/project.js';
-  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
-  import { createPointer } from '../../shared/pointer.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createOrbit, createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'wireframe-lattice';
   const canvas = document.getElementById('canvas');
@@ -61,12 +62,14 @@
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'tilt', label: 'Tilt', type: 'range', min: 0, max: 1.2, step: 0.01, default: 0.55 },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32 },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0 },
     ],
     defaults: { hue: 190, hueB: 205, saturation: 0.35 },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const orbit = createOrbit({ canvas });
 
   const camera = createCamera({ fov: 620 });
 
@@ -117,8 +120,9 @@
     const light = values.invert ? 0.35 : 0.62;
 
     camera.set({
-      tilt: values.tilt,
-      yaw: (values.angle * Math.PI) / 180,
+      tilt: (values.rotX * Math.PI) / 180 + orbit.pitch,
+      yaw: (values.rotY * Math.PI) / 180 + orbit.yaw,
+      roll: (values.angle * Math.PI) / 180,
       cx: canvas.width / 2,
       cy: canvas.height / 2,
     });
@@ -179,6 +183,9 @@
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
       .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });

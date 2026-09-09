@@ -84,11 +84,12 @@ npx serve .
 
 Then open `http://localhost:<port>/pieces/<piece-name>/`.
 
-## The 13 shared controls
+## The 14 shared controls
 
 Every piece gets these controls for free via `createControlPanel()`
 (`shared/controls.js`): `scale`, `speed`, `stroke`, `opacity`, `saturation`,
-`hue`, `hueB`, `glow`, `angle`, `motion`, `phase`, `invert`, `density`.
+`hue`, `hueB`, `glow`, `angle`, `motion`, `phase`, `invert`, `density`,
+`pointer`.
 
 A new piece should make **each** of these visibly affect its render — don't
 leave a control wired up but inert. If a control doesn't map naturally onto
@@ -102,7 +103,7 @@ it.
 Pass an `extraControls` array to `createControlPanel({ ... extraControls })`
 for controls unique to your piece (same spec shape as the shared controls —
 `name`, `label`, `type`, `min`/`max`/`step` or default, etc). These render
-below the 13 shared controls automatically. You can also add one after the
+below the 14 shared controls automatically. You can also add one after the
 panel exists with `panel.addControl({ ... })`.
 
 ## Defaults (`defaults`)
@@ -160,22 +161,26 @@ array. See `pieces/flow-field/index.html` for a worked example.
 strips the control panel, inlines all of `shared/*.js` into one
 `<script type="module">`, and hardcodes the current control values as
 `window.__LF_BAKED_VALUES__`. The output has zero external references and
-runs from anywhere, including outside this repo. If you add a new shared
-module, add its path to `SHARED_MODULE_PATHS` in `bakeHtml()` and make sure
-its top-level names don't collide with any other shared module's top-level
-names (`bakeHtml` concatenates all of them into one scope).
+runs from anywhere, including outside this repo. Shared modules are derived
+from the piece's imports; no separate bake list is maintained. `exportSource()`
+fetches the current route without its query/hash and downloads those exact,
+unbaked bytes.
 
 ## 3D pieces
 
 `shared/project.js` is where 3D capability lives and grows. It exposes
-`createCamera({ tilt, yaw, fov, cx, cy })` returning `.project(x, y, z)`,
+`createCamera({ tilt, yaw, roll, fov, cx, cy })` returning `.project(x, y, z)`,
 `.projectPath(points)` and `.set(partialOptions)`, plus a standalone
 `rotatePoint`. A projected point carries a `scale` — the perspective
 divisor — so pieces can thin or fade distant geometry; `scale === 0` means
 the point is at or beyond the camera's near plane (20% of `fov` ahead of
 the lens, capping scale at 5x) and must be skipped.
 
-Extend it by adding a camera *option*, not by changing call signatures, so
+3D pieces expose `rotX`/`rotY` as Pitch/Yaw and use shared Angle as roll.
+`createOrbit()` in `shared/pointer.js` adds bounded drag offsets and disables
+itself under `?preview=1`.
+
+Extend the camera by adding an option, not by changing call signatures, so
 existing pieces keep working. Deliberately absent today: depth sorting and
 occlusion, matrix stacks, lighting, mesh loading, and an orthographic mode.
 
@@ -185,4 +190,4 @@ A piece has no bundler, transpiler, or test runner of its own. Canvas
 rendering is verified visually: serve the repo root, open the piece in a
 browser, and confirm it renders and animates as expected, with zero
 console errors. Also click through each export button (PNG 2x, PNG 4x,
-SVG, Baked HTML, Copy AI Prompt) to confirm they work.
+SVG, Baked HTML, Source, Copy AI Prompt) to confirm they work.

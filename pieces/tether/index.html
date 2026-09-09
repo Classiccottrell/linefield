@@ -16,6 +16,7 @@
 
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
   <button id="btn-png-2x">PNG 2x</button>
   <button id="btn-png-4x">PNG 4x</button>
   <button id="btn-svg">SVG</button>
@@ -27,7 +28,8 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
-  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'tether';
   const canvas = document.getElementById('canvas');
@@ -81,6 +83,7 @@
     defaults: { hue: 220, hueB: 250, saturation: 0.25 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   seedCables(Math.max(2, Math.round(BASE_COUNT * currentValues.density)));
 
@@ -95,10 +98,16 @@
     const light = values.invert ? 0.35 : 0.65;
     const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than meridian
     const noiseScale = 0.9 * (0.3 + values.scale);
+    const k = values.pointer * pointer.influence;
+    const theta = (values.angle * Math.PI) / 180;
+    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
+    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
+    const plx = W / 2 + pdx * cosT - pdy * sinT;
+    const ply = H / 2 + pdx * sinT + pdy * cosT;
 
     ctx.save();
     ctx.translate(W / 2, H / 2);
-    ctx.rotate((values.angle * Math.PI) / 180);
+    ctx.rotate(theta);
     ctx.translate(-W / 2, -H / 2);
 
     for (let i = 0; i < cables.length; i++) {
@@ -134,7 +143,11 @@
         // A little high-frequency shiver, like a plucked string.
         const shiver =
           simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
-        const py = y + droop + shiver;
+        let py = y + droop + shiver;
+        if (k) {
+          const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / 240);
+          py += (py >= ply ? 1 : -1) * f * k * 80 * (4 * u * (1 - u));
+        }
         if (s === 0) ctx.moveTo(x, py);
         else ctx.lineTo(x, py);
         pts.push([x, py]);
@@ -156,6 +169,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
@@ -167,6 +181,9 @@
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
       .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });
