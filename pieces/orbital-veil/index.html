@@ -105,15 +105,11 @@
     const k = modeFactor(values, pointer);
     const mode = values.cursorInteraction;
 
-    // Orb tilts toward the pointer: a per-ring lateral shift driven by
-    // nx/ny, scaled by each ring's own radius so outer rings (the near side
-    // of the tilt) shift further than inner ones. This was the piece's one
-    // existing pointer response and has no positional falloff of its own —
-    // scoped to Attract, where "the whole orb leans toward the cursor"
-    // reads as attraction; Grow/Shrink/Vortex get a genuine per-point
-    // falloff deformation below instead.
-    const tiltX = mode === 'Attract' ? pointer.nx * k : 0;
-    const tiltY = mode === 'Attract' ? pointer.ny * k : 0;
+    // The piece's one prior pointer response was a global nx/ny tilt with
+    // no positional falloff — against the "k and a positional falloff,
+    // nothing else" contract. Replaced below with a genuine per-point
+    // falloff pull/swell/rotation for all four modes, not kept for any of
+    // them.
 
     for (let i = 0; i < rings; i++) {
       const f = i / (rings - 1 || 1);
@@ -133,9 +129,19 @@
       ctx.beginPath();
       for (let s = 0; s <= SEG; s++) {
         const a = start + (s / SEG) * sweep;
-        let x = cx + Math.cos(a) * radius + tiltX * radius * 0.5;
-        let y = cy + Math.sin(a) * radius * tilt + tiltY * radius * 0.5;
-        if (k && (mode === 'Grow' || mode === 'Shrink' || mode === 'Vortex')) {
+        let x = cx + Math.cos(a) * radius;
+        let y = cy + Math.sin(a) * radius * tilt;
+        if (k && mode === 'Attract') {
+          const f = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / SWELL_RADIUS);
+          if (f) {
+            // Clamp the EASE FRACTION, not f*k directly: k can reach 2
+            // (Pointer control's max), and a lerp factor above 1 overshoots
+            // the pointer and reflects the point past it.
+            const ease = Math.min(f * k, 1);
+            x += (pointer.x - x) * ease;
+            y += (pointer.y - y) * ease;
+          }
+        } else if (k && (mode === 'Grow' || mode === 'Shrink' || mode === 'Vortex')) {
           const amp = mode === 'Shrink' ? 1 / (1 + k * 1.5) : 1 + k * 1.5;
           const swellRadius = SWELL_RADIUS * amp;
           const f = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / swellRadius);

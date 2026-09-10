@@ -1576,8 +1576,12 @@ function createOrbit({
       const f = pointer.falloff(p.x, p.y, WARP_RADIUS);
       if (!f) continue;
       if (mode === 'Attract') {
-        p.x += (pointer.x - p.x) * f * k;
-        p.y += (pointer.y - p.y) * f * k;
+        // Clamp the EASE FRACTION, not f*k: k can reach 2 (Pointer's max),
+        // and a lerp factor above 1 overshoots the pointer and reflects
+        // the point past it.
+        const ease = Math.min(f * k, 1);
+        p.x += (pointer.x - p.x) * ease;
+        p.y += (pointer.y - p.y) * ease;
       } else {
         const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * k * 1.1 });
         p.x = pointer.x + r.x;

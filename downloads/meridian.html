@@ -1620,7 +1620,10 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
             }
           } else if (mode === 'Attract') {
             const dist = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / DEFLECT_RADIUS);
-            if (dist) y += (ply - y) * dist * k;
+            // Clamp the EASE FRACTION, not dist*k: k can reach 2 (Pointer's
+            // max), and a lerp factor above 1 overshoots the pointer and
+            // reflects the point past it.
+            if (dist) y += (ply - y) * Math.min(dist * k, 1);
           } else if (mode === 'Vortex') {
             const dist = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / DEFLECT_RADIUS);
             if (dist) {
