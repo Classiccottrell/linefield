@@ -34,6 +34,7 @@
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'flow-field';
   const canvas = document.getElementById('canvas');
@@ -88,6 +89,7 @@
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
 
   seedParticles(Math.round(BASE_COUNT * currentValues.density));
   window.addEventListener('resize', () =>
@@ -120,9 +122,10 @@
     for (const p of particles) {
       let angle = fieldAngle(p.x, p.y, elapsed, values);
 
-      // Multiplied by BOTH the control and influence: off at pointer 0, and
-      // eased rather than snapped when the cursor leaves. Nothing else.
-      const k = values.pointer * pointer.influence;
+      // modeFactor is off at pointer 0, off when cursorInteraction is 'None'
+      // regardless of pointer, and eased rather than snapped when the cursor
+      // leaves. Nothing else.
+      const k = modeFactor(values, pointer);
       let pushX = 0, pushY = 0;
       if (k) {
         const f = pointer.falloff(p.x, p.y, 260);
@@ -201,11 +204,15 @@
         }
       }
     }
+
+    overlay.draw(ctx, `rgb(${r},${g},${b})`, modeFactor(values, pointer));
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });
