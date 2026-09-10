@@ -1,13 +1,24 @@
 // shared/controls.js
 
+import { hexToHue } from './color.js';
+
 const SHARED_CONTROLS = [
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
   { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6 },
-  { name: 'hue', label: 'Hue', type: 'range', min: 0, max: 360, step: 1, default: 200 },
-  { name: 'hueB', label: 'Hue B', type: 'range', min: 0, max: 360, step: 1, default: 280 },
+  // Solid/gradient palette. `colorA`/`colorB` are the authored controls a
+  // user actually sees and drags; `hue`/`hueB` are hidden (no panel row) —
+  // the exact numeric degrees every piece's render math still reads. Picking
+  // a colour writes the hidden field via `linkedHue` (see setValue below);
+  // the reverse never happens, so a piece's own seeded default hue is never
+  // round-tripped through 8-bit hex and stays exactly what the piece declares.
+  { name: 'colorMode', label: 'Color Mode', type: 'select', options: ['solid', 'gradient'], default: 'gradient' },
+  { name: 'colorA', label: 'Color A', type: 'color', default: '#00aaff', linkedHue: 'hue' },
+  { name: 'colorB', label: 'Color B', type: 'color', default: '#aa00ff', linkedHue: 'hueB' },
+  { name: 'hue', label: 'Hue', type: 'hidden', default: 200 },
+  { name: 'hueB', label: 'Hue B', type: 'hidden', default: 280 },
   { name: 'glow', label: 'Glow', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
   { name: 'angle', label: 'Angle', type: 'range', min: 0, max: 360, step: 1, default: 0 },
   { name: 'motion', label: 'Motion', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
@@ -42,6 +53,14 @@ const PANEL_CSS = `
 .lf-chip:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 1px; }
 `;
 
+function kindOf(spec) {
+  if (spec.type === 'checkbox') return 'boolean';
+  if (spec.type === 'color') return 'color';
+  if (spec.type === 'select') return 'enum';
+  if (spec.type === 'hidden') return 'hidden';
+  return 'number';
+}
+
 function injectCss() {
   if (document.getElementById('lf-panel-css')) return;
   const style = document.createElement('style');
@@ -63,11 +82,13 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   const storageKey = `linefield:${pieceId}`;
   const allSpecs = [...SHARED_CONTROLS, ...extraControls];
   const specByName = {};
-  // kind is the discriminant every gate must branch on, never `type`: Stage C
-  // adds 'select'/'radio' types, and a gate that switches on type-name string
-  // would silently fall a new type into whichever branch it doesn't match.
+  // kind is the discriminant every gate must branch on, never `type`: a gate
+  // that switches on the type-name string would silently fall a new type
+  // into whichever branch it doesn't match. 'hidden' (hue/hueB) has no panel
+  // row at all and is excluded from control gates entirely — it is not a
+  // user-facing control, just the exact numeric value colorA/colorB drive.
   for (const spec of allSpecs) {
-    spec.kind = spec.type === 'checkbox' ? 'boolean' : 'number';
+    spec.kind = kindOf(spec);
     specByName[spec.name] = spec;
   }
   const defaults = {};
@@ -104,10 +125,10 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   body.className = 'lf-body';
   panel.appendChild(body);
 
-  // Per-control render hook. The default registration below covers a plain
-  // <input>; a widget that isn't a bare input (Stage C's dropdown/radio/
-  // colour picker) registers its own render(v) instead, so setValue below
-  // stays agnostic to what is actually on screen.
+  // Per-control render hook. Covers <input type=range|checkbox|color> and
+  // <select> uniformly; a future widget that isn't a bare input/select would
+  // register its own render(v) instead, so setValue below stays agnostic to
+  // what is actually on screen.
   const controllers = {};
 
   // Clamp to the spec's declared range where numeric, then snap to its step
@@ -139,13 +160,32 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
     const spec = specByName[name];
     const v = clampValue(spec, value);
     values[name] = v;
+    // A colour control's spec names the hidden numeric field it drives
+    // (colorA -> hue, colorB -> hueB). This is the ONLY place that hex gets
+    // decoded — once per pick, never in a render loop — and it never runs
+    // for a programmatic write to the hidden field itself (see applyValues,
+    // which reasserts hue/hueB after this fires so a preset/reset always
+    // lands on the exact declared number, not a lossy decode of colorA/
+    // colorB). An achromatic pick (grey/white/black) has no hue to extract;
+    // hexToHue returns null and the previous hue is left untouched.
+    if (spec?.linkedHue) {
+      const decoded = hexToHue(v);
+      if (decoded !== null) values[spec.linkedHue] = decoded;
+    }
     controllers[name]?.render(v);
+    if (name === 'colorMode') controllers.colorB?.setRowVisible?.(v === 'gradient');
     setActiveChip(null);
     onChange(name, v, values);
     if (shouldPersist) persist();
   }
 
   function buildRow(spec, beforeEl) {
+    // 'hidden' (hue/hueB) is not a control — no row, no input, no DOM at all.
+    // It stays in allSpecs/defaults/values so the rest of the machinery
+    // (defaults composition, presets, persistence) treats it like any other
+    // value; it is simply never rendered or driven directly.
+    if (spec.type === 'hidden') return;
+
     const row = document.createElement('div');
     row.className = 'lf-row';
     const label = document.createElement('label');
@@ -161,6 +201,15 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
       input = document.createElement('input');
       input.type = 'color';
       input.value = values[spec.name];
+    } else if (spec.type === 'select') {
+      input = document.createElement('select');
+      for (const opt of spec.options) {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        input.appendChild(o);
+      }
+      input.value = values[spec.name];
     } else {
       input = document.createElement('input');
       input.type = 'range';
@@ -174,7 +223,9 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
     // not touch values/onChange/persistence itself — setValue is the only
     // write path (see above).
     input.addEventListener('input', () => {
-      const v = spec.type === 'checkbox' ? input.checked : parseFloat(input.value);
+      const v = spec.type === 'checkbox' ? input.checked
+        : (spec.type === 'color' || spec.type === 'select') ? input.value
+        : parseFloat(input.value);
       setValue(spec.name, v);
     });
 
@@ -182,6 +233,9 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
       render(v) {
         if (spec.type === 'checkbox') input.checked = v;
         else input.value = v;
+      },
+      setRowVisible(visible) {
+        row.style.display = visible ? '' : 'none';
       },
     };
     row.appendChild(input);
@@ -197,6 +251,16 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   function applyValues(map) {
     const next = { ...defaults, ...map };
     for (const spec of allSpecs) setValue(spec.name, next[spec.name], { persist: false });
+    // setValue(colorA/colorB, ...) above may have just overwritten hue/hueB
+    // with a lossy hex decode — order-dependent otherwise, since 'hidden'
+    // specs are plain entries in the same allSpecs array. The exact value
+    // `next` already carries always wins on a programmatic write (preset,
+    // Reset, ?preset= on load): reassert it directly, no side effects, so
+    // these paths render at exactly the declared number, never an
+    // approximation of it.
+    for (const spec of allSpecs) {
+      if (spec.kind === 'hidden') values[spec.name] = next[spec.name];
+    }
     persist();
   }
 
@@ -231,6 +295,9 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   }
 
   for (const spec of allSpecs) buildRow(spec);
+  // colorB's row only makes sense in gradient mode; setValue toggles it on
+  // every subsequent change, this sets the correct initial state.
+  controllers.colorB?.setRowVisible?.(values.colorMode === 'gradient');
 
   const resetBtn = document.createElement('button');
   resetBtn.className = 'lf-reset';
@@ -277,7 +344,7 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
     el: panel,
     setValue,
     addControl(spec) {
-      spec.kind = spec.type === 'checkbox' ? 'boolean' : 'number';
+      spec.kind = kindOf(spec);
       specByName[spec.name] = spec;
       allSpecs.push(spec);
       defaults[spec.name] = spec.default;

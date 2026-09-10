@@ -26,7 +26,7 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { createCamera } from '../../shared/project.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createOrbit, createPointer } from '../../shared/pointer.js';
@@ -66,7 +66,7 @@
       { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32 },
       { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0 },
     ],
-    defaults: { hue: 285, hueB: 230, saturation: 0.6 },
+    defaults: { hue: 285, hueB: 230, saturation: 0.6, colorMode: 'gradient', colorA: '#bf00ff', colorB: '#002bff' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
@@ -181,11 +181,8 @@
     for (let i = 1; i <= rings; i++) {
       const u = i / rings;
       const R = radiusAt(u);
-      const [r, g, b] = hslToRgb(
-        values.hue + (values.hueB - values.hue) * u,
-        values.saturation,
-        light
-      );
+      const { h, s } = paletteHsl(values, u);
+      const [r, g, b] = hslToRgb(h, s, light);
 
       const pts = [];
       for (let s = 0; s <= SEG; s++) {
@@ -199,7 +196,8 @@
     const spokes = Math.max(4, Math.round(SPOKES * values.density));
     for (let k = 0; k < spokes; k++) {
       const a = (k / spokes) * Math.PI * 2;
-      const [r, g, b] = hslToRgb(values.hueB, values.saturation, light * 0.85);
+      const stopB = paletteHsl(values, 1);
+      const [r, g, b] = hslToRgb(stopB.h, stopB.s, light * 0.85);
 
       const pts = [];
       for (let s = 0; s <= 24; s++) {

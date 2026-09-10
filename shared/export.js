@@ -53,27 +53,63 @@ export async function exportSource({ filename = 'linefield-source.html' } = {}) 
 const SHARED_IMPORT_RE =
   /^\s*import\s*\{[^}]*\}\s*from\s*['"](\.\.\/\.\.\/shared\/[^'"]+\.js)['"];?\s*$/gm;
 
+// A shared module importing ANOTHER shared module (e.g. controls.js reading
+// hexToHue from color.js) addresses it as './color.js' — same directory,
+// different relative base than the piece's '../../shared/color.js'. Matched
+// separately and normalised back to the piece-style path below so the same
+// `seen` dedupe applies to both forms of the same file.
+const INNER_SHARED_IMPORT_RE =
+  /^\s*import\s*\{[^}]*\}\s*from\s*['"]\.\/([^'"]+\.js)['"];?\s*$/gm;
+
 function stripExports(src) {
   // `export function foo` / `export const foo` -> drop the `export ` keyword.
   return src.replace(/^export\s+/gm, '');
 }
 
+function stripInnerImports(src) {
+  return src.replace(INNER_SHARED_IMPORT_RE, '');
+}
+
+// BFS over the shared-module import graph, not just the piece's own
+// top-level imports. Scanning only the piece script is exactly the
+// hand-maintained-list failure this function's own comment already warns
+// about, one level removed: a shared module's OWN imports were invisible to
+// it, so a new cross-shared-module import survived verbatim into a classic
+// (non-module) inline script — a SyntaxError this file's <script> tag has no
+// listener for, producing a validly-loading, blank-canvas download. See
+// skills/building-generative-backgrounds/SKILL.md, "Inlining and bundling".
 async function inlineSharedModules(pieceScriptSrc) {
-  const paths = [...pieceScriptSrc.matchAll(SHARED_IMPORT_RE)].map((m) => m[1]);
-  const unique = [...new Set(paths)];
-  if (!unique.length) {
+  const strippedPieceSrc = pieceScriptSrc.replace(SHARED_IMPORT_RE, '');
+  const initial = [...pieceScriptSrc.matchAll(SHARED_IMPORT_RE)].map((m) => m[1]);
+  if (!initial.length) {
     throw new Error('bakeHtml: the piece imports no shared modules — refusing to bake a file that would render blank');
   }
-  const strippedPieceSrc = pieceScriptSrc.replace(SHARED_IMPORT_RE, '');
 
-  const bodies = await Promise.all(
-    unique.map(async (path) => {
-      const res = await fetch(path);
-      if (!res.ok) throw new Error(`bakeHtml: could not fetch ${path} (${res.status})`);
-      const src = await res.text();
-      return `// --- inlined: ${path} ---\n${stripExports(src)}`;
-    })
-  );
+  const seen = new Set();
+  const order = [];
+  const srcByPath = new Map();
+  const queue = [...initial];
+  while (queue.length) {
+    const path = queue.shift();
+    if (seen.has(path)) continue;
+    seen.add(path);
+    order.push(path);
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`bakeHtml: could not fetch ${path} (${res.status})`);
+    const src = await res.text();
+    srcByPath.set(path, src);
+    // Normalise './foo.js' found INSIDE a shared module to the same
+    // '../../shared/foo.js' form the piece-level regex produces, so a module
+    // reached both ways (e.g. color.js: directly by the piece, and via
+    // controls.js) is only ever inlined once.
+    const inner = [...src.matchAll(INNER_SHARED_IMPORT_RE)].map((m) => `../../shared/${m[1]}`);
+    for (const p of inner) if (!seen.has(p)) queue.push(p);
+  }
+
+  const bodies = order.map((path) => {
+    const src = srcByPath.get(path);
+    return `// --- inlined: ${path} ---\n${stripInnerImports(stripExports(src))}`;
+  });
 
   return `${bodies.join('\n\n')}\n\n// --- piece script ---\n${strippedPieceSrc}`;
 }

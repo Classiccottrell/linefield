@@ -26,7 +26,7 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
@@ -80,7 +80,7 @@
     // control defaults, but stating them here is what makes 200/280 visible as
     // TAKEN to the next contributor grepping pieces' `defaults` blocks for a
     // free hue — and keeps flow-field's violet if the shared defaults ever move.
-    defaults: { hue: 200, hueB: 280, saturation: 0.6 },
+    defaults: { hue: 200, hueB: 280, saturation: 0.6, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
@@ -100,8 +100,10 @@
   }
 
   function drawFrame(dt, elapsed, values) {
-    const [r, g, b] = hslToRgb(values.hue, values.saturation, 0.55);
-    const [rB, gB, bB] = hslToRgb(values.hueB, values.saturation, 0.55);
+    const stopA = paletteHsl(values, 0);
+    const [r, g, b] = hslToRgb(stopA.h, stopA.s, 0.55);
+    const stopB = paletteHsl(values, 1);
+    const [rB, gB, bB] = hslToRgb(stopB.h, stopB.s, 0.55);
 
     // Low fade alpha: each frame only partially clears, so the streaks a
     // particle leaves behind persist long enough to read as flowing lines.

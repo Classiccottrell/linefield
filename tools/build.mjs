@@ -22,12 +22,17 @@ export function loadManifest() {
   return JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8'));
 }
 
-// Pull the `defaults: { hue: N, hueB: N, saturation: N }` block out of a
+// Pull the `defaults: { hue: N, hueB: N, saturation: N, ... }` block out of a
 // piece's source. Whitespace-tolerant; returns null if the piece has none.
+// Locked to hue/hueB/saturation appearing FIRST and in that exact order —
+// same as before — but no longer requires them to be the only keys: the
+// colour-picker fields (colorMode/colorA/colorB) that now follow are hidden
+// implementation values these hue/hueB numbers still drive exactly, so the
+// block ends in `,` (more keys follow) or `}` (old three-key shape) either way.
 export function readPieceDefaults(slug) {
   const src = readFileSync(join(ROOT, 'pieces', slug, 'index.html'), 'utf8');
   const m = src.match(
-    /defaults:\s*\{\s*hue:\s*(-?[\d.]+)\s*,\s*hueB:\s*(-?[\d.]+)\s*,\s*saturation:\s*([\d.]+)\s*\}/
+    /defaults:\s*\{\s*hue:\s*(-?[\d.]+)\s*,\s*hueB:\s*(-?[\d.]+)\s*,\s*saturation:\s*([\d.]+)\s*[,}]/
   );
   if (!m) return null;
   return { hue: Number(m[1]), hueB: Number(m[2]), saturation: Number(m[3]) };

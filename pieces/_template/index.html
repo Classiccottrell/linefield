@@ -19,15 +19,19 @@
   1. Copy this whole folder to ../<your-piece-name>/ (kebab-case).
   2. Change <title> above.
   3. In the script below, replace the drawFrame() body with your own
-     rendering logic. Read `values` for the 14 shared controls (see
+     rendering logic. Read `values` for the 15 shared controls (see
      shared/controls.js for names/ranges) plus any piece-specific ones,
      which you add via the `extraControls` option to createControlPanel()
      (see the real pieces for examples) — or panel.addControl({...}) if
-     you need to add one after the panel is already constructed.
+     you need to add one after the panel is already constructed. For colour,
+     call `paletteHsl(values, f)` (shared/color.js) rather than reading
+     values.hue/hueB directly — those two are hidden implementation values
+     the colorA/colorB pickers drive, not controls themselves.
   4. Rebuild `paths` each frame if you want SVG export to work (array of
      point-arrays); otherwise SVG export will just produce an empty file.
   5. Pass a `defaults` palette to createControlPanel() (see below) so your
-     piece doesn't silently clone flow-field's hue.
+     piece doesn't silently clone flow-field's hue — include colorA/colorB
+     hex too, so the picker's initial swatch matches the piece's own look.
 -->
 
 <div class="lf-export-row" data-lf-panel>
@@ -43,7 +47,7 @@
   import { createControlPanel } from '../../shared/controls.js';
   import { createPointer } from '../../shared/pointer.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
 
   const PIECE_ID = 'template';
@@ -80,7 +84,7 @@
     // Every piece must pick its own palette here. shared/controls.js's own
     // fallback defaults (hue 200 / hueB 280) belong to flow-field — a piece
     // that omits this block silently clones the flagship's look.
-    defaults: { hue: 130, hueB: 20, saturation: 0.5 },
+    defaults: { hue: 130, hueB: 20, saturation: 0.5, colorMode: 'gradient', colorA: '#00ff2b', colorB: '#ff5500' },
   });
   const currentValues = baked || panel.values;
 
@@ -100,7 +104,8 @@
   });
 
   function drawFrame(dt, elapsed, values) {
-    const [r, g, b] = hslToRgb(values.hue, values.saturation, 0.5);
+    const { h, s } = paletteHsl(values, 0);
+    const [r, g, b] = hslToRgb(h, s, 0.5);
 
     // Your pointer response goes here. `k` is the ONLY gate: at pointer 0 it
     // is 0 and the piece must render byte-identically to having no cursor at

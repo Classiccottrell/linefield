@@ -26,7 +26,7 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
 
@@ -62,7 +62,7 @@
     extraControls: [
       { name: 'split', label: 'Split', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
     ],
-    defaults: { hue: 185, hueB: 320, saturation: 0.75 },
+    defaults: { hue: 185, hueB: 320, saturation: 0.75, colorMode: 'gradient', colorA: '#00eaff', colorB: '#ff00aa' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
@@ -118,8 +118,9 @@
     const dy = Math.sin(dir) * sep;
 
     const light = values.invert ? 0.35 : 0.6;
+    const stopA = paletteHsl(values, 0);
     drawFamily(cx - dx, cy - dy, rings, spacing,
-      hslToRgb(values.hue, values.saturation, light), values);
+      hslToRgb(stopA.h, stopA.s, light), values);
 
     // Second family's centre eases toward the pointer by k: a plain blend
     // gated by the control*influence product, no term scaled by values.speed.
@@ -129,8 +130,9 @@
     const ease = Math.min(k, 1);
     const cx2 = (cx + dx) + (pointer.x - (cx + dx)) * ease;
     const cy2 = (cy + dy) + (pointer.y - (cy + dy)) * ease;
+    const stopB = paletteHsl(values, 1);
     drawFamily(cx2, cy2, rings, spacing,
-      hslToRgb(values.hueB, values.saturation, light), values);
+      hslToRgb(stopB.h, stopB.s, light), values);
   }
 
   const loop = createLoop({

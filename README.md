@@ -73,7 +73,8 @@ the existing `<script type="module">`:
 <script>
   window.__LF_BAKED_VALUES__ = {
     scale: 1, speed: 0.6, stroke: 1, opacity: 1,
-    saturation: 0.5, hue: 210, hueB: 260,
+    saturation: 0.5, colorMode: 'gradient', hue: 210, hueB: 260,
+    colorA: '#3399ff', colorB: '#aa00ff',
     glow: 0, angle: 0, motion: 1, phase: 0,
     invert: false, density: 0.8,
   };
@@ -90,7 +91,7 @@ HTML export removes it separately, along with anything else marked
 `data-lf-panel`. Delete or hide that `<div class="lf-export-row">` if you
 are configuring a piece by hand and don't want it visible.
 
-Every one of the 14 shared controls may be set this way, plus any
+Every one of the 15 shared controls may be set this way, plus any
 piece-specific control — check that piece's `extraControls` for its names.
 But unlike the real Baked HTML export, which always writes every control's
 current value, a hand-written object is used as-is: it is not merged with
@@ -98,6 +99,13 @@ the piece's defaults. Any control you omit reads as `undefined`, which
 breaks rendering (an untuned canvas, no visible strokes) rather than
 falling back to a default. Set every control the piece defines — copy the
 full list above and edit values, don't trim it. Unknown keys are ignored.
+
+A piece's own rendering reads `hue`/`hueB`/`saturation`/`colorMode`/`invert`
+(via `paletteHsl()`, see CONTRIBUTING.md) — `colorA`/`colorB` are the
+picker's own hex display and are not read by drawing code, but the real
+Baked HTML export always includes them since it dumps the panel's full
+value set. Include them by hand too if you're hand-authoring rather than
+exporting, for consistency, though rendering does not require it.
 
 ## Presets
 
@@ -148,9 +156,12 @@ tooling" below and CONTRIBUTING.md.
 - `event-horizon` — a polar grid bent inward by a gravity well
 - `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
 
-Every piece shares 14 controls (scale, speed, stroke, opacity, saturation,
-hue, hue B, glow, angle, motion, phase, invert, density, pointer) plus its
-own piece-specific control. `density` multiplies the piece's base element
+Every piece shares 15 controls (scale, speed, stroke, opacity, saturation,
+color mode, color A, color B, glow, angle, motion, phase, invert, density,
+pointer) plus its own piece-specific control. Color mode switches between a
+single hue (Solid) and a two-stop blend (Gradient, the default — every
+piece's own look); Color A/B are hex pickers, B shown only in Gradient mode.
+`density` multiplies the piece's base element
 count. `pointer` scales the piece's cursor response (0 by default, opt-in);
 each piece maps it to its own visual vocabulary and remains responsive at
 Speed 0. `wireframe-lattice` and `event-horizon` also provide Pitch and Yaw

@@ -26,7 +26,7 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
 
@@ -62,7 +62,7 @@
     extraControls: [
       { name: 'sweep', label: 'Sweep', type: 'range', min: 0.05, max: 1, step: 0.01, default: 0.62 },
     ],
-    defaults: { hue: 265, hueB: 330, saturation: 0.55 },
+    defaults: { hue: 265, hueB: 330, saturation: 0.55, colorMode: 'gradient', colorA: '#6a00ff', colorB: '#ff0080' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
@@ -103,11 +103,8 @@
       const sweep = Math.PI * 2 * values.sweep;
       const start = rot;
 
-      const [r, g, b] = hslToRgb(
-        values.hue + (values.hueB - values.hue) * f,
-        values.saturation,
-        light
-      );
+      const { h, s } = paletteHsl(values, f);
+      const [r, g, b] = hslToRgb(h, s, light);
       ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
 
       const pts = [];

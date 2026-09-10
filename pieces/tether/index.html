@@ -26,7 +26,7 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
@@ -80,7 +80,7 @@
     extraControls: [
       { name: 'slack', label: 'Slack', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
     ],
-    defaults: { hue: 220, hueB: 250, saturation: 0.25 },
+    defaults: { hue: 220, hueB: 250, saturation: 0.25, colorMode: 'gradient', colorA: '#0055ff', colorB: '#2a00ff' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
@@ -125,11 +125,8 @@
       const sway = Math.sin(t + c.j + values.phase * Math.PI);
       const sag = H * 0.16 * values.slack * (0.55 + 0.45 * sway);
 
-      const [r, g, b] = hslToRgb(
-        values.hue + (values.hueB - values.hue) * f,
-        values.saturation,
-        light
-      );
+      const { h, s } = paletteHsl(values, f);
+      const [r, g, b] = hslToRgb(h, s, light);
       ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
 
       const pts = [];

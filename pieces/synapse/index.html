@@ -26,7 +26,7 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
@@ -81,7 +81,7 @@
     extraControls: [
       { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 90 },
     ],
-    defaults: { hue: 75, hueB: 45, saturation: 0.7 },
+    defaults: { hue: 75, hueB: 45, saturation: 0.7, colorMode: 'gradient', colorA: '#bfff00', colorB: '#ffbf00' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
@@ -146,8 +146,10 @@
     }
 
     const reach2 = reach * reach;
-    const [r0, g0, b0] = hslToRgb(values.hue, values.saturation, light);
-    const [r1, g1, b1] = hslToRgb(values.hueB, values.saturation, light);
+    const stopA = paletteHsl(values, 0);
+    const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
+    const stopB = paletteHsl(values, 1);
+    const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
     const pointerK = values.pointer * pointer.influence;
 
     for (let cy = 0; cy < rows; cy++) {

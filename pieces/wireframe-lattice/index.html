@@ -26,7 +26,7 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { createCamera } from '../../shared/project.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
@@ -65,7 +65,7 @@
       { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32 },
       { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0 },
     ],
-    defaults: { hue: 190, hueB: 205, saturation: 0.35 },
+    defaults: { hue: 190, hueB: 205, saturation: 0.35, colorMode: 'gradient', colorA: '#00d4ff', colorB: '#0095ff' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
@@ -174,11 +174,8 @@
     // Rows (constant z), then columns (constant x).
     for (let i = 0; i <= steps; i++) {
       const f = i / steps;
-      const [r, g, b] = hslToRgb(
-        values.hue + (values.hueB - values.hue) * f,
-        values.saturation,
-        light
-      );
+      const { h, s } = paletteHsl(values, f);
+      const [r, g, b] = hslToRgb(h, s, light);
 
       const rowPts = [];
       const colPts = [];

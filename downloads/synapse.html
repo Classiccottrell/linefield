@@ -35,7 +35,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.7,"hue":75,"hueB":45,"glow":0,"angle":0,"motion":1,"phase":0,"invert":false,"density":1,"pointer":0,"reach":90};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.7,"colorMode":"gradient","colorA":"#bfff00","colorB":"#ffbf00","hue":75,"hueB":45,"glow":0,"angle":0,"motion":1,"phase":0,"invert":false,"density":1,"pointer":0,"reach":90};
 // --- inlined: ../../shared/controls.js ---
 // shared/controls.js
 
@@ -45,8 +45,17 @@ const SHARED_CONTROLS = [
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
   { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6 },
-  { name: 'hue', label: 'Hue', type: 'range', min: 0, max: 360, step: 1, default: 200 },
-  { name: 'hueB', label: 'Hue B', type: 'range', min: 0, max: 360, step: 1, default: 280 },
+  // Solid/gradient palette. `colorA`/`colorB` are the authored controls a
+  // user actually sees and drags; `hue`/`hueB` are hidden (no panel row) —
+  // the exact numeric degrees every piece's render math still reads. Picking
+  // a colour writes the hidden field via `linkedHue` (see setValue below);
+  // the reverse never happens, so a piece's own seeded default hue is never
+  // round-tripped through 8-bit hex and stays exactly what the piece declares.
+  { name: 'colorMode', label: 'Color Mode', type: 'select', options: ['solid', 'gradient'], default: 'gradient' },
+  { name: 'colorA', label: 'Color A', type: 'color', default: '#00aaff', linkedHue: 'hue' },
+  { name: 'colorB', label: 'Color B', type: 'color', default: '#aa00ff', linkedHue: 'hueB' },
+  { name: 'hue', label: 'Hue', type: 'hidden', default: 200 },
+  { name: 'hueB', label: 'Hue B', type: 'hidden', default: 280 },
   { name: 'glow', label: 'Glow', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
   { name: 'angle', label: 'Angle', type: 'range', min: 0, max: 360, step: 1, default: 0 },
   { name: 'motion', label: 'Motion', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
@@ -81,6 +90,14 @@ const PANEL_CSS = `
 .lf-chip:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 1px; }
 `;
 
+function kindOf(spec) {
+  if (spec.type === 'checkbox') return 'boolean';
+  if (spec.type === 'color') return 'color';
+  if (spec.type === 'select') return 'enum';
+  if (spec.type === 'hidden') return 'hidden';
+  return 'number';
+}
+
 function injectCss() {
   if (document.getElementById('lf-panel-css')) return;
   const style = document.createElement('style');
@@ -102,11 +119,13 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   const storageKey = `linefield:${pieceId}`;
   const allSpecs = [...SHARED_CONTROLS, ...extraControls];
   const specByName = {};
-  // kind is the discriminant every gate must branch on, never `type`: Stage C
-  // adds 'select'/'radio' types, and a gate that switches on type-name string
-  // would silently fall a new type into whichever branch it doesn't match.
+  // kind is the discriminant every gate must branch on, never `type`: a gate
+  // that switches on the type-name string would silently fall a new type
+  // into whichever branch it doesn't match. 'hidden' (hue/hueB) has no panel
+  // row at all and is excluded from control gates entirely — it is not a
+  // user-facing control, just the exact numeric value colorA/colorB drive.
   for (const spec of allSpecs) {
-    spec.kind = spec.type === 'checkbox' ? 'boolean' : 'number';
+    spec.kind = kindOf(spec);
     specByName[spec.name] = spec;
   }
   const defaults = {};
@@ -143,10 +162,10 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   body.className = 'lf-body';
   panel.appendChild(body);
 
-  // Per-control render hook. The default registration below covers a plain
-  // <input>; a widget that isn't a bare input (Stage C's dropdown/radio/
-  // colour picker) registers its own render(v) instead, so setValue below
-  // stays agnostic to what is actually on screen.
+  // Per-control render hook. Covers <input type=range|checkbox|color> and
+  // <select> uniformly; a future widget that isn't a bare input/select would
+  // register its own render(v) instead, so setValue below stays agnostic to
+  // what is actually on screen.
   const controllers = {};
 
   // Clamp to the spec's declared range where numeric, then snap to its step
@@ -178,13 +197,32 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
     const spec = specByName[name];
     const v = clampValue(spec, value);
     values[name] = v;
+    // A colour control's spec names the hidden numeric field it drives
+    // (colorA -> hue, colorB -> hueB). This is the ONLY place that hex gets
+    // decoded — once per pick, never in a render loop — and it never runs
+    // for a programmatic write to the hidden field itself (see applyValues,
+    // which reasserts hue/hueB after this fires so a preset/reset always
+    // lands on the exact declared number, not a lossy decode of colorA/
+    // colorB). An achromatic pick (grey/white/black) has no hue to extract;
+    // hexToHue returns null and the previous hue is left untouched.
+    if (spec?.linkedHue) {
+      const decoded = hexToHue(v);
+      if (decoded !== null) values[spec.linkedHue] = decoded;
+    }
     controllers[name]?.render(v);
+    if (name === 'colorMode') controllers.colorB?.setRowVisible?.(v === 'gradient');
     setActiveChip(null);
     onChange(name, v, values);
     if (shouldPersist) persist();
   }
 
   function buildRow(spec, beforeEl) {
+    // 'hidden' (hue/hueB) is not a control — no row, no input, no DOM at all.
+    // It stays in allSpecs/defaults/values so the rest of the machinery
+    // (defaults composition, presets, persistence) treats it like any other
+    // value; it is simply never rendered or driven directly.
+    if (spec.type === 'hidden') return;
+
     const row = document.createElement('div');
     row.className = 'lf-row';
     const label = document.createElement('label');
@@ -200,6 +238,15 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
       input = document.createElement('input');
       input.type = 'color';
       input.value = values[spec.name];
+    } else if (spec.type === 'select') {
+      input = document.createElement('select');
+      for (const opt of spec.options) {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        input.appendChild(o);
+      }
+      input.value = values[spec.name];
     } else {
       input = document.createElement('input');
       input.type = 'range';
@@ -213,7 +260,9 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
     // not touch values/onChange/persistence itself — setValue is the only
     // write path (see above).
     input.addEventListener('input', () => {
-      const v = spec.type === 'checkbox' ? input.checked : parseFloat(input.value);
+      const v = spec.type === 'checkbox' ? input.checked
+        : (spec.type === 'color' || spec.type === 'select') ? input.value
+        : parseFloat(input.value);
       setValue(spec.name, v);
     });
 
@@ -221,6 +270,9 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
       render(v) {
         if (spec.type === 'checkbox') input.checked = v;
         else input.value = v;
+      },
+      setRowVisible(visible) {
+        row.style.display = visible ? '' : 'none';
       },
     };
     row.appendChild(input);
@@ -236,6 +288,16 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   function applyValues(map) {
     const next = { ...defaults, ...map };
     for (const spec of allSpecs) setValue(spec.name, next[spec.name], { persist: false });
+    // setValue(colorA/colorB, ...) above may have just overwritten hue/hueB
+    // with a lossy hex decode — order-dependent otherwise, since 'hidden'
+    // specs are plain entries in the same allSpecs array. The exact value
+    // `next` already carries always wins on a programmatic write (preset,
+    // Reset, ?preset= on load): reassert it directly, no side effects, so
+    // these paths render at exactly the declared number, never an
+    // approximation of it.
+    for (const spec of allSpecs) {
+      if (spec.kind === 'hidden') values[spec.name] = next[spec.name];
+    }
     persist();
   }
 
@@ -270,6 +332,9 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   }
 
   for (const spec of allSpecs) buildRow(spec);
+  // colorB's row only makes sense in gradient mode; setValue toggles it on
+  // every subsequent change, this sets the correct initial state.
+  controllers.colorB?.setRowVisible?.(values.colorMode === 'gradient');
 
   const resetBtn = document.createElement('button');
   resetBtn.className = 'lf-reset';
@@ -316,9 +381,10 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
     el: panel,
     setValue,
     addControl(spec) {
-      spec.kind = spec.type === 'checkbox' ? 'boolean' : 'number';
+      spec.kind = kindOf(spec);
       specByName[spec.name] = spec;
       allSpecs.push(spec);
+      defaults[spec.name] = spec.default;
       if (!(spec.name in values)) values[spec.name] = spec.default;
       buildRow(spec, resetBtn);
       persist();
@@ -406,6 +472,45 @@ function hueShift(h, degrees) {
 
 function invertRgb(r, g, b) {
   return [255 - r, 255 - g, 255 - b];
+}
+
+// Extracts ONLY hue from a hex colour — the picker's own saturation/lightness
+// are discarded, because rendering always sources chroma from the piece's
+// shared `saturation` slider, never from the swatch a user happened to pick.
+// This is a one-way, lossy read (8-bit RGB quantizes hue), used exactly once
+// per user pick — never in a render loop, and never applied to a piece's own
+// seeded defaults, which keep their exact authored degree value untouched.
+// A grey/white/black pick (max === min) has no hue at all; callers must keep
+// the previous hue rather than let this return a meaningless 0 (red).
+function hexToHue(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return null; // achromatic — caller must preserve prior hue
+  const d = max - min;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  return h < 0 ? h + 360 : h;
+}
+
+// The shared 0-1 ramp position -> {h, s} for a piece's two-stop palette.
+// Solid mode ignores `f` and always returns stop A; gradient mode lerps hue
+// between the two stops exactly as every piece's own per-element interpolation
+// did before this control existed (`hue + (hueB - hue) * f`). `s` is always
+// the piece's single shared saturation control — colour stops never carry
+// their own saturation. `hue`/`hueB` are the exact, hidden numeric palette
+// values (see shared/controls.js); `colorA`/`colorB` are their hex *view*
+// only and are never read here.
+function paletteHsl(values, f) {
+  const s = values.saturation;
+  if (values.colorMode === 'solid') return { h: values.hue, s };
+  return { h: values.hue + (values.hueB - values.hue) * f, s };
 }
 
 
@@ -541,27 +646,63 @@ async function exportSource({ filename = 'linefield-source.html' } = {}) {
 const SHARED_IMPORT_RE =
   /^\s*import\s*\{[^}]*\}\s*from\s*['"](\.\.\/\.\.\/shared\/[^'"]+\.js)['"];?\s*$/gm;
 
+// A shared module importing ANOTHER shared module (e.g. controls.js reading
+// hexToHue from color.js) addresses it as './color.js' — same directory,
+// different relative base than the piece's '../../shared/color.js'. Matched
+// separately and normalised back to the piece-style path below so the same
+// `seen` dedupe applies to both forms of the same file.
+const INNER_SHARED_IMPORT_RE =
+  /^\s*import\s*\{[^}]*\}\s*from\s*['"]\.\/([^'"]+\.js)['"];?\s*$/gm;
+
 function stripExports(src) {
   // `export function foo` / `export const foo` -> drop the `export ` keyword.
   return src.replace(/^export\s+/gm, '');
 }
 
+function stripInnerImports(src) {
+  return src.replace(INNER_SHARED_IMPORT_RE, '');
+}
+
+// BFS over the shared-module import graph, not just the piece's own
+// top-level imports. Scanning only the piece script is exactly the
+// hand-maintained-list failure this function's own comment already warns
+// about, one level removed: a shared module's OWN imports were invisible to
+// it, so a new cross-shared-module import survived verbatim into a classic
+// (non-module) inline script — a SyntaxError this file's <script> tag has no
+// listener for, producing a validly-loading, blank-canvas download. See
+// skills/building-generative-backgrounds/SKILL.md, "Inlining and bundling".
 async function inlineSharedModules(pieceScriptSrc) {
-  const paths = [...pieceScriptSrc.matchAll(SHARED_IMPORT_RE)].map((m) => m[1]);
-  const unique = [...new Set(paths)];
-  if (!unique.length) {
+  const strippedPieceSrc = pieceScriptSrc.replace(SHARED_IMPORT_RE, '');
+  const initial = [...pieceScriptSrc.matchAll(SHARED_IMPORT_RE)].map((m) => m[1]);
+  if (!initial.length) {
     throw new Error('bakeHtml: the piece imports no shared modules — refusing to bake a file that would render blank');
   }
-  const strippedPieceSrc = pieceScriptSrc.replace(SHARED_IMPORT_RE, '');
 
-  const bodies = await Promise.all(
-    unique.map(async (path) => {
-      const res = await fetch(path);
-      if (!res.ok) throw new Error(`bakeHtml: could not fetch ${path} (${res.status})`);
-      const src = await res.text();
-      return `// --- inlined: ${path} ---\n${stripExports(src)}`;
-    })
-  );
+  const seen = new Set();
+  const order = [];
+  const srcByPath = new Map();
+  const queue = [...initial];
+  while (queue.length) {
+    const path = queue.shift();
+    if (seen.has(path)) continue;
+    seen.add(path);
+    order.push(path);
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`bakeHtml: could not fetch ${path} (${res.status})`);
+    const src = await res.text();
+    srcByPath.set(path, src);
+    // Normalise './foo.js' found INSIDE a shared module to the same
+    // '../../shared/foo.js' form the piece-level regex produces, so a module
+    // reached both ways (e.g. color.js: directly by the piece, and via
+    // controls.js) is only ever inlined once.
+    const inner = [...src.matchAll(INNER_SHARED_IMPORT_RE)].map((m) => `../../shared/${m[1]}`);
+    for (const p of inner) if (!seen.has(p)) queue.push(p);
+  }
+
+  const bodies = order.map((path) => {
+    const src = srcByPath.get(path);
+    return `// --- inlined: ${path} ---\n${stripInnerImports(stripExports(src))}`;
+  });
 
   return `${bodies.join('\n\n')}\n\n// --- piece script ---\n${strippedPieceSrc}`;
 }
@@ -787,7 +928,7 @@ function createOrbit({
     extraControls: [
       { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 90 },
     ],
-    defaults: { hue: 75, hueB: 45, saturation: 0.7 },
+    defaults: { hue: 75, hueB: 45, saturation: 0.7, colorMode: 'gradient', colorA: '#bfff00', colorB: '#ffbf00' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
@@ -852,8 +993,10 @@ function createOrbit({
     }
 
     const reach2 = reach * reach;
-    const [r0, g0, b0] = hslToRgb(values.hue, values.saturation, light);
-    const [r1, g1, b1] = hslToRgb(values.hueB, values.saturation, light);
+    const stopA = paletteHsl(values, 0);
+    const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
+    const stopB = paletteHsl(values, 1);
+    const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
     const pointerK = values.pointer * pointer.influence;
 
     for (let cy = 0; cy < rows; cy++) {

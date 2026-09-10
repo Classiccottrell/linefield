@@ -38,10 +38,12 @@ dependency. None of that reaches a user of a piece.
 
 1. Build the piece as described above.
 2. Add an entry to `pieces.json` — `slug`, `title`, `blurb`, `tags`, and the
-   `hue`/`hueB`/`saturation` from the piece's own `defaults` block. The
-   `defaults` block itself must list its keys in that exact order
+   `hue`/`hueB`/`saturation` from the piece's own `defaults` block. These
+   three must come FIRST in the `defaults` block and in that exact order
    (`hue`, then `hueB`, then `saturation`) — the verifier's parser is a
-   regex locked to that order.
+   regex locked to that order. `colorMode`/`colorA`/`colorB` (see "The 15
+   shared controls" below) may follow after; they are not read by the
+   manifest.
 3. Add a bullet to README's Pieces list.
 4. Run `npm run build`.
 
@@ -84,35 +86,48 @@ npx serve .
 
 Then open `http://localhost:<port>/pieces/<piece-name>/`.
 
-## The 14 shared controls
+## The 15 shared controls
 
 Every piece gets these controls for free via `createControlPanel()`
 (`shared/controls.js`): `scale`, `speed`, `stroke`, `opacity`, `saturation`,
-`hue`, `hueB`, `glow`, `angle`, `motion`, `phase`, `invert`, `density`,
-`pointer`.
+`colorMode`, `colorA`, `colorB`, `glow`, `angle`, `motion`, `phase`,
+`invert`, `density`, `pointer`.
 
-A new piece should make **each** of these visibly affect its render — don't
-leave a control wired up but inert. If a control doesn't map naturally onto
-your piece's visuals, find a reasonable interpretation (e.g. `angle` can
-rotate a field, `motion` can scale a secondary animation speed distinct
-from `speed`, `hueB` can drive a second color family) rather than skipping
-it.
+`colorMode` (Solid/Gradient) and `colorA`/`colorB` (hex colour pickers,
+`colorB` only shown in Gradient mode) are the *authored* palette — a piece
+never reads them directly. Call `paletteHsl(values, f)` from
+`shared/color.js` instead: it returns `{ h, s }` for a 0-1 position along the
+ramp (`f=0` is stop A, `f=1` is stop B; Solid mode ignores `f` and always
+returns stop A), sourcing `s` from the shared `saturation` control. `hue` and
+`hueB` still exist in `values` — exact numeric degrees, hidden from the
+panel — but they are implementation values `colorA`/`colorB` drive one-way
+(pick a colour -> hue updates); a piece's own code should never read them.
+
+A new piece should make **each** authored control visibly affect its
+render — don't leave a control wired up but inert. If a control doesn't map
+naturally onto your piece's visuals, find a reasonable interpretation (e.g.
+`angle` can rotate a field, `motion` can scale a secondary animation speed
+distinct from `speed`, `colorB`/stop B can drive a second color family)
+rather than skipping it.
 
 ## Piece-specific controls (`extraControls`)
 
 Pass an `extraControls` array to `createControlPanel({ ... extraControls })`
 for controls unique to your piece (same spec shape as the shared controls —
 `name`, `label`, `type`, `min`/`max`/`step` or default, etc). These render
-below the 14 shared controls automatically. You can also add one after the
+below the 15 shared controls automatically. You can also add one after the
 panel exists with `panel.addControl({ ... })`.
 
 ## Defaults (`defaults`)
 
 Pass a `defaults` object to `createControlPanel({ ... defaults })` to set
-your piece's own default values, most importantly `hue` and `hueB`, so each
-piece in the library reads as visually distinct out of the box. Check the
-existing pieces' `defaults` blocks before picking colors to avoid
-duplicating another piece's palette.
+your piece's own default values: `hue`/`hueB` (exact degrees — most
+important, so each piece in the library reads as visually distinct out of
+the box) and `colorA`/`colorB` (the hex the picker shows for those same two
+hues on first load — a display value only, never decoded back for
+rendering, so it doesn't need to round-trip exactly). Check the existing
+pieces' `defaults` blocks before picking colors to avoid duplicating another
+piece's palette.
 
 Note a saved `localStorage` value always outranks a piece's `defaults` for
 a returning visitor — that's expected; "Reset to defaults" in the panel
