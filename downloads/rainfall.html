@@ -247,9 +247,19 @@ function createCursorOverlay() {
       const now = performance.now();
       if (mode === 'Particle Trail' && pointer.active) {
         const moved = lastX === null || Math.hypot(pointer.x - lastX, pointer.y - lastY) > 6;
-        if (moved) {
+        // A movement-only trigger leaves nothing to sample once the cursor
+        // stops (or, under the deterministic harness's single pointermove,
+        // once the one dot's 900ms life has elapsed against a run that
+        // steps thousands of ms) — that read as inert on every full-clear
+        // piece, which repaints from nothing each frame and so has no
+        // accumulated trace once the last dot expires. Throttled re-emission
+        // while the pointer is present, mirroring Ripples below, keeps a
+        // live mark on screen regardless of whether the cursor is moving.
+        const lastDot = marks.length ? marks[marks.length - 1] : null;
+        const stale = !lastDot || now - lastDot.born > 70;
+        if (moved || stale) {
           marks.push({ kind: 'dot', x: pointer.x, y: pointer.y, born: now,
-            life: 900, r: 1 + Math.random() * 2,
+            life: 900, r: 8 + Math.random() * 10,
             dx: (Math.random() - 0.5) * 18, dy: (Math.random() - 0.5) * 18 });
           lastX = pointer.x; lastY = pointer.y;
         }
@@ -1400,6 +1410,7 @@ function createOrbit({
 
 
 
+
   const PIECE_ID = 'rainfall';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -1464,6 +1475,7 @@ function createOrbit({
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
 
   seedDrops(Math.max(4, Math.round(BASE_COUNT * currentValues.density)));
 
@@ -1482,7 +1494,9 @@ function createOrbit({
     // Gentle wind sway, independent of fall speed — subtle by design so the
     // piece stays calm rather than turning into a gust.
     const swayAmount = W * 0.006 * values.motion;
-    const k = values.pointer * pointer.influence;
+    // The only gate: off at pointer 0, off when cursorInteraction is 'None',
+    // eased by influence.
+    const k = modeFactor(values, pointer);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
     const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
@@ -1504,9 +1518,25 @@ function createOrbit({
 
       const n = simplex2(d.sway, elapsed * 0.15 * values.motion);
       let x = d.x * W + n * swayAmount;
+      let lw = lineWidth;
       if (k) {
-        const f = Math.max(0, 1 - Math.hypot(x - plx, headY - ply) / 220);
-        x += (x >= plx ? 1 : -1) * f * k * 55;
+        const ddx = x - plx, ddy = headY - ply;
+        const dist = Math.hypot(ddx, ddy) || 1;
+        const f = Math.max(0, 1 - dist / 220);
+        if (f) {
+          if (values.cursorInteraction === 'Attract') {
+            x += -(ddx / dist) * f * k * 70;
+          } else if (values.cursorInteraction === 'Vortex') {
+            // Tangential: perpendicular to (drop - pointer); only the
+            // horizontal component is expressible since a drop's fall (y)
+            // is time-driven, but the sideways sweep still reads as orbit.
+            x += -(ddy / dist) * f * k * 70;
+          } else if (values.cursorInteraction === 'Grow') {
+            lw = lineWidth * (1 + f * k * 1.6);
+          } else if (values.cursorInteraction === 'Shrink') {
+            lw = Math.max(lineWidth * 0.15, lineWidth / (1 + f * k * 1.6));
+          }
+        }
       }
 
       const lightBase = values.invert ? 0.3 : 0.68;
@@ -1523,7 +1553,7 @@ function createOrbit({
 
       ctx.strokeStyle = grad;
       if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 4;
+        ctx.lineWidth = lw + values.glow * 4;
         ctx.globalAlpha = values.glow * 0.22;
         ctx.beginPath();
         ctx.moveTo(x, tailY);
@@ -1531,7 +1561,7 @@ function createOrbit({
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      ctx.lineWidth = lineWidth;
+      ctx.lineWidth = lw;
       ctx.beginPath();
       ctx.moveTo(x, tailY);
       ctx.lineTo(x, headY);
@@ -1541,7 +1571,7 @@ function createOrbit({
         // Soft radial highlight at the head — bigger than the stroke itself
         // so "brighter head" reads clearly even at a glance, still small
         // enough relative to the canvas to stay calm rather than blobby.
-        const r = lineWidth * 3;
+        const r = lw * 3;
         const glintGrad = ctx.createRadialGradient(x, headY, 0, x, headY, r);
         glintGrad.addColorStop(0, `rgba(${hr},${hg},${hb},${values.opacity})`);
         glintGrad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
@@ -1555,11 +1585,19 @@ function createOrbit({
     }
 
     ctx.restore();
+
+    // Drawn after ctx.restore(), so overlay marks track the pointer's actual
+    // screen position rather than the piece's rotated coordinate space.
+    const stopB2 = paletteHsl(values, 1);
+    const [ovR, ovG, ovB] = hslToRgb(stopB2.h, stopB2.s, values.invert ? 0.3 : 0.68);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

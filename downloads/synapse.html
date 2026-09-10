@@ -247,9 +247,19 @@ function createCursorOverlay() {
       const now = performance.now();
       if (mode === 'Particle Trail' && pointer.active) {
         const moved = lastX === null || Math.hypot(pointer.x - lastX, pointer.y - lastY) > 6;
-        if (moved) {
+        // A movement-only trigger leaves nothing to sample once the cursor
+        // stops (or, under the deterministic harness's single pointermove,
+        // once the one dot's 900ms life has elapsed against a run that
+        // steps thousands of ms) — that read as inert on every full-clear
+        // piece, which repaints from nothing each frame and so has no
+        // accumulated trace once the last dot expires. Throttled re-emission
+        // while the pointer is present, mirroring Ripples below, keeps a
+        // live mark on screen regardless of whether the cursor is moving.
+        const lastDot = marks.length ? marks[marks.length - 1] : null;
+        const stale = !lastDot || now - lastDot.born > 70;
+        if (moved || stale) {
           marks.push({ kind: 'dot', x: pointer.x, y: pointer.y, born: now,
-            life: 900, r: 1 + Math.random() * 2,
+            life: 900, r: 8 + Math.random() * 10,
             dx: (Math.random() - 0.5) * 18, dy: (Math.random() - 0.5) * 18 });
           lastX = pointer.x; lastY = pointer.y;
         }
@@ -1400,6 +1410,7 @@ function createOrbit({
 
 
 
+
   const PIECE_ID = 'synapse';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -1454,6 +1465,7 @@ function createOrbit({
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
 
   seedNodes(Math.max(8, Math.round(BASE_COUNT * currentValues.density)));
   window.addEventListener('resize', () =>
@@ -1483,6 +1495,10 @@ function createOrbit({
     const lineWidth = 0.25 + values.stroke * 0.8;
     ctx.lineWidth = lineWidth;
 
+    // The only gate: off at pointer 0, off when cursorInteraction is 'None',
+    // eased by influence.
+    const k = modeFactor(values, pointer);
+
     // Drift the nodes on a noise field, wrapping at the edges.
     for (const n of nodes) {
       const a =
@@ -1490,6 +1506,27 @@ function createOrbit({
         (values.angle * Math.PI) / 180;
       n.x += Math.cos(a) * drift - (n.x - n.homeX) * pull * stepDt;
       n.y += Math.sin(a) * drift - (n.y - n.homeY) * pull * stepDt;
+
+      if (k && (values.cursorInteraction === 'Attract' || values.cursorInteraction === 'Vortex')) {
+        // Uses only dt (real frame time), never values.speed, so the
+        // response survives Speed 0.
+        const f = pointer.falloff(n.x, n.y, 220);
+        if (f) {
+          if (values.cursorInteraction === 'Attract') {
+            const toward = Math.atan2(pointer.y - n.y, pointer.x - n.x);
+            const push = f * k * 110 * stepDt;
+            n.x += Math.cos(toward) * push;
+            n.y += Math.sin(toward) * push;
+          } else {
+            const away = Math.atan2(n.y - pointer.y, n.x - pointer.x);
+            const tangent = away + Math.PI / 2;
+            const push = f * k * 110 * stepDt;
+            n.x += Math.cos(tangent) * push;
+            n.y += Math.sin(tangent) * push;
+          }
+        }
+      }
+
       if (n.x < 0) n.x += canvas.width;
       if (n.x > canvas.width) n.x -= canvas.width;
       if (n.y < 0) n.y += canvas.height;
@@ -1519,7 +1556,6 @@ function createOrbit({
     const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
     const stopB = paletteHsl(values, 1);
     const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
-    const pointerK = values.pointer * pointer.influence;
 
     for (let cy = 0; cy < rows; cy++) {
       for (let cx = 0; cx < cols; cx++) {
@@ -1554,19 +1590,32 @@ function createOrbit({
                 const cr = r0 + (r1 - r0) * mix;
                 const cg = g0 + (g1 - g0) * mix;
                 const cb = b0 + (b1 - b0) * mix;
-                const activation = pointerK * pointer.falloff((a.x + b.x) / 2, (a.y + b.y) / 2, 220);
+                const midF = k ? pointer.falloff((a.x + b.x) / 2, (a.y + b.y) / 2, 220) : 0;
+                // Activation brightens edges near the cursor under Attract/
+                // Vortex, where nodes are already moving; withheld under
+                // Grow/Shrink so those two stay distinguishable by width alone.
+                const activation =
+                  (values.cursorInteraction === 'Attract' || values.cursorInteraction === 'Vortex')
+                    ? k * midF : 0;
                 const alpha = Math.min(1, values.opacity * closeness * (0.25 + pulse * 0.75) * (1 + activation * 2));
 
+                let lw = lineWidth;
+                if (midF) {
+                  if (values.cursorInteraction === 'Grow') lw = lineWidth * (1 + midF * k * 1.6);
+                  else if (values.cursorInteraction === 'Shrink') lw = Math.max(lineWidth * 0.15, lineWidth / (1 + midF * k * 1.6));
+                }
+
                 ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${alpha})`;
+                ctx.lineWidth = lw;
                 ctx.beginPath();
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);
                 if (values.glow > 0) {
-                  ctx.lineWidth = lineWidth + values.glow * 2.5;
+                  ctx.lineWidth = lw + values.glow * 2.5;
                   ctx.globalAlpha = values.glow * 0.25;
                   ctx.stroke();
                   ctx.globalAlpha = 1;
-                  ctx.lineWidth = lineWidth;
+                  ctx.lineWidth = lw;
                 }
                 ctx.stroke();
                 paths.push([[a.x, a.y], [b.x, b.y]]);
@@ -1576,11 +1625,15 @@ function createOrbit({
         }
       }
     }
+
+    overlay.draw(ctx, `rgb(${r0},${g0},${b0})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

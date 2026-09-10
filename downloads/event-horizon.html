@@ -247,9 +247,19 @@ function createCursorOverlay() {
       const now = performance.now();
       if (mode === 'Particle Trail' && pointer.active) {
         const moved = lastX === null || Math.hypot(pointer.x - lastX, pointer.y - lastY) > 6;
-        if (moved) {
+        // A movement-only trigger leaves nothing to sample once the cursor
+        // stops (or, under the deterministic harness's single pointermove,
+        // once the one dot's 900ms life has elapsed against a run that
+        // steps thousands of ms) — that read as inert on every full-clear
+        // piece, which repaints from nothing each frame and so has no
+        // accumulated trace once the last dot expires. Throttled re-emission
+        // while the pointer is present, mirroring Ripples below, keeps a
+        // live mark on screen regardless of whether the cursor is moving.
+        const lastDot = marks.length ? marks[marks.length - 1] : null;
+        const stale = !lastDot || now - lastDot.born > 70;
+        if (moved || stale) {
           marks.push({ kind: 'dot', x: pointer.x, y: pointer.y, born: now,
-            life: 900, r: 1 + Math.random() * 2,
+            life: 900, r: 8 + Math.random() * 10,
             dx: (Math.random() - 0.5) * 18, dy: (Math.random() - 0.5) * 18 });
           lastX = pointer.x; lastY = pointer.y;
         }
