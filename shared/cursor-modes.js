@@ -38,18 +38,36 @@ export function createCursorOverlay() {
         const moved = lastX === null || Math.hypot(pointer.x - lastX, pointer.y - lastY) > 6;
         // A movement-only trigger leaves nothing to sample once the cursor
         // stops (or, under the deterministic harness's single pointermove,
-        // once the one dot's 900ms life has elapsed against a run that
+        // once the last particle's life has elapsed against a run that
         // steps thousands of ms) — that read as inert on every full-clear
         // piece, which repaints from nothing each frame and so has no
-        // accumulated trace once the last dot expires. Throttled re-emission
-        // while the pointer is present, mirroring Ripples below, keeps a
-        // live mark on screen regardless of whether the cursor is moving.
+        // accumulated trace once the emission expires. Throttled re-emission
+        // while the pointer is present, mirroring Ripples below, keeps the
+        // trail alive regardless of whether the cursor is moving.
         const lastDot = marks.length ? marks[marks.length - 1] : null;
-        const stale = !lastDot || now - lastDot.born > 70;
+        const stale = !lastDot || now - lastDot.born > 45;
         if (moved || stale) {
-          marks.push({ kind: 'dot', x: pointer.x, y: pointer.y, born: now,
-            life: 900, r: 6 + Math.random() * 6,
-            dx: (Math.random() - 0.5) * 18, dy: (Math.random() - 0.5) * 18 });
+          // Dust, not beads: a scattered cluster of small, faint, varied-
+          // size particles around the cursor (not centred on a single
+          // point), each drifting apart as it ages. Density (particle
+          // count) carries the effect's visibility, not size or opacity —
+          // those stay small/low so the overlay doesn't outweigh a piece's
+          // own marks (grain-field's fine specks are the tuning floor).
+          const n = 22;
+          for (let i = 0; i < n; i++) {
+            const ang = Math.random() * Math.PI * 2;
+            const rad = Math.random() * 11;
+            marks.push({
+              kind: 'dot',
+              x: pointer.x + Math.cos(ang) * rad,
+              y: pointer.y + Math.sin(ang) * rad,
+              born: now, life: 650 + Math.random() * 450,
+              r: 0.5 + Math.random() * 1.6,
+              alphaMul: 0.3 + Math.random() * 0.35,
+              dx: (Math.random() - 0.5) * 50,
+              dy: (Math.random() - 0.5) * 50,
+            });
+          }
           lastX = pointer.x; lastY = pointer.y;
         }
       }
@@ -73,7 +91,7 @@ export function createCursorOverlay() {
         if (age >= 1) continue;
         const alpha = (1 - age) * k;
         if (m.kind === 'dot') {
-          ctx.globalAlpha = Math.min(alpha, 1);
+          ctx.globalAlpha = Math.min(alpha * (m.alphaMul ?? 1), 1);
           ctx.fillStyle = colour;
           ctx.beginPath();
           ctx.arc(m.x + m.dx * age, m.y + m.dy * age, m.r, 0, Math.PI * 2);
