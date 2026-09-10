@@ -78,7 +78,7 @@
       if (name === 'density') seedCables(Math.max(2, Math.round(BASE_COUNT * values.density)));
     },
     extraControls: [
-      { name: 'slack', label: 'Slack', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+      { name: 'slack', label: 'Slack', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
     ],
     defaults: { hue: 220, hueB: 250, saturation: 0.25, colorMode: 'gradient', colorA: '#0055ff', colorB: '#2a00ff' },
   });

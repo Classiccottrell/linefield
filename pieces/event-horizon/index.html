@@ -62,9 +62,9 @@
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'mass', label: 'Mass', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
-      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32 },
-      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0 },
+      { name: 'mass', label: 'Mass', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32, category: 'interaction' },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
     ],
     defaults: { hue: 285, hueB: 230, saturation: 0.6, colorMode: 'gradient', colorA: '#bf00ff', colorB: '#002bff' },
   });

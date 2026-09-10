@@ -79,7 +79,7 @@
       if (name === 'density') seedNodes(Math.max(8, Math.round(BASE_COUNT * values.density)));
     },
     extraControls: [
-      { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 90 },
+      { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 90, category: 'visual' },
     ],
     defaults: { hue: 75, hueB: 45, saturation: 0.7, colorMode: 'gradient', colorA: '#bfff00', colorB: '#ffbf00' },
   });

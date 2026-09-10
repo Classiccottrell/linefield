@@ -23,7 +23,14 @@
      shared/controls.js for names/ranges) plus any piece-specific ones,
      which you add via the `extraControls` option to createControlPanel()
      (see the real pieces for examples) — or panel.addControl({...}) if
-     you need to add one after the panel is already constructed. For colour,
+     you need to add one after the panel is already constructed. Tag every
+     extra control with an explicit `category`: 'interaction' (cursor/camera
+     controls — Pitch/Yaw on the two 3D pieces), 'color', or the piece's own
+     sub-tag ('motion', 'form', 'ink' — see the real pieces; e.g. meridian's
+     `sweep` is motion, orbital-veil's `sweep` is form) — anything other than
+     'interaction'/'color' renders in the Visual section. It defaults to
+     Visual if omitted, but every piece in this library sets it explicitly
+     rather than relying on that default. For colour,
      call `paletteHsl(values, f)` (shared/color.js) rather than reading
      values.hue/hueB directly — those two are hidden implementation values
      the colorA/colorB pickers drive, not controls themselves.

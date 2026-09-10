@@ -79,7 +79,7 @@
       if (name === 'density') seedMotes(Math.max(20, Math.round(BASE_COUNT * values.density)));
     },
     extraControls: [
-      { name: 'spin', label: 'Spin', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+      { name: 'spin', label: 'Spin', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'motion' },
     ],
     defaults: { hue: 10, hueB: 40, saturation: 0.8, colorMode: 'gradient', colorA: '#ff2b00', colorB: '#ffaa00' },
   });

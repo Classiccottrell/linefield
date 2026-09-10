@@ -91,7 +91,7 @@ HTML export removes it separately, along with anything else marked
 `data-lf-panel`. Delete or hide that `<div class="lf-export-row">` if you
 are configuring a piece by hand and don't want it visible.
 
-Every one of the 15 shared controls may be set this way, plus any
+Every one of the 16 shared controls may be set this way, plus any
 piece-specific control — check that piece's `extraControls` for its names.
 But unlike the real Baked HTML export, which always writes every control's
 current value, a hand-written object is used as-is: it is not merged with
@@ -156,17 +156,25 @@ tooling" below and CONTRIBUTING.md.
 - `event-horizon` — a polar grid bent inward by a gravity well
 - `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
 
-Every piece shares 15 controls (scale, speed, stroke, opacity, saturation,
-color mode, color A, color B, glow, angle, motion, phase, invert, density,
-pointer) plus its own piece-specific control. Color mode switches between a
-single hue (Solid) and a two-stop blend (Gradient, the default — every
-piece's own look); Color A/B are hex pickers, B shown only in Gradient mode.
-`density` multiplies the piece's base element
-count. `pointer` scales the piece's cursor response (0 by default, opt-in);
-each piece maps it to its own visual vocabulary and remains responsive at
-Speed 0. `wireframe-lattice` and `event-horizon` also provide Pitch and Yaw
-controls; Angle is roll, and dragging the canvas orbits the camera on direct
-piece pages. Gallery previews disable drag-to-orbit.
+Every piece shares 16 controls (cursor interaction, scale, speed, stroke,
+opacity, saturation, color mode, color A, color B, glow, angle, motion,
+phase, invert, density, pointer) plus its own piece-specific control. Color
+mode switches between a single hue (Solid) and a two-stop blend (Gradient,
+the default — every piece's own look); Color A/B are hex pickers, B shown
+only in Gradient mode. `density` multiplies the piece's base element count.
+`pointer` scales the piece's cursor response (0 by default, opt-in); each
+piece maps it to its own visual vocabulary and remains responsive at Speed
+0. `cursor interaction` currently ships with a single option, `None` — the
+control exists for a future sub-project (Grow, Shrink, Particle Trail,
+Ripples, Attract, Vortex) and does nothing yet. `wireframe-lattice` and
+`event-horizon` also provide Pitch and Yaw controls; Angle is roll, and
+dragging the canvas orbits the camera on direct piece pages. Gallery
+previews disable drag-to-orbit.
+
+The panel itself is sectioned into Interactions (cursor interaction,
+pointer, and Pitch/Yaw on the two 3D pieces), Color, and Visual, with Reset
+pinned below all three. Below ~640px it docks as a bottom sheet, collapsed
+to a handle by default.
 
 ## Adding a new piece
 
