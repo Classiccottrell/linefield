@@ -127,8 +127,18 @@ const LIVE_THRESHOLD = 0.05; // % of sampled pixels changed, below this = no vis
 // the hue/hueB manifest gate). Pin both stops to two maximally distinct
 // colours before probing colorMode specifically, so its own test isolates
 // the mechanism rather than inheriting a piece's palette choice.
+//
+// Same conflation for `pointer`/`cursorInteraction`: a piece's cursor
+// response is gated on BOTH being non-default at once (modeFactor in
+// shared/cursor-modes.js returns 0 unless cursorInteraction !== 'None' AND
+// pointer > 0, by design — pointer=0 or None must be fully inert). Probing
+// either control alone leaves the other at ITS default (pointer=0,
+// cursorInteraction='None'), so the response is zero regardless of what the
+// probed control does. Pin the other one on, same fix as colorMode above.
 const PREREQS = {
   colorMode: { colorA: '#ff2d2d', colorB: '#2de0ff' },
+  pointer: { cursorInteraction: 'Attract' },
+  cursorInteraction: { pointer: 1 },
 };
 
 async function renderVariant(page, base, slug, name, value) {

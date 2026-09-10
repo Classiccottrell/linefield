@@ -86,12 +86,22 @@ npx serve .
 
 Then open `http://localhost:<port>/pieces/<piece-name>/`.
 
-## The 15 shared controls
+## The 16 shared controls
 
 Every piece gets these controls for free via `createControlPanel()`
-(`shared/controls.js`): `scale`, `speed`, `stroke`, `opacity`, `saturation`,
-`colorMode`, `colorA`, `colorB`, `glow`, `angle`, `motion`, `phase`,
-`invert`, `density`, `pointer`.
+(`shared/controls.js`): `cursorInteraction`, `pointer`, `scale`, `speed`,
+`stroke`, `opacity`, `saturation`, `colorMode`, `colorA`, `colorB`, `glow`,
+`angle`, `motion`, `phase`, `invert`, `density`.
+
+`cursorInteraction` (None / Grow / Shrink / Particle Trail / Ripples /
+Attract / Vortex) selects a cursor-response mode; `pointer` scales its
+strength. The vocabulary and the shared Trail/Ripples overlay live in
+`shared/cursor-modes.js` — see `modeFactor(values, pointer)`, which every
+mode multiplies by and which is 0 whenever `cursorInteraction` is `'None'`
+or `pointer` is 0. Per-mode behaviour (Grow/Shrink/Attract/Vortex) is wired
+piece by piece; a piece that hasn't been wired yet shows no cursor response
+at all, which is expected, not a bug — check `pieces/flow-field/index.html`
+for the current worked example.
 
 `colorMode` (Solid/Gradient) and `colorA`/`colorB` (hex colour pickers,
 `colorB` only shown in Gradient mode) are the *authored* palette — a piece
@@ -115,7 +125,7 @@ rather than skipping it.
 Pass an `extraControls` array to `createControlPanel({ ... extraControls })`
 for controls unique to your piece (same spec shape as the shared controls —
 `name`, `label`, `type`, `min`/`max`/`step` or default, etc). These render
-below the 15 shared controls automatically. You can also add one after the
+below the 16 shared controls automatically. You can also add one after the
 panel exists with `panel.addControl({ ... })`.
 
 ## Defaults (`defaults`)

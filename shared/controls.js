@@ -11,7 +11,11 @@ const SHARED_CONTROLS = [
   // The seven cursor-interaction modes (Grow, Shrink, Particle Trail,
   // Ripples, Attract, Vortex, None). The behaviours are wired per-piece
   // (see shared/cursor-modes.js); this declares the shared vocabulary so
-  // it is never duplicated per piece.
+  // it is never duplicated per piece. Until a piece reads it, this control
+  // and `pointer` audit DEAD there (tools/audit-controls.mjs's PREREQS pins
+  // the other one on when probing either in isolation, but a piece with no
+  // wiring at all still shows no effect) — expected on every piece not yet
+  // wired, not a bug.
   { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: CURSOR_MODES, default: 'None', category: 'interaction' },
   { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0, category: 'interaction' },
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
