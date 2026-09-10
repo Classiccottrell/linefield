@@ -280,6 +280,7 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
       spec.kind = spec.type === 'checkbox' ? 'boolean' : 'number';
       specByName[spec.name] = spec;
       allSpecs.push(spec);
+      defaults[spec.name] = spec.default;
       if (!(spec.name in values)) values[spec.name] = spec.default;
       buildRow(spec, resetBtn);
       persist();
