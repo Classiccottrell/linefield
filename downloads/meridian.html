@@ -259,7 +259,7 @@ function createCursorOverlay() {
         const stale = !lastDot || now - lastDot.born > 70;
         if (moved || stale) {
           marks.push({ kind: 'dot', x: pointer.x, y: pointer.y, born: now,
-            life: 900, r: 8 + Math.random() * 10,
+            life: 900, r: 6 + Math.random() * 6,
             dx: (Math.random() - 0.5) * 18, dy: (Math.random() - 0.5) * 18 });
           lastX = pointer.x; lastY = pointer.y;
         }
