@@ -1460,9 +1460,9 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
   const overlay = createCursorOverlay();
 
   // Each ring is one continuous stroked path, so per-mark scaling isn't
-  // available: Grow/Shrink/Vortex get a per-point falloff-weighted radial
-  // swell/rotation, mirroring interference. No canvas rotation transform is
-  // applied here, so pointer.x/y are usable directly.
+  // available: all four modes get a per-point falloff-weighted radial
+  // pull/swell/rotation, mirroring interference. No canvas rotation
+  // transform is applied here, so pointer.x/y are usable directly.
   const SWELL_MAG = 30;
   const SWELL_RADIUS = 200;
 

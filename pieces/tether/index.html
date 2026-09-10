@@ -172,10 +172,12 @@
             if (f) py += (py >= ply ? 1 : -1) * f * DEFLECT_MAG * amp * envelope;
           } else if (mode === 'Attract') {
             const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
-            // Clamp the EASE FRACTION, not f*k*envelope: k can reach 2
-            // (Pointer's max), and a lerp factor above 1 overshoots the
-            // pointer and reflects the point past it.
-            if (f) py += (ply - py) * Math.min(f * k * envelope, 1);
+            // Clamp f*k alone, THEN apply envelope outside the clamp — same
+            // shape as Grow/Shrink above (envelope scales an already-bounded
+            // magnitude). Clamping the product f*k*envelope would flatten
+            // the envelope into a plateau at high k, reintroducing pull
+            // nearer the anchors than the envelope intends.
+            if (f) py += (ply - py) * Math.min(f * k, 1) * envelope;
           } else if (mode === 'Vortex') {
             const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
             if (f) {
