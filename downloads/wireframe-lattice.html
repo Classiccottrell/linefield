@@ -1497,6 +1497,7 @@ function createOrbit({
 
 
 
+
   const PIECE_ID = 'wireframe-lattice';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -1561,6 +1562,30 @@ function createOrbit({
   });
 
   const camera = createCamera({ fov: 620 });
+  const overlay = createCursorOverlay();
+  const WARP_RADIUS = 220;
+
+  // Attract/Vortex operate on the already-projected screen-space points
+  // (mirroring event-horizon's projectWithLens), since "toward the cursor"
+  // and "rotate about the cursor" are screen-space ideas for a tilted sheet;
+  // Grow/Shrink stay world-space Z, scaling the sheet's existing lift.
+  function warpProjected(pts, mode, k) {
+    if (!k || (mode !== 'Attract' && mode !== 'Vortex')) return pts;
+    for (const p of pts) {
+      if (p.scale <= 0) continue;
+      const f = pointer.falloff(p.x, p.y, WARP_RADIUS);
+      if (!f) continue;
+      if (mode === 'Attract') {
+        p.x += (pointer.x - p.x) * f * k;
+        p.y += (pointer.y - p.y) * f * k;
+      } else {
+        const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * k * 1.1 });
+        p.x = pointer.x + r.x;
+        p.y = pointer.y + r.y;
+      }
+    }
+    return pts;
+  }
 
   function strokePath(pts, values, lineWidth, rgb) {
     // pts: array of {x, y, scale}. Walk in order and break the run at any
@@ -1616,20 +1641,26 @@ function createOrbit({
       cy: canvas.height / 2,
     });
 
-    // Gate: off at pointer 0, eased by influence, local via falloff.
-    const k = values.pointer * pointer.influence;
+    // Gate: off at pointer 0, off when cursorInteraction is 'None', eased
+    // by influence, local via falloff.
+    const k = modeFactor(values, pointer);
+    const mode = values.cursorInteraction;
 
-    // World-space height of the sheet at (x, z). The lift term projects the
-    // (unlifted) point to screen space first to find its distance from the
-    // pointer, then adds a falloff-weighted Z — no term routed through
-    // values.speed, so it survives Speed 0.
+    // World-space height of the sheet at (x, z). Grow/Shrink only: the lift
+    // term projects the (unlifted) point to screen space first to find its
+    // distance from the pointer, then adds a falloff-weighted Z, scaled and
+    // radius-widened by the same amp — no term routed through values.speed,
+    // so it survives Speed 0. Attract/Vortex act on screen space instead —
+    // see warpProjected.
     const heightAt = (x, z) => {
       const base = simplex2(x * noiseScale + values.phase, z * noiseScale + t) * amp;
-      if (!k) return base;
+      if (!k || (mode !== 'Grow' && mode !== 'Shrink')) return base;
+      const grow = mode === 'Grow';
+      const lAmp = grow ? 1 + k * 1.5 : 1 / (1 + k * 1.5);
       const approx = camera.project(x, 0, z);
       if (approx.scale <= 0) return base;
-      const f = pointer.falloff(approx.x, approx.y, 220);
-      return base - f * k * 70;
+      const f = pointer.falloff(approx.x, approx.y, WARP_RADIUS * lAmp);
+      return base - f * 70 * lAmp;
     };
 
     const half = SPAN / 2;
@@ -1650,14 +1681,20 @@ function createOrbit({
         rowPts.push([c, heightAt(c, a), a]);
         colPts.push([a, heightAt(a, c), c]);
       }
-      strokePath(camera.projectPath(rowPts), values, baseWidth, [r, g, b]);
-      strokePath(camera.projectPath(colPts), values, baseWidth, [r, g, b]);
+      strokePath(warpProjected(camera.projectPath(rowPts), mode, k), values, baseWidth, [r, g, b]);
+      strokePath(warpProjected(camera.projectPath(colPts), mode, k), values, baseWidth, [r, g, b]);
     }
+
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

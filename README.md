@@ -166,9 +166,12 @@ the default — every piece's own look); Color A/B are hex pickers, B shown
 only in Gradient mode. `density` multiplies the piece's base element count.
 `pointer` scales the piece's cursor response (0 by default, opt-in); each
 piece maps it to its own visual vocabulary and remains responsive at Speed
-0. `cursor interaction` currently ships with a single option, `None` — the
-control exists for a future sub-project (Grow, Shrink, Particle Trail,
-Ripples, Attract, Vortex) and does nothing yet. `wireframe-lattice` and
+0. `cursor interaction` (None / Grow / Shrink / Particle Trail / Ripples /
+Attract / Vortex) is wired on all twelve pieces: Grow/Shrink/Attract/Vortex
+scale marks individually on element-based pieces and amplify/damp an
+existing local deformation on whole-path pieces (rings, bands, ribbons,
+cables); Particle Trail and Ripples are a shared cursor-relative overlay,
+identical on every piece. `wireframe-lattice` and
 `event-horizon` also provide Pitch and Yaw controls; Angle is roll, and
 dragging the canvas orbits the camera on direct piece pages. Gallery
 previews disable drag-to-orbit.

@@ -113,9 +113,12 @@ strength. The vocabulary and the shared Trail/Ripples overlay live in
 `shared/cursor-modes.js` — see `modeFactor(values, pointer)`, which every
 mode multiplies by and which is 0 whenever `cursorInteraction` is `'None'`
 or `pointer` is 0. Per-mode behaviour (Grow/Shrink/Attract/Vortex) is wired
-piece by piece; a piece that hasn't been wired yet shows no cursor response
-at all, which is expected, not a bug — check `pieces/flow-field/index.html`
-for the current worked example.
+piece by piece and is now live on all twelve pieces. Element-based pieces
+(particles, dots, nodes) scale marks individually — see
+`pieces/flow-field/index.html` for the worked example. Whole-path pieces
+that stroke a ring/band/ribbon/cable as one path can't vary stroke width
+mid-path, so they amplify/damp an existing falloff-weighted local
+deformation instead — see `pieces/contour-grid/index.html`.
 
 `colorMode` (Solid/Gradient) and `colorA`/`colorB` (hex colour pickers,
 `colorB` only shown in Gradient mode) are the *authored* palette — a piece

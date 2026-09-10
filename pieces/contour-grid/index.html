@@ -34,6 +34,8 @@
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+  import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'contour-grid';
   const canvas = document.getElementById('canvas');
@@ -71,6 +73,14 @@
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
+
+  // The bulge is one continuous stroked path per band, so per-mark scaling
+  // (flow-field's approach) isn't available: Grow/Shrink amplify/damp this
+  // existing falloff-weighted offset and its radius instead, rather than
+  // varying ctx.lineWidth mid-path.
+  const BULGE_MAG = 70;
+  const BULGE_RADIUS = 300;
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -89,9 +99,10 @@
     const lineWidth = 0.4 + values.stroke * 1.1;
     ctx.lineWidth = lineWidth;
 
-    // Gate: off at pointer 0, eased by influence, local via falloff. Uses no
-    // term scaled by values.speed, so the bulge survives Speed 0.
-    const k = values.pointer * pointer.influence;
+    // Gate: off at pointer 0, off when cursorInteraction is 'None', eased by
+    // influence, local via falloff. Uses no term scaled by values.speed (or
+    // values.relief, which a user can set to 0), so the bulge survives both.
+    const k = modeFactor(values, pointer);
 
     // Drawing below happens in the pre-rotation local space that ctx.rotate
     // maps to screen space, but pointer.x/y are screen (canvas-pixel) space.
@@ -128,15 +139,36 @@
       for (let x = -margin; x <= canvas.width + margin; x += STEP_PX) {
         const n1 = simplex2(x * noiseScale + values.phase, baseY * noiseScale);
         const n2 = simplex2(x * noiseScale + values.phase + 137, baseY * noiseScale + t);
-        // Terrain bulges beneath the pointer: a falloff-weighted offset added
-        // to the height field, independent of the speed-scaled wobble above.
-        // Falloff against the un-rotated pointer (plx, ply), not pointer.x/y
-        // directly — see note above ctx.save().
-        const bulge = k ? Math.max(0, 1 - Math.hypot(x - plx, baseY - ply) / 260) * k * 60 : 0;
-        const y = baseY + n1 * baseAmp + n2 * moveAmp - bulge;
-        if (x === -margin) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-        pts.push([x, y]);
+        let y = baseY + n1 * baseAmp + n2 * moveAmp;
+        let px = x;
+        if (k) {
+          // Falloff against the un-rotated pointer (plx, ply), not pointer.x/y
+          // directly — see note above ctx.save().
+          const mode = values.cursorInteraction;
+          if (mode === 'Grow' || mode === 'Shrink') {
+            const amp = mode === 'Grow' ? 1 + k * 1.5 : 1 / (1 + k * 1.5);
+            const radius = BULGE_RADIUS * amp;
+            const f = Math.max(0, 1 - Math.hypot(x - plx, baseY - ply) / radius);
+            if (f) y -= f * BULGE_MAG * amp;
+          } else if (mode === 'Attract') {
+            const f = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / BULGE_RADIUS);
+            if (f) y += (ply - y) * f * k;
+          } else if (mode === 'Vortex') {
+            const f = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / BULGE_RADIUS);
+            if (f) {
+              // True tangential rotation of the sampled point about the
+              // un-rotated pointer, not an offset toward/away from it —
+              // rotatePoint's roll term is exactly 2D rotation when tilt/yaw
+              // are left at 0 (z stays 0 throughout).
+              const r = rotatePoint(x - plx, y - ply, 0, { roll: f * k * 1.1 });
+              px = plx + r.x;
+              y = ply + r.y;
+            }
+          }
+        }
+        if (x === -margin) ctx.moveTo(px, y);
+        else ctx.lineTo(px, y);
+        pts.push([px, y]);
       }
       if (values.glow > 0) {
         ctx.lineWidth = lineWidth + values.glow * 3;
@@ -150,11 +182,21 @@
     }
 
     ctx.restore();
+
+    // Overlay marks are cursor-relative, drawn in screen space, so they must
+    // come after ctx.restore() (out of the rotated local frame) and after
+    // the fillRect above (the piece's own full clear), or they'd render
+    // rotated/offset from the visible cursor, or get wiped by the clear.
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.6);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

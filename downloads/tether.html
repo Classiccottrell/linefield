@@ -1421,7 +1421,77 @@ function createOrbit({
 }
 
 
+// --- inlined: ../../shared/project.js ---
+// shared/project.js
+// 3D -> 2D projection for pieces that want perspective geometry.
+//
+// Shaped as an extension point: behaviour is configured through an options
+// bag on a camera object, so future capability (roll, camera position, an
+// orthographic mode) arrives as a new option that existing callers ignore,
+// rather than a changed signature at every call site.
+//
+// Deliberately absent, by choice rather than oversight: depth sorting and
+// occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
+
+// Rotate a point: yaw about Y, pitch about X, then roll about Z.
+function rotatePoint(x, y, z, { tilt = 0, yaw = 0, roll = 0 } = {}) {
+  const cyaw = Math.cos(yaw);
+  const syaw = Math.sin(yaw);
+  const rx = x * cyaw - z * syaw;
+  let rz = x * syaw + z * cyaw;
+
+  const ct = Math.cos(tilt);
+  const st = Math.sin(tilt);
+  const ry = y * ct - rz * st;
+  rz = y * st + rz * ct;
+
+  const cr = Math.cos(roll);
+  const sr = Math.sin(roll);
+  return { x: rx * cr - ry * sr, y: rx * sr + ry * cr, z: rz };
+}
+
+function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 } = {}) {
+  const opt = { tilt, yaw, roll, fov, cx, cy };
+
+  function project(x, y, z) {
+    const r = rotatePoint(x, y, z, opt);
+    const denom = opt.fov + r.z;
+    // Near plane sits at 20% of the fov ahead of the lens (not at the lens
+    // itself), capping scale at 1/0.2 = 5x. Without this, points just past
+    // the lens (denom -> 0) blow up toward arbitrary magnification, which
+    // canvas draw calls and exported paths share the same coordinates for —
+    // canvas just clips silently at the screen edge, export doesn't. A
+    // blown-up point lands off the visible frame whenever the near-plane
+    // crossing is off the camera's optical axis, which any meaningful tilt
+    // guarantees; a tilt at or near zero (camera roughly in the plane of
+    // the geometry) is the degenerate exception where a dropped point can
+    // still be near-frame, and dropping it can visibly change the render.
+    // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
+    // steps) at which event-horizon's SVG export at Scale 2, an angle
+    // exposing the near plane, has no coordinate over magnitude 5000. At
+    // or beyond the near plane there is no meaningful projection; scale 0
+    // is the caller's signal to skip this point.
+    const nearPlane = opt.fov * 0.2;
+    if (denom <= nearPlane) return { x: 0, y: 0, scale: 0 };
+    const scale = opt.fov / denom;
+    return { x: opt.cx + r.x * scale, y: opt.cy + r.y * scale, scale };
+  }
+
+  return {
+    project,
+    projectPath(points) {
+      return points.map((p) => project(p[0], p[1], p[2]));
+    },
+    set(partial) {
+      Object.assign(opt, partial);
+    },
+  };
+}
+
+
 // --- piece script ---
+
+
 
 
 
@@ -1481,6 +1551,15 @@ function createOrbit({
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
+
+  // Each cable is one continuous stroked path, so per-mark scaling isn't
+  // available: Grow/Shrink amplify/damp the existing falloff-weighted
+  // deflection and its radius. Only 6 cables at rest — the sparsest piece
+  // in the library — so the radius is wider than contour-grid's equivalent
+  // to keep Shrink's dimple comfortably above the gate threshold.
+  const DEFLECT_MAG = 110;
+  const DEFLECT_RADIUS = 340;
 
   seedCables(Math.max(2, Math.round(BASE_COUNT * currentValues.density)));
 
@@ -1495,7 +1574,10 @@ function createOrbit({
     const light = values.invert ? 0.35 : 0.65;
     const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than meridian
     const noiseScale = 0.9 * (0.3 + values.scale);
-    const k = values.pointer * pointer.influence;
+    // Off at pointer 0, off when cursorInteraction is 'None', eased by
+    // influence. No term routed through values.speed or values.slack (both
+    // user-zeroable), so deflection survives either at 0.
+    const k = modeFactor(values, pointer);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
     const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
@@ -1538,13 +1620,34 @@ function createOrbit({
         const shiver =
           simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
         let py = y + droop + shiver;
+        let px = x;
         if (k) {
-          const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / 240);
-          py += (py >= ply ? 1 : -1) * f * k * 80 * (4 * u * (1 - u));
+          // Envelope fades to 0 at both anchors, same as droop/shiver above,
+          // so cursor response never tugs a cable's fixed endpoints.
+          const envelope = 4 * u * (1 - u);
+          const mode = values.cursorInteraction;
+          if (mode === 'Grow' || mode === 'Shrink') {
+            const amp = mode === 'Grow' ? 1 + k * 1.5 : 1 / (1 + k * 1.5);
+            const radius = DEFLECT_RADIUS * amp;
+            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / radius);
+            if (f) py += (py >= ply ? 1 : -1) * f * DEFLECT_MAG * amp * envelope;
+          } else if (mode === 'Attract') {
+            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
+            if (f) py += (ply - py) * f * k * envelope;
+          } else if (mode === 'Vortex') {
+            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
+            if (f) {
+              // True tangential rotation about the un-rotated pointer, not
+              // an offset toward/away from it.
+              const r = rotatePoint(x - plx, py - ply, 0, { roll: f * k * envelope * 1.1 });
+              px = plx + r.x;
+              py = ply + r.y;
+            }
+          }
         }
-        if (s === 0) ctx.moveTo(x, py);
-        else ctx.lineTo(x, py);
-        pts.push([x, py]);
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+        pts.push([px, py]);
       }
 
       if (values.glow > 0) {
@@ -1559,11 +1662,19 @@ function createOrbit({
     }
 
     ctx.restore();
+
+    // Screen space, after restore and after the fillRect clear above — see
+    // shared/cursor-modes.js's draw-ordering contract.
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.65);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });
