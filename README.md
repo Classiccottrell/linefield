@@ -172,9 +172,12 @@ dragging the canvas orbits the camera on direct piece pages. Gallery
 previews disable drag-to-orbit.
 
 The panel itself is sectioned into Interactions (cursor interaction,
-pointer, and Pitch/Yaw on the two 3D pieces), Color, and Visual, with Reset
-pinned below all three. Below ~640px it docks as a bottom sheet, collapsed
-to a handle by default.
+pointer, and Pitch/Yaw on the two 3D pieces), Color, and Visual — each a
+collapsible header with its own open/closed state, persisted per piece.
+Interactions opens by default; Color and Visual start closed, so the panel
+fits on screen at rest. Reset is a sticky footer, always visible at the
+panel's bottom edge regardless of scroll position. Below ~640px the panel
+docks as a bottom sheet, collapsed to a handle by default.
 
 ## Adding a new piece
 

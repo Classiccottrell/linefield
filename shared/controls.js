@@ -51,20 +51,37 @@ export const PRESET_NAMES = ['whisper', 'ink', 'neon', 'drift', 'dense'];
 // PREVIEW_PLANE + VISUAL telemetry boxes in mock 2 are deferred — no data
 // feed for them yet — everything else about its styling is applied.
 const PANEL_CSS = `
+/* Fix round 1: the panel is a flex column so the scrollable middle
+   (.lf-body) can't push the footer (.lf-reset) off screen, and section
+   headers are now toggle buttons so the panel fits at rest. */
 .lf-panel { position: fixed; bottom: 12px; right: 12px; width: 300px;
   background: #0b0b0f; color: #e8e8e8; font: 12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;
-  border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 18px;
-  z-index: 9999; max-height: 80vh; overflow-y: auto; box-sizing: border-box; }
-.lf-panel.collapsed .lf-body { display: none; }
-.lf-panel h3 { margin: 0 0 14px; padding: 0; font: 700 11px/1 ui-monospace,Menlo,monospace;
-  text-transform: uppercase; letter-spacing: .12em; color: #6b7cff;
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 16px;
+  z-index: 9999; max-height: 80vh; overflow: hidden; box-sizing: border-box;
+  display: flex; flex-direction: column; }
+.lf-panel.collapsed .lf-body, .lf-panel.collapsed .lf-reset { display: none; }
+.lf-panel h3 { margin: 0; padding: 14px 18px 12px; font: 700 11px/1 ui-monospace,Menlo,monospace;
+  text-transform: uppercase; letter-spacing: .12em; color: #6b7cff; flex: none;
   display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
 .lf-panel h3 .lf-status { display: flex; align-items: center; gap: 5px; font: 500 10px/1 ui-monospace,Menlo,monospace;
   letter-spacing: .05em; color: #8a8a9a; text-transform: none; }
 .lf-panel h3 .lf-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
   box-shadow: 0 0 6px rgba(34,197,94,0.8); flex: none; }
-.lf-section-head { margin: 0 0 10px; font: 700 10px/1 ui-monospace,Menlo,monospace;
-  text-transform: uppercase; letter-spacing: .12em; color: #6b7cff; }
+/* .lf-body is the ONLY scrolling region — header, footer and the mobile
+   handle sit outside it so they never scroll out of view. min-height: 0 is
+   load-bearing: without it a flex child won't shrink below its content size
+   and this scroller simply never activates. */
+.lf-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 18px 14px; }
+.lf-section-head { all: revert; appearance: none; background: none; border: none; padding: 0;
+  margin: 0 0 10px; width: 100%; box-sizing: border-box; text-align: left; cursor: pointer;
+  font: 700 10px/1 ui-monospace,Menlo,monospace; text-transform: uppercase; letter-spacing: .12em;
+  color: #6b7cff; display: flex; align-items: center; justify-content: space-between; }
+.lf-section-head:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 2px; }
+.lf-chevron { display: inline-block; font: 10px/1 ui-monospace,Menlo,monospace;
+  transition: transform .15s ease; }
+.lf-chevron::before { content: '\\25be'; }
+.lf-section.lf-section-collapsed .lf-chevron { transform: rotate(-90deg); }
+.lf-section.lf-section-collapsed .lf-section-body { display: none; }
 .lf-section + .lf-section { margin-top: 14px; }
 .lf-divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 16px 0; }
 .lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
@@ -107,10 +124,15 @@ const PANEL_CSS = `
 .lf-seg-btn.lf-seg-btn-active::before { border-color: #6b7cff; background: #6b7cff; }
 .lf-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
-.lf-reset { width: 100%; margin-top: 16px; background: #141419; color: #e8e8e8;
-  border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 9px; cursor: pointer;
+/* Sticky footer (fix round 1, finding 1): a flex sibling of .lf-body, not a
+   child of it, so it never scrolls with the sections above it. Its own
+   background covers content scrolling underneath; its top border is the
+   hairline that reads it as a footer rather than a floating button. */
+.lf-reset { flex: none; width: 100%; box-sizing: border-box; margin: 0; background: #0b0b0f;
+  color: #e8e8e8; border: none; border-top: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0 0 16px 16px; padding: 12px 18px; cursor: pointer;
   font: 11px -apple-system,sans-serif; }
-.lf-reset:hover { border-color: #6b7cff; }
+.lf-reset:hover { background: #141419; }
 .lf-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 14px; }
 .lf-chip { flex: 1 1 auto; background: #141419; color: #c9c9d4; border: 1px solid rgba(255,255,255,0.08);
   border-radius: 6px; padding: 5px 6px; font: 500 10px/1 ui-monospace,Menlo,monospace;
@@ -126,9 +148,10 @@ const PANEL_CSS = `
 .lf-handle { display: none; }
 @media (max-width: 640px) {
   .lf-panel { left: 0; right: 0; bottom: 0; width: 100%; max-height: 70vh;
-    border-radius: 16px 16px 0 0; border-bottom: none; padding: 10px 18px 18px; }
-  .lf-handle { display: flex; justify-content: center; padding: 6px 0 12px; cursor: pointer; margin: -10px -18px 0; }
+    border-radius: 16px 16px 0 0; border-bottom: none; }
+  .lf-handle { display: flex; flex: none; justify-content: center; padding: 8px 0; cursor: pointer; }
   .lf-handle::before { content: ''; width: 36px; height: 4px; border-radius: 999px; background: #3a3a46; }
+  .lf-reset { border-radius: 0; }
   .lf-panel.mobile-collapsed .lf-body,
   .lf-panel.mobile-collapsed .lf-reset { display: none; }
 }
@@ -193,6 +216,14 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   // <=640px media query in CSS, so toggling it can never affect (or be
   // affected by) the desktop `collapsed` state above.
   let mobileCollapsed = true;
+  // Fix round 1, finding 2: sections collapse independently, persisted
+  // alongside `collapsed`/`values`. Interactions starts open (the thing the
+  // separation was for); Color and Visual start closed, so the panel fits
+  // on screen at rest. `saved.sections ?? {}` is deliberately defensive — a
+  // blob written before this change has no `sections` key at all, and
+  // reading it without the fallback would throw on spread below.
+  const DEFAULT_SECTION_OPEN = { interaction: true, color: false, visual: false };
+  const sectionOpen = { ...DEFAULT_SECTION_OPEN, ...(saved.sections ?? {}) };
 
   const panel = document.createElement('div');
   panel.className = 'lf-panel mobile-collapsed' + (collapsed ? ' collapsed' : '');
@@ -229,33 +260,58 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
 
   // Two tiers, per the brief: Interactions (cursor response, kept separate
   // from background configuration on purpose) divided from Color+Visual.
-  // Each section is just a container a category routes rows into —
-  // `sectionOf` below is the single place that mapping lives.
-  function makeSection(title) {
+  // Each section is a toggle-button header plus a body a category routes
+  // rows into — `sectionOf` below is the single place that mapping lives.
+  // Collapsing hides `.lf-section-body` via CSS only: rows stay in the DOM
+  // (never removed), so a gate that drives a control by name or by
+  // `row.querySelector` still finds it whether its section is open or not.
+  function makeSection(key, title) {
     const section = document.createElement('div');
     section.className = 'lf-section';
-    const head = document.createElement('div');
-    head.className = 'lf-section-head';
-    head.textContent = title;
-    section.appendChild(head);
-    return section;
+
+    const headBtn = document.createElement('button');
+    headBtn.type = 'button';
+    headBtn.className = 'lf-section-head';
+    const headLabel = document.createElement('span');
+    headLabel.textContent = title;
+    const chevron = document.createElement('span');
+    chevron.className = 'lf-chevron';
+    headBtn.append(headLabel, chevron);
+
+    const sectionBody = document.createElement('div');
+    sectionBody.className = 'lf-section-body';
+    section.append(headBtn, sectionBody);
+
+    function applyOpenState() {
+      const open = sectionOpen[key];
+      headBtn.setAttribute('aria-expanded', String(open));
+      section.classList.toggle('lf-section-collapsed', !open);
+    }
+    applyOpenState();
+    headBtn.addEventListener('click', () => {
+      sectionOpen[key] = !sectionOpen[key];
+      applyOpenState();
+      persist();
+    });
+
+    return { el: section, body: sectionBody };
   }
-  const sectionInteraction = makeSection('Interactions');
-  const sectionColor = makeSection('Color');
-  const sectionVisual = makeSection('Visual');
-  body.appendChild(sectionInteraction);
+  const secInteraction = makeSection('interaction', 'Interactions');
+  const secColor = makeSection('color', 'Color');
+  const secVisual = makeSection('visual', 'Visual');
+  body.appendChild(secInteraction.el);
   body.appendChild(document.createElement('hr')).className = 'lf-divider';
-  body.appendChild(sectionColor);
-  body.appendChild(sectionVisual);
+  body.appendChild(secColor.el);
+  body.appendChild(secVisual.el);
 
   // category is optional and defaults to 'visual'. Only 'interaction' and
   // 'color' route a control out of Visual — 'motion'/'form'/'ink' (the
   // piece-extra sub-tags called out in the brief) are metadata for a future
   // stage and land in Visual today, same as an uncategorised control.
   function sectionOf(spec) {
-    if (spec.category === 'interaction') return sectionInteraction;
-    if (spec.category === 'color') return sectionColor;
-    return sectionVisual;
+    if (spec.category === 'interaction') return secInteraction.body;
+    if (spec.category === 'color') return secColor.body;
+    return secVisual.body;
   }
 
   // Per-control render hook. Covers <input type=range|checkbox|color> and
@@ -512,7 +568,7 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
     // Presets sit above every section, ahead of the two tiers built earlier
     // in this function — insertBefore rather than appendChild, since the
     // section containers are already in `body` by this point.
-    body.insertBefore(chipRow, sectionInteraction);
+    body.insertBefore(chipRow, secInteraction.el);
   }
 
   for (const spec of allSpecs) buildRow(spec);
@@ -520,8 +576,11 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   // every subsequent change, this sets the correct initial state.
   controllers.colorB?.setRowVisible?.(values.colorMode === 'gradient');
 
-  // Reset stays pinned at the bottom, below every section, per the brief.
-  body.appendChild(document.createElement('hr')).className = 'lf-divider';
+  // Reset is a sticky footer (fix round 1, finding 1): a sibling of `body`,
+  // not a child of it, so the flex layout in PANEL_CSS keeps it pinned to
+  // the panel's bottom edge regardless of how far `body` is scrolled. Still
+  // inside `panel`, which carries `data-lf-panel` — the hard constraint is
+  // about that attribute, not about which direct child holds a row.
   const resetBtn = document.createElement('button');
   resetBtn.className = 'lf-reset';
   resetBtn.textContent = 'Reset to defaults';
@@ -529,13 +588,13 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
     applyValues(defaults);
     setActiveChip(null);
   });
-  body.appendChild(resetBtn);
+  panel.appendChild(resetBtn);
 
   document.body.appendChild(panel);
 
   function persist() {
     if (isPreview) return;
-    localStorage.setItem(storageKey, JSON.stringify({ collapsed, values }));
+    localStorage.setItem(storageKey, JSON.stringify({ collapsed, values, sections: sectionOpen }));
   }
 
   // Declared, uncomposed. tools/build.mjs reads this off the loaded page
