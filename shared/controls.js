@@ -14,6 +14,7 @@ const SHARED_CONTROLS = [
   { name: 'phase', label: 'Phase', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
   { name: 'invert', label: 'Invert', type: 'checkbox', default: false },
   { name: 'density', label: 'Density', type: 'range', min: 0.1, max: 2, step: 0.01, default: 1 },
+  { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
 ];
 
 // The shared preset vocabulary. Every piece declares all five; the names mean
@@ -61,6 +62,14 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
 
   const storageKey = `linefield:${pieceId}`;
   const allSpecs = [...SHARED_CONTROLS, ...extraControls];
+  const specByName = {};
+  // kind is the discriminant every gate must branch on, never `type`: Stage C
+  // adds 'select'/'radio' types, and a gate that switches on type-name string
+  // would silently fall a new type into whichever branch it doesn't match.
+  for (const spec of allSpecs) {
+    spec.kind = spec.type === 'checkbox' ? 'boolean' : 'number';
+    specByName[spec.name] = spec;
+  }
   const defaults = {};
   for (const spec of allSpecs) {
     defaults[spec.name] = spec.name in defaultOverrides ? defaultOverrides[spec.name] : spec.default;
@@ -95,7 +104,46 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   body.className = 'lf-body';
   panel.appendChild(body);
 
-  const inputs = {};
+  // Per-control render hook. The default registration below covers a plain
+  // <input>; a widget that isn't a bare input (Stage C's dropdown/radio/
+  // colour picker) registers its own render(v) instead, so setValue below
+  // stays agnostic to what is actually on screen.
+  const controllers = {};
+
+  // Clamp to the spec's declared range where numeric, then snap to its step
+  // the same way <input type=range> snaps on a programmatic .value set. That
+  // browser-side snap is exactly what the old DOM round-trip captured (set
+  // .value, then read it back post-sanitization); setValue writes values[]
+  // directly and never reads the DOM back, so without this step a control's
+  // displayed slider position and its rendered value can disagree — the
+  // Pitch/Yaw divergence this stage exists to remove, reintroduced. Not
+  // applied to booleans (kind === 'boolean') or to a name with no known spec.
+  function clampValue(spec, v) {
+    if (!spec || spec.kind !== 'number' || typeof spec.min !== 'number' || typeof spec.max !== 'number') {
+      return v;
+    }
+    const clamped = Math.min(spec.max, Math.max(spec.min, v));
+    const step = Number(spec.step);
+    if (!(step > 0)) return clamped;
+    const snapped = spec.min + Math.round((clamped - spec.min) / step) * step;
+    const decimals = (String(step).split('.')[1] || '').length;
+    return decimals ? Number(snapped.toFixed(decimals)) : snapped;
+  }
+
+  // THE write path. Every value change — a drag, a preset, Reset, or a gate
+  // script driving the panel with no DOM at all — goes through this and only
+  // this, so a value set by an audit renders identically to the same value
+  // set by a human: clamp -> write -> render -> clear active chip -> fire
+  // onChange exactly once -> persist if asked.
+  function setValue(name, value, { persist: shouldPersist = true } = {}) {
+    const spec = specByName[name];
+    const v = clampValue(spec, value);
+    values[name] = v;
+    controllers[name]?.render(v);
+    setActiveChip(null);
+    onChange(name, v, values);
+    if (shouldPersist) persist();
+  }
 
   function buildRow(spec, beforeEl) {
     const row = document.createElement('div');
@@ -122,15 +170,20 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
       input.value = values[spec.name];
     }
 
+    // Thin adapter: read the raw DOM value and hand it to setValue. It must
+    // not touch values/onChange/persistence itself — setValue is the only
+    // write path (see above).
     input.addEventListener('input', () => {
       const v = spec.type === 'checkbox' ? input.checked : parseFloat(input.value);
-      values[spec.name] = v;
-      setActiveChip(null);
-      persist();
-      onChange(spec.name, v, values);
+      setValue(spec.name, v);
     });
 
-    inputs[spec.name] = input;
+    controllers[spec.name] = {
+      render(v) {
+        if (spec.type === 'checkbox') input.checked = v;
+        else input.value = v;
+      },
+    };
     row.appendChild(input);
     if (beforeEl) body.insertBefore(row, beforeEl);
     else body.appendChild(row);
@@ -143,16 +196,7 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   // piece's own default rather than keeping the previous preset's value.
   function applyValues(map) {
     const next = { ...defaults, ...map };
-    for (const spec of allSpecs) {
-      const v = next[spec.name];
-      values[spec.name] = v;
-      const input = inputs[spec.name];
-      if (input) {
-        if (spec.type === 'checkbox') input.checked = v;
-        else input.value = v;
-      }
-      onChange(spec.name, v, values);
-    }
+    for (const spec of allSpecs) setValue(spec.name, next[spec.name], { persist: false });
     persist();
   }
 
@@ -213,6 +257,10 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   window.__LF_SPECS__ = allSpecs;
   // The live value object, for gate scripts. Same reference the panel mutates.
   window.__LF_VALUES__ = values;
+  // The write path itself, for gate scripts that need to drive controls with
+  // no DOM query at all — e.g. tools/audit-controls.mjs, which otherwise
+  // depends on positional row indices no future widget need honour.
+  window.__LF_PANEL__ = { setValue };
 
   // Highest precedence on load: an explicit ?preset= beats saved localStorage,
   // which beats the piece's defaults. Applied after every row exists so the
@@ -227,8 +275,12 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   return {
     values,
     el: panel,
+    setValue,
     addControl(spec) {
+      spec.kind = spec.type === 'checkbox' ? 'boolean' : 'number';
+      specByName[spec.name] = spec;
       allSpecs.push(spec);
+      defaults[spec.name] = spec.default;
       if (!(spec.name in values)) values[spec.name] = spec.default;
       buildRow(spec, resetBtn);
       persist();

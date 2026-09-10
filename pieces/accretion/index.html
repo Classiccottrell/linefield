@@ -16,6 +16,7 @@
 
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
   <button id="btn-png-2x">PNG 2x</button>
   <button id="btn-png-4x">PNG 4x</button>
   <button id="btn-svg">SVG</button>
@@ -26,7 +27,8 @@
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb } from '../../shared/color.js';
-  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'accretion';
   const canvas = document.getElementById('canvas');
@@ -82,6 +84,7 @@
     defaults: { hue: 10, hueB: 40, saturation: 0.8 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   seedMotes(Math.max(20, Math.round(BASE_COUNT * currentValues.density)));
   window.addEventListener('resize', () =>
@@ -114,6 +117,12 @@
 
     const [r0, g0, b0] = hslToRgb(values.hue, values.saturation, light);
     const [r1, g1, b1] = hslToRgb(values.hueB, values.saturation, light);
+    const k = values.pointer * pointer.influence;
+    const lens = (x, y) => {
+      if (!k) return [x, y];
+      const f = pointer.falloff(x, y, 240);
+      return [x + (pointer.x - x) * f * k * 0.15, y + (pointer.y - y) * f * k * 0.15];
+    };
 
     for (const m of motes) {
       const prevA = m.a;
@@ -137,10 +146,14 @@
       // that would draw a long spoke across the whole disc every respawn.
       const startA = respawned ? m.a : prevA;
       const startR = respawned ? m.r : prevR;
-      const x0 = cx + Math.cos(drawAngle(startA, startR)) * startR;
-      const y0 = cy + Math.sin(drawAngle(startA, startR)) * startR;
-      const x1 = cx + Math.cos(drawAngle(m.a, m.r)) * m.r;
-      const y1 = cy + Math.sin(drawAngle(m.a, m.r)) * m.r;
+      const [x0, y0] = lens(
+        cx + Math.cos(drawAngle(startA, startR)) * startR,
+        cy + Math.sin(drawAngle(startA, startR)) * startR
+      );
+      const [x1, y1] = lens(
+        cx + Math.cos(drawAngle(m.a, m.r)) * m.r,
+        cy + Math.sin(drawAngle(m.a, m.r)) * m.r
+      );
 
       // Hot near the core, cooler at the rim.
       const heat = 1 - Math.min(1, (m.r - CORE) / Math.max(1, rim - CORE));
@@ -166,6 +179,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
@@ -177,6 +191,9 @@
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
       .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });

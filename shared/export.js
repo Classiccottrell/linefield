@@ -38,17 +38,20 @@ export function exportSvg(paths, { width = 800, height = 600 } = {}) {
   download('linefield.svg', blob);
 }
 
-// Shared modules a piece's inline <script type="module"> may import from.
-// Order matters: modules with no internal deps first is not required since
-// they're pure functions, but we keep a stable, readable order.
-const SHARED_MODULE_PATHS = [
-  '../../shared/noise.js',
-  '../../shared/color.js',
-  '../../shared/anim.js',
-  '../../shared/project.js',
-  '../../shared/controls.js',
-  '../../shared/export.js',
-];
+export async function exportSource({ filename = 'linefield-source.html' } = {}) {
+  const url = location.href.split(/[?#]/)[0];
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`exportSource: could not fetch source (${res.status})`);
+  const blob = await res.blob();
+  download(filename, blob);
+  return blob;
+}
+
+// The piece's own import statements are the registration. A hand-maintained
+// list is a silent-failure surface: omit an entry and the baked file is
+// valid, loads without error, and renders nothing. That shipped once.
+const SHARED_IMPORT_RE =
+  /^\s*import\s*\{[^}]*\}\s*from\s*['"](\.\.\/\.\.\/shared\/[^'"]+\.js)['"];?\s*$/gm;
 
 function stripExports(src) {
   // `export function foo` / `export const foo` -> drop the `export ` keyword.
@@ -56,15 +59,17 @@ function stripExports(src) {
 }
 
 async function inlineSharedModules(pieceScriptSrc) {
-  // Strip the piece's own import lines pulling from shared/*.js.
-  const strippedPieceSrc = pieceScriptSrc.replace(
-    /^\s*import\s*\{[^}]*\}\s*from\s*['"]\.\.\/\.\.\/shared\/[^'"]+\.js['"];?\s*$/gm,
-    ''
-  );
+  const paths = [...pieceScriptSrc.matchAll(SHARED_IMPORT_RE)].map((m) => m[1]);
+  const unique = [...new Set(paths)];
+  if (!unique.length) {
+    throw new Error('bakeHtml: the piece imports no shared modules — refusing to bake a file that would render blank');
+  }
+  const strippedPieceSrc = pieceScriptSrc.replace(SHARED_IMPORT_RE, '');
 
   const bodies = await Promise.all(
-    SHARED_MODULE_PATHS.map(async (path) => {
+    unique.map(async (path) => {
       const res = await fetch(path);
+      if (!res.ok) throw new Error(`bakeHtml: could not fetch ${path} (${res.status})`);
       const src = await res.text();
       return `// --- inlined: ${path} ---\n${stripExports(src)}`;
     })

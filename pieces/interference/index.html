@@ -16,6 +16,7 @@
 
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
   <button id="btn-png-2x">PNG 2x</button>
   <button id="btn-png-4x">PNG 4x</button>
   <button id="btn-svg">SVG</button>
@@ -26,7 +27,8 @@
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb } from '../../shared/color.js';
-  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'interference';
   const canvas = document.getElementById('canvas');
@@ -63,6 +65,7 @@
     defaults: { hue: 185, hueB: 320, saturation: 0.75 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   // One family of concentric rings, centred at (cx, cy).
   function drawFamily(cx, cy, rings, spacing, rgb, values) {
@@ -117,12 +120,22 @@
     const light = values.invert ? 0.35 : 0.6;
     drawFamily(cx - dx, cy - dy, rings, spacing,
       hslToRgb(values.hue, values.saturation, light), values);
-    drawFamily(cx + dx, cy + dy, rings, spacing,
+
+    // Second family's centre eases toward the pointer by k: a plain blend
+    // gated by the control*influence product, no term scaled by values.speed.
+    const k = values.pointer * pointer.influence;
+    // Clamp the EASE FRACTION, not k: k can reach 2 (pointer control's max),
+    // and a lerp factor above 1 overshoots the pointer and reflects past it.
+    const ease = Math.min(k, 1);
+    const cx2 = (cx + dx) + (pointer.x - (cx + dx)) * ease;
+    const cy2 = (cy + dy) + (pointer.y - (cy + dy)) * ease;
+    drawFamily(cx2, cy2, rings, spacing,
       hslToRgb(values.hueB, values.saturation, light), values);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
@@ -133,6 +146,9 @@
   document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });

@@ -16,6 +16,7 @@
 
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
   <button id="btn-png-2x">PNG 2x</button>
   <button id="btn-png-4x">PNG 4x</button>
   <button id="btn-svg">SVG</button>
@@ -27,7 +28,8 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
-  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'contour-grid';
   const canvas = document.getElementById('canvas');
@@ -64,6 +66,7 @@
     defaults: { hue: 35, hueB: 15, saturation: 0.5 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -82,10 +85,28 @@
     const lineWidth = 0.4 + values.stroke * 1.1;
     ctx.lineWidth = lineWidth;
 
+    // Gate: off at pointer 0, eased by influence, local via falloff. Uses no
+    // term scaled by values.speed, so the bulge survives Speed 0.
+    const k = values.pointer * pointer.influence;
+
+    // Drawing below happens in the pre-rotation local space that ctx.rotate
+    // maps to screen space, but pointer.x/y are screen (canvas-pixel) space.
+    // Un-rotate the pointer about the same centre/angle the canvas transform
+    // uses, so falloff is evaluated in the same space the geometry is drawn
+    // in — otherwise the bulge drifts away from the visible cursor as soon
+    // as Angle leaves 0 (confirmed: ~103px off at 15deg, ~515px at 90deg,
+    // with an off-centre cursor).
+    const rcx = canvas.width / 2, rcy = canvas.height / 2;
+    const theta = (values.angle * Math.PI) / 180;
+    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
+    const pdx = pointer.x - rcx, pdy = pointer.y - rcy;
+    const plx = rcx + pdx * cosT - pdy * sinT;
+    const ply = rcy + pdx * sinT + pdy * cosT;
+
     ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((values.angle * Math.PI) / 180);
-    ctx.translate(-canvas.width / 2, -canvas.height / 2);
+    ctx.translate(rcx, rcy);
+    ctx.rotate(theta);
+    ctx.translate(-rcx, -rcy);
 
     // Overdraw horizontally so rotation never reveals the canvas edge.
     const margin = Math.max(canvas.width, canvas.height) * 0.4;
@@ -106,7 +127,12 @@
       for (let x = -margin; x <= canvas.width + margin; x += STEP_PX) {
         const n1 = simplex2(x * noiseScale + values.phase, baseY * noiseScale);
         const n2 = simplex2(x * noiseScale + values.phase + 137, baseY * noiseScale + t);
-        const y = baseY + n1 * baseAmp + n2 * moveAmp;
+        // Terrain bulges beneath the pointer: a falloff-weighted offset added
+        // to the height field, independent of the speed-scaled wobble above.
+        // Falloff against the un-rotated pointer (plx, ply), not pointer.x/y
+        // directly — see note above ctx.save().
+        const bulge = k ? Math.max(0, 1 - Math.hypot(x - plx, baseY - ply) / 260) * k * 60 : 0;
+        const y = baseY + n1 * baseAmp + n2 * moveAmp - bulge;
         if (x === -margin) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
@@ -127,6 +153,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
@@ -137,6 +164,9 @@
   document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });

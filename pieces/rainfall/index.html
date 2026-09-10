@@ -16,6 +16,7 @@
 
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
   <button id="btn-png-2x">PNG 2x</button>
   <button id="btn-png-4x">PNG 4x</button>
   <button id="btn-svg">SVG</button>
@@ -27,7 +28,8 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
-  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'rainfall';
   const canvas = document.getElementById('canvas');
@@ -92,6 +94,7 @@
     defaults: { hue: 205, hueB: 195, saturation: 0.18 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   seedDrops(Math.max(4, Math.round(BASE_COUNT * currentValues.density)));
 
@@ -110,10 +113,16 @@
     // Gentle wind sway, independent of fall speed — subtle by design so the
     // piece stays calm rather than turning into a gust.
     const swayAmount = W * 0.006 * values.motion;
+    const k = values.pointer * pointer.influence;
+    const theta = (values.angle * Math.PI) / 180;
+    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
+    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
+    const plx = W / 2 + pdx * cosT - pdy * sinT;
+    const ply = H / 2 + pdx * sinT + pdy * cosT;
 
     ctx.save();
     ctx.translate(W / 2, H / 2);
-    ctx.rotate((values.angle * Math.PI) / 180);
+    ctx.rotate(theta);
     ctx.translate(-W / 2, -H / 2);
 
     for (const d of drops) {
@@ -125,7 +134,11 @@
       const tailY = headY - baseLen * d.lenMult;
 
       const n = simplex2(d.sway, elapsed * 0.15 * values.motion);
-      const x = d.x * W + n * swayAmount;
+      let x = d.x * W + n * swayAmount;
+      if (k) {
+        const f = Math.max(0, 1 - Math.hypot(x - plx, headY - ply) / 220);
+        x += (x >= plx ? 1 : -1) * f * k * 55;
+      }
 
       const lightBase = values.invert ? 0.3 : 0.68;
       const headLight = Math.min(0.95, lightBase + 0.22);
@@ -175,6 +188,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
@@ -185,6 +199,9 @@
   document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });

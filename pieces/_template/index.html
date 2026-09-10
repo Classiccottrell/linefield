@@ -19,7 +19,7 @@
   1. Copy this whole folder to ../<your-piece-name>/ (kebab-case).
   2. Change <title> above.
   3. In the script below, replace the drawFrame() body with your own
-     rendering logic. Read `values` for the 13 shared controls (see
+     rendering logic. Read `values` for the 14 shared controls (see
      shared/controls.js for names/ranges) plus any piece-specific ones,
      which you add via the `extraControls` option to createControlPanel()
      (see the real pieces for examples) — or panel.addControl({...}) if
@@ -32,6 +32,7 @@
 
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
   <button id="btn-png-2x">PNG 2x</button>
   <button id="btn-png-4x">PNG 4x</button>
   <button id="btn-svg">SVG</button>
@@ -40,9 +41,10 @@
 
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
+  import { createPointer } from '../../shared/pointer.js';
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb } from '../../shared/color.js';
-  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
 
   const PIECE_ID = 'template';
   const canvas = document.getElementById('canvas');
@@ -82,14 +84,38 @@
   });
   const currentValues = baked || panel.values;
 
+  // Every piece honours the shared `pointer` control. A piece decides WHAT
+  // the cursor does to it, not WHETHER it responds — a shared control that
+  // some pieces ignore is a dead control, which this project has shipped
+  // twice. See CONTRIBUTING.md.
+  const pointer = createPointer({ canvas });
+
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      // No argument: step() keeps its own clock, because influence is a
+      // UI-response quantity and should not track animation timing.
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
 
   function drawFrame(dt, elapsed, values) {
     const [r, g, b] = hslToRgb(values.hue, values.saturation, 0.5);
+
+    // Your pointer response goes here. `k` is the ONLY gate: at pointer 0 it
+    // is 0 and the piece must render byte-identically to having no cursor at
+    // all. Multiply by `pointer.falloff(x, y, radius)` for a local effect.
+    //
+    // Do NOT route the response through anything a user can set to zero —
+    // `values.speed` in particular. flow-field's first version bent a heading
+    // that only reached pixels via a speed-scaled term, so the cursor did
+    // nothing at Speed 0 while looking correct at defaults. `dt` for
+    // frame-rate normalisation is fine.
+    const k = values.pointer * pointer.influence;
+    if (k) {
+      // e.g. const f = pointer.falloff(x, y, 260);
+      //      offset += f * k * 40 * (dt || 0.016);
+    }
     ctx.fillStyle = 'rgba(10,10,13,0.15)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -128,6 +154,9 @@
   document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });

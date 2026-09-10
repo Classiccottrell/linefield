@@ -1,6 +1,6 @@
 // tools/audit-controls.mjs
 //
-// Empirically checks every control (13 shared + each piece's own) on every
+// Empirically checks every control (14 shared + each piece's own) on every
 // piece: drive it between its extremes, render a fixed number of
 // deterministic frames, and diff sampled canvas pixels. A dead control
 // (reads a value, changes nothing visible) shows ~zero diff; a live one
@@ -49,31 +49,27 @@ function serveRepo(port) {
   return new Promise((resolve) => server.listen(port, () => resolve(server)));
 }
 
-async function getRows(page) {
-  return page.evaluate(() => {
-    return [...document.querySelectorAll('.lf-panel .lf-row')].map((row, i) => {
-      const input = row.querySelector('input');
-      return {
-        i,
-        label: row.querySelector('label').textContent,
-        type: input.type,
-        min: input.type === 'checkbox' ? null : Number(input.min),
-        max: input.type === 'checkbox' ? null : Number(input.max),
-      };
-    });
-  });
+// Reads the control specs off window.__LF_SPECS__ instead of the DOM, so an
+// addressing scheme survives whatever widget renders a control. Discriminate
+// on `kind` (boolean/number), never on `type` — a future 'select'/'radio'
+// type must not silently alias to one of these two branches.
+async function getControls(page) {
+  return page.evaluate(() =>
+    (window.__LF_SPECS__ || []).map((spec, i) => ({
+      i,
+      name: spec.name,
+      label: spec.label,
+      kind: spec.kind,
+      min: spec.kind === 'number' ? Number(spec.min) : null,
+      max: spec.kind === 'number' ? Number(spec.max) : null,
+    }))
+  );
 }
 
-async function setRow(page, i, value) {
+async function setControl(page, name, value) {
   await page.evaluate(
-    ({ i, value }) => {
-      const row = document.querySelectorAll('.lf-panel .lf-row')[i];
-      const input = row.querySelector('input');
-      if (input.type === 'checkbox') input.checked = value;
-      else input.value = String(value);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    },
-    { i, value }
+    ({ name, value }) => window.__LF_PANEL__.setValue(name, value),
+    { name, value }
   );
 }
 
@@ -115,10 +111,23 @@ function diffScore(a, b) {
 
 const LIVE_THRESHOLD = 0.05; // % of sampled pixels changed, below this = no visible change
 
-async function renderVariant(page, base, slug, rowIndex, value) {
+async function renderVariant(page, base, slug, name, value) {
   await page.goto(`${base}/pieces/${slug}/?preview=1`, { waitUntil: 'load' });
   await page.waitForSelector('.lf-panel .lf-row');
-  if (rowIndex !== null) await setRow(page, rowIndex, value);
+  // No cursor exists in a headless audit, so pointer response would measure
+  // as DEAD on every piece. Place one at a fixed canvas-relative position —
+  // a constant, so two runs stay pixel-identical — and let influence settle.
+  await page.evaluate(() => {
+    const c = document.querySelector('#canvas');
+    const r = c.getBoundingClientRect();
+    c.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }));
+    c.dispatchEvent(new PointerEvent('pointermove', {
+      bubbles: true,
+      clientX: r.left + r.width * 0.35,
+      clientY: r.top + r.height * 0.4,
+    }));
+  });
+  if (name !== null) await setControl(page, name, value);
   await stepFrames(page);
   return sample(page);
 }
@@ -129,16 +138,18 @@ async function renderVariant(page, base, slug, rowIndex, value) {
 // the range instead and take the largest pairwise diff, so a control is only
 // called DEAD if it produces near-zero change between EVERY pair of test
 // points, not just the two that happened to alias.
-function samplePoints(row) {
-  if (row.type === 'checkbox') return [false, true];
-  const { min, max } = row;
-  return [0, 0.25, 0.5, 0.75, 1].map((f) => min + f * (max - min));
+function samplePoints(control) {
+  if (control.kind === 'boolean') return [false, true];
+  const { min, max } = control;
+  // Uneven fractions avoid aliasing discrete symmetries too: event-horizon's
+  // 36 spokes repeat every 10deg, so quarter-turn samples all looked equal.
+  return [0, 0.19, 0.43, 0.71, 1].map((f) => min + f * (max - min));
 }
 
 async function auditPiece(page, base, p) {
   await page.goto(`${base}/pieces/${p.slug}/?preview=1`, { waitUntil: 'load' });
   await page.waitForSelector('.lf-panel .lf-row');
-  const rows = await getRows(page);
+  const controls = await getControls(page);
 
   // Determinism sanity check: two default renders must diff to zero.
   const d1 = await renderVariant(page, base, p.slug, null, null);
@@ -146,17 +157,17 @@ async function auditPiece(page, base, p) {
   const baseline = diffScore(d1, d2);
 
   const results = [];
-  for (const row of rows) {
-    const points = samplePoints(row);
+  for (const control of controls) {
+    const points = samplePoints(control);
     const renders = [];
-    for (const v of points) renders.push(await renderVariant(page, base, p.slug, row.i, v));
+    for (const v of points) renders.push(await renderVariant(page, base, p.slug, control.name, v));
     let best = 0;
     for (let x = 0; x < renders.length; x++) {
       for (let y = x + 1; y < renders.length; y++) {
         best = Math.max(best, diffScore(renders[x], renders[y]));
       }
     }
-    results.push({ label: row.label, points, score: best, live: best >= LIVE_THRESHOLD });
+    results.push({ label: control.label, points, score: best, live: best >= LIVE_THRESHOLD });
   }
   return { slug: p.slug, baseline, results };
 }
@@ -187,11 +198,13 @@ async function main() {
     }
 
     console.log('\n\n--- summary of DEAD controls ---');
+    let deadCount = 0;
     for (const r of report) {
       for (const row of r.results) {
-        if (!row.live) console.log(`${r.slug}: ${row.label}`);
+        if (!row.live) { console.log(`${r.slug}: ${row.label}`); deadCount++; }
       }
     }
+    if (deadCount > 0) process.exitCode = 1;
   } finally {
     await browser.close();
     server.close();

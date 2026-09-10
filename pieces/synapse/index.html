@@ -16,6 +16,7 @@
 
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
   <button id="btn-png-2x">PNG 2x</button>
   <button id="btn-png-4x">PNG 4x</button>
   <button id="btn-svg">SVG</button>
@@ -27,7 +28,8 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
-  import { exportPng, exportSvg, bakeHtml, describeForAI } from '../../shared/export.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
 
   const PIECE_ID = 'synapse';
   const canvas = document.getElementById('canvas');
@@ -82,6 +84,7 @@
     defaults: { hue: 75, hueB: 45, saturation: 0.7 },
   });
   const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
 
   seedNodes(Math.max(8, Math.round(BASE_COUNT * currentValues.density)));
   window.addEventListener('resize', () =>
@@ -145,6 +148,7 @@
     const reach2 = reach * reach;
     const [r0, g0, b0] = hslToRgb(values.hue, values.saturation, light);
     const [r1, g1, b1] = hslToRgb(values.hueB, values.saturation, light);
+    const pointerK = values.pointer * pointer.influence;
 
     for (let cy = 0; cy < rows; cy++) {
       for (let cx = 0; cx < cols; cx++) {
@@ -179,7 +183,8 @@
                 const cr = r0 + (r1 - r0) * mix;
                 const cg = g0 + (g1 - g0) * mix;
                 const cb = b0 + (b1 - b0) * mix;
-                const alpha = values.opacity * closeness * (0.25 + pulse * 0.75);
+                const activation = pointerK * pointer.falloff((a.x + b.x) / 2, (a.y + b.y) / 2, 220);
+                const alpha = Math.min(1, values.opacity * closeness * (0.25 + pulse * 0.75) * (1 + activation * 2));
 
                 ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${alpha})`;
                 ctx.beginPath();
@@ -204,6 +209,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      pointer.step();
       drawFrame(dt, elapsed, currentValues);
     },
   });
@@ -215,6 +221,9 @@
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
       .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
   });
   document.getElementById('btn-prompt')?.addEventListener('click', () => {
     describeForAI({ pieceName: PIECE_ID, values: panel.values });

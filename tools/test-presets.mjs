@@ -53,7 +53,8 @@ async function open(query = '') {
   // 2. A preset map is partial — at least one preset omits at least one control.
   const partial = await page.evaluate(() => {
     const p = window.__LF_PRESETS__;
-    return Object.values(p).some((m) => Object.keys(m).length < 13);
+    const total = (window.__LF_SPECS__ || []).length;
+    return Object.values(p).every((m) => Object.keys(m).length < total);
   });
   check('preset maps are partial, not full snapshots', partial);
   await ctx.close();
@@ -141,7 +142,11 @@ async function open(query = '') {
   await page.click('.lf-chip[data-preset="ink"]');
   await page.waitForTimeout(200);
   await page.evaluate(() => {
-    const el = [...document.querySelectorAll('.lf-row input[type=range]')][0];
+    // Pinned to Scale by label, not position: every piece declares it and it
+    // stays a plain slider, unlike a positional index into .lf-row.
+    const row = [...document.querySelectorAll('.lf-row')]
+      .find((candidate) => candidate.querySelector('label')?.textContent.trim() === 'Scale');
+    const el = row.querySelector('input[type=range]');
     el.value = String(Number(el.value) === 0 ? 1 : 0);
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
