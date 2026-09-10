@@ -142,7 +142,11 @@ async function open(query = '') {
   await page.click('.lf-chip[data-preset="ink"]');
   await page.waitForTimeout(200);
   await page.evaluate(() => {
-    const el = [...document.querySelectorAll('.lf-row input[type=range]')][0];
+    // Pinned to Scale by label, not position: every piece declares it and it
+    // stays a plain slider, unlike a positional index into .lf-row.
+    const row = [...document.querySelectorAll('.lf-row')]
+      .find((candidate) => candidate.querySelector('label')?.textContent.trim() === 'Scale');
+    const el = row.querySelector('input[type=range]');
     el.value = String(Number(el.value) === 0 ? 1 : 0);
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });

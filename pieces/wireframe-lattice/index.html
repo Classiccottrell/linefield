@@ -69,7 +69,31 @@
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
-  const orbit = createOrbit({ canvas });
+  const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
+  // In panel mode the drag writes straight into rotX/rotY through setValue —
+  // the only write path — so the Pitch/Yaw sliders and the rendered camera
+  // never disagree. A baked export has no panel to write through, so it
+  // mutates currentValues directly, clamped to the same ranges the panel
+  // would have enforced.
+  const orbit = createOrbit({
+    canvas,
+    onOrbit: (dPitch, dYaw) => {
+      const dPitchDeg = (dPitch * 180) / Math.PI;
+      const dYawDeg = (dYaw * 180) / Math.PI;
+      if (panel) {
+        panel.setValue('rotX', panel.values.rotX + dPitchDeg, { persist: false });
+        panel.setValue('rotY', panel.values.rotY + dYawDeg, { persist: false });
+      } else {
+        currentValues.rotX = clampDeg(currentValues.rotX + dPitchDeg, -90, 90);
+        currentValues.rotY = clampDeg(currentValues.rotY + dYawDeg, -180, 180);
+      }
+    },
+    onSettle: () => {
+      if (!panel) return;
+      panel.setValue('rotX', panel.values.rotX, { persist: true });
+      panel.setValue('rotY', panel.values.rotY, { persist: true });
+    },
+  });
 
   const camera = createCamera({ fov: 620 });
 
@@ -120,8 +144,8 @@
     const light = values.invert ? 0.35 : 0.62;
 
     camera.set({
-      tilt: (values.rotX * Math.PI) / 180 + orbit.pitch,
-      yaw: (values.rotY * Math.PI) / 180 + orbit.yaw,
+      tilt: (values.rotX * Math.PI) / 180,
+      yaw: (values.rotY * Math.PI) / 180,
       roll: (values.angle * Math.PI) / 180,
       cx: canvas.width / 2,
       cy: canvas.height / 2,

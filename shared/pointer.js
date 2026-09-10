@@ -77,15 +77,21 @@ export function createPointer({ canvas, enabled = true }) {
   return p;
 }
 
+// Stateless delta emitter: holds no pitch/yaw of its own. Each drag move
+// calls onOrbit(dPitchRad, dYawRad) with the frame's delta only; the caller
+// (a piece, via panel.setValue) owns where that delta lands, so the panel's
+// Pitch/Yaw sliders and the rendered camera can never read two different
+// numbers. onSettle fires once on pointerup, for the caller to persist the
+// drag's final position without writing to localStorage on every move.
 export function createOrbit({
   canvas,
   enabled = new URLSearchParams(location.search).get('preview') !== '1',
   sensitivity = 0.008,
+  onOrbit = () => {},
+  onSettle = () => {},
 } = {}) {
-  const orbit = { pitch: 0, yaw: 0 };
   let dragging = false;
   let lastX = 0, lastY = 0;
-  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
   function onDown(e) {
     if (e.button !== 0) return;
@@ -95,13 +101,15 @@ export function createOrbit({
   }
   function onMove(e) {
     if (!dragging) return;
-    orbit.yaw = clamp(orbit.yaw + (e.clientX - lastX) * sensitivity, -Math.PI, Math.PI);
-    orbit.pitch = clamp(orbit.pitch + (e.clientY - lastY) * sensitivity, -Math.PI / 2, Math.PI / 2);
+    const dYaw = (e.clientX - lastX) * sensitivity;
+    const dPitch = (e.clientY - lastY) * sensitivity;
     lastX = e.clientX; lastY = e.clientY;
+    onOrbit(dPitch, dYaw);
   }
   function onUp(e) {
     dragging = false;
     canvas.releasePointerCapture?.(e.pointerId);
+    onSettle();
   }
 
   if (enabled) {
@@ -111,11 +119,12 @@ export function createOrbit({
     canvas.addEventListener('pointercancel', onUp);
   }
 
-  orbit.destroy = () => {
-    canvas.removeEventListener('pointerdown', onDown);
-    canvas.removeEventListener('pointermove', onMove);
-    canvas.removeEventListener('pointerup', onUp);
-    canvas.removeEventListener('pointercancel', onUp);
+  return {
+    destroy() {
+      canvas.removeEventListener('pointerdown', onDown);
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointercancel', onUp);
+    },
   };
-  return orbit;
 }

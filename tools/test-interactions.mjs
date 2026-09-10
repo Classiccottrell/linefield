@@ -56,6 +56,10 @@ async function placeCursor(page, x = 440, y = 300) {
   }, { x, y });
 }
 
+async function orbitValues(page) {
+  return page.evaluate(() => ({ rotX: window.__LF_VALUES__.rotX, rotY: window.__LF_VALUES__.rotY }));
+}
+
 async function sample(page) {
   return page.evaluate(() => {
     const canvas = document.querySelector('#canvas');
@@ -173,20 +177,27 @@ try {
     await setControl(page, 'Pointer', 0);
     await stepFrames(page);
     const beforeDrag = await sample(page);
+    const beforeDragValues = await orbitValues(page);
     await drag(page);
     const afterDrag = await sample(page);
+    const afterDragValues = await orbitValues(page);
     const directDrag = changedPercent(beforeDrag, afterDrag);
     assert.ok(directDrag >= 0.05, `${slug}: direct-page drag did not orbit`);
+    assert.notEqual(afterDragValues.rotX, beforeDragValues.rotX, `${slug}: drag did not write back rotX`);
+    assert.notEqual(afterDragValues.rotY, beforeDragValues.rotY, `${slug}: drag did not write back rotY`);
 
     await openPiece(page, base, slug, true);
     await setControl(page, 'Speed', 0);
     await setControl(page, 'Pointer', 0);
     await stepFrames(page);
     const beforePreviewDrag = await sample(page);
+    const beforePreviewValues = await orbitValues(page);
     await drag(page);
     const afterPreviewDrag = await sample(page);
+    const afterPreviewValues = await orbitValues(page);
     const previewDrag = changedPercent(beforePreviewDrag, afterPreviewDrag);
     assert.equal(previewDrag, 0, `${slug}: preview drag changed orientation (${previewDrag.toFixed(3)}%)`);
+    assert.deepEqual(afterPreviewValues, beforePreviewValues, `${slug}: preview drag changed rotX/rotY values`);
 
     for (const controls of [
       { Angle: 0, Pitch: -90, Yaw: -180, Density: 0.1, Scale: 0, Pointer: 2 },

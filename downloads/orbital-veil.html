@@ -101,6 +101,14 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
 
   const storageKey = `linefield:${pieceId}`;
   const allSpecs = [...SHARED_CONTROLS, ...extraControls];
+  const specByName = {};
+  // kind is the discriminant every gate must branch on, never `type`: Stage C
+  // adds 'select'/'radio' types, and a gate that switches on type-name string
+  // would silently fall a new type into whichever branch it doesn't match.
+  for (const spec of allSpecs) {
+    spec.kind = spec.type === 'checkbox' ? 'boolean' : 'number';
+    specByName[spec.name] = spec;
+  }
   const defaults = {};
   for (const spec of allSpecs) {
     defaults[spec.name] = spec.name in defaultOverrides ? defaultOverrides[spec.name] : spec.default;
@@ -135,7 +143,46 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   body.className = 'lf-body';
   panel.appendChild(body);
 
-  const inputs = {};
+  // Per-control render hook. The default registration below covers a plain
+  // <input>; a widget that isn't a bare input (Stage C's dropdown/radio/
+  // colour picker) registers its own render(v) instead, so setValue below
+  // stays agnostic to what is actually on screen.
+  const controllers = {};
+
+  // Clamp to the spec's declared range where numeric, then snap to its step
+  // the same way <input type=range> snaps on a programmatic .value set. That
+  // browser-side snap is exactly what the old DOM round-trip captured (set
+  // .value, then read it back post-sanitization); setValue writes values[]
+  // directly and never reads the DOM back, so without this step a control's
+  // displayed slider position and its rendered value can disagree — the
+  // Pitch/Yaw divergence this stage exists to remove, reintroduced. Not
+  // applied to booleans (kind === 'boolean') or to a name with no known spec.
+  function clampValue(spec, v) {
+    if (!spec || spec.kind !== 'number' || typeof spec.min !== 'number' || typeof spec.max !== 'number') {
+      return v;
+    }
+    const clamped = Math.min(spec.max, Math.max(spec.min, v));
+    const step = Number(spec.step);
+    if (!(step > 0)) return clamped;
+    const snapped = spec.min + Math.round((clamped - spec.min) / step) * step;
+    const decimals = (String(step).split('.')[1] || '').length;
+    return decimals ? Number(snapped.toFixed(decimals)) : snapped;
+  }
+
+  // THE write path. Every value change — a drag, a preset, Reset, or a gate
+  // script driving the panel with no DOM at all — goes through this and only
+  // this, so a value set by an audit renders identically to the same value
+  // set by a human: clamp -> write -> render -> clear active chip -> fire
+  // onChange exactly once -> persist if asked.
+  function setValue(name, value, { persist: shouldPersist = true } = {}) {
+    const spec = specByName[name];
+    const v = clampValue(spec, value);
+    values[name] = v;
+    controllers[name]?.render(v);
+    setActiveChip(null);
+    onChange(name, v, values);
+    if (shouldPersist) persist();
+  }
 
   function buildRow(spec, beforeEl) {
     const row = document.createElement('div');
@@ -162,15 +209,20 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
       input.value = values[spec.name];
     }
 
+    // Thin adapter: read the raw DOM value and hand it to setValue. It must
+    // not touch values/onChange/persistence itself — setValue is the only
+    // write path (see above).
     input.addEventListener('input', () => {
       const v = spec.type === 'checkbox' ? input.checked : parseFloat(input.value);
-      values[spec.name] = v;
-      setActiveChip(null);
-      persist();
-      onChange(spec.name, v, values);
+      setValue(spec.name, v);
     });
 
-    inputs[spec.name] = input;
+    controllers[spec.name] = {
+      render(v) {
+        if (spec.type === 'checkbox') input.checked = v;
+        else input.value = v;
+      },
+    };
     row.appendChild(input);
     if (beforeEl) body.insertBefore(row, beforeEl);
     else body.appendChild(row);
@@ -183,16 +235,7 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   // piece's own default rather than keeping the previous preset's value.
   function applyValues(map) {
     const next = { ...defaults, ...map };
-    for (const spec of allSpecs) {
-      const v = next[spec.name];
-      values[spec.name] = v;
-      const input = inputs[spec.name];
-      if (input) {
-        if (spec.type === 'checkbox') input.checked = v;
-        else input.value = v;
-      }
-      onChange(spec.name, v, values);
-    }
+    for (const spec of allSpecs) setValue(spec.name, next[spec.name], { persist: false });
     persist();
   }
 
@@ -253,6 +296,10 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   window.__LF_SPECS__ = allSpecs;
   // The live value object, for gate scripts. Same reference the panel mutates.
   window.__LF_VALUES__ = values;
+  // The write path itself, for gate scripts that need to drive controls with
+  // no DOM query at all — e.g. tools/audit-controls.mjs, which otherwise
+  // depends on positional row indices no future widget need honour.
+  window.__LF_PANEL__ = { setValue };
 
   // Highest precedence on load: an explicit ?preset= beats saved localStorage,
   // which beats the piece's defaults. Applied after every row exists so the
@@ -267,7 +314,10 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   return {
     values,
     el: panel,
+    setValue,
     addControl(spec) {
+      spec.kind = spec.type === 'checkbox' ? 'boolean' : 'number';
+      specByName[spec.name] = spec;
       allSpecs.push(spec);
       if (!(spec.name in values)) values[spec.name] = spec.default;
       buildRow(spec, resetBtn);
@@ -551,15 +601,21 @@ function createPointer({ canvas, enabled = true }) {
   return p;
 }
 
+// Stateless delta emitter: holds no pitch/yaw of its own. Each drag move
+// calls onOrbit(dPitchRad, dYawRad) with the frame's delta only; the caller
+// (a piece, via panel.setValue) owns where that delta lands, so the panel's
+// Pitch/Yaw sliders and the rendered camera can never read two different
+// numbers. onSettle fires once on pointerup, for the caller to persist the
+// drag's final position without writing to localStorage on every move.
 function createOrbit({
   canvas,
   enabled = new URLSearchParams(location.search).get('preview') !== '1',
   sensitivity = 0.008,
+  onOrbit = () => {},
+  onSettle = () => {},
 } = {}) {
-  const orbit = { pitch: 0, yaw: 0 };
   let dragging = false;
   let lastX = 0, lastY = 0;
-  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
   function onDown(e) {
     if (e.button !== 0) return;
@@ -569,13 +625,15 @@ function createOrbit({
   }
   function onMove(e) {
     if (!dragging) return;
-    orbit.yaw = clamp(orbit.yaw + (e.clientX - lastX) * sensitivity, -Math.PI, Math.PI);
-    orbit.pitch = clamp(orbit.pitch + (e.clientY - lastY) * sensitivity, -Math.PI / 2, Math.PI / 2);
+    const dYaw = (e.clientX - lastX) * sensitivity;
+    const dPitch = (e.clientY - lastY) * sensitivity;
     lastX = e.clientX; lastY = e.clientY;
+    onOrbit(dPitch, dYaw);
   }
   function onUp(e) {
     dragging = false;
     canvas.releasePointerCapture?.(e.pointerId);
+    onSettle();
   }
 
   if (enabled) {
@@ -585,13 +643,14 @@ function createOrbit({
     canvas.addEventListener('pointercancel', onUp);
   }
 
-  orbit.destroy = () => {
-    canvas.removeEventListener('pointerdown', onDown);
-    canvas.removeEventListener('pointermove', onMove);
-    canvas.removeEventListener('pointerup', onUp);
-    canvas.removeEventListener('pointercancel', onUp);
+  return {
+    destroy() {
+      canvas.removeEventListener('pointerdown', onDown);
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointercancel', onUp);
+    },
   };
-  return orbit;
 }
 
 

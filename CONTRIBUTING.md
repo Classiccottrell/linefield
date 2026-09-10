@@ -135,9 +135,13 @@ A preset value that exceeds its control's declared `min`/`max` still
 renders — `applyValues` writes it straight into the values object the
 render reads, and the range input only clamps its own displayed position.
 `node tools/test-presets.mjs <slug>` checks every preset value against
-`window.__LF_SPECS__` (the resolved control specs) and fails naming the
-offending piece/preset/control/value/range, but keep values in range by
-construction rather than relying on the gate to catch it after the fact.
+`window.__LF_SPECS__` (the resolved control specs, each carrying a `kind` of
+`'boolean'` or `'number'` — gate scripts must discriminate on `kind`, never
+on `type`) and fails naming the offending piece/preset/control/value/range,
+but keep values in range by construction rather than relying on the gate to
+catch it after the fact. `window.__LF_PANEL__.setValue(name, value, { persist
+})` is the panel's write path exposed for tooling — every gate script drives
+controls through it rather than querying `.lf-row` DOM by position.
 
 ## Density convention
 
@@ -177,8 +181,12 @@ the point is at or beyond the camera's near plane (20% of `fov` ahead of
 the lens, capping scale at 5x) and must be skipped.
 
 3D pieces expose `rotX`/`rotY` as Pitch/Yaw and use shared Angle as roll.
-`createOrbit()` in `shared/pointer.js` adds bounded drag offsets and disables
-itself under `?preview=1`.
+`createOrbit()` in `shared/pointer.js` is a stateless delta emitter — it
+holds no pitch/yaw itself. Each drag move calls `onOrbit(dPitchRad, dYawRad)`;
+the piece writes that delta into `rotX`/`rotY` via `panel.setValue(...,
+{ persist: false })` so the Pitch/Yaw sliders and the rendered camera can
+never disagree, then persists once from `onSettle()` on pointerup. It
+disables itself (and this write-back) under `?preview=1`.
 
 Extend the camera by adding an option, not by changing call signatures, so
 existing pieces keep working. Deliberately absent today: depth sorting and

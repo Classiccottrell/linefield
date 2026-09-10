@@ -215,11 +215,14 @@ per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
 points across its full range with a seeded RNG and a manually-stepped
 clock (so two identical-settings renders are pixel-identical — no noise
 floor to reason about), then diffs sampled canvas pixels. It flags a
-control DEAD if no pair of test points produces a visible change. Two
-pieces have shipped a control that read a value but changed nothing
-(`tether` and `synapse`'s Scale) — both passed per-piece review by
-inspection alone, which is why this exists as a script instead of a
-one-off check.
+control DEAD if no pair of test points produces a visible change, and
+exits non-zero if any control is DEAD, so CI actually fails on a
+regression. Two pieces have shipped a control that read a value but
+changed nothing (`tether` and `synapse`'s Scale) — both passed per-piece
+review by inspection alone, which is why this exists as a script instead
+of a one-off check. It drives controls via `window.__LF_PANEL__.setValue`
+and reads `window.__LF_SPECS__`, not DOM position, so it survives whatever
+widget a control renders as.
 
 The gallery's live hover/keyboard preview loads pieces with `?preview=1`.
 `shared/controls.js` checks for that flag and, when present, skips both
