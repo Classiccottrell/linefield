@@ -36,7 +36,7 @@ async function setControl(page, label, value) {
     const row = [...document.querySelectorAll('.lf-panel .lf-row')]
       .find((candidate) => candidate.querySelector('label')?.textContent.trim() === label);
     if (!row) throw new Error(`control not found: ${label}`);
-    const input = row.querySelector('input');
+    const input = row.querySelector('input, select');
     if (input.type === 'checkbox') input.checked = Boolean(value);
     else input.value = String(value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -139,6 +139,27 @@ try {
     assert.ok(variance(second) > 4, `${slug}: blank canvas`);
     assert.ok(motion >= 0.05, `${slug}: no visible animation (${motion.toFixed(3)}%)`);
     console.log(`  render ${slug.padEnd(18)} variance=${variance(second).toFixed(1)} animation=${motion.toFixed(3)}%`);
+  }
+
+  // Colour picker: every gate elsewhere drives the panel through
+  // window.__LF_PANEL__.setValue, bypassing the DOM entirely — which is
+  // exactly how a real `parseFloat(input.value)` bug on the color/select
+  // input path (NaN on any hex string) shipped unnoticed until this stage
+  // added a widget that actually exercised it. This is the one check that
+  // drives the picker the way a human dragging it would: dispatch a raw DOM
+  // `input` event on the real <input type=color> and <select>, never
+  // setValue directly.
+  {
+    const slug = 'flow-field';
+    await openPiece(page, base, slug, false);
+    const before = await page.evaluate(() => ({ ...window.__LF_VALUES__ }));
+    await setControl(page, 'Color A', '#00ff00');
+    await setControl(page, 'Color Mode', 'solid');
+    const after = await page.evaluate(() => ({ ...window.__LF_VALUES__ }));
+    assert.equal(after.colorA, '#00ff00', `${slug}: Color A DOM input did not write colorA`);
+    assert.notEqual(after.hue, before.hue, `${slug}: Color A pick did not drive the linked hue field`);
+    assert.equal(after.colorMode, 'solid', `${slug}: Color Mode DOM select did not write colorMode`);
+    console.log(`  picker  ${slug.padEnd(18)} colorA->hue=${before.hue.toFixed(1)}->${after.hue.toFixed(1)} colorMode->${after.colorMode}`);
   }
 
   for (const slug of POINTER_PIECES) {
