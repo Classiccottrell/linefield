@@ -202,10 +202,11 @@ async function withPage(browser, url, render, { deterministic = false, scale = 0
 // piece with actual line-art clears this by a wide margin.
 const BLANK_VARIANCE_THRESHOLD = 4;
 
-// Shared by both capture paths. captureSwatches originally lacked this, which
-// is how three black-tile swatches shipped with every gate green: the check
-// lived in the thumbnail path and in the curation tool, but not in the path
-// that writes what the gallery actually displays.
+// Guards the thumbnail capture path. The lesson it encodes outlives the code
+// that prompted it: a capture path without this check once shipped three
+// black-tile images with every gate reporting green, because the check lived
+// in the curation tool and the thumbnail path but not in the path that wrote
+// what the gallery displayed. Any new capture path needs it too.
 async function assertCanvasRendered(page, label) {
   const variance = await page.evaluate(() => {
     const canvas = document.querySelector('#canvas');
@@ -321,36 +322,6 @@ export function verifyPresets(manifest) {
   console.log(`  presets: ${manifest.length} pieces x ${PRESET_NAMES.length} verified`);
 }
 
-// One swatch per preset. Each gets its own deterministic context rather than
-// clicking chips in a long-lived page: applying a preset mid-animation would
-// capture a transition, and trail-accumulating pieces would still carry ink
-// drawn at the previous settings.
-export async function captureSwatches(browser, manifest, base) {
-  mkdirSync(join(ROOT, 'thumbs'), { recursive: true });
-  for (const p of manifest) {
-    for (const name of p.presets || []) {
-      await withPage(browser, `${base}/pieces/${p.slug}/?preset=${encodeURIComponent(name)}`, async (page) => {
-        await page.addStyleTag({ content: '[data-lf-panel] { visibility: hidden; }' });
-        await page.waitForTimeout(100);
-        const stillVisible = await page.evaluate(() => {
-          const el = document.querySelector('[data-lf-panel]');
-          return el ? getComputedStyle(el).visibility !== 'hidden' : null;
-        });
-        if (stillVisible === null) throw new Error(`${p.slug}/${name}: no [data-lf-panel] found to hide before capture`);
-        if (stillVisible) throw new Error(`${p.slug}/${name}: [data-lf-panel] still visible at capture time`);
-        await assertCanvasRendered(page, `${p.slug}/${name}`);
-        const buf = await page.locator('#canvas').screenshot();
-        return {
-          result: null,
-          commit: () => {
-            writeFileSync(join(ROOT, 'thumbs', `${p.slug}.${name}.png`), buf);
-            console.log(`  swatch: ${p.slug}.${name}`);
-          },
-        };
-      }, { deterministic: true, scale: 0.1875 });
-    }
-  }
-}
 
 export async function captureDownloads(browser, manifest, base) {
   mkdirSync(join(ROOT, 'downloads'), { recursive: true });
@@ -376,13 +347,6 @@ function cardHtml(p) {
   const accent = `hsl(${p.hue} ${Math.round(p.saturation * 100)}% 60%)`;
   const accentB = `hsl(${p.hueB} ${Math.round(p.saturation * 100)}% 60%)`;
   const tags = p.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
-  // Swatches are links, not a hover-cycle: the card's main frame already swaps
-  // to a live preview on hover, and cycling here would fight it.
-  const presetStrip = (p.presets || []).map((name) =>
-    `<a class="pre" href="pieces/${p.slug}/?preset=${encodeURIComponent(name)}" title="${escapeHtml(p.title)} \u2014 ${escapeHtml(name)}">
-        <img src="thumbs/${p.slug}.${encodeURIComponent(name)}.png" alt="" loading="lazy" width="240" height="150" />
-        <span>${escapeHtml(name)}</span>
-      </a>`).join('');
   return `  <article class="card" data-tags="${escapeHtml(p.tags.join(' '))}" style="--accent:${accent}">
     <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
       <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="240" height="150" />
@@ -394,7 +358,6 @@ function cardHtml(p) {
       </h2>
       <p class="blurb">${escapeHtml(p.blurb)}</p>
       <div class="tags">${tags}</div>
-      <div class="presets">${presetStrip}</div>
       <div class="actions">
         <a class="btn" href="pieces/${p.slug}/">Open</a>
         <button class="btn" type="button" data-embed="pieces/${p.slug}/">Copy embed</button>
@@ -440,8 +403,6 @@ if (isMain) {
     verifyPresets(manifest);
     console.log('Capturing thumbnails...');
     await captureThumbnails(browser, manifest, base);
-    console.log('Capturing preset swatches...');
-    await captureSwatches(browser, manifest, base);
     console.log('Baking downloads...');
     await captureDownloads(browser, manifest, base);
     console.log('Building gallery...');

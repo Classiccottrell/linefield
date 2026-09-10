@@ -4,6 +4,42 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The control panel is sectioned, restyled and usable on a phone.** Cursor
+  interaction is now its own group, separated from background configuration.
+  Sections collapse, with Interactions open by default so the panel fits on
+  screen at rest, and "Reset to defaults" is a sticky footer rather than a
+  button below an internal scroll.
+- **Colour is authored with a picker** — a Solid/Gradient mode and one or two
+  hex stops — instead of two raw hue sliders. Hue is still stored exactly
+  behind the picker, because a hue survives a round trip through 8-bit hex
+  only when `(hue mod 60)` is a multiple of 4, which fails for eleven of the
+  twelve pieces. Rendering is unchanged: all 72 thumbnails are byte-identical.
+- **Control gates address controls by name, not DOM position.** `setValue` is
+  the panel's single write path and the audit drives it directly, so a
+  dropdown, radio or colour picker is testable where an indexed
+  `<input type=range>` query would have silently stopped working.
+- Preset swatches no longer appear on the gallery homepage. Presets remain in
+  each piece's panel and `?preset=<name>` links still work.
+
+### Fixed
+
+- **`npm run audit-controls` can fail.** It had no `process.exit` and always
+  exited 0, so the CI step running it could report dead controls and still
+  pass — for the whole life of the project.
+- **Every piece declares a viewport meta tag.** None of the thirteen did, so
+  a phone used a ~980px layout viewport and the panel's mobile rules could
+  never match; the controls rendered as an unreadable corner card.
+- **Drag-to-orbit moves the Pitch and Yaw sliders.** It previously held
+  private state, so the panel displayed values that were not what the camera
+  was rendering.
+- **Baked exports inline the full shared-module import graph.** The inliner
+  only walked each piece's own top-level imports, so the first
+  shared-module-importing-a-shared-module broke all twelve downloads.
+
 ## [1.3.0] — 2026-09-07
 
 ### Added

@@ -127,7 +127,9 @@ chip, since the configuration is no longer that preset. Picking a preset
 persists like any manual tuning, and "Reset to defaults" still returns to the
 piece's own defaults.
 
-The gallery shows all five as a strip of labelled swatches under each card.
+Presets live in each piece's own control panel. The gallery does not surface
+them — a homepage of twelve cards each carrying five swatches was more
+inventory than invitation.
 
 ## Gallery
 
@@ -224,8 +226,7 @@ node tools/preset-sheet.mjs <slug>   # render a piece's presets for review
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
-canvas, captured at 1280×800), `thumbs/<slug>.<preset>.png` (sixty preset
-swatches at 240×150) and `downloads/<slug>.html` (each piece's own
+canvas, captured at 1280×800) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
 never reimplemented) for all twelve pieces, then renders `index.html` at
 the repo root from `tools/templates/gallery.html` and the manifest — the
