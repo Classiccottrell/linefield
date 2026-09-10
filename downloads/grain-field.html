@@ -128,8 +128,185 @@
 
 
 <script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.12,"colorMode":"gradient","colorA":"#ff8000","colorB":"#007fff","hue":30,"hueB":210,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"grain":2.2};
+// --- inlined: ../../shared/color.js ---
+// shared/color.js
+
+function hslToRgb(h, s, l) {
+  h = ((h % 360) + 360) % 360 / 360;
+  s = Math.min(1, Math.max(0, s));
+  l = Math.min(1, Math.max(0, l));
+
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+
+  const r = hue2rgb(p, q, h + 1 / 3);
+  const g = hue2rgb(p, q, h);
+  const b = hue2rgb(p, q, h - 1 / 3);
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function hueShift(h, degrees) {
+  return ((h + degrees) % 360 + 360) % 360;
+}
+
+function invertRgb(r, g, b) {
+  return [255 - r, 255 - g, 255 - b];
+}
+
+// Extracts ONLY hue from a hex colour — the picker's own saturation/lightness
+// are discarded, because rendering always sources chroma from the piece's
+// shared `saturation` slider, never from the swatch a user happened to pick.
+// This is a one-way, lossy read (8-bit RGB quantizes hue), used exactly once
+// per user pick — never in a render loop, and never applied to a piece's own
+// seeded defaults, which keep their exact authored degree value untouched.
+// A grey/white/black pick (max === min) has no hue at all; callers must keep
+// the previous hue rather than let this return a meaningless 0 (red).
+function hexToHue(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return null; // achromatic — caller must preserve prior hue
+  const d = max - min;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  return h < 0 ? h + 360 : h;
+}
+
+// The shared 0-1 ramp position -> {h, s} for a piece's two-stop palette.
+// Solid mode ignores `f` and always returns stop A; gradient mode lerps hue
+// between the two stops exactly as every piece's own per-element interpolation
+// did before this control existed (`hue + (hueB - hue) * f`). `s` is always
+// the piece's single shared saturation control — colour stops never carry
+// their own saturation. `hue`/`hueB` are the exact, hidden numeric palette
+// values (see shared/controls.js); `colorA`/`colorB` are their hex *view*
+// only and are never read here.
+function paletteHsl(values, f) {
+  const s = values.saturation;
+  if (values.colorMode === 'solid') return { h: values.hue, s };
+  return { h: values.hue + (values.hueB - values.hue) * f, s };
+}
+
+
+// --- inlined: ../../shared/cursor-modes.js ---
+// shared/cursor-modes.js
+// A leaf module: no imports, matching every other shared module, so the bake
+// inliner picks it up from a piece's own import line.
+
+const CURSOR_MODES = [
+  'None', 'Grow', 'Shrink', 'Particle Trail', 'Ripples', 'Attract', 'Vortex',
+];
+
+// Trail and Ripples are cursor effects, not piece effects, so they live here
+// once rather than twelve times. They keep their OWN aged memory and redraw
+// every surviving mark from scratch each frame: ten pieces clear the canvas
+// fully each frame (marks would vanish) and two repaint translucent to
+// accumulate trails (marks would smear at the piece's fade rate, untunable).
+//
+// CONTRACT, binding on every piece that wires this in (see CONTRIBUTING.md,
+// "Cursor interaction"): call `.draw()` AFTER the piece has cleared the
+// canvas and drawn its own frame for this tick — as the very last thing in
+// the frame, not before it. `.step()` has no such constraint; call it
+// whenever convenient in onFrame, typically right after `pointer.step()`.
+// A piece that draws BEFORE its own clear renders nothing: a full-clear
+// piece's fillRect/clearRect wipes the overlay's marks along with
+// everything else drawn that frame. Ten of the twelve pieces in this
+// library do a full clear every frame, so this is the common case, not an
+// edge case.
+function createCursorOverlay() {
+  let marks = [];
+  let lastX = null, lastY = null;
+
+  return {
+    // Called once per frame from the piece's onFrame, before drawing.
+    step(mode, k, pointer) {
+      if (!k || (mode !== 'Particle Trail' && mode !== 'Ripples')) {
+        if (marks.length) marks = [];
+        return;
+      }
+      const now = performance.now();
+      if (mode === 'Particle Trail' && pointer.active) {
+        const moved = lastX === null || Math.hypot(pointer.x - lastX, pointer.y - lastY) > 6;
+        if (moved) {
+          marks.push({ kind: 'dot', x: pointer.x, y: pointer.y, born: now,
+            life: 900, r: 1 + Math.random() * 2,
+            dx: (Math.random() - 0.5) * 18, dy: (Math.random() - 0.5) * 18 });
+          lastX = pointer.x; lastY = pointer.y;
+        }
+      }
+      if (mode === 'Ripples' && pointer.active) {
+        const last = marks[marks.length - 1];
+        if (!last || now - last.born > 260) {
+          marks.push({ kind: 'ring', x: pointer.x, y: pointer.y, born: now, life: 1400 });
+        }
+      }
+      marks = marks.filter((m) => now - m.born < m.life);
+      if (marks.length > 400) marks = marks.slice(-400);
+    },
+
+    // Called after the piece has drawn its own frame.
+    draw(ctx, colour, k) {
+      if (!marks.length || !k) return;
+      const now = performance.now();
+      ctx.save();
+      for (const m of marks) {
+        const age = (now - m.born) / m.life;
+        if (age >= 1) continue;
+        const alpha = (1 - age) * k;
+        if (m.kind === 'dot') {
+          ctx.globalAlpha = Math.min(alpha, 1);
+          ctx.fillStyle = colour;
+          ctx.beginPath();
+          ctx.arc(m.x + m.dx * age, m.y + m.dy * age, m.r, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.globalAlpha = Math.min(alpha * 0.7, 1);
+          ctx.strokeStyle = colour;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(m.x, m.y, 12 + age * 190, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    },
+
+    reset() { marks = []; lastX = null; lastY = null; },
+  };
+}
+
+// The strength every per-piece mode multiplies by. `pointer` is the intensity
+// control, `influence` eases the cursor entering and leaving. Nothing else —
+// in particular never `values.speed`, which a user can set to zero.
+function modeFactor(values, pointer) {
+  if (values.cursorInteraction === 'None') return 0;
+  return values.pointer * pointer.influence;
+}
+
+
 // --- inlined: ../../shared/controls.js ---
 // shared/controls.js
+
 
 // `category` routes a control to one of the panel's tiers — 'interaction',
 // 'color', or the default 'visual' — and is presentation-only: it changes
@@ -137,12 +314,14 @@
 // order, which every gate that isn't the panel itself still reads flat.
 const SHARED_CONTROLS = [
   // The seven cursor-interaction modes (Grow, Shrink, Particle Trail,
-  // Ripples, Attract, Vortex, None) are a separate sub-project. This ships
-  // the control, not the behaviours: a real, audit-drivable select with a
-  // single option. Its single sample point means audit-controls.mjs has no
-  // second point to diff against and reports it DEAD — expected for an
-  // intentionally inert control, not a bug.
-  { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: ['None'], default: 'None', category: 'interaction' },
+  // Ripples, Attract, Vortex, None). The behaviours are wired per-piece
+  // (see shared/cursor-modes.js); this declares the shared vocabulary so
+  // it is never duplicated per piece. Until a piece reads it, this control
+  // and `pointer` audit DEAD there (tools/audit-controls.mjs's PREREQS pins
+  // the other one on when probing either in isolation, but a piece with no
+  // wiring at all still shows no effect) — expected on every piece not yet
+  // wired, not a bug.
+  { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: CURSOR_MODES, default: 'None', category: 'interaction' },
   { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0, category: 'interaction' },
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
@@ -339,6 +518,23 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   }
 
   const values = { ...defaults, ...saved.values };
+  // A saved localStorage blob is a plain object spread above, not a
+  // setValue() call, so it never reaches clampValue's enum-membership check
+  // (see below) — a stale blob holding a mode string that was since removed
+  // or renamed (e.g. a future rename of one of the seven cursor-interaction
+  // modes) would land in `values` unvalidated: the <select> falls back to
+  // whatever its first <option> happens to be while `values` keeps the
+  // stale string, the exact divergence that check exists to prevent. Not
+  // reachable today (every currently-saved value was written by setValue,
+  // which already validates), but reachable the moment a spec's `options`
+  // changes under an existing save. Re-validate every enum field on load,
+  // same fallback rule as clampValue: an out-of-vocabulary value reverts to
+  // that control's own default, not just "whatever was previously in scope".
+  for (const spec of allSpecs) {
+    if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
+      values[spec.name] = defaults[spec.name];
+    }
+  }
   let collapsed = saved.collapsed || false;
   // Mobile-sheet collapse is a separate, unpersisted flag: it starts
   // collapsed every load (handle-only, per the brief) and is scoped to the
@@ -458,6 +654,15 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   // Pitch/Yaw divergence this stage exists to remove, reintroduced. Not
   // applied to booleans (kind === 'boolean') or to a name with no known spec.
   function clampValue(spec, v) {
+    // Enum membership is not optional: a value outside spec.options must be
+    // rejected rather than written, or __LF_VALUES__ and the rendered <select>
+    // diverge (the <select> silently ignores an out-of-range .value while
+    // the state object keeps whatever was passed in). Falls back to the
+    // control's current value, the same "previous value stands" rule a
+    // number's clamp already applies at its min/max.
+    if (spec?.kind === 'enum') {
+      return spec.options.includes(v) ? v : values[spec.name];
+    }
     if (!spec || spec.kind !== 'number' || typeof spec.min !== 'number' || typeof spec.max !== 'number') {
       return v;
     }
@@ -808,86 +1013,6 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
-// --- inlined: ../../shared/color.js ---
-// shared/color.js
-
-function hslToRgb(h, s, l) {
-  h = ((h % 360) + 360) % 360 / 360;
-  s = Math.min(1, Math.max(0, s));
-  l = Math.min(1, Math.max(0, l));
-
-  if (s === 0) {
-    const v = Math.round(l * 255);
-    return [v, v, v];
-  }
-
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-
-  const hue2rgb = (p, q, t) => {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1 / 6) return p + (q - p) * 6 * t;
-    if (t < 1 / 2) return q;
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-    return p;
-  };
-
-  const r = hue2rgb(p, q, h + 1 / 3);
-  const g = hue2rgb(p, q, h);
-  const b = hue2rgb(p, q, h - 1 / 3);
-
-  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-}
-
-function hueShift(h, degrees) {
-  return ((h + degrees) % 360 + 360) % 360;
-}
-
-function invertRgb(r, g, b) {
-  return [255 - r, 255 - g, 255 - b];
-}
-
-// Extracts ONLY hue from a hex colour — the picker's own saturation/lightness
-// are discarded, because rendering always sources chroma from the piece's
-// shared `saturation` slider, never from the swatch a user happened to pick.
-// This is a one-way, lossy read (8-bit RGB quantizes hue), used exactly once
-// per user pick — never in a render loop, and never applied to a piece's own
-// seeded defaults, which keep their exact authored degree value untouched.
-// A grey/white/black pick (max === min) has no hue at all; callers must keep
-// the previous hue rather than let this return a meaningless 0 (red).
-function hexToHue(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const r = ((n >> 16) & 255) / 255;
-  const g = ((n >> 8) & 255) / 255;
-  const b = (n & 255) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  if (max === min) return null; // achromatic — caller must preserve prior hue
-  const d = max - min;
-  let h;
-  if (max === r) h = ((g - b) / d) % 6;
-  else if (max === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
-  h *= 60;
-  return h < 0 ? h + 360 : h;
-}
-
-// The shared 0-1 ramp position -> {h, s} for a piece's two-stop palette.
-// Solid mode ignores `f` and always returns stop A; gradient mode lerps hue
-// between the two stops exactly as every piece's own per-element interpolation
-// did before this control existed (`hue + (hueB - hue) * f`). `s` is always
-// the piece's single shared saturation control — colour stops never carry
-// their own saturation. `hue`/`hueB` are the exact, hidden numeric palette
-// values (see shared/controls.js); `colorA`/`colorB` are their hex *view*
-// only and are never read here.
-function paletteHsl(values, f) {
-  const s = values.saturation;
-  if (values.colorMode === 'solid') return { h: values.hue, s };
-  return { h: values.hue + (values.hueB - values.hue) * f, s };
-}
-
-
 // --- inlined: ../../shared/noise.js ---
 // shared/noise.js
 // Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
@@ -1037,13 +1162,29 @@ function stripInnerImports(src) {
   return src.replace(INNER_SHARED_IMPORT_RE, '');
 }
 
-// BFS over the shared-module import graph, not just the piece's own
-// top-level imports. Scanning only the piece script is exactly the
-// hand-maintained-list failure this function's own comment already warns
-// about, one level removed: a shared module's OWN imports were invisible to
-// it, so a new cross-shared-module import survived verbatim into a classic
-// (non-module) inline script — a SyntaxError this file's <script> tag has no
-// listener for, producing a validly-loading, blank-canvas download. See
+// Topological sort (post-order DFS) over the shared-module import graph, not
+// just the piece's own top-level imports, and NOT discovery (BFS) order.
+// Scanning only the piece script is exactly the hand-maintained-list failure
+// this function's own comment already warns about, one level removed: a
+// shared module's OWN imports were invisible to it, so a new cross-shared-
+// module import survived verbatim into a classic (non-module) inline script.
+//
+// BFS discovery order is not enough once a shared module reads another
+// shared module's binding at TOP LEVEL (module-evaluation time), not just
+// inside a function body called later. controls.js is always a piece's
+// first import, so BFS always placed it first in the concatenated output —
+// fine for `hexToHue` (from color.js), which is only called inside
+// `setValue`, deferred to call time; broken for `CURSOR_MODES` (from
+// cursor-modes.js), which controls.js's top-level `const SHARED_CONTROLS =
+// [...]` reads immediately. cursor-modes.js, discovered as controls.js's own
+// import, was concatenated AFTER controls.js under BFS — a real
+// ReferenceError: Cannot access 'CURSOR_MODES' before initialization, in
+// every downloaded file, that loaded without error and rendered blank.
+//
+// A post-order DFS guarantees every module's dependencies appear before it
+// in the emitted output, independent of whether the consumer reads the
+// dependency's binding at top level or lazily inside a function — the
+// general fix, not a per-call-site workaround. See
 // skills/building-generative-backgrounds/SKILL.md, "Inlining and bundling".
 async function inlineSharedModules(pieceScriptSrc) {
   const strippedPieceSrc = pieceScriptSrc.replace(SHARED_IMPORT_RE, '');
@@ -1052,15 +1193,17 @@ async function inlineSharedModules(pieceScriptSrc) {
     throw new Error('bakeHtml: the piece imports no shared modules — refusing to bake a file that would render blank');
   }
 
-  const seen = new Set();
-  const order = [];
   const srcByPath = new Map();
-  const queue = [...initial];
-  while (queue.length) {
-    const path = queue.shift();
-    if (seen.has(path)) continue;
-    seen.add(path);
-    order.push(path);
+  const order = []; // post-order: a module's dependencies land before it
+  const done = new Set();
+  const visiting = new Set(); // cycle guard — a real cycle would recurse forever otherwise
+
+  async function visit(path) {
+    if (done.has(path)) return;
+    if (visiting.has(path)) {
+      throw new Error(`bakeHtml: circular shared-module import detected at ${path}`);
+    }
+    visiting.add(path);
     const res = await fetch(path);
     if (!res.ok) throw new Error(`bakeHtml: could not fetch ${path} (${res.status})`);
     const src = await res.text();
@@ -1070,8 +1213,13 @@ async function inlineSharedModules(pieceScriptSrc) {
     // reached both ways (e.g. color.js: directly by the piece, and via
     // controls.js) is only ever inlined once.
     const inner = [...src.matchAll(INNER_SHARED_IMPORT_RE)].map((m) => `../../shared/${m[1]}`);
-    for (const p of inner) if (!seen.has(p)) queue.push(p);
+    for (const p of inner) await visit(p);
+    visiting.delete(path);
+    done.add(path);
+    order.push(path);
   }
+
+  for (const path of initial) await visit(path);
 
   const bodies = order.map((path) => {
     const src = srcByPath.get(path);

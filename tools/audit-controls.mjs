@@ -135,9 +135,25 @@ const LIVE_THRESHOLD = 0.05; // % of sampled pixels changed, below this = no vis
 // either control alone leaves the other at ITS default (pointer=0,
 // cursorInteraction='None'), so the response is zero regardless of what the
 // probed control does. Pin the other one on, same fix as colorMode above.
+//
+// Pinned to 'Particle Trail', not a per-piece mode like 'Attract': Particle
+// Trail is the shared overlay in shared/cursor-modes.js — one
+// implementation, already covered by tools/test-cursor-modes.mjs, that
+// per-piece work (Tasks 2/3 rewriting Attract/Grow/Shrink/Vortex on eleven
+// pieces) does not touch. Pinning to a per-piece mode would make this
+// PROBE's own result ride on whatever that mode currently happens to do —
+// `pointer` could read DEAD from a regression in Attract's rewrite, a
+// failure that belongs to Attract, misattributed to Pointer instead.
+//
+// What "Pointer LIVE" asserts, since this pin changes it: NOT "moving the
+// pointer slider alone, everything else at its own default, changes
+// pixels" — that reads DEAD by design at cursorInteraction='None'. It
+// asserts "with cursor response already active via the overlay, sliding
+// pointer's strength up changes pixels." The interaction as a whole is what
+// PREREQS.cursorInteraction (below) exercises the reverse of.
 const PREREQS = {
   colorMode: { colorA: '#ff2d2d', colorB: '#2de0ff' },
-  pointer: { cursorInteraction: 'Attract' },
+  pointer: { cursorInteraction: 'Particle Trail' },
   cursorInteraction: { pointer: 1 },
 };
 

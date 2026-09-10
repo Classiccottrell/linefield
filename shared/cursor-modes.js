@@ -11,6 +11,17 @@ export const CURSOR_MODES = [
 // every surviving mark from scratch each frame: ten pieces clear the canvas
 // fully each frame (marks would vanish) and two repaint translucent to
 // accumulate trails (marks would smear at the piece's fade rate, untunable).
+//
+// CONTRACT, binding on every piece that wires this in (see CONTRIBUTING.md,
+// "Cursor interaction"): call `.draw()` AFTER the piece has cleared the
+// canvas and drawn its own frame for this tick — as the very last thing in
+// the frame, not before it. `.step()` has no such constraint; call it
+// whenever convenient in onFrame, typically right after `pointer.step()`.
+// A piece that draws BEFORE its own clear renders nothing: a full-clear
+// piece's fillRect/clearRect wipes the overlay's marks along with
+// everything else drawn that frame. Ten of the twelve pieces in this
+// library do a full clear every frame, so this is the common case, not an
+// edge case.
 export function createCursorOverlay() {
   let marks = [];
   let lastX = null, lastY = null;

@@ -60,10 +60,18 @@ unrelated `npm run build` is a byte-identical no-op — only pieces you
 actually touched will show a diff in `thumbs/`.
 
 **CI will not catch a forgotten rebuild.** CI (`.github/workflows/checks.yml`)
-runs `npm run verify` (manifest vs. pieces vs. README agreement) and
-`npm run audit-controls` (every control has a visible effect). It
-deliberately does not run `npm run build`, because the gallery, thumbnails
-and downloads are committed and GitHub Pages serves them directly —
+runs `npm run verify` (manifest vs. pieces vs. README agreement),
+`npm run audit-controls` (every control has a visible effect),
+`npm run test-baked` (every *committed* `downloads/*.html` renders standalone
+over `file://`), and `npm run test-bake-fresh` (bakes every piece live — the
+real `bakeHtml()` in `shared/export.js`, against today's source — and
+validates that output instead). The two bake checks are deliberately both
+kept: `test-baked` catches a stale committed artifact and is blind to a
+regression in the bake process itself until someone next runs
+`npm run build`; `test-bake-fresh` is the reverse — always current, blind to
+staleness. It deliberately does not run `npm run build` to update
+committed files, because the gallery, thumbnails and downloads are committed
+and GitHub Pages serves them directly —
 rebuilding in CI would rewrite those committed artifacts on every run and
 undo the determinism work above. This is an accepted gap, not an oversight:
 if you tune a piece and forget to re-run `npm run build`, the committed
@@ -183,6 +191,43 @@ state frame to frame, not values recomputed from scratch each frame), you
 must re-seed that array inside the panel's `onChange` callback when
 `density` changes — recomputing `count` alone won't resize an existing
 array. See `pieces/flow-field/index.html` for a worked example.
+
+## Cursor interaction
+
+`shared/cursor-modes.js` exports `CURSOR_MODES` (the seven-mode vocabulary
+the `cursorInteraction` control declares), `modeFactor(values, pointer)`
+(the strength every mode multiplies by — 0 whenever `cursorInteraction` is
+`'None'` or `pointer` is 0, and nothing else, so a user can always fully
+disable cursor response), and `createCursorOverlay()` (the shared
+Particle-Trail/Ripples renderer — implement it once here, not per piece).
+
+Wire it in a piece's `onFrame`:
+
+```js
+const overlay = createCursorOverlay();
+// ...
+onFrame(dt, elapsed) {
+  pointer.step();
+  const k = modeFactor(currentValues, pointer);
+  overlay.step(currentValues.cursorInteraction, k, pointer);
+  drawFrame(dt, elapsed, currentValues);   // the piece's own render
+}
+```
+
+**Draw-ordering contract, binding on every piece:** call `overlay.draw(ctx,
+colour, k)` as the LAST thing in the piece's own frame — after it has
+cleared the canvas and drawn everything else for that tick, never before.
+Ten of the twelve pieces in this library do a full clear every frame; a
+piece that draws the overlay before its own clear/fillRect wipes the
+overlay's marks along with everything else. See
+`pieces/flow-field/index.html`'s `drawFrame()` — `overlay.draw(...)` is the
+last line in the function, after the frame's own drawing loop.
+
+Grow/Shrink/Attract/Vortex are per-piece behaviours: each piece interprets
+what "grow"/"shrink"/etc. means for its own geometry, gated on
+`modeFactor(values, pointer)`, dispatched by `values.cursorInteraction`.
+There is no shared implementation for these four — only the vocabulary and
+the gate.
 
 ## Baked HTML export
 

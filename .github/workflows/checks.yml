@@ -43,8 +43,24 @@ jobs:
       # no shared/ sibling — the promise a baked export makes. Catches a
       # shared module silently missing from the bake, which has shipped
       # blank exports before while every other gate reported green.
+      #
+      # This validates the committed ARTIFACT and nothing else: it catches
+      # staleness (a piece tuned without a rebuild) but is blind to a
+      # regression in the bake PROCESS itself until someone next runs
+      # `npm run build` — which is exactly how a temporal-dead-zone crash in
+      # shared/export.js's inliner (controls.js reading CURSOR_MODES before
+      # cursor-modes.js had run) shipped past every gate: downloads/ was
+      # never regenerated in that commit, so this step kept validating
+      # pre-cursor-modes files that didn't contain the broken path at all.
       - name: Test baked exports
         run: npm run test-baked
+
+      # The complement: bakes each piece live (clicks its real "Baked HTML"
+      # button, exercising today's shared/export.js) and validates THAT
+      # output, so a bake-process regression fails here even if nobody
+      # remembered to run `npm run build`.
+      - name: Test fresh bake (live bake process, not the committed artifact)
+        run: npm run test-bake-fresh
 
       - name: Test source exports
         run: npm run test-source

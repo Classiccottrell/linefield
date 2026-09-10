@@ -213,6 +213,23 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   }
 
   const values = { ...defaults, ...saved.values };
+  // A saved localStorage blob is a plain object spread above, not a
+  // setValue() call, so it never reaches clampValue's enum-membership check
+  // (see below) — a stale blob holding a mode string that was since removed
+  // or renamed (e.g. a future rename of one of the seven cursor-interaction
+  // modes) would land in `values` unvalidated: the <select> falls back to
+  // whatever its first <option> happens to be while `values` keeps the
+  // stale string, the exact divergence that check exists to prevent. Not
+  // reachable today (every currently-saved value was written by setValue,
+  // which already validates), but reachable the moment a spec's `options`
+  // changes under an existing save. Re-validate every enum field on load,
+  // same fallback rule as clampValue: an out-of-vocabulary value reverts to
+  // that control's own default, not just "whatever was previously in scope".
+  for (const spec of allSpecs) {
+    if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
+      values[spec.name] = defaults[spec.name];
+    }
+  }
   let collapsed = saved.collapsed || false;
   // Mobile-sheet collapse is a separate, unpersisted flag: it starts
   // collapsed every load (handle-only, per the brief) and is scoped to the
