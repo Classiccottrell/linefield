@@ -61,24 +61,30 @@ actually touched will show a diff in `thumbs/`.
 
 **CI will not catch a forgotten rebuild.** CI (`.github/workflows/checks.yml`)
 runs `npm run verify` (manifest vs. pieces vs. README agreement),
-`npm run audit-controls` (every control has a visible effect),
-`npm run test-baked` (every *committed* `downloads/*.html` renders standalone
-over `file://`), and `npm run test-bake-fresh` (bakes every piece live — the
-real `bakeHtml()` in `shared/export.js`, against today's source — and
-validates that output instead). The two bake checks are deliberately both
-kept: `test-baked` catches a stale committed artifact and is blind to a
-regression in the bake process itself until someone next runs
-`npm run build`; `test-bake-fresh` is the reverse — always current, blind to
-staleness. It deliberately does not run `npm run build` to update
-committed files, because the gallery, thumbnails and downloads are committed
-and GitHub Pages serves them directly —
-rebuilding in CI would rewrite those committed artifacts on every run and
-undo the determinism work above. This is an accepted gap, not an oversight:
-if you tune a piece and forget to re-run `npm run build`, the committed
-thumbnail and baked download for that piece go stale, `npm run verify`
-still passes (it checks the manifest, not pixels), and CI stays green.
-There is no automated check for this — re-running the build after any
-visual change is on you.
+`npm run test-bake-fresh` (bakes every piece live — the real `bakeHtml()` in
+`shared/export.js`, against today's source — and validates that output),
+`npm run test-baked` (every *committed* `downloads/*.html` renders
+standalone over `file://`), and `npm run audit-controls` (every control has
+a visible effect; run LAST, deliberately — it's the slowest, broadest check
+and the one most likely to fail mid-rollout of a new control, and a slow
+broad gate must never stand in front of fast specific ones and hide their
+results). Neither bake check catches a forgotten rebuild, and saying so is
+not a contradiction of the heading above — it's the point. `test-bake-fresh`
+proves the bake *process* works against current source and says nothing
+about what's actually committed; `test-baked` proves the committed *bytes*
+still render standalone (catching a hand-edit, a truncated file, or output
+left over from a since-fixed broken bake) and is blind to a live process
+regression until someone next runs `npm run build`. A piece whose values
+were tuned but never rebuilt renders fine either way — nonzero variance, no
+errors — so both gates pass trivially on a stale download. CI deliberately
+does not run `npm run build` itself to refresh committed files, because the
+gallery, thumbnails and downloads are committed and GitHub Pages serves them
+directly — rebuilding in CI would rewrite those committed artifacts on
+every run and undo the determinism work above. This is an accepted gap, not
+an oversight: if you tune a piece and forget to re-run `npm run build`, the
+committed thumbnail and baked download for that piece go stale, every gate
+above still passes, and CI stays green. There is no automated check for
+this — re-running the build after any visual change is on you.
 
 ## Serving the project
 

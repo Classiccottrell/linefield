@@ -1,10 +1,15 @@
 // tools/test-bake-fresh.mjs — the bake PROCESS must produce a working file,
 // not just the committed downloads/*.html.
 //
-// tools/test-baked.mjs validates the artifact on disk — real and worth
-// keeping (it catches staleness: a piece tuned without a rebuild). But it
-// cannot catch a regression in shared/export.js's bake process itself until
-// someone happens to run `npm run build` again. That gap is exactly how the
+// tools/test-baked.mjs validates the committed BYTES on disk: real and
+// worth keeping, because it catches a hand-edit, a truncated file, or
+// output left over from a since-fixed broken bake. It does NOT catch a
+// piece that was visually tuned and never rebuilt — that piece's stale
+// download still renders fine (nonzero variance, no errors); there is no
+// automated check for that (see CONTRIBUTING.md, "CI will not catch a
+// forgotten rebuild"). What test-baked.mjs is actually blind to is a
+// regression in shared/export.js's bake PROCESS itself, until someone
+// happens to run `npm run build` again. That gap is exactly how the
 // CURSOR_MODES temporal-dead-zone bug shipped past every gate: the BFS ->
 // dependency-order fix landed in the same commits as controls.js importing
 // cursor-modes.js, downloads/ was never regenerated, and test-baked.mjs kept
@@ -15,9 +20,12 @@
 // "Baked HTML" button, which calls the actual bakeHtml() in shared/export.js
 // against the piece's actual current source — captures the download, and
 // loads THAT file over file://, exactly like test-baked.mjs does for the
-// committed copy. Run both in CI: this one is blind to staleness (it always
-// re-bakes fresh) but not to a broken bake process; test-baked.mjs is the
-// reverse.
+// committed copy. Proves the PROCESS works against today's source; says
+// nothing about what's actually committed in downloads/ (a hand-edit there
+// would pass this check and only test-baked.mjs would catch it). Run both
+// in CI: this one is blind to what's committed; test-baked.mjs is blind to
+// a live process regression. NEITHER catches a forgotten rebuild after a
+// visual tuning change — that remains manual, on the author.
 //
 // Run: node tools/test-bake-fresh.mjs [slug]
 import { chromium } from 'playwright';
