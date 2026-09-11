@@ -29,6 +29,17 @@ const VIEWPORT = { width: 1280, height: 800 };
 // pieces and across sheets.
 const PARK_FX = 0.35, PARK_FY = 0.4;
 
+// Same threshold as tools/build.mjs and tools/preset-sheet.mjs.
+const BLANK_VARIANCE_THRESHOLD = 4;
+
+// 3 columns so all twelve tiles fit in one frame at a normal zoom level —
+// the review question is explicitly cross-piece (does Grow on rainfall
+// read as the same idea as Grow on meridian), which a 1-tile-per-row sheet
+// would bury nine screens of scrolling apart. Still native pixel size
+// (1280x800, deviceScaleFactor 1) — 3 columns, not 1, is a layout choice,
+// not a display downscale.
+const COLS = 3;
+
 const slugs = readdirSync(join(ROOT, 'pieces'), { withFileTypes: true })
   .filter((d) => d.isDirectory() && d.name !== '_template').map((d) => d.name).sort();
 
@@ -102,6 +113,27 @@ async function renderTile(browser, slug, mode) {
     throw new Error(`${slug}/${mode} reported console errors:\n  ${errors.join('\n  ')}`);
   }
 
+  // Same guard tools/build.mjs and tools/preset-sheet.mjs use: any new
+  // capture path needs it, and it's exactly the check that would make a
+  // blank/misrendered tile self-detecting instead of silently shipping in
+  // the sheet the judge reviews.
+  const variance = await page.evaluate(() => {
+    const canvas = document.querySelector('#canvas');
+    const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    let sum = 0, sumSq = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4 * 37) {
+      const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      sum += lum; sumSq += lum * lum; n++;
+    }
+    const mean = sum / n;
+    return sumSq / n - mean * mean;
+  });
+  if (variance < BLANK_VARIANCE_THRESHOLD) {
+    throw new Error(
+      `${slug}/${mode}: canvas looks blank (pixel variance ${variance.toFixed(2)} < ${BLANK_VARIANCE_THRESHOLD})`
+    );
+  }
+
   const buf = await page.locator('#canvas').screenshot();
   await ctx.close();
   return buf.toString('base64');
@@ -124,22 +156,24 @@ try {
       console.log(`  ${slug}`);
     }
 
-    // One tile per row, at the canvas's own native pixel size (1280x800,
-    // deviceScaleFactor 1) — no display downscale, so nothing this sheet is
-    // built to catch can be re-hidden by the sheet itself.
-    const ctxS = await browser.newContext({ viewport: { width: VIEWPORT.width + 40, height: 900 } });
+    // 3-column grid, every tile still at the canvas's own native pixel size
+    // (1280x800, deviceScaleFactor 1) — no display downscale, so nothing
+    // this sheet is built to catch can be re-hidden by the sheet itself.
+    const sheetW = VIEWPORT.width * COLS + 80;
+    const ctxS = await browser.newContext({ viewport: { width: sheetW, height: 900 } });
     const sheet = await ctxS.newPage();
     await sheet.setContent(`<!doctype html><html><head><style>
   body{margin:0;background:#101014;font:12px ui-monospace,Menlo,monospace;color:#c8c8d2}
   h1{font:600 15px system-ui;margin:14px 20px 2px;color:#e8e8ec}
   p.meta{margin:0 20px 14px;color:#8a8a96}
-  figure{margin:0 20px 24px}
+  main{display:grid;grid-template-columns:repeat(${COLS},${VIEWPORT.width}px);gap:20px;padding:0 20px 20px}
+  figure{margin:0}
   img{width:${VIEWPORT.width}px;height:${VIEWPORT.height}px;display:block;border:1px solid #26262f}
   figcaption{padding:6px 2px;text-transform:uppercase;letter-spacing:.08em;font-size:12px}
 </style></head><body>
   <h1>cursor mode — ${mode}</h1>
   <p class="meta">1280x800 native, deviceScaleFactor 1 — pointer=1, parked at (${PARK_FX}, ${PARK_FY}) of canvas — ${slugs.length} pieces</p>
-  ${tiles.map((t) => `<figure><img src="data:image/png;base64,${t.b64}"><figcaption>${t.slug}</figcaption></figure>`).join('\n  ')}
+  <main>${tiles.map((t) => `<figure><img src="data:image/png;base64,${t.b64}"><figcaption>${t.slug}</figcaption></figure>`).join('\n    ')}</main>
 </body></html>`);
     await sheet.waitForTimeout(300);
     const out = join(OUT_DIR, `${mode.toLowerCase().replace(/\s+/g, '-')}.png`);
