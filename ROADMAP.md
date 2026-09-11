@@ -9,9 +9,30 @@ Ordered roughly by how much it would add.
 
 ## Next up
 
-No scheduled work. Pointer interaction, full 3D orientation, drag-to-orbit,
-and exact Source export shipped in 1.3.0. Seven cursor-interaction modes
-across all twelve pieces shipped in 1.4.0.
+### Five new pieces
+
+Specified and not yet built. These came from a direct request and are the
+outstanding work on the library:
+
+- **globe** — a wire mesh of horizontal and vertical lines bending inward to
+  read as a spinning globe.
+- **matrix code** — dripping columns of symbols that continually change.
+- **puddle** — a rippling puddle.
+- **chain haze** — lines of chains receding into the distance.
+- **stock market** — rising and falling movement with buy and sell
+  rectangles, reading as a trading chart.
+
+Each inherits the constraints in [INSPIRATION.md](INSPIRATION.md) and must
+honour all thirteen shared controls, all seven cursor modes, and the
+collection review before shipping. `matrix code` and `stock market` need a
+capability the library does not have yet — glyph and rectangle marks rather
+than strokes — so each of those is closer to a new technique than a new
+arrangement.
+
+Pointer interaction, full 3D orientation, drag-to-orbit and exact Source
+export shipped in 1.3.0. Seven cursor-interaction modes across all twelve
+pieces shipped in 1.4.0. The sectioned control panel, colour picker and
+mobile sheet shipped alongside.
 
 ---
 

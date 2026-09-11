@@ -14,6 +14,44 @@ ambiguous labels are kept uncertain rather than treated as specifications.
 
 ---
 
+## Commissioned, not yet built
+
+Five pieces requested directly. Unlike everything below, these are not
+candidates to weigh — they are outstanding work. ROADMAP lists them under
+Next up.
+
+**`globe`** — a wire mesh of horizontal and vertical lines bending inward to
+read as a spinning globe. Closest existing relative is `wireframe-lattice`,
+and `shared/project.js`'s camera already does the projection. The risk is the
+`orb` tag: `orbital-veil`, `accretion` and `event-horizon` are already
+orb-shaped, and this project has shipped five pieces that were individually
+fine and collectively one thing. A globe has to earn its slot on structure —
+longitude and latitude lines reading as a surface, not another ring family.
+
+**`matrix code`** — dripping columns of symbols that continually change.
+Needs a capability nothing here has: **glyph marks**. Every current piece
+strokes paths. Text introduces font loading, per-glyph measurement, and a
+baked-export question, since a baked file cannot assume a font is present.
+Closest in motion to `rainfall`, and it must not read as rainfall wearing
+letters.
+
+**`puddle`** — a rippling puddle. Concentric interference on a surface with a
+falloff, closest to `interference` but bounded and organic rather than
+infinite and regular. The cursor-modes overlay already draws ripples, so this
+piece has to be clearly more than the Ripples mode made permanent.
+
+**`chain haze`** — lines of chains receding into the distance. Needs
+**repeated linked marks along a path** rather than a continuous stroke, plus
+depth fade. `tether` is the nearest relative and reads as smooth cable, so
+the chain link has to be legible at the sizes the piece actually draws.
+
+**`stock market`** — rising and falling movement with buy and sell
+rectangles, reading as a trading chart. Needs **filled rectangle marks**,
+which no piece currently draws, and it is the only candidate here whose
+subject is representational. That makes it the one most likely to look like a
+chart rather than line art, which may be the point or may be the failure —
+worth settling before it is built.
+
 ## Techniques the library doesn't have yet
 
 Three of these families need a capability no current piece has. Those are
