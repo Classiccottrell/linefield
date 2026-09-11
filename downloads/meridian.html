@@ -1627,10 +1627,17 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
             }
           } else if (mode === 'Attract') {
             const dist = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / DEFLECT_RADIUS);
-            // Clamp the EASE FRACTION, not dist*k: k can reach 2 (Pointer's
-            // max), and a lerp factor above 1 overshoots the pointer and
-            // reflects the point past it.
-            if (dist) y += (ply - y) * Math.min(dist * k, 1);
+            // A smooth saturating curve, not Math.min(dist*k, cap): this
+            // pull runs along a shared horizontal target (ply), so ANY
+            // hard ceiling makes every x within the region where dist*k
+            // clears it collapse onto the exact same (constant) y and
+            // render as a dead-flat line segment with a hard crease at the
+            // ceiling's boundary — a plateau, not a swell. dist*k/(1+dist*k)
+            // is strictly monotonic and always < 1, so it inherits dist's
+            // own smooth shape instead of ever saturating to a constant —
+            // which also rules out overshoot past the cursor without a
+            // separate clamp.
+            if (dist) y += (ply - y) * ((dist * k) / (1 + dist * k));
           } else if (mode === 'Vortex') {
             const dist = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / DEFLECT_RADIUS);
             if (dist) {

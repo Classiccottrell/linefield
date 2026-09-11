@@ -1620,10 +1620,18 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
             if (f) y -= f * BULGE_MAG * amp;
           } else if (mode === 'Attract') {
             const f = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / BULGE_RADIUS);
-            // Clamp the EASE FRACTION, not f*k: k can reach 2 (Pointer's
-            // max), and a lerp factor above 1 overshoots the pointer and
-            // reflects the point past it.
-            if (f) y += (ply - y) * Math.min(f * k, 1);
+            // A smooth saturating curve, not Math.min(f*k, cap): this pull
+            // runs along a shared horizontal target (ply), so ANY hard
+            // ceiling (1, or a lower constant) makes every x within the
+            // region where f*k clears it collapse onto the exact same
+            // (constant) y and render as a dead-flat line segment with a
+            // hard crease at the ceiling's boundary — a plateau, not a
+            // swell. f*k/(1+f*k) is strictly monotonic in f*k and always
+            // < 1, so it inherits f's own smooth shape (single peak at the
+            // closest x, continuously varying, no flat interval) instead
+            // of ever saturating to a constant — which also rules out
+            // overshoot past the cursor without a separate clamp.
+            if (f) y += (ply - y) * ((f * k) / (1 + f * k));
           } else if (mode === 'Vortex') {
             const f = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / BULGE_RADIUS);
             if (f) {
