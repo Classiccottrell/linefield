@@ -1446,6 +1446,17 @@ function createOrbit({
   // Fraction of canvas height a streak crosses per second at speedMult=1,
   // values.speed=1 — slow enough that a single drop takes ~14s to fall.
   const BASE_FALL = 0.07;
+  // Grow/Shrink/Attract/Vortex fall off per-drop, unlike tether/meridian's
+  // single continuous path, but the same sparsity problem applies: only 28
+  // drops scattered across the canvas, each at its own independent point in
+  // the fall cycle, so a narrow radius catches at most two or three at any
+  // cursor position and the effect reads as nothing at normal viewing scale
+  // even though it passes the live-pixel gate. Widened well past
+  // contour-grid's 300/meridian's 320 for the same reason tether went to
+  // 340 — the sparsest pieces need the widest catchment — with no amplitude
+  // coupling to worry about here, since Grow/Shrink scale per-drop
+  // lineWidth, not radius-times-amplitude like the single-path pieces.
+  const DEFLECT_RADIUS = 480;
   let drops = [];
   let paths = [];
 
@@ -1540,7 +1551,7 @@ function createOrbit({
       if (k) {
         const ddx = x - plx, ddy = headY - ply;
         const dist = Math.hypot(ddx, ddy) || 1;
-        const f = Math.max(0, 1 - dist / 220);
+        const f = Math.max(0, 1 - dist / DEFLECT_RADIUS);
         if (f) {
           if (values.cursorInteraction === 'Attract') {
             x += -(ddx / dist) * f * k * 70;
