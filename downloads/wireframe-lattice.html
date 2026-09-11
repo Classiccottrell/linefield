@@ -1569,21 +1569,22 @@ function createOrbit({
   // (mirroring event-horizon's projectWithLens), since "toward the cursor"
   // and "rotate about the cursor" are screen-space ideas for a tilted sheet;
   // Grow/Shrink stay world-space Z, scaling the sheet's existing lift.
-  function warpProjected(pts, mode, k) {
-    if (!k || (mode !== 'Attract' && mode !== 'Vortex')) return pts;
+  // Receives kAmp (pre-capped at the caller, see drawFrame), not raw k.
+  function warpProjected(pts, mode, kAmp) {
+    if (!kAmp || (mode !== 'Attract' && mode !== 'Vortex')) return pts;
     for (const p of pts) {
       if (p.scale <= 0) continue;
       const f = pointer.falloff(p.x, p.y, WARP_RADIUS);
       if (!f) continue;
       if (mode === 'Attract') {
-        // Clamp the EASE FRACTION, not f*k: k can reach 2 (Pointer's max),
-        // and a lerp factor above 1 overshoots the pointer and reflects
-        // the point past it.
-        const ease = Math.min(f * k, 1);
+        // Clamp the EASE FRACTION too, not just kAmp: f*kAmp can still
+        // exceed 1 near the pointer, and a lerp factor above 1 overshoots
+        // the pointer and reflects the point past it.
+        const ease = Math.min(f * kAmp, 1);
         p.x += (pointer.x - p.x) * ease;
         p.y += (pointer.y - p.y) * ease;
       } else {
-        const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * k * 1.1 });
+        const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * kAmp * 1.1 });
         p.x = pointer.x + r.x;
         p.y = pointer.y + r.y;
       }
@@ -1650,6 +1651,14 @@ function createOrbit({
     const k = modeFactor(values, pointer);
     const mode = values.cursorInteraction;
 
+    // Cap the amplitude/radius/rotation input at k=1: uncapped, k=2
+    // (Pointer's max) quadruples Grow's lift magnitude AND falloff
+    // radius together, and widens Vortex's rotation the same way, which
+    // can destroy the sheet's identity rather than swelling/swirling it.
+    // This holds Pointer 1..2 flat at the Pointer=1 strength (gate numbers
+    // unchanged) instead of compounding further.
+    const kAmp = Math.min(k, 1);
+
     // World-space height of the sheet at (x, z). Grow/Shrink only: the lift
     // term projects the (unlifted) point to screen space first to find its
     // distance from the pointer, then adds a falloff-weighted Z, scaled and
@@ -1660,7 +1669,7 @@ function createOrbit({
       const base = simplex2(x * noiseScale + values.phase, z * noiseScale + t) * amp;
       if (!k || (mode !== 'Grow' && mode !== 'Shrink')) return base;
       const grow = mode === 'Grow';
-      const lAmp = grow ? 1 + k * 1.5 : 1 / (1 + k * 1.5);
+      const lAmp = grow ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
       const approx = camera.project(x, 0, z);
       if (approx.scale <= 0) return base;
       const f = pointer.falloff(approx.x, approx.y, WARP_RADIUS * lAmp);
@@ -1685,8 +1694,8 @@ function createOrbit({
         rowPts.push([c, heightAt(c, a), a]);
         colPts.push([a, heightAt(a, c), c]);
       }
-      strokePath(warpProjected(camera.projectPath(rowPts), mode, k), values, baseWidth, [r, g, b]);
-      strokePath(warpProjected(camera.projectPath(colPts), mode, k), values, baseWidth, [r, g, b]);
+      strokePath(warpProjected(camera.projectPath(rowPts), mode, kAmp), values, baseWidth, [r, g, b]);
+      strokePath(warpProjected(camera.projectPath(colPts), mode, kAmp), values, baseWidth, [r, g, b]);
     }
 
     const stopA = paletteHsl(values, 0);

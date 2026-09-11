@@ -1578,6 +1578,13 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     // influence. No term routed through values.speed or values.slack (both
     // user-zeroable), so deflection survives either at 0.
     const k = modeFactor(values, pointer);
+    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
+    // (Pointer's max) quadruples magnitude AND falloff radius together,
+    // which on this piece (6 cables, the sparsest in the library) pulls
+    // nearly every cable hard and destroys the piece's identity rather
+    // than swelling it. This holds Pointer 1..2 flat at the Pointer=1
+    // amplitude (gate numbers unchanged) instead of compounding further.
+    const kAmp = Math.min(k, 1);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
     const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
@@ -1604,6 +1611,15 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
       const sway = Math.sin(t + c.j + values.phase * Math.PI);
       const sag = H * 0.16 * values.slack * (0.55 + 0.45 * sway);
 
+      // Grow/Shrink's push direction, fixed per cable (chord midpoint vs.
+      // the pointer), not per sample. Keying it off the per-sample py (as
+      // the piece did before cursor modes existed) flips sign wherever the
+      // cable's own droop/shiver crosses the pointer's y — at high enough
+      // magnitude that flip is a near-vertical jump between adjacent
+      // samples, not a bow, and reads as the cable snapping into a sharp
+      // V/box rather than swelling.
+      const pushDir = (ay + by) / 2 >= ply ? 1 : -1;
+
       const { h, s } = paletteHsl(values, f);
       const [r, g, b] = hslToRgb(h, s, light);
       ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
@@ -1627,10 +1643,10 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
           const envelope = 4 * u * (1 - u);
           const mode = values.cursorInteraction;
           if (mode === 'Grow' || mode === 'Shrink') {
-            const amp = mode === 'Grow' ? 1 + k * 1.5 : 1 / (1 + k * 1.5);
+            const amp = mode === 'Grow' ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
             const radius = DEFLECT_RADIUS * amp;
             const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / radius);
-            if (f) py += (py >= ply ? 1 : -1) * f * DEFLECT_MAG * amp * envelope;
+            if (f) py += pushDir * f * DEFLECT_MAG * amp * envelope;
           } else if (mode === 'Attract') {
             const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
             // Clamp f*k alone, THEN apply envelope outside the clamp — same

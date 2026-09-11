@@ -1490,6 +1490,14 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     const k = modeFactor(values, pointer);
     const mode = values.cursorInteraction;
 
+    // Cap the amplitude/radius/rotation input at k=1: uncapped, k=2
+    // (Pointer's max) quadruples Grow's magnitude AND falloff radius
+    // together (and widens Vortex's rotation radius the same way), which
+    // pulls nearly every ring hard and destroys the piece's identity. This
+    // holds Pointer 1..2 flat at the Pointer=1 strength (gate numbers
+    // unchanged) instead of compounding further.
+    const kAmp = Math.min(k, 1);
+
     // The piece's one prior pointer response was a global nx/ny tilt with
     // no positional falloff — against the "k and a positional falloff,
     // nothing else" contract. Replaced below with a genuine per-point
@@ -1527,14 +1535,14 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
             y += (pointer.y - y) * ease;
           }
         } else if (k && (mode === 'Grow' || mode === 'Shrink' || mode === 'Vortex')) {
-          const amp = mode === 'Shrink' ? 1 / (1 + k * 1.5) : 1 + k * 1.5;
+          const amp = mode === 'Shrink' ? 1 / (1 + kAmp * 1.5) : 1 + kAmp * 1.5;
           const swellRadius = SWELL_RADIUS * amp;
           const f = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / swellRadius);
           if (f) {
             if (mode === 'Vortex') {
               // True tangential rotation about the pointer, not an offset
               // toward/away from it.
-              const rp = rotatePoint(x - pointer.x, y - pointer.y, 0, { roll: f * k * 1.1 });
+              const rp = rotatePoint(x - pointer.x, y - pointer.y, 0, { roll: f * kAmp * 1.1 });
               x = pointer.x + rp.x;
               y = pointer.y + rp.y;
             } else {

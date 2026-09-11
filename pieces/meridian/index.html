@@ -102,6 +102,13 @@
     // influence, local via falloff. No term routed through values.speed or
     // values.sweep (both user-zeroable), so deflection survives either at 0.
     const k = modeFactor(values, pointer);
+    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
+    // (Pointer's max) quadruples magnitude AND falloff radius together,
+    // which on a sparse piece (7 ribbons) pulls nearly everything hard and
+    // destroys the piece's identity rather than swelling it. This holds
+    // Pointer 1..2 flat at the Pointer=1 amplitude (gate numbers
+    // unchanged) instead of compounding further.
+    const kAmp = Math.min(k, 1);
 
     // Drawing below happens in the pre-rotation local space that ctx.rotate
     // maps to screen space, but pointer.x/y are screen (canvas-pixel) space.
@@ -146,7 +153,7 @@
           // ctx.save().
           const mode = values.cursorInteraction;
           if (mode === 'Grow' || mode === 'Shrink') {
-            const amp = mode === 'Grow' ? 1 + k * 1.5 : 1 / (1 + k * 1.5);
+            const amp = mode === 'Grow' ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
             const radius = DEFLECT_RADIUS * amp;
             // Direction keyed off baseY (constant per ribbon), not the
             // wobbled y — keying off y flips sign at STEP_PX granularity

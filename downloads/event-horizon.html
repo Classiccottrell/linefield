@@ -1562,6 +1562,16 @@ function createOrbit({
     // user-zeroable).
     const pointerK = modeFactor(values, pointer);
     const pointerMode = values.cursorInteraction;
+    // Cap the amplitude/radius/rotation input at pointerK=1: uncapped,
+    // pointerK=2 (Pointer's max) quadruples Grow's amp AND is itself
+    // multiplied into the pull magnitude again below, compounding to a
+    // pull factor that can exceed 1 near the pointer (the same overshoot/
+    // reflect hazard as the Attract fix, plus a falloff radius wide enough
+    // to reach most of the disc) — together they can destroy the piece's
+    // identity rather than swelling it. This holds Pointer 1..2 flat at
+    // the Pointer=1 strength (gate numbers unchanged) instead of
+    // compounding further.
+    const pointerKAmp = Math.min(pointerK, 1);
     const projectWithLens = (pts) => {
       const projected = camera.projectPath(pts);
       if (!pointerK) return projected;
@@ -1570,15 +1580,18 @@ function createOrbit({
           // Grow/Shrink scale the lens's existing pull magnitude and radius
           // by the same amp — this IS the piece's existing Attract-like
           // behaviour, amplified/damped rather than replaced.
-          const amp = pointerMode === 'Grow' ? 1 + pointerK * 1.5 : 1 / (1 + pointerK * 1.5);
+          const amp = pointerMode === 'Grow' ? 1 + pointerKAmp * 1.5 : 1 / (1 + pointerKAmp * 1.5);
           const f = pointer.falloff(p.x, p.y, LENS_RADIUS * amp);
           if (f) {
-            p.x += (pointer.x - p.x) * f * pointerK * 0.18 * amp;
-            p.y += (pointer.y - p.y) * f * pointerK * 0.18 * amp;
+            const ease = Math.min(f * pointerKAmp * 0.18 * amp, 1);
+            p.x += (pointer.x - p.x) * ease;
+            p.y += (pointer.y - p.y) * ease;
           }
         } else if (pointerMode === 'Attract') {
           // The lens already pulls projected points toward the pointer —
-          // unchanged from before wiring, just scoped to this mode.
+          // unchanged from before wiring, just scoped to this mode. Max
+          // factor here is pointerK*0.18 = 0.36, already well under 1, so
+          // no overshoot clamp is needed.
           const f = pointer.falloff(p.x, p.y, LENS_RADIUS);
           if (f) {
             p.x += (pointer.x - p.x) * f * pointerK * 0.18;
@@ -1589,7 +1602,7 @@ function createOrbit({
           // toward/away from it.
           const f = pointer.falloff(p.x, p.y, LENS_RADIUS);
           if (f) {
-            const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * pointerK * 1.1 });
+            const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * pointerKAmp * 1.1 });
             p.x = pointer.x + r.x;
             p.y = pointer.y + r.y;
           }

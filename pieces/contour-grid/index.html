@@ -103,6 +103,13 @@
     // influence, local via falloff. Uses no term scaled by values.speed (or
     // values.relief, which a user can set to 0), so the bulge survives both.
     const k = modeFactor(values, pointer);
+    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
+    // (Pointer's max) quadruples magnitude AND falloff radius together,
+    // which on a sparse piece pulls nearly everything hard and destroys
+    // the piece's identity rather than swelling it. This holds Pointer
+    // 1..2 flat at the Pointer=1 amplitude (gate numbers unchanged)
+    // instead of compounding further.
+    const kAmp = Math.min(k, 1);
 
     // Drawing below happens in the pre-rotation local space that ctx.rotate
     // maps to screen space, but pointer.x/y are screen (canvas-pixel) space.
@@ -146,7 +153,7 @@
           // directly — see note above ctx.save().
           const mode = values.cursorInteraction;
           if (mode === 'Grow' || mode === 'Shrink') {
-            const amp = mode === 'Grow' ? 1 + k * 1.5 : 1 / (1 + k * 1.5);
+            const amp = mode === 'Grow' ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
             const radius = BULGE_RADIUS * amp;
             const f = Math.max(0, 1 - Math.hypot(x - plx, baseY - ply) / radius);
             if (f) y -= f * BULGE_MAG * amp;
