@@ -1488,7 +1488,16 @@ function createOrbit({
 
   const camera = createCamera({ fov: 700 });
   const overlay = createCursorOverlay();
-  const LENS_RADIUS = 260;
+  // Shrink's ease factor (below) tops out at ~0.072 of a point's distance
+  // to the pointer — deliberately small so Grow's lens bulge has the
+  // headroom it needs without overshooting. At 260 that pull only reached
+  // grid lines close to the disc's own converging center, where the
+  // perspective warp already dominates and swallows a further few-percent
+  // nudge. Widened to 420 so the pull also reaches the event horizon's own
+  // silhouette — where a contracting edge against the black disc is what
+  // actually reads as "shrink" here — without changing the ease factor
+  // itself (still tuning the catchment, not deepening the per-point pull).
+  const LENS_RADIUS = 420;
 
   function strokePts(pts, values, lineWidth, rgb) {
     // Walk in order and break the run at any point behind the camera

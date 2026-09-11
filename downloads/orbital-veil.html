@@ -1464,7 +1464,14 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
   // pull/swell/rotation, mirroring interference. No canvas rotation
   // transform is applied here, so pointer.x/y are usable directly.
   const SWELL_MAG = 30;
-  const SWELL_RADIUS = 200;
+  // 200 (matching interference's own SWELL_RADIUS) left Shrink invisible at
+  // the review's parked cursor position: interference's two dense ripple
+  // sources keep many rings within 200px of any point, but orbital-veil's
+  // rings are spaced widely enough that only a sliver of one or two rings
+  // fell inside the falloff at a time. Widened to 340 (tether's radius) so
+  // enough ring length is affected at once to read, not to deepen Shrink's
+  // already-small per-point push.
+  const SWELL_RADIUS = 340;
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
