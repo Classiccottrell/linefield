@@ -164,14 +164,28 @@ phase, invert, density, pointer) plus its own piece-specific control. Color
 mode switches between a single hue (Solid) and a two-stop blend (Gradient,
 the default — every piece's own look); Color A/B are hex pickers, B shown
 only in Gradient mode. `density` multiplies the piece's base element count.
-`pointer` scales the piece's cursor response (0 by default, opt-in); each
-piece maps it to its own visual vocabulary and remains responsive at Speed
-0. `cursor interaction` (None / Grow / Shrink / Particle Trail / Ripples /
-Attract / Vortex) is wired on all twelve pieces: Grow/Shrink/Attract/Vortex
-scale marks individually on element-based pieces and amplify/damp an
+`cursor interaction` selects one of seven modes, wired on all twelve
+pieces. None does nothing. Grow enlarges marks near the cursor; Shrink
+narrows them. Attract pulls nearby marks toward the cursor; Vortex swirls
+them around it in place. Particle Trail scatters a fading dust of small
+particles that follows the cursor's recent path; Ripples sends expanding
+rings outward from wherever the cursor rests. Grow/Shrink/Attract/Vortex
+scale marks individually on element-based pieces and amplify or damp an
 existing local deformation on whole-path pieces (rings, bands, ribbons,
-cables); Particle Trail and Ripples are a shared cursor-relative overlay,
-identical on every piece. `wireframe-lattice` and
+cables) — canvas cannot vary a single path's stroke width partway along
+it, so a piece that draws a whole ring or ribbon as one path leans on
+motion it already has rather than literal per-mark scaling. Particle Trail
+and Ripples are a shared cursor-relative overlay, identical on every
+piece, layered on top of a piece's own drawing rather than replacing any
+of it.
+
+`pointer` scales whichever mode is selected and defaults to 0, since these
+are backgrounds — meant to hold still until a visitor's cursor invites
+otherwise — and each piece remains fully responsive to it at Speed 0.
+`cursorInteraction: None` and `pointer: 0` are two different ways to be
+off: the mode dropdown turns cursor response off regardless of pointer,
+while leaving a mode selected with pointer at 0 keeps it silent but ready
+— raising pointer later needs no other change. `wireframe-lattice` and
 `event-horizon` also provide Pitch and Yaw controls; Angle is roll, and
 dragging the canvas orbits the camera on direct piece pages. Gallery
 previews disable drag-to-orbit.
@@ -223,9 +237,12 @@ npm run build            # verify, then regenerate thumbs/ and downloads/
 npm run audit-controls   # empirically check every shared+piece control moves pixels
 node tools/test-presets.mjs <slug>   # preset mechanism + value range gate
 npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
+npm run test-bake-fresh  # bakes every piece live, rather than reading committed downloads/
 npm run test-source      # Source buttons download exact unbaked piece files
 npm run test-interactions # pointer, orbit, animation, and baked-artifact browser QA
+node tools/test-cursor-modes.mjs     # every cursor mode live and mutually distinct, per piece
 node tools/preset-sheet.mjs <slug>   # render a piece's presets for review
+node tools/mode-sheet.mjs            # paired None-vs-mode 1:1 crops for visual review
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's

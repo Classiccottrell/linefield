@@ -238,6 +238,28 @@ what "grow"/"shrink"/etc. means for its own geometry, gated on
 There is no shared implementation for these four — only the vocabulary and
 the gate.
 
+### What a new piece owes
+
+A new piece must implement all seven modes, not a subset — None, Grow,
+Shrink, Attract, Vortex per-piece plus the shared Particle Trail/Ripples
+overlay wired as shown above. Every mode's strength must flow through
+`modeFactor(values, pointer)` and nothing else: don't gate cursor response
+on `speed`, `motion`, `density`, or any other control a user can set to
+zero, since `modeFactor` is the one place `cursorInteraction: 'None'` and
+`pointer: 0` are honoured, and a second gate is a second way to leave a
+mode silently stuck on or off. At `pointer: 0` the piece must be
+byte-for-byte inert under cursor movement — `modeFactor` already returns 0
+there, so this falls out for free as long as nothing bypasses it.
+
+Run `node tools/test-cursor-modes.mjs` before calling a piece's cursor
+wiring done — it drives every mode live on every piece and asserts no two
+render identically. It is a change-detector, not a visibility check: a
+piece can pass it and still look like nothing moved to a human (see
+ROADMAP.md, "A diff percentage is not visibility"). Follow it with
+`node tools/mode-sheet.mjs` and look at the paired None-vs-mode crops
+yourself — that is the only instrument that answers whether the effect
+reads.
+
 ## Baked HTML export
 
 `shared/export.js`'s `bakeHtml()` produces a fully standalone file: it

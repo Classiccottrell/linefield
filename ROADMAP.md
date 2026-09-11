@@ -10,7 +10,8 @@ Ordered roughly by how much it would add.
 ## Next up
 
 No scheduled work. Pointer interaction, full 3D orientation, drag-to-orbit,
-and exact Source export shipped in 1.3.0.
+and exact Source export shipped in 1.3.0. Seven cursor-interaction modes
+across all twelve pieces shipped in 1.4.0.
 
 ---
 
@@ -49,6 +50,22 @@ exists; a full build reads defaults and presets off the running page via
 `readReadmeSlugs` scans the whole README rather than just the Pieces
 section, so a future limitations bullet leading with a backticked slug would
 be misread as a piece claim. Both fail loudly, neither fails silently.
+
+**Shrink cannot read on marks that are already near sub-pixel width.**
+`grain-field` and `synapse` draw their finest strokes close to the width
+floor a browser can render distinctly, and Shrink narrows from there.
+Widening the falloff radius was tried on both and did not help — it
+enlarges the affected area without deepening the effect, so the marks
+inside it dim rather than visibly narrow. Left as a limitation rather than
+a bug: the mode is wired correctly and reads on the other ten pieces.
+
+**`rainfall`'s Vortex reads as lateral wind, not rotation.** A drop's
+vertical position is time-driven rather than angle-driven, so only the
+horizontal component of the tangential motion a true vortex would apply is
+expressible in the draw model — the construction underneath is a genuine
+rotation, but nothing vertical can carry it. Fixing this means giving
+`rainfall` a second, angle-driven vertical term specifically for Vortex,
+which no other mode on this piece needs.
 
 ---
 
@@ -168,3 +185,28 @@ blank-canvas check, which hid the problem instead of fixing it.
 pieces that were each individually correct and collectively looked like one
 thing five times, because every review judged a piece against its own intent
 and never against the others.
+
+**A diff percentage is not visibility.** `event-horizon`'s Shrink changed
+10.67% of sampled pixels and was invisible to a human, because the change
+sat entirely within the disc's own silhouette. Conversely `rainfall`'s
+Shrink measured twice the gate threshold and was invisible because only
+about three of thirty drops fell inside the falloff radius. Every
+threshold-based gate in this repo inherits this limit: it proves something
+changed, never that anyone can see it.
+
+**A review instrument must answer the question you are asking.** The first
+collection sheets showed twelve pieces under one mode, full-frame. That
+compares pieces to each other but never to their own baseline, and a
+1280-wide frame squeezed into a grid column loses any local effect.
+Rebuilt as paired 1:1 crops — None beside the mode, same seed and frame
+count, cropped to the cursor. The earlier instrument produced a confident
+"inconclusive" that the better one overturned in both directions. This
+sharpens two entries above: "Judge at the viewport that ships" and "Judge
+the collection, not just the piece" both assume the instrument shows what
+it claims to; this is what happens when it doesn't.
+
+**A named mode means one thing; the mechanism may differ.** Grow is
+literal on five pieces and amplification on seven, because canvas cannot
+vary stroke width within a single path. What keeps that honest is looking
+at all twelve under each mode and asking whether they read as the same
+intent — which no automated gate can answer.
