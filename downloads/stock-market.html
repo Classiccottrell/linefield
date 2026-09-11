@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — tether</title>
+<title>linefield — stock market</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.25,"colorMode":"gradient","colorA":"#0055ff","colorB":"#2a00ff","hue":220,"hueB":250,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"slack":1};
+<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.5,"colorMode":"gradient","colorA":"#9fd34a","colorB":"#d3654a","hue":78,"hueB":92,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"barWidth":0.62};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1049,82 +1049,6 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
-// --- inlined: ../../shared/noise.js ---
-// shared/noise.js
-// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
-// reference algorithm (Stefan Gustavson).
-
-const GRAD = [
-  [1, 1], [-1, 1], [1, -1], [-1, -1],
-  [1, 0], [-1, 0], [1, 0], [-1, 0],
-  [0, 1], [0, -1], [0, 1], [0, -1],
-];
-
-function buildPermutation(seed = 1337) {
-  const p = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) p[i] = i;
-  let s = seed;
-  const rand = () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-  for (let i = 255; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [p[i], p[j]] = [p[j], p[i]];
-  }
-  const perm = new Uint8Array(512);
-  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-  return perm;
-}
-
-const perm = buildPermutation();
-
-function dot(g, x, y) {
-  return g[0] * x + g[1] * y;
-}
-
-const F2 = 0.5 * (Math.sqrt(3) - 1);
-const G2 = (3 - Math.sqrt(3)) / 6;
-
-function simplex2(xin, yin) {
-  const s = (xin + yin) * F2;
-  const i = Math.floor(xin + s);
-  const j = Math.floor(yin + s);
-  const t = (i + j) * G2;
-  const X0 = i - t;
-  const Y0 = j - t;
-  const x0 = xin - X0;
-  const y0 = yin - Y0;
-
-  let i1, j1;
-  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
-
-  const x1 = x0 - i1 + G2;
-  const y1 = y0 - j1 + G2;
-  const x2 = x0 - 1 + 2 * G2;
-  const y2 = y0 - 1 + 2 * G2;
-
-  const ii = i & 255;
-  const jj = j & 255;
-  const gi0 = perm[ii + perm[jj]] % 12;
-  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
-  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
-
-  let n0 = 0, n1 = 0, n2 = 0;
-
-  let t0 = 0.5 - x0 * x0 - y0 * y0;
-  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
-
-  let t1 = 0.5 - x1 * x1 - y1 * y1;
-  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
-
-  let t2 = 0.5 - x2 * x2 - y2 * y2;
-  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
-
-  return 70 * (n0 + n1 + n2);
-}
-
-
 // --- inlined: ../../shared/export.js ---
 // shared/export.js
 
@@ -1440,74 +1364,6 @@ function createOrbit({
 }
 
 
-// --- inlined: ../../shared/project.js ---
-// shared/project.js
-// 3D -> 2D projection for pieces that want perspective geometry.
-//
-// Shaped as an extension point: behaviour is configured through an options
-// bag on a camera object, so future capability (roll, camera position, an
-// orthographic mode) arrives as a new option that existing callers ignore,
-// rather than a changed signature at every call site.
-//
-// Deliberately absent, by choice rather than oversight: depth sorting and
-// occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
-
-// Rotate a point: yaw about Y, pitch about X, then roll about Z.
-function rotatePoint(x, y, z, { tilt = 0, yaw = 0, roll = 0 } = {}) {
-  const cyaw = Math.cos(yaw);
-  const syaw = Math.sin(yaw);
-  const rx = x * cyaw - z * syaw;
-  let rz = x * syaw + z * cyaw;
-
-  const ct = Math.cos(tilt);
-  const st = Math.sin(tilt);
-  const ry = y * ct - rz * st;
-  rz = y * st + rz * ct;
-
-  const cr = Math.cos(roll);
-  const sr = Math.sin(roll);
-  return { x: rx * cr - ry * sr, y: rx * sr + ry * cr, z: rz };
-}
-
-function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 } = {}) {
-  const opt = { tilt, yaw, roll, fov, cx, cy };
-
-  function project(x, y, z) {
-    const r = rotatePoint(x, y, z, opt);
-    const denom = opt.fov + r.z;
-    // Near plane sits at 20% of the fov ahead of the lens (not at the lens
-    // itself), capping scale at 1/0.2 = 5x. Without this, points just past
-    // the lens (denom -> 0) blow up toward arbitrary magnification, which
-    // canvas draw calls and exported paths share the same coordinates for —
-    // canvas just clips silently at the screen edge, export doesn't. A
-    // blown-up point lands off the visible frame whenever the near-plane
-    // crossing is off the camera's optical axis, which any meaningful tilt
-    // guarantees; a tilt at or near zero (camera roughly in the plane of
-    // the geometry) is the degenerate exception where a dropped point can
-    // still be near-frame, and dropping it can visibly change the render.
-    // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
-    // steps) at which event-horizon's SVG export at Scale 2, an angle
-    // exposing the near plane, has no coordinate over magnitude 5000. At
-    // or beyond the near plane there is no meaningful projection; scale 0
-    // is the caller's signal to skip this point.
-    const nearPlane = opt.fov * 0.2;
-    if (denom <= nearPlane) return { x: 0, y: 0, scale: 0 };
-    const scale = opt.fov / denom;
-    return { x: opt.cx + r.x * scale, y: opt.cy + r.y * scale, scale };
-  }
-
-  return {
-    project,
-    projectPath(points) {
-      return points.map((p) => project(p[0], p[1], p[2]));
-    },
-    set(partial) {
-      Object.assign(opt, partial);
-    },
-  };
-}
-
-
 // --- piece script ---
 
 
@@ -1515,9 +1371,7 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
 
 
 
-
-
-  const PIECE_ID = 'tether';
+  const PIECE_ID = 'stock-market';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1528,59 +1382,72 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
   window.addEventListener('resize', resize);
   resize();
 
-  // Deliberately the sparsest piece in the library.
-  const BASE_COUNT = 6;
-  const SAMPLES = 48; // points along each cable
-  let cables = [];
-  let paths = [];
-
-  function seedCables(count) {
-    cables = Array.from({ length: count }, (_, i) => ({
-      // Anchors live in normalised space so a resize doesn't restring them.
-      ax: 0.02 + Math.random() * 0.2,
-      ay: 0.1 + Math.random() * 0.8,
-      bx: 0.78 + Math.random() * 0.2,
-      by: 0.1 + Math.random() * 0.8,
-      j: (i / Math.max(1, count)) * Math.PI * 2 + Math.random(),
-    }));
+  // The library's first filled-rectangle mark (see CONTRIBUTING.md, "The 16
+  // shared controls" / ROADMAP.md's collection-constraints note on this
+  // piece). Deliberately NOT a literal chart widget: no axis, no gridlines,
+  // no price labels, no single fixed baseline. Several independent tracks
+  // of marching bars, each centred on its own mid-line and growing up or
+  // down from it, so the composition reads as generative rhythm — rise and
+  // fall, buy and sell — rather than a finance-app screenshot. This is the
+  // same move `globe` made for "sphere without being literal continents":
+  // keep the structural cue (discrete bars, up/down state, marching motion)
+  // and drop everything that would anchor it to a specific instrument.
+  function hash(a, b, c) {
+    let h = (a * 374761393 + b * 668265263 + c * 2246822519) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  // Deterministic pseudo-random in [0,1) from an integer hash — no
+  // Math.random anywhere, same discipline as matrix-code/chain-haze, so
+  // thumbnail capture (pinned clock) and the change-detector gates stay
+  // byte-identical against untouched source.
+  function rand01(a, b, c) {
+    return (hash(a, b, c) % 100000) / 100000;
   }
 
-  // Only 6 heavy cables at rest, so `whisper` has to drop stroke hard or it
-  // still reads heavy. stroke's control max is 2 — `ink` is held at 1.9,
-  // not the limit, so the preset isn't pinned to a ceiling.
+  const BASE_TRACKS = 4;
+  const BASE_COLS_PER_TRACK = 22;
+  const MARCH_RATE = 1.6; // whole bars/sec a track advances at speed=1
+  const BUCKET_SEC = 0.9; // how often a bar's height/state re-rolls, scaled by motion
+
   const PRESETS = {
-    whisper: { opacity: 0.22, stroke: 0.3, density: 0.5, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.9, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.95, stroke: 1.2, density: 1.2, saturation: 0.95, glow: 1.2 },
-    drift:   { opacity: 0.5, stroke: 1, density: 0.7, speed: 0.25, motion: 1.7 },
-    dense:   { opacity: 0.6, stroke: 0.7, density: 1.8, speed: 0.8 },
+    whisper: { opacity: 0.3, stroke: 0.4, density: 0.6, saturation: 0.12, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.4, density: 0.9, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 0.6, density: 1.1, saturation: 0.9, glow: 1.3 },
+    drift:   { opacity: 0.6, stroke: 0.7, density: 0.85, speed: 0.35, motion: 1.6 },
+    dense:   { opacity: 0.75, stroke: 0.5, density: 1.9, speed: 1.2 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
     presets: PRESETS,
-    onChange: (name, value, values) => {
-      if (name === 'density') seedCables(Math.max(2, Math.round(BASE_COUNT * values.density)));
-    },
+    onChange: () => {},
     extraControls: [
-      { name: 'slack', label: 'Slack', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      // Bar width as a fraction of its column slot — 'form', matching
+      // chain-haze's linkAspect precedent for a piece-specific shape knob.
+      { name: 'barWidth', label: 'Bar width', type: 'range', min: 0.3, max: 0.9, step: 0.01, default: 0.62, category: 'form' },
     ],
-    defaults: { hue: 220, hueB: 250, saturation: 0.25, colorMode: 'gradient', colorA: '#0055ff', colorB: '#2a00ff' },
+    // 78/92: sits in the open span between synapse (54) and chain-haze (96)
+    // that ROADMAP.md's collection-constraints table leaves free — the
+    // 95-135 band it calls out is nearly claimed by puddle/matrix-code/
+    // chain-haze already. Differentiated on form (filled rectangles, the
+    // library's first) and aimed at the 0.11-0.19 ink-coverage band the
+    // table flags as empty, not on a wide hue gap.
+    defaults: { hue: 78, hueB: 92, saturation: 0.5, colorMode: 'gradient', colorA: '#9fd34a', colorB: '#d3654a' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
   const overlay = createCursorOverlay();
 
-  // Each cable is one continuous stroked path, so per-mark scaling isn't
-  // available: Grow/Shrink amplify/damp the existing falloff-weighted
-  // deflection and its radius. Only 6 cables at rest — the sparsest piece
-  // in the library — so the radius is wider than contour-grid's equivalent
-  // to keep Shrink's dimple comfortably above the gate threshold.
-  const DEFLECT_MAG = 110;
-  const DEFLECT_RADIUS = 340;
+  let paths = [];
 
-  seedCables(Math.max(2, Math.round(BASE_COUNT * currentValues.density)));
+  // Closed 4-corner polyline for SVG export — a rect has no path primitive
+  // in exportSvg's polyline-only contract, so it's sampled the same way
+  // chain-haze samples its ellipses.
+  function rectPath(x, y, w, h) {
+    return [[x, y], [x + w, y], [x + w, y + h], [x, y + h], [x, y]];
+  }
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -1589,21 +1456,16 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     paths = [];
     const W = canvas.width;
     const H = canvas.height;
-    const t = elapsed * values.speed * 0.35;
-    const light = values.invert ? 0.35 : 0.65;
-    const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than meridian
-    const noiseScale = 0.9 * (0.3 + values.scale);
-    // Off at pointer 0, off when cursorInteraction is 'None', eased by
-    // influence. No term routed through values.speed or values.slack (both
-    // user-zeroable), so deflection survives either at 0.
+
+    const tracks = Math.max(2, Math.round(BASE_TRACKS * Math.max(0.4, values.scale)));
+    // density's convention: more, narrower columns per track, not a
+    // resized persistent array — there is no persistent array, every bar
+    // is recomputed from track/col/bucket indices each frame.
+    const colsPerTrack = Math.max(6, Math.round(BASE_COLS_PER_TRACK * values.density));
+    const colW = W / colsPerTrack;
+    const barW = colW * values.barWidth;
+
     const k = modeFactor(values, pointer);
-    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
-    // (Pointer's max) quadruples magnitude AND falloff radius together,
-    // which on this piece (6 cables, the sparsest in the library) pulls
-    // nearly every cable hard and destroys the piece's identity rather
-    // than swelling it. This holds Pointer 1..2 flat at the Pointer=1
-    // amplitude (gate numbers unchanged) instead of compounding further.
-    const kAmp = Math.min(k, 1);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
     const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
@@ -1615,98 +1477,92 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     ctx.rotate(theta);
     ctx.translate(-W / 2, -H / 2);
 
-    for (let i = 0; i < cables.length; i++) {
-      const c = cables[i];
-      const f = cables.length === 1 ? 0.5 : i / (cables.length - 1);
+    const bucket = Math.floor(elapsed * values.motion / BUCKET_SEC);
+    // `phase` offsets the marching sequence along x (static shift); `speed`
+    // marches whole columns over time; `motion` drives the independent
+    // re-roll clock above — none gates the others at zero.
+    const marchCols = elapsed * values.speed * MARCH_RATE + values.phase * colsPerTrack * 0.5;
 
-      // Anchors drift slowly so the rig never looks static.
-      const wobble = 0.012 * values.motion;
-      const ax = (c.ax + simplex2(i * 1.7 + t * 0.3, 0.5) * wobble) * W;
-      const ay = (c.ay + simplex2(i * 1.7 + t * 0.3, 3.5) * wobble * 3) * H;
-      const bx = (c.bx + simplex2(i * 2.9 + t * 0.3, 7.5) * wobble) * W;
-      const by = (c.by + simplex2(i * 2.9 + t * 0.3, 9.5) * wobble * 3) * H;
+    for (let t = 0; t < tracks; t++) {
+      const tf = tracks === 1 ? 0.5 : t / (tracks - 1);
+      const midY = H * (0.18 + 0.64 * tf);
+      const maxBarH = (H / tracks) * 0.42 * Math.max(0.2, values.scale);
 
-      // Sag: a parabola along the chord, swaying with a slow oscillation.
-      const sway = Math.sin(t + c.j + values.phase * Math.PI);
-      const sag = H * 0.16 * values.slack * (0.55 + 0.45 * sway);
+      for (let col = -1; col < colsPerTrack + 1; col++) {
+        const globalCol = col + Math.floor(marchCols);
+        const localX = ((col - (marchCols % 1) + colsPerTrack) % colsPerTrack) * colW;
 
-      // Grow/Shrink's push direction, fixed per cable (chord midpoint vs.
-      // the pointer), not per sample. Keying it off the per-sample py (as
-      // the piece did before cursor modes existed) flips sign wherever the
-      // cable's own droop/shiver crosses the pointer's y — at high enough
-      // magnitude that flip is a near-vertical jump between adjacent
-      // samples, not a bow, and reads as the cable snapping into a sharp
-      // V/box rather than swelling.
-      const pushDir = (ay + by) / 2 >= ply ? 1 : -1;
+        // Two consecutive re-rolls hashed by (track, globalCol, bucket) and
+        // its predecessor give a continuous-feeling walk without storing
+        // any state: the "previous price" is just bucket-1 of the same
+        // deterministic function, not a remembered value.
+        const prev = rand01(t, globalCol, bucket - 1);
+        const now = rand01(t, globalCol, bucket);
+        const delta = now - prev; // signed: >0 rise ("buy"), <0 fall ("sell")
+        const up = delta >= 0;
+        const mag = Math.min(1, Math.abs(delta) * 2.2 + 0.12);
 
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
+        let barH = maxBarH * mag;
+        let x = localX + (colW - barW) / 2;
+        let y = up ? midY - barH : midY;
+        let w = barW;
 
-      const pts = [];
-      ctx.beginPath();
-      for (let s = 0; s <= SAMPLES; s++) {
-        const u = s / SAMPLES;
-        const x = ax + (bx - ax) * u;
-        const y = ay + (by - ay) * u;
-        // 4*u*(1-u) peaks at 1 in the middle and is 0 at both anchors.
-        const droop = 4 * u * (1 - u) * sag;
-        // A little high-frequency shiver, like a plucked string.
-        const shiver =
-          simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
-        let py = y + droop + shiver;
-        let px = x;
         if (k) {
-          // Envelope fades to 0 at both anchors, same as droop/shiver above,
-          // so cursor response never tugs a cable's fixed endpoints.
-          const envelope = 4 * u * (1 - u);
-          const mode = values.cursorInteraction;
-          if (mode === 'Grow' || mode === 'Shrink') {
-            const amp = mode === 'Grow' ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
-            const radius = DEFLECT_RADIUS * amp;
-            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / radius);
-            if (f) py += pushDir * f * DEFLECT_MAG * amp * envelope;
-          } else if (mode === 'Attract') {
-            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
-            // Clamp f*k alone, THEN apply envelope outside the clamp — same
-            // shape as Grow/Shrink above (envelope scales an already-bounded
-            // magnitude). Clamping the product f*k*envelope would flatten
-            // the envelope into a plateau at high k, reintroducing pull
-            // nearer the anchors than the envelope intends.
-            if (f) py += (ply - py) * Math.min(f * k, 1) * envelope;
-          } else if (mode === 'Vortex') {
-            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
-            if (f) {
-              // True tangential rotation about the un-rotated pointer, not
-              // an offset toward/away from it.
-              const r = rotatePoint(x - plx, py - ply, 0, { roll: f * k * envelope * 1.1 });
-              px = plx + r.x;
-              py = ply + r.y;
+          const cx = x + w / 2, cy = midY;
+          const ddx = cx - plx, ddy = cy - ply;
+          const dist = Math.hypot(ddx, ddy) || 1;
+          const f = Math.max(0, 1 - dist / 300);
+          if (f) {
+            const mode = values.cursorInteraction;
+            if (mode === 'Grow') {
+              const grow = 1 + f * k * 1.1;
+              barH *= grow;
+              w *= 1 + f * k * 0.4;
+              x = localX + (colW - w) / 2;
+              y = up ? midY - barH : midY;
+            } else if (mode === 'Shrink') {
+              const shrink = 1 / (1 + f * k * 1.4);
+              barH = Math.max(1, barH * shrink);
+              w = Math.max(1, w / (1 + f * k * 0.7));
+              x = localX + (colW - w) / 2;
+              y = up ? midY - barH : midY;
+            } else if (mode === 'Attract') {
+              x += (plx - cx) * f * k * 0.5;
+            } else if (mode === 'Vortex') {
+              y += -(ddx / dist) * f * k * 40;
             }
           }
         }
-        if (s === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-        pts.push([px, py]);
-      }
 
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 5;
-        ctx.globalAlpha = values.glow * 0.25;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+        const f01 = up ? 0.15 : 0.85;
+        const { h, s } = paletteHsl(values, f01);
+        const light = values.invert ? (up ? 0.32 : 0.42) : (up ? 0.62 : 0.55);
+        const [r, g, b] = hslToRgb(h, s, light);
+        const alpha = values.opacity * (0.55 + mag * 0.45);
+
+        if (values.glow > 0) {
+          ctx.fillStyle = `rgba(${r},${g},${b},${values.glow * 0.28 * alpha})`;
+          const pad = values.glow * 3;
+          ctx.fillRect(x - pad, y - pad, w + pad * 2, barH + pad * 2);
+        }
+
+        ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+        ctx.fillRect(x, y, w, barH);
+
+        if (values.stroke > 0) {
+          ctx.lineWidth = values.stroke * 1.6;
+          ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(1, alpha * 1.3)})`;
+          ctx.strokeRect(x, y, w, barH);
+        }
+
+        paths.push(rectPath(x, y, w, barH));
       }
-      ctx.lineWidth = lineWidth;
-      ctx.stroke();
-      paths.push(pts);
     }
 
     ctx.restore();
 
-    // Screen space, after restore and after the fillRect clear above — see
-    // shared/cursor-modes.js's draw-ordering contract.
     const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.65);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.3 : 0.66);
     overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
@@ -1724,8 +1580,7 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
   document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
   document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
-    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
-      .catch((err) => console.error('bakeHtml failed', err));
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
   });
   document.getElementById('btn-source')?.addEventListener('click', () => {
     exportSource().catch((err) => console.error('exportSource failed', err));

@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — tether</title>
+<title>linefield — globe</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.25,"colorMode":"gradient","colorA":"#0055ff","colorB":"#2a00ff","hue":220,"hueB":250,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"slack":1};
+<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.4,"colorMode":"gradient","colorA":"#e6316f","colorB":"#f2154a","hue":340,"hueB":355,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":18,"rotY":0};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1049,79 +1049,71 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
-// --- inlined: ../../shared/noise.js ---
-// shared/noise.js
-// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
-// reference algorithm (Stefan Gustavson).
+// --- inlined: ../../shared/project.js ---
+// shared/project.js
+// 3D -> 2D projection for pieces that want perspective geometry.
+//
+// Shaped as an extension point: behaviour is configured through an options
+// bag on a camera object, so future capability (roll, camera position, an
+// orthographic mode) arrives as a new option that existing callers ignore,
+// rather than a changed signature at every call site.
+//
+// Deliberately absent, by choice rather than oversight: depth sorting and
+// occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
 
-const GRAD = [
-  [1, 1], [-1, 1], [1, -1], [-1, -1],
-  [1, 0], [-1, 0], [1, 0], [-1, 0],
-  [0, 1], [0, -1], [0, 1], [0, -1],
-];
+// Rotate a point: yaw about Y, pitch about X, then roll about Z.
+function rotatePoint(x, y, z, { tilt = 0, yaw = 0, roll = 0 } = {}) {
+  const cyaw = Math.cos(yaw);
+  const syaw = Math.sin(yaw);
+  const rx = x * cyaw - z * syaw;
+  let rz = x * syaw + z * cyaw;
 
-function buildPermutation(seed = 1337) {
-  const p = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) p[i] = i;
-  let s = seed;
-  const rand = () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-  for (let i = 255; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [p[i], p[j]] = [p[j], p[i]];
+  const ct = Math.cos(tilt);
+  const st = Math.sin(tilt);
+  const ry = y * ct - rz * st;
+  rz = y * st + rz * ct;
+
+  const cr = Math.cos(roll);
+  const sr = Math.sin(roll);
+  return { x: rx * cr - ry * sr, y: rx * sr + ry * cr, z: rz };
+}
+
+function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 } = {}) {
+  const opt = { tilt, yaw, roll, fov, cx, cy };
+
+  function project(x, y, z) {
+    const r = rotatePoint(x, y, z, opt);
+    const denom = opt.fov + r.z;
+    // Near plane sits at 20% of the fov ahead of the lens (not at the lens
+    // itself), capping scale at 1/0.2 = 5x. Without this, points just past
+    // the lens (denom -> 0) blow up toward arbitrary magnification, which
+    // canvas draw calls and exported paths share the same coordinates for —
+    // canvas just clips silently at the screen edge, export doesn't. A
+    // blown-up point lands off the visible frame whenever the near-plane
+    // crossing is off the camera's optical axis, which any meaningful tilt
+    // guarantees; a tilt at or near zero (camera roughly in the plane of
+    // the geometry) is the degenerate exception where a dropped point can
+    // still be near-frame, and dropping it can visibly change the render.
+    // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
+    // steps) at which event-horizon's SVG export at Scale 2, an angle
+    // exposing the near plane, has no coordinate over magnitude 5000. At
+    // or beyond the near plane there is no meaningful projection; scale 0
+    // is the caller's signal to skip this point.
+    const nearPlane = opt.fov * 0.2;
+    if (denom <= nearPlane) return { x: 0, y: 0, scale: 0 };
+    const scale = opt.fov / denom;
+    return { x: opt.cx + r.x * scale, y: opt.cy + r.y * scale, scale };
   }
-  const perm = new Uint8Array(512);
-  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-  return perm;
-}
 
-const perm = buildPermutation();
-
-function dot(g, x, y) {
-  return g[0] * x + g[1] * y;
-}
-
-const F2 = 0.5 * (Math.sqrt(3) - 1);
-const G2 = (3 - Math.sqrt(3)) / 6;
-
-function simplex2(xin, yin) {
-  const s = (xin + yin) * F2;
-  const i = Math.floor(xin + s);
-  const j = Math.floor(yin + s);
-  const t = (i + j) * G2;
-  const X0 = i - t;
-  const Y0 = j - t;
-  const x0 = xin - X0;
-  const y0 = yin - Y0;
-
-  let i1, j1;
-  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
-
-  const x1 = x0 - i1 + G2;
-  const y1 = y0 - j1 + G2;
-  const x2 = x0 - 1 + 2 * G2;
-  const y2 = y0 - 1 + 2 * G2;
-
-  const ii = i & 255;
-  const jj = j & 255;
-  const gi0 = perm[ii + perm[jj]] % 12;
-  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
-  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
-
-  let n0 = 0, n1 = 0, n2 = 0;
-
-  let t0 = 0.5 - x0 * x0 - y0 * y0;
-  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
-
-  let t1 = 0.5 - x1 * x1 - y1 * y1;
-  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
-
-  let t2 = 0.5 - x2 * x2 - y2 * y2;
-  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
-
-  return 70 * (n0 + n1 + n2);
+  return {
+    project,
+    projectPath(points) {
+      return points.map((p) => project(p[0], p[1], p[2]));
+    },
+    set(partial) {
+      Object.assign(opt, partial);
+    },
+  };
 }
 
 
@@ -1440,74 +1432,6 @@ function createOrbit({
 }
 
 
-// --- inlined: ../../shared/project.js ---
-// shared/project.js
-// 3D -> 2D projection for pieces that want perspective geometry.
-//
-// Shaped as an extension point: behaviour is configured through an options
-// bag on a camera object, so future capability (roll, camera position, an
-// orthographic mode) arrives as a new option that existing callers ignore,
-// rather than a changed signature at every call site.
-//
-// Deliberately absent, by choice rather than oversight: depth sorting and
-// occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
-
-// Rotate a point: yaw about Y, pitch about X, then roll about Z.
-function rotatePoint(x, y, z, { tilt = 0, yaw = 0, roll = 0 } = {}) {
-  const cyaw = Math.cos(yaw);
-  const syaw = Math.sin(yaw);
-  const rx = x * cyaw - z * syaw;
-  let rz = x * syaw + z * cyaw;
-
-  const ct = Math.cos(tilt);
-  const st = Math.sin(tilt);
-  const ry = y * ct - rz * st;
-  rz = y * st + rz * ct;
-
-  const cr = Math.cos(roll);
-  const sr = Math.sin(roll);
-  return { x: rx * cr - ry * sr, y: rx * sr + ry * cr, z: rz };
-}
-
-function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 } = {}) {
-  const opt = { tilt, yaw, roll, fov, cx, cy };
-
-  function project(x, y, z) {
-    const r = rotatePoint(x, y, z, opt);
-    const denom = opt.fov + r.z;
-    // Near plane sits at 20% of the fov ahead of the lens (not at the lens
-    // itself), capping scale at 1/0.2 = 5x. Without this, points just past
-    // the lens (denom -> 0) blow up toward arbitrary magnification, which
-    // canvas draw calls and exported paths share the same coordinates for —
-    // canvas just clips silently at the screen edge, export doesn't. A
-    // blown-up point lands off the visible frame whenever the near-plane
-    // crossing is off the camera's optical axis, which any meaningful tilt
-    // guarantees; a tilt at or near zero (camera roughly in the plane of
-    // the geometry) is the degenerate exception where a dropped point can
-    // still be near-frame, and dropping it can visibly change the render.
-    // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
-    // steps) at which event-horizon's SVG export at Scale 2, an angle
-    // exposing the near plane, has no coordinate over magnitude 5000. At
-    // or beyond the near plane there is no meaningful projection; scale 0
-    // is the caller's signal to skip this point.
-    const nearPlane = opt.fov * 0.2;
-    if (denom <= nearPlane) return { x: 0, y: 0, scale: 0 };
-    const scale = opt.fov / denom;
-    return { x: opt.cx + r.x * scale, y: opt.cy + r.y * scale, scale };
-  }
-
-  return {
-    project,
-    projectPath(points) {
-      return points.map((p) => project(p[0], p[1], p[2]));
-    },
-    set(partial) {
-      Object.assign(opt, partial);
-    },
-  };
-}
-
-
 // --- piece script ---
 
 
@@ -1516,8 +1440,7 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
 
 
 
-
-  const PIECE_ID = 'tether';
+  const PIECE_ID = 'globe';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1528,185 +1451,268 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
   window.addEventListener('resize', resize);
   resize();
 
-  // Deliberately the sparsest piece in the library.
-  const BASE_COUNT = 6;
-  const SAMPLES = 48; // points along each cable
-  let cables = [];
+  // Ring/meridian counts derive per frame from density — no persistent
+  // array. SEG_* are per-curve segment resolution, for SVG export fidelity
+  // and smooth circles at rest.
+  const BASE_LATS = 10;  // latitude rings, excluding the two poles
+  const BASE_LONS = 16;  // longitude meridians, pole to pole
+  const SEG_LAT = 64;
+  const SEG_LON = 48;
+  const MAX_LAT_DEG = 82; // stops short of the poles so a ring never degenerates to a point
+  const FOV = 650;
   let paths = [];
 
-  function seedCables(count) {
-    cables = Array.from({ length: count }, (_, i) => ({
-      // Anchors live in normalised space so a resize doesn't restring them.
-      ax: 0.02 + Math.random() * 0.2,
-      ay: 0.1 + Math.random() * 0.8,
-      bx: 0.78 + Math.random() * 0.2,
-      by: 0.1 + Math.random() * 0.8,
-      j: (i / Math.max(1, count)) * Math.PI * 2 + Math.random(),
-    }));
-  }
-
-  // Only 6 heavy cables at rest, so `whisper` has to drop stroke hard or it
-  // still reads heavy. stroke's control max is 2 — `ink` is held at 1.9,
-  // not the limit, so the preset isn't pinned to a ceiling.
+  // Distinct from the three orb pieces (orbital-veil, accretion,
+  // event-horizon), which are all flat screen-space discs squashed by a
+  // tilt factor. globe is a real 3D sphere — latitude small-circles at
+  // radius R*cos(lat) plus longitude great-circles converging at the
+  // poles, both walked through shared/project.js's perspective camera,
+  // same as wireframe-lattice. Structure, not colour, is the differentiator.
   const PRESETS = {
-    whisper: { opacity: 0.22, stroke: 0.3, density: 0.5, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.9, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.95, stroke: 1.2, density: 1.2, saturation: 0.95, glow: 1.2 },
-    drift:   { opacity: 0.5, stroke: 1, density: 0.7, speed: 0.25, motion: 1.7 },
-    dense:   { opacity: 0.6, stroke: 0.7, density: 1.8, speed: 0.8 },
+    whisper: { opacity: 0.28, stroke: 1, density: 0.55, saturation: 0.08, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.6, density: 0.75, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 0.85, density: 1.1, saturation: 0.95, glow: 1.1 },
+    drift:   { opacity: 0.5, stroke: 0.8, density: 0.65, speed: 0.3, motion: 1.7 },
+    dense:   { opacity: 0.62, stroke: 0.6, density: 1.8, speed: 0.7, glow: 0 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
     presets: PRESETS,
-    onChange: (name, value, values) => {
-      if (name === 'density') seedCables(Math.max(2, Math.round(BASE_COUNT * values.density)));
-    },
+    onChange: () => {},
     extraControls: [
-      { name: 'slack', label: 'Slack', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 18, category: 'interaction' },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
     ],
-    defaults: { hue: 220, hueB: 250, saturation: 0.25, colorMode: 'gradient', colorA: '#0055ff', colorB: '#2a00ff' },
+    // Hue 340/355: the biggest open gap left in the hue wheel (ROADMAP's
+    // collection-constraints table) is 305->370(=10), the arc past
+    // orbital-veil's 305/330 stop pair and short of accretion's 10. Picked
+    // deliberately inside that gap rather than measured — same caveat
+    // ROADMAP records for puddle's hue. Tagged 3d/geometric, not orb, so
+    // the gallery doesn't re-collapse globe into the ring cluster it was
+    // built to read apart from.
+    defaults: { hue: 340, hueB: 355, saturation: 0.4, colorMode: 'gradient', colorA: '#e6316f', colorB: '#f2154a' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
+  // In panel mode the drag writes straight into rotX/rotY through setValue —
+  // the only write path — so the Pitch/Yaw sliders and the rendered camera
+  // never disagree. A baked export has no panel to write through, so it
+  // mutates currentValues directly, clamped to the same ranges the panel
+  // would have enforced.
+  const orbit = createOrbit({
+    canvas,
+    onOrbit: (dPitch, dYaw) => {
+      const dPitchDeg = (dPitch * 180) / Math.PI;
+      const dYawDeg = (dYaw * 180) / Math.PI;
+      if (panel) {
+        panel.setValue('rotX', panel.values.rotX + dPitchDeg, { persist: false });
+        panel.setValue('rotY', panel.values.rotY + dYawDeg, { persist: false });
+      } else {
+        currentValues.rotX = clampDeg(currentValues.rotX + dPitchDeg, -90, 90);
+        currentValues.rotY = clampDeg(currentValues.rotY + dYawDeg, -180, 180);
+      }
+    },
+    onSettle: () => {
+      if (!panel) return;
+      panel.setValue('rotX', panel.values.rotX, { persist: true });
+      panel.setValue('rotY', panel.values.rotY, { persist: true });
+    },
+  });
+
+  const camera = createCamera({ fov: FOV });
   const overlay = createCursorOverlay();
+  // Screen-space falloff radius shared by every cursor mode below.
+  const WARP_RADIUS = 220;
 
-  // Each cable is one continuous stroked path, so per-mark scaling isn't
-  // available: Grow/Shrink amplify/damp the existing falloff-weighted
-  // deflection and its radius. Only 6 cables at rest — the sparsest piece
-  // in the library — so the radius is wider than contour-grid's equivalent
-  // to keep Shrink's dimple comfortably above the gate threshold.
-  const DEFLECT_MAG = 110;
-  const DEFLECT_RADIUS = 340;
+  // Grow/Shrink displace the sphere's OWN surface outward/inward along its
+  // radius (a genuine bulge/dent in world space, falloff-weighted by the
+  // point's projected screen distance to the pointer — mirrors
+  // wireframe-lattice's heightAt) — a behaviour none of the three orb
+  // pieces has, since they only ever nudge already-flat screen-space
+  // points. Attract/Vortex stay screen-space, like wireframe-lattice's
+  // warpProjected, since "toward the cursor" and "rotate about the
+  // cursor" are screen-space ideas once a point is projected.
+  function bulgeR(dirX, dirY, dirZ, R, mode, kAmp) {
+    if (!kAmp || (mode !== 'Grow' && mode !== 'Shrink')) return R;
+    const approx = camera.project(dirX * R, dirY * R, dirZ * R);
+    if (approx.scale <= 0) return R;
+    const grow = mode === 'Grow';
+    const lAmp = grow ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
+    const f = pointer.falloff(approx.x, approx.y, WARP_RADIUS * lAmp);
+    if (!f) return R;
+    const push = f * R * 0.22 * lAmp;
+    return grow ? R + push : R - push;
+  }
 
-  seedCables(Math.max(2, Math.round(BASE_COUNT * currentValues.density)));
+  function warpProjected(pts, mode, kAmp) {
+    if (!kAmp || (mode !== 'Attract' && mode !== 'Vortex')) return pts;
+    for (const p of pts) {
+      if (p.scale <= 0) continue;
+      const f = pointer.falloff(p.x, p.y, WARP_RADIUS);
+      if (!f) continue;
+      if (mode === 'Attract') {
+        // Clamp the EASE FRACTION, not just kAmp: f*kAmp can still exceed 1
+        // near the pointer, and a lerp factor above 1 overshoots the
+        // pointer and reflects the point past it.
+        const ease = Math.min(f * kAmp, 1);
+        p.x += (pointer.x - p.x) * ease;
+        p.y += (pointer.y - p.y) * ease;
+      } else {
+        const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * kAmp * 1.1 });
+        p.x = pointer.x + r.x;
+        p.y = pointer.y + r.y;
+      }
+    }
+    return pts;
+  }
+
+  // Draws one already-projected polyline. Walks in order and breaks the
+  // run at any point behind the camera (scale <= 0) instead of filtering —
+  // a skipped interior point must start a new subpath, not get bridged
+  // over. Each segment is stroked individually so its own average `scale`
+  // (the projection's perspective divisor — larger is nearer) can drive a
+  // per-segment alpha: the far hemisphere recedes instead of reading flat,
+  // which is the depth cue a lat/long wire mesh needs to read as a surface
+  // rather than a mandala.
+  function strokeRun(pts, values, lineWidth, rgb) {
+    const run = pts.filter((p) => p.scale > 0);
+    // Still record broken sub-runs for SVG fidelity.
+    let cur = [];
+    for (const p of pts) {
+      if (p.scale > 0) cur.push([p.x, p.y]);
+      else if (cur.length >= 2) { paths.push(cur); cur = []; }
+      else cur = [];
+    }
+    if (cur.length >= 2) paths.push(cur);
+    if (run.length < 2) return;
+
+    const [r, g, b] = rgb;
+    ctx.lineWidth = lineWidth;
+    for (let i = 0; i < run.length - 1; i++) {
+      // A point right at the run's seam (scale <= 0 neighbour skipped) can
+      // still be drawn against the next in-front point — fine, since both
+      // endpoints here are already filtered to scale > 0.
+      const a = run[i], b2 = run[i + 1];
+      const avgScale = (a.scale + b2.scale) / 2;
+      const depthAlpha = Math.max(0.22, Math.min(1, avgScale * 0.72));
+      const alpha = values.opacity * depthAlpha;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+      if (values.glow > 0) {
+        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.globalAlpha = values.glow * 0.25 * depthAlpha;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b2.x, b2.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = lineWidth;
+      }
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b2.x, b2.y);
+      ctx.stroke();
+    }
+  }
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     paths = [];
-    const W = canvas.width;
-    const H = canvas.height;
-    const t = elapsed * values.speed * 0.35;
-    const light = values.invert ? 0.35 : 0.65;
-    const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than meridian
-    const noiseScale = 0.9 * (0.3 + values.scale);
+    // R stays under 0.8*FOV even at Scale's max (2), so the near-plane cap
+    // in shared/project.js (20% of fov ahead of the lens) never silently
+    // swallows the sphere's front cap: 0.35*2 = 0.7 < 0.8.
+    const R = FOV * 0.35 * values.scale;
+    const lats = Math.max(3, Math.round(BASE_LATS * values.density));
+    const lons = Math.max(4, Math.round(BASE_LONS * values.density));
+    const light = values.invert ? 0.35 : 0.62;
+    const baseWidth = 0.3 + values.stroke * 1.0;
+
+    // Speed drives the continuous spin — the piece's headline motion, so a
+    // spinning globe survives Speed 0 as a still frame rather than going
+    // inert (the read is just frozen, not gone). Motion drives an
+    // independent axial wobble (precession), a small oscillation on tilt
+    // distinct from the yaw spin — Motion 0 flattens it to a fixed tilt,
+    // Speed 0 leaves it oscillating; neither is a proxy for the other.
+    const spin = elapsed * values.speed * 0.35;
+    const wobble = Math.sin(elapsed * values.motion * 0.22) * 6 * (Math.PI / 180);
+
+    camera.set({
+      tilt: (values.rotX * Math.PI) / 180 + wobble,
+      yaw: (values.rotY * Math.PI) / 180 + spin,
+      roll: (values.angle * Math.PI) / 180,
+      cx: canvas.width / 2,
+      cy: canvas.height / 2,
+    });
+
     // Off at pointer 0, off when cursorInteraction is 'None', eased by
-    // influence. No term routed through values.speed or values.slack (both
-    // user-zeroable), so deflection survives either at 0.
+    // influence. No term routed through values.speed or values.motion
+    // (both user-zeroable).
     const k = modeFactor(values, pointer);
-    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
-    // (Pointer's max) quadruples magnitude AND falloff radius together,
-    // which on this piece (6 cables, the sparsest in the library) pulls
-    // nearly every cable hard and destroys the piece's identity rather
-    // than swelling it. This holds Pointer 1..2 flat at the Pointer=1
-    // amplitude (gate numbers unchanged) instead of compounding further.
+    const mode = values.cursorInteraction;
+    // Cap the amplitude/radius input at k=1 — uncapped, k=2 (Pointer's max)
+    // would compound the bulge/falloff radius together, destroying the
+    // sphere's identity rather than swelling/denting it (same reasoning as
+    // wireframe-lattice's kAmp).
     const kAmp = Math.min(k, 1);
-    const theta = (values.angle * Math.PI) / 180;
-    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
-    const plx = W / 2 + pdx * cosT - pdy * sinT;
-    const ply = H / 2 + pdx * sinT + pdy * cosT;
 
-    ctx.save();
-    ctx.translate(W / 2, H / 2);
-    ctx.rotate(theta);
-    ctx.translate(-W / 2, -H / 2);
+    // Phase RESTRUCTURES the latitude spacing rather than translating the
+    // whole mesh (translation on a rotationally symmetric, already-spinning
+    // figure is imperceptible — see event-horizon's own note on why it
+    // warps radius instead of yaw). warpLat is the identity at Phase 0 and
+    // stays monotonic in v across [-1, 1], so rings never cross; increasing
+    // Phase bunches rings toward the equator.
+    const warpLat = (v) => Math.sign(v) * Math.pow(Math.abs(v), 1 + values.phase * 1.5);
 
-    for (let i = 0; i < cables.length; i++) {
-      const c = cables[i];
-      const f = cables.length === 1 ? 0.5 : i / (cables.length - 1);
+    // --- Latitude rings (small circles at fixed y, radius R*cos(lat)) ---
+    for (let i = 0; i < lats; i++) {
+      const u = lats === 1 ? 0.5 : i / (lats - 1);
+      const v = warpLat(u * 2 - 1); // -1..1
+      const latDeg = v * MAX_LAT_DEG;
+      const lat = (latDeg * Math.PI) / 180;
+      const ringR = Math.cos(lat);
+      const y = Math.sin(lat);
 
-      // Anchors drift slowly so the rig never looks static.
-      const wobble = 0.012 * values.motion;
-      const ax = (c.ax + simplex2(i * 1.7 + t * 0.3, 0.5) * wobble) * W;
-      const ay = (c.ay + simplex2(i * 1.7 + t * 0.3, 3.5) * wobble * 3) * H;
-      const bx = (c.bx + simplex2(i * 2.9 + t * 0.3, 7.5) * wobble) * W;
-      const by = (c.by + simplex2(i * 2.9 + t * 0.3, 9.5) * wobble * 3) * H;
-
-      // Sag: a parabola along the chord, swaying with a slow oscillation.
-      const sway = Math.sin(t + c.j + values.phase * Math.PI);
-      const sag = H * 0.16 * values.slack * (0.55 + 0.45 * sway);
-
-      // Grow/Shrink's push direction, fixed per cable (chord midpoint vs.
-      // the pointer), not per sample. Keying it off the per-sample py (as
-      // the piece did before cursor modes existed) flips sign wherever the
-      // cable's own droop/shiver crosses the pointer's y — at high enough
-      // magnitude that flip is a near-vertical jump between adjacent
-      // samples, not a bow, and reads as the cable snapping into a sharp
-      // V/box rather than swelling.
-      const pushDir = (ay + by) / 2 >= ply ? 1 : -1;
-
+      const f = (i + 0.5) / lats;
       const { h, s } = paletteHsl(values, f);
       const [r, g, b] = hslToRgb(h, s, light);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
 
       const pts = [];
-      ctx.beginPath();
-      for (let s = 0; s <= SAMPLES; s++) {
-        const u = s / SAMPLES;
-        const x = ax + (bx - ax) * u;
-        const y = ay + (by - ay) * u;
-        // 4*u*(1-u) peaks at 1 in the middle and is 0 at both anchors.
-        const droop = 4 * u * (1 - u) * sag;
-        // A little high-frequency shiver, like a plucked string.
-        const shiver =
-          simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
-        let py = y + droop + shiver;
-        let px = x;
-        if (k) {
-          // Envelope fades to 0 at both anchors, same as droop/shiver above,
-          // so cursor response never tugs a cable's fixed endpoints.
-          const envelope = 4 * u * (1 - u);
-          const mode = values.cursorInteraction;
-          if (mode === 'Grow' || mode === 'Shrink') {
-            const amp = mode === 'Grow' ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
-            const radius = DEFLECT_RADIUS * amp;
-            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / radius);
-            if (f) py += pushDir * f * DEFLECT_MAG * amp * envelope;
-          } else if (mode === 'Attract') {
-            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
-            // Clamp f*k alone, THEN apply envelope outside the clamp — same
-            // shape as Grow/Shrink above (envelope scales an already-bounded
-            // magnitude). Clamping the product f*k*envelope would flatten
-            // the envelope into a plateau at high k, reintroducing pull
-            // nearer the anchors than the envelope intends.
-            if (f) py += (ply - py) * Math.min(f * k, 1) * envelope;
-          } else if (mode === 'Vortex') {
-            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
-            if (f) {
-              // True tangential rotation about the un-rotated pointer, not
-              // an offset toward/away from it.
-              const r = rotatePoint(x - plx, py - ply, 0, { roll: f * k * envelope * 1.1 });
-              px = plx + r.x;
-              py = ply + r.y;
-            }
-          }
-        }
-        if (s === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-        pts.push([px, py]);
+      for (let s = 0; s <= SEG_LAT; s++) {
+        const a = (s / SEG_LAT) * Math.PI * 2;
+        const dx = Math.cos(a) * ringR;
+        const dz = Math.sin(a) * ringR;
+        const rr = bulgeR(dx, y, dz, R, mode, kAmp);
+        pts.push([dx * rr, y * rr, dz * rr]);
       }
-
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 5;
-        ctx.globalAlpha = values.glow * 0.25;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-      ctx.lineWidth = lineWidth;
-      ctx.stroke();
-      paths.push(pts);
+      strokeRun(warpProjected(camera.projectPath(pts), mode, kAmp), values, baseWidth, [r, g, b]);
     }
 
-    ctx.restore();
+    // --- Longitude meridians (great circles through both poles) ---
+    for (let j = 0; j < lons; j++) {
+      const lon = (j / lons) * Math.PI * 2;
+      const f = j / lons;
+      const { h, s } = paletteHsl(values, f);
+      const [r, g, b] = hslToRgb(h, s, light);
 
-    // Screen space, after restore and after the fillRect clear above — see
-    // shared/cursor-modes.js's draw-ordering contract.
+      const pts = [];
+      for (let s = 0; s <= SEG_LON; s++) {
+        const lat = (s / SEG_LON) * Math.PI - Math.PI / 2; // -90..90 (pole to pole)
+        const cLat = Math.cos(lat);
+        const dx = Math.cos(lon) * cLat;
+        const dy = Math.sin(lat);
+        const dz = Math.sin(lon) * cLat;
+        const rr = bulgeR(dx, dy, dz, R, mode, kAmp);
+        pts.push([dx * rr, dy * rr, dz * rr]);
+      }
+      strokeRun(warpProjected(camera.projectPath(pts), mode, kAmp), values, baseWidth * 0.85, [r, g, b]);
+    }
+
     const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.65);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
     overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 

@@ -157,6 +157,11 @@ tooling" below and CONTRIBUTING.md.
 - `tether` — a few heavy cables strung taut and swaying
 - `event-horizon` — a polar grid bent inward by a gravity well
 - `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
+- `puddle` — bounded, organic interference rippling across a puddle's surface
+- `globe` — a latitude/longitude wire mesh bending into a spinning sphere
+- `matrix-code` — quantized columns of glyphs churning identity independently of their falling head
+- `chain-haze` — lines of chains receding into the distance, discrete linked ovals fading with depth
+- `stock-market` — tracks of rising and falling bars marching across the field, buy and sell rendered as filled rectangles
 
 Every piece shares 16 controls (cursor interaction, scale, speed, stroke,
 opacity, saturation, color mode, color A, color B, glow, angle, motion,

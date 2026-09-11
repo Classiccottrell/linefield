@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — tether</title>
+<title>linefield — chain haze</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.25,"colorMode":"gradient","colorA":"#0055ff","colorB":"#2a00ff","hue":220,"hueB":250,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"slack":1};
+<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.22,"colorMode":"gradient","colorA":"#8fae9e","colorB":"#7fa0c2","hue":96,"hueB":108,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"linkAspect":0.55};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1049,82 +1049,6 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
-// --- inlined: ../../shared/noise.js ---
-// shared/noise.js
-// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
-// reference algorithm (Stefan Gustavson).
-
-const GRAD = [
-  [1, 1], [-1, 1], [1, -1], [-1, -1],
-  [1, 0], [-1, 0], [1, 0], [-1, 0],
-  [0, 1], [0, -1], [0, 1], [0, -1],
-];
-
-function buildPermutation(seed = 1337) {
-  const p = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) p[i] = i;
-  let s = seed;
-  const rand = () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-  for (let i = 255; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [p[i], p[j]] = [p[j], p[i]];
-  }
-  const perm = new Uint8Array(512);
-  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-  return perm;
-}
-
-const perm = buildPermutation();
-
-function dot(g, x, y) {
-  return g[0] * x + g[1] * y;
-}
-
-const F2 = 0.5 * (Math.sqrt(3) - 1);
-const G2 = (3 - Math.sqrt(3)) / 6;
-
-function simplex2(xin, yin) {
-  const s = (xin + yin) * F2;
-  const i = Math.floor(xin + s);
-  const j = Math.floor(yin + s);
-  const t = (i + j) * G2;
-  const X0 = i - t;
-  const Y0 = j - t;
-  const x0 = xin - X0;
-  const y0 = yin - Y0;
-
-  let i1, j1;
-  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
-
-  const x1 = x0 - i1 + G2;
-  const y1 = y0 - j1 + G2;
-  const x2 = x0 - 1 + 2 * G2;
-  const y2 = y0 - 1 + 2 * G2;
-
-  const ii = i & 255;
-  const jj = j & 255;
-  const gi0 = perm[ii + perm[jj]] % 12;
-  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
-  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
-
-  let n0 = 0, n1 = 0, n2 = 0;
-
-  let t0 = 0.5 - x0 * x0 - y0 * y0;
-  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
-
-  let t1 = 0.5 - x1 * x1 - y1 * y1;
-  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
-
-  let t2 = 0.5 - x2 * x2 - y2 * y2;
-  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
-
-  return 70 * (n0 + n1 + n2);
-}
-
-
 // --- inlined: ../../shared/export.js ---
 // shared/export.js
 
@@ -1516,8 +1440,7 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
 
 
 
-
-  const PIECE_ID = 'tether';
+  const PIECE_ID = 'chain-haze';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1528,59 +1451,80 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
   window.addEventListener('resize', resize);
   resize();
 
-  // Deliberately the sparsest piece in the library.
-  const BASE_COUNT = 6;
-  const SAMPLES = 48; // points along each cable
-  let cables = [];
+  // Element-based, not a path piece: each chain is a sequence of discrete
+  // linked marks (stroked ovals) walking a straight line toward a per-chain
+  // vanishing point, not one continuous stroke — the structural difference
+  // from `tether`. No Math.random() anywhere and no persistent array —
+  // every link's position is a pure function of (chain index, link index,
+  // elapsed) recomputed each frame, same discipline as `matrix-code`, so
+  // there is no density re-seed trap and thumbnail capture stays
+  // byte-identical against a pinned clock.
+  const BASE_CHAINS = 7;
+  const BASE_LINKS = 24;
+  const FOV = 520; // perspective divisor strength — see persp() below
+  const MARCH_RATE = 90; // world-depth units/sec a chain advances at speed=1
+  const MIN_SCALE = 0.38; // hard floor: below this an oval reads as a dot,
+                            // which is exactly the "dashed line pretending
+                            // to be chain" failure this piece exists to avoid
   let paths = [];
 
-  function seedCables(count) {
-    cables = Array.from({ length: count }, (_, i) => ({
-      // Anchors live in normalised space so a resize doesn't restring them.
-      ax: 0.02 + Math.random() * 0.2,
-      ay: 0.1 + Math.random() * 0.8,
-      bx: 0.78 + Math.random() * 0.2,
-      by: 0.1 + Math.random() * 0.8,
-      j: (i / Math.max(1, count)) * Math.PI * 2 + Math.random(),
-    }));
-  }
-
-  // Only 6 heavy cables at rest, so `whisper` has to drop stroke hard or it
-  // still reads heavy. stroke's control max is 2 — `ink` is held at 1.9,
-  // not the limit, so the preset isn't pinned to a ceiling.
+  // Sparse, heavy-stroked territory (`meridian`/`tether`) is already the
+  // library's weakest pair per ROADMAP.md's collection-constraints table.
+  // Many links per chain across several chains pushes ink coverage into the
+  // empty 0.11-0.19 band rather than adding to that cluster.
   const PRESETS = {
-    whisper: { opacity: 0.22, stroke: 0.3, density: 0.5, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.9, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.95, stroke: 1.2, density: 1.2, saturation: 0.95, glow: 1.2 },
-    drift:   { opacity: 0.5, stroke: 1, density: 0.7, speed: 0.25, motion: 1.7 },
-    dense:   { opacity: 0.6, stroke: 0.7, density: 1.8, speed: 0.8 },
+    whisper: { opacity: 0.28, stroke: 0.4, density: 0.6, saturation: 0.08, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.7, density: 0.9, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.92, stroke: 1, density: 1.2, saturation: 0.9, glow: 1.2 },
+    drift:   { opacity: 0.55, stroke: 0.8, density: 0.85, speed: 0.35, motion: 1.7 },
+    dense:   { opacity: 0.7, stroke: 0.6, density: 1.8, speed: 1.1 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
     presets: PRESETS,
-    onChange: (name, value, values) => {
-      if (name === 'density') seedCables(Math.max(2, Math.round(BASE_COUNT * values.density)));
-    },
+    onChange: () => {},
     extraControls: [
-      { name: 'slack', label: 'Slack', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'linkAspect', label: 'Link aspect', type: 'range', min: 0.3, max: 0.9, step: 0.01, default: 0.55, category: 'form' },
     ],
-    defaults: { hue: 220, hueB: 250, saturation: 0.25, colorMode: 'gradient', colorA: '#0055ff', colorB: '#2a00ff' },
+    // 96/108: the last open slice below `puddle` (112/138) and
+    // `matrix-code` (132/145) in the 95-135 band ROADMAP.md flags as the
+    // only open one — picked deliberately, not measured, same caveat those
+    // two record. Low saturation reads as cold, oxidised steel, which also
+    // happens to suit chain links thematically.
+    defaults: { hue: 96, hueB: 108, saturation: 0.22, colorMode: 'gradient', colorA: '#8fae9e', colorB: '#7fa0c2' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
   const overlay = createCursorOverlay();
 
-  // Each cable is one continuous stroked path, so per-mark scaling isn't
-  // available: Grow/Shrink amplify/damp the existing falloff-weighted
-  // deflection and its radius. Only 6 cables at rest — the sparsest piece
-  // in the library — so the radius is wider than contour-grid's equivalent
-  // to keep Shrink's dimple comfortably above the gate threshold.
-  const DEFLECT_MAG = 110;
-  const DEFLECT_RADIUS = 340;
+  // Perspective divisor (see CONTRIBUTING.md "3D pieces" for the shared
+  // camera — deliberately NOT used here: a straight receding line needs
+  // only a scalar divisor, not full pitch/yaw/orbit, and pulling in
+  // createCamera/createOrbit would drag rotX/rotY persistence and
+  // test-interactions coverage this piece doesn't need). Saturates toward 0
+  // as z grows, which both shrinks and bunches distant links together —
+  // the correct perspective read for evenly-spaced world depth.
+  function persp(z) {
+    return FOV / (FOV + Math.max(0, z));
+  }
 
-  seedCables(Math.max(2, Math.round(BASE_COUNT * currentValues.density)));
+  // Samples an ellipse (rotated, centred) into a polyline so SVG export has
+  // real geometry — `exportSvg` only understands point arrays, and unlike
+  // `matrix-code`'s glyph marks (which have a `texts` escape hatch) an oval
+  // mark has no equivalent; it must be sampled.
+  const ELLIPSE_SEG = 14;
+  function sampleEllipse(cx, cy, rx, ry, rot) {
+    const cosR = Math.cos(rot), sinR = Math.sin(rot);
+    const pts = [];
+    for (let k = 0; k <= ELLIPSE_SEG; k++) {
+      const a = (k / ELLIPSE_SEG) * Math.PI * 2;
+      const ex = rx * Math.cos(a), ey = ry * Math.sin(a);
+      pts.push([cx + ex * cosR - ey * sinR, cy + ex * sinR + ey * cosR]);
+    }
+    return pts;
+  }
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -1589,21 +1533,18 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     paths = [];
     const W = canvas.width;
     const H = canvas.height;
-    const t = elapsed * values.speed * 0.35;
-    const light = values.invert ? 0.35 : 0.65;
-    const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than meridian
-    const noiseScale = 0.9 * (0.3 + values.scale);
-    // Off at pointer 0, off when cursorInteraction is 'None', eased by
-    // influence. No term routed through values.speed or values.slack (both
-    // user-zeroable), so deflection survives either at 0.
+    const light = values.invert ? 0.32 : 0.66;
+
+    const chains = Math.max(2, Math.round(BASE_CHAINS * values.density));
+    const linksPerChain = Math.max(6, Math.round(BASE_LINKS * values.density));
+
+    const aspect = values.linkAspect;
+    const linkLen = 30 * values.scale; // world-space link length (pre-perspective)
+    const step = linkLen * 1.5; // ~30% overlap between consecutive links — abutting
+                                  // links read as beads on a string, not chain
+    const zSpan = step * linksPerChain;
+
     const k = modeFactor(values, pointer);
-    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
-    // (Pointer's max) quadruples magnitude AND falloff radius together,
-    // which on this piece (6 cables, the sparsest in the library) pulls
-    // nearly every cable hard and destroys the piece's identity rather
-    // than swelling it. This holds Pointer 1..2 flat at the Pointer=1
-    // amplitude (gate numbers unchanged) instead of compounding further.
-    const kAmp = Math.min(k, 1);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
     const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
@@ -1615,98 +1556,101 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     ctx.rotate(theta);
     ctx.translate(-W / 2, -H / 2);
 
-    for (let i = 0; i < cables.length; i++) {
-      const c = cables[i];
-      const f = cables.length === 1 ? 0.5 : i / (cables.length - 1);
+    // `phase` offsets the whole link sequence along the path (a static
+    // shift, independent of the marching driven by `speed`); `speed`
+    // marches links toward the vanishing point over time; `motion` drives
+    // an independent lateral sway distinct from both — none gates the
+    // others out at zero.
+    const marchOffset = elapsed * values.speed * MARCH_RATE + values.phase * zSpan * 0.5;
 
-      // Anchors drift slowly so the rig never looks static.
-      const wobble = 0.012 * values.motion;
-      const ax = (c.ax + simplex2(i * 1.7 + t * 0.3, 0.5) * wobble) * W;
-      const ay = (c.ay + simplex2(i * 1.7 + t * 0.3, 3.5) * wobble * 3) * H;
-      const bx = (c.bx + simplex2(i * 2.9 + t * 0.3, 7.5) * wobble) * W;
-      const by = (c.by + simplex2(i * 2.9 + t * 0.3, 9.5) * wobble * 3) * H;
+    for (let c = 0; c < chains; c++) {
+      const cf = chains === 1 ? 0.5 : c / (chains - 1);
+      const anchorX = W * (0.06 + 0.88 * cf);
+      const anchorY = H * (0.94 + 0.02 * Math.sin(c * 2.1));
+      // Each chain's own vanishing point drifts slightly so the whole
+      // library of lines doesn't converge on one identical pixel.
+      const vanishX = W * (0.46 + 0.08 * Math.sin(c * 1.7 + 0.6));
+      const vanishY = H * (0.08 + 0.05 * Math.cos(c * 1.3));
+      const tangent = Math.atan2(vanishY - anchorY, vanishX - anchorX);
+      const perpX = -Math.sin(tangent), perpY = Math.cos(tangent);
 
-      // Sag: a parabola along the chord, swaying with a slow oscillation.
-      const sway = Math.sin(t + c.j + values.phase * Math.PI);
-      const sag = H * 0.16 * values.slack * (0.55 + 0.45 * sway);
+      const chainSeed = c * 12.9898;
+      const chainPhase = ((c / chains) * zSpan) % zSpan;
 
-      // Grow/Shrink's push direction, fixed per cable (chord midpoint vs.
-      // the pointer), not per sample. Keying it off the per-sample py (as
-      // the piece did before cursor modes existed) flips sign wherever the
-      // cable's own droop/shiver crosses the pointer's y — at high enough
-      // magnitude that flip is a near-vertical jump between adjacent
-      // samples, not a bow, and reads as the cable snapping into a sharp
-      // V/box rather than swelling.
-      const pushDir = (ay + by) / 2 >= ply ? 1 : -1;
+      const { h, s } = paletteHsl(values, cf);
 
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
+      for (let i = 0; i < linksPerChain; i++) {
+        let z = ((i * step - marchOffset + chainPhase) % zSpan + zSpan) % zSpan;
+        const p = persp(z);
 
-      const pts = [];
-      ctx.beginPath();
-      for (let s = 0; s <= SAMPLES; s++) {
-        const u = s / SAMPLES;
-        const x = ax + (bx - ax) * u;
-        const y = ay + (by - ay) * u;
-        // 4*u*(1-u) peaks at 1 in the middle and is 0 at both anchors.
-        const droop = 4 * u * (1 - u) * sag;
-        // A little high-frequency shiver, like a plucked string.
-        const shiver =
-          simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
-        let py = y + droop + shiver;
-        let px = x;
+        let cx = vanishX + (anchorX - vanishX) * p;
+        let cy = vanishY + (anchorY - vanishY) * p;
+
+        // Lateral sway, perpendicular to the chain's own path direction —
+        // `motion` scales it, `speed`/`density` play no part, so it
+        // survives Speed 0 (a frozen-but-non-degenerate chain, same
+        // precedent as `globe`'s wobble).
+        const sway = Math.sin(elapsed * 0.9 + chainSeed + i * 0.35) * 6 * values.motion * p;
+        cx += perpX * sway;
+        cy += perpY * sway;
+
+        let linkScale = Math.max(MIN_SCALE, p);
+        const depthAlpha = Math.max(0.22, Math.min(1, p * 0.95));
+
         if (k) {
-          // Envelope fades to 0 at both anchors, same as droop/shiver above,
-          // so cursor response never tugs a cable's fixed endpoints.
-          const envelope = 4 * u * (1 - u);
           const mode = values.cursorInteraction;
-          if (mode === 'Grow' || mode === 'Shrink') {
-            const amp = mode === 'Grow' ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
-            const radius = DEFLECT_RADIUS * amp;
-            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / radius);
-            if (f) py += pushDir * f * DEFLECT_MAG * amp * envelope;
-          } else if (mode === 'Attract') {
-            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
-            // Clamp f*k alone, THEN apply envelope outside the clamp — same
-            // shape as Grow/Shrink above (envelope scales an already-bounded
-            // magnitude). Clamping the product f*k*envelope would flatten
-            // the envelope into a plateau at high k, reintroducing pull
-            // nearer the anchors than the envelope intends.
-            if (f) py += (ply - py) * Math.min(f * k, 1) * envelope;
-          } else if (mode === 'Vortex') {
-            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
-            if (f) {
-              // True tangential rotation about the un-rotated pointer, not
-              // an offset toward/away from it.
-              const r = rotatePoint(x - plx, py - ply, 0, { roll: f * k * envelope * 1.1 });
-              px = plx + r.x;
-              py = ply + r.y;
+          const f = pointer.falloff(cx, cy, 260);
+          if (f) {
+            if (mode === 'Grow') {
+              linkScale *= 1 + f * k * 1.4;
+            } else if (mode === 'Shrink') {
+              linkScale = Math.max(0.12, linkScale / (1 + f * k * 1.4));
+            } else if (mode === 'Attract') {
+              const ease = Math.min(f * k, 1);
+              cx += (plx - cx) * ease;
+              cy += (ply - cy) * ease;
+            } else if (mode === 'Vortex') {
+              const r = rotatePoint(cx - plx, cy - ply, 0, { roll: f * k * 1.1 });
+              cx = plx + r.x;
+              cy = ply + r.y;
             }
           }
         }
-        if (s === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-        pts.push([px, py]);
-      }
 
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 5;
-        ctx.globalAlpha = values.glow * 0.25;
+        const rx = (linkLen / 2) * linkScale;
+        // Alternating orientation: even links read face-on (full width),
+        // odd links read edge-on (squashed to ~35% width) — the same
+        // ellipse major axis (rx, along the chain's tangent), alternating
+        // minor axis, is what reads as interlocking links rather than a
+        // dotted/dashed line pretending to be chain.
+        const ryFull = (linkLen / 2) * aspect * linkScale;
+        const ry = i % 2 === 0 ? ryFull : ryFull * 0.35;
+
+        const [r, g, b] = hslToRgb(h, s, light);
+        const alpha = values.opacity * depthAlpha;
+
+        ctx.lineWidth = 1 + values.stroke * 3;
+        if (values.glow > 0) {
+          ctx.strokeStyle = `rgba(${r},${g},${b},${values.glow * 0.3 * depthAlpha})`;
+          ctx.lineWidth = (1 + values.stroke * 3) + values.glow * 3;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, rx, ry, tangent, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.lineWidth = 1 + values.stroke * 3;
+        }
+        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, tangent, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.globalAlpha = 1;
+
+        paths.push(sampleEllipse(cx, cy, rx, ry, tangent));
       }
-      ctx.lineWidth = lineWidth;
-      ctx.stroke();
-      paths.push(pts);
     }
 
     ctx.restore();
 
-    // Screen space, after restore and after the fillRect clear above — see
-    // shared/cursor-modes.js's draw-ordering contract.
     const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.65);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.32 : 0.66);
     overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 

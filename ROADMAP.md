@@ -9,30 +9,13 @@ Ordered roughly by how much it would add.
 
 ## Next up
 
-### Five new pieces
-
-Specified and not yet built. These came from a direct request and are the
-outstanding work on the library:
-
-- **globe** — a wire mesh of horizontal and vertical lines bending inward to
-  read as a spinning globe.
-- **matrix code** — dripping columns of symbols that continually change.
-- **puddle** — a rippling puddle.
-- **chain haze** — lines of chains receding into the distance.
-- **stock market** — rising and falling movement with buy and sell
-  rectangles, reading as a trading chart.
-
-Each inherits the constraints in [INSPIRATION.md](INSPIRATION.md) and must
-honour all thirteen shared controls, all seven cursor modes, and the
-collection review before shipping. `matrix code` and `stock market` need a
-capability the library does not have yet — glyph and rectangle marks rather
-than strokes — so each of those is closer to a new technique than a new
-arrangement.
-
-Pointer interaction, full 3D orientation, drag-to-orbit and exact Source
-export shipped in 1.3.0. Seven cursor-interaction modes across all twelve
-pieces shipped in 1.4.0. The sectioned control panel, colour picker and
-mobile sheet shipped alongside.
+No scheduled work. `puddle`, `globe`, `matrix code`, `chain haze` and
+`stock market` — the five commissioned pieces (see INSPIRATION.md) — have
+all shipped, `stock market` last (seventeenth piece), closing out that
+outstanding work. Pointer interaction, full 3D orientation, drag-to-orbit,
+and exact Source export shipped in 1.3.0. Seven cursor-interaction modes
+across all twelve pieces shipped in 1.4.0. The sectioned control panel,
+colour picker and mobile sheet shipped alongside.
 
 ---
 
@@ -46,10 +29,17 @@ when Motion is 0, since all animation lives in the motion-scaled layer.
 a horizontal translate. None is dead at default settings.
 
 **SVG export ignores `angle`** for pieces that rotate via canvas transform
-(`contour-grid`, `meridian`, `tether`) — their path points are recorded
-before the rotation is applied, so an exported SVG shows unrotated geometry.
-PNG export is unaffected. Fixing it properly means every rotating piece
-baking its transform into stored points.
+(`contour-grid`, `meridian`, `tether`, `matrix-code`, `chain-haze`) — their path/text
+points are recorded before the rotation is applied, so an exported SVG shows
+unrotated geometry. PNG export is unaffected. Fixing it properly means every
+rotating piece baking its transform into stored points.
+
+**`matrix-code` SVG export uses `<text>`, not `<polyline>`.** It is the
+library's first glyph-mark piece — a filled/stroked character has no line
+geometry to export as a path. `shared/export.js`'s `exportSvg()` gained an
+additive `texts` option (an array of `{x, y, ch, size, fontFamily}`) for
+this; every other piece still calls it with only `paths` and renders
+byte-identical output to before this option existed.
 
 **`wireframe-lattice` at exactly Pitch 0** loses a little real geometry. The
 camera's near plane sits at 20% of `fov` to keep SVG coordinates bounded,
@@ -135,9 +125,22 @@ the same ten pieces, same floor, same overlay, same risk.
 
 ---
 
-## Collection constraints for a thirteenth piece
+## Collection constraints for an eighteenth piece
 
-Measured across the twelve shipped pieces, from their generated thumbnails:
+Measured across the twelve pieces shipped before `puddle`, from their
+generated thumbnails (`puddle`, `globe`, `matrix-code`, `chain-haze` and
+`stock-market`'s own hue/sat/ink rows are not included here — none has been
+run through the same thumbnail-measurement tooling; `puddle` was placed at
+hue 112/138 deliberately, the one open band below, `globe` at hue 340/355,
+the widest remaining gap past `orbital-veil`'s 305/330, `matrix-code` at hue
+132/145, just past `puddle` in the same open band, differentiated on form
+(a quantized glyph grid, no other piece's structure) and ink coverage rather
+than colour, `chain-haze` at hue 96/108, the last open slice below
+`matrix-code` in that same band, differentiated on structure (repeated
+linked marks) rather than colour, and `stock-market` at hue 78/92, in the
+open span between `synapse` (54) and `chain-haze` (96), differentiated on
+form (the library's first filled-rectangle mark) — none measured the way
+this table's other rows were):
 mean rendered hue (weighted by colourfulness), mean saturation, and ink
 coverage — the fraction of pixels the piece actually marks.
 
