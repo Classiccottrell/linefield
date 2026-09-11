@@ -67,6 +67,51 @@ rotation, but nothing vertical can carry it. Fixing this means giving
 `rainfall` a second, angle-driven vertical term specifically for Vortex,
 which no other mode on this piece needs.
 
+**`flow-field`'s Grow/Shrink are invisible at Speed 0.** Both modes act
+only on `lineWidth`; flow-field draws each particle as a segment from `p.x`
+to `p.x + cos(angle) * 260 * values.speed * dt`, so at Speed 0 that segment
+has zero length, and a zero-length butt-capped stroke draws no pixels at
+any width. `tools/test-interactions.mjs`'s widened Speed-0 loop (added
+2026-09-11) measured this at 0.000% and excludes it explicitly via
+`SPEED0_KNOWN_DEAD`, with the same measurement recorded in that file's own
+comment — every OTHER piece clears the 0.05% floor under identical
+conditions (Grow 0.249-24.274%, Shrink 0.206-3.602%), so this is
+flow-field's draw model specifically, not a gate set too high. In the
+letter of CONTRIBUTING's contract this IS cursor response
+gated on `speed` — not through `modeFactor`, which is unaffected, but
+through the absence of any geometry for a wider line to apply to. Fixing it
+means giving flow-field a minimum segment length (or a dot fallback) when
+`values.speed` is 0, which changes rendered output and needs its own
+`npm run build` and visual review — deferred, not fixed in this pass.
+
+**`pieces/_template/` has no automated coverage at all.** It is excluded
+from `pieces.json`, and every gate that derives its piece list from that
+manifest — `tools/test-cursor-modes.mjs`, `tools/test-bake-fresh.mjs`,
+`tools/test-presets.mjs`'s check 8 sweep, and the build's capture paths —
+therefore never touches it. A regression in the scaffold that every new
+piece is forked from ships uncaught; only `CONTRIBUTING.md`'s manual
+"verify visually in a browser" step would catch it, and only if someone
+happens to open the template itself rather than a piece copied from it.
+
+**`accretion`'s Particle Trail reads boldest of the five per-element
+pieces.** Its partial-clear fade compounds the overlay across frames — each
+frame's marks blend with what the previous frame already drew, rather than
+starting from a clean slate the way a full-clear piece does. Cosmetic,
+unresolved.
+
+**The Pointer-as-number assertion (`tools/test-interactions.mjs`) runs at a
+thin margin on most pieces** — measured 2026-09-11 at 0.087-0.126% against a
+0.05% floor on ten of twelve (the exceptions are the two accumulator
+pieces: `flow-field` 15.309%, `accretion` 6.338%) — because it is pinned to
+the deliberately faint Particle Trail overlay, chosen specifically so a
+regression in a per-piece mode cannot masquerade as a Pointer failure (see
+that assertion's own comment). A future retune of the overlay's tuning
+(particle count, size, alpha) could flip many pieces' margins at once and
+read as a Pointer regression across the board rather than what it actually
+is. The widened Speed-0 loop added alongside this measurement inherits the
+same fragility for its own Particle-Trail-at-Speed-0 case: 0.079-0.123% on
+the same ten pieces, same floor, same overlay, same risk.
+
 ---
 
 ## Collection constraints for a thirteenth piece

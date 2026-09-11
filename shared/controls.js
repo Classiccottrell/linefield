@@ -659,9 +659,17 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
       specByName[spec.name] = spec;
       allSpecs.push(spec);
       defaults[spec.name] = spec.default;
-      if (!(spec.name in values)) values[spec.name] = spec.default;
+      // Route through setValue — THE write path (see above) — rather than
+      // writing `values` directly. setValue's own render() optional-chains
+      // through `controllers[name]` (undefined until buildRow below runs),
+      // so calling it first is a harmless no-op render and leaves `values`
+      // holding the exact number buildRow then reads for the row's initial
+      // DOM state. Same precedence `{ ...defaults, ...saved.values }` uses
+      // at panel construction: a value already in `values` (e.g. restored
+      // from localStorage before this control existed) wins over the spec's
+      // own default, never silently overwritten.
+      setValue(spec.name, spec.name in values ? values[spec.name] : spec.default);
       buildRow(spec);
-      persist();
     },
   };
 }

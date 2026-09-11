@@ -60,15 +60,24 @@ unrelated `npm run build` is a byte-identical no-op — only pieces you
 actually touched will show a diff in `thumbs/`.
 
 **CI will not catch a forgotten rebuild.** CI (`.github/workflows/checks.yml`)
-runs `npm run verify` (manifest vs. pieces vs. README agreement),
-`npm run test-bake-fresh` (bakes every piece live — the real `bakeHtml()` in
-`shared/export.js`, against today's source — and validates that output),
-`npm run test-baked` (every *committed* `downloads/*.html` renders
-standalone over `file://`), and `npm run audit-controls` (every control has
-a visible effect; run LAST, deliberately — it's the slowest, broadest check
+runs, in order: `npm run verify` (manifest vs. pieces vs. README
+agreement), `node tools/test-presets.mjs synapse` (preset mechanism on one
+piece, preset value/enum data on all twelve — see "Presets" below),
+`npm run test-bake-fresh` (bakes every piece live — the real `bakeHtml()`
+in `shared/export.js`, against today's source — and validates that
+output), `npm run test-baked` (every *committed* `downloads/*.html`
+renders standalone over `file://`), `npm run test-source` (Source buttons
+download exact unbaked piece files), `npm run test-interactions` (pointer,
+orbit, animation, and baked-artifact browser QA), `npm run test-cursor-modes`
+(every cursor mode live and mutually distinct, per piece — see "Cursor
+interaction" below), and `npm run audit-controls` (every control has a
+visible effect; run LAST, deliberately — it's the slowest, broadest check
 and the one most likely to fail mid-rollout of a new control, and a slow
 broad gate must never stand in front of fast specific ones and hide their
-results). Neither bake check catches a forgotten rebuild, and saying so is
+results). `node tools/preset-sheet.mjs`, `node tools/mode-sheet.mjs`, and
+`node tools/browser-matrix.mjs` are visual-review tools with no pass/fail
+gate and do not run in CI at all — read their output yourself. Neither bake
+check catches a forgotten rebuild, and saying so is
 not a contradiction of the heading above — it's the point. `test-bake-fresh`
 proves the bake *process* works against current source and says nothing
 about what's actually committed; `test-baked` proves the committed *bytes*
@@ -178,10 +187,14 @@ renders — `applyValues` writes it straight into the values object the
 render reads, and the range input only clamps its own displayed position.
 `node tools/test-presets.mjs <slug>` checks every preset value against
 `window.__LF_SPECS__` (the resolved control specs, each carrying a `kind` of
-`'boolean'` or `'number'` — gate scripts must discriminate on `kind`, never
-on `type`) and fails naming the offending piece/preset/control/value/range,
-but keep values in range by construction rather than relying on the gate to
-catch it after the fact. `window.__LF_PANEL__.setValue(name, value, { persist
+`'boolean'`, `'color'`, `'enum'`, `'hidden'`, or `'number'` — gate scripts
+must discriminate on `kind`, never on `type`) and fails naming the
+offending piece/preset/control/value/range-or-options, but keep values in
+range (and enum values in vocabulary) by construction rather than relying
+on the gate to catch it after the fact. This check sweeps every piece in
+`pieces.json`, not just `<slug>` — preset data is piece-specific, unlike
+checks 1-7 in that file, which exercise the shared mechanism and are
+representative from one piece. `window.__LF_PANEL__.setValue(name, value, { persist
 })` is the panel's write path exposed for tooling — every gate script drives
 controls through it rather than querying `.lf-row` DOM by position.
 
@@ -251,9 +264,10 @@ mode silently stuck on or off. At `pointer: 0` the piece must be
 byte-for-byte inert under cursor movement — `modeFactor` already returns 0
 there, so this falls out for free as long as nothing bypasses it.
 
-Run `node tools/test-cursor-modes.mjs` before calling a piece's cursor
-wiring done — it drives every mode live on every piece and asserts no two
-render identically. It is a change-detector, not a visibility check: a
+Run `npm run test-cursor-modes` (also enforced in CI) before calling a
+piece's cursor wiring done — it drives every mode live on every piece and
+asserts no two render identically. It is a change-detector, not a
+visibility check: a
 piece can pass it and still look like nothing moved to a human (see
 ROADMAP.md, "A diff percentage is not visibility"). Follow it with
 `node tools/mode-sheet.mjs` and look at the paired None-vs-mode crops

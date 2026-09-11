@@ -202,25 +202,45 @@ try {
   //   can't test it — it's driven by performance.now(), never touches
   //   values.speed, so pinning it here would pass this assertion
   //   unconditionally regardless of whether a piece's own mode has that
-  //   bug. Pin to 'Attract' instead, implemented on all twelve pieces (see
-  //   tools/test-cursor-modes.mjs's MODES).
+  //   bug.
   // - cursorInteraction-as-enum (modeDiff): reusing pointerOn (Particle
   //   Trail) against a second render under 'Grow' proves the dropdown
   //   actually branches behaviour, not just that some mode is on. This is
   //   a basic sanity check, not the full per-mode battery — that's
   //   tools/test-cursor-modes.mjs's job, exercised there mode-by-mode,
   //   piece-by-piece; this file doesn't reassert it.
+
+  // Every mode tested individually below by the Speed-0 loop — same six
+  // named in tools/test-cursor-modes.mjs's MODES (kept as a separate literal,
+  // not imported, matching that file's own convention of not importing
+  // shared/cursor-modes.js's CURSOR_MODES either).
+  const ZERO_TEST_MODES = ['Grow', 'Shrink', 'Particle Trail', 'Ripples', 'Attract', 'Vortex'];
+
+  // flow-field's Grow/Shrink measure 0.000% here — a genuine contract
+  // violation this loop was written to catch, not a threshold problem (see
+  // ROADMAP.md's "flow-field's Grow/Shrink are invisible at Speed 0" for
+  // the mechanism and the fix this stands in for). Both modes act only on
+  // lineWidth, and flow-field draws each particle as a segment from p.x to
+  // p.x + cos(angle)*260*values.speed*dt — at Speed 0 that is a zero-length
+  // path, and a zero-length butt-capped stroke draws no pixels at any
+  // width. Measured in the same run against every OTHER piece under
+  // identical conditions: Grow ranges 0.249%-24.274% (grain-field lowest,
+  // interference highest) and Shrink ranges 0.206%-3.602%, both clearing
+  // the 0.05% floor on all eleven — so this is flow-field's draw model
+  // specifically, not a floor set too high. Anything ADDED to this map is a
+  // regression until proven otherwise the same way this entry was: by
+  // comparing against the other pieces under the same conditions, not by
+  // lowering 0.05.
+  const SPEED0_KNOWN_DEAD = { 'flow-field': ['Grow', 'Shrink'] };
+
   for (const slug of POINTER_PIECES) {
     const baseline = await variant(page, base, slug, { pointer: 0, mode: 'Particle Trail' });
     const pointerOff = await variant(page, base, slug, { pointer: 0, mode: 'Particle Trail', cursor: { x: 440, y: 300 } });
     const pointerOn = await variant(page, base, slug, { pointer: 1, mode: 'Particle Trail', cursor: { x: 440, y: 300 } });
     const pointerOnNoCursor = await variant(page, base, slug, { pointer: 1, mode: 'Particle Trail' });
-    const speedZero = await variant(page, base, slug, { pointer: 1, mode: 'Attract', speed: 0, cursor: { x: 440, y: 300 } });
-    const speedZeroNoCursor = await variant(page, base, slug, { pointer: 1, mode: 'Attract', speed: 0 });
     const modeB = await variant(page, base, slug, { pointer: 1, mode: 'Grow', cursor: { x: 440, y: 300 } });
     const offDiff = changedPercent(baseline, pointerOff);
     const onDiff = changedPercent(pointerOnNoCursor, pointerOn);
-    const zeroDiff = changedPercent(speedZeroNoCursor, speedZero);
     const modeDiff = changedPercent(pointerOn, modeB);
     assert.equal(offDiff, 0, `${slug}: Pointer 0 changed canvas (${offDiff.toFixed(3)}%)`);
     // Margin note: Particle Trail is deliberately faint (density carries
@@ -230,11 +250,63 @@ try {
     // once, suspect a retune of the overlay's own tuning (particle count,
     // size, alpha), not a per-piece Pointer regression.
     assert.ok(onDiff >= 0.05, `${slug}: Pointer response not visible (${onDiff.toFixed(3)}%)`);
-    assert.ok(zeroDiff >= 0.05, `${slug}: Pointer response died at Speed 0 under Attract (${zeroDiff.toFixed(3)}%)`);
     assert.ok(modeDiff >= 0.05, `${slug}: cursorInteraction has no effect (Particle Trail vs Grow, ${modeDiff.toFixed(3)}%)`);
+
+    // Widened Speed-0 gate. CONTRIBUTING's contract ("What a new piece
+    // owes") is that no mode may be gated on speed, motion, density, or any
+    // other control a user can zero — not just Attract, which is all the
+    // original single-mode check (db53b38) proved. A grep confirms no
+    // mode's maths references values.speed today, but a grep is not proof
+    // of anything (see ROADMAP.md, "A diff percentage is not visibility"
+    // for the same evidentiary point applied elsewhere) — this actually
+    // renders each mode at speed 0 with the cursor on vs off and measures.
+    const zeroDiffs = {};
+    for (const mode of ZERO_TEST_MODES) {
+      const off = await variant(page, base, slug, { pointer: 1, mode, speed: 0 });
+      const on = await variant(page, base, slug, { pointer: 1, mode, speed: 0, cursor: { x: 440, y: 300 } });
+      const diff = changedPercent(off, on);
+      zeroDiffs[mode] = diff;
+      if (SPEED0_KNOWN_DEAD[slug]?.includes(mode)) {
+        console.log(`  KNOWN-DEAD ${slug}/${mode}: speed0 diff=${diff.toFixed(3)}% (see SPEED0_KNOWN_DEAD, ROADMAP.md)`);
+        continue;
+      }
+      assert.ok(diff >= 0.05, `${slug}/${mode}: cursor response died at Speed 0 (${diff.toFixed(3)}%)`);
+    }
+
+    // Same claim, `motion` and `density` at their floor (shared/controls.js:
+    // density min is 0.1, not 0). Pinned to Attract rather than repeated
+    // per mode — the contract is "no CONTROL a user can zero", not "no
+    // mode x control pair"; the loop above is what proves every mode
+    // survives speed specifically, and one already-multi-piece-implemented
+    // mode is sufficient evidence for the other two axes.
+    const motionOff = await variant(page, base, slug, { pointer: 1, mode: 'Attract', controls: { motion: 0 } });
+    const motionOn = await variant(page, base, slug, { pointer: 1, mode: 'Attract', controls: { motion: 0 }, cursor: { x: 440, y: 300 } });
+    const motionDiff = changedPercent(motionOff, motionOn);
+    assert.ok(motionDiff >= 0.05, `${slug}: cursor response died at Motion 0 (${motionDiff.toFixed(3)}%)`);
+
+    // Density's actual floor (shared/controls.js: min 0.1) is untestable
+    // this way on grain-field and synapse: both derive element count from
+    // density (CONTRIBUTING's "Density convention"), Attract's visible
+    // effect is proportional to how many elements sit inside the falloff
+    // radius, and at 0.1 both collapse to too few elements near the cursor
+    // to measure anything — grain-field read 0.018%, synapse 0.000%,
+    // against unrelated-to-cursor-gating causes (both are already the
+    // sparsest, faintest pair in the collection; see ROADMAP.md). That is a
+    // test-design failure, not a density-gating regression: it would fire
+    // identically whether or not modeFactor ever reads values.density. 0.5
+    // still exercises "density well below default (1) survives" on all
+    // twelve without falling into the element-count cliff at the true
+    // floor.
+    const densityOff = await variant(page, base, slug, { pointer: 1, mode: 'Attract', controls: { density: 0.5 } });
+    const densityOn = await variant(page, base, slug, { pointer: 1, mode: 'Attract', controls: { density: 0.5 }, cursor: { x: 440, y: 300 } });
+    const densityDiff = changedPercent(densityOff, densityOn);
+    assert.ok(densityDiff >= 0.05, `${slug}: cursor response died at low Density (${densityDiff.toFixed(3)}%)`);
+
     await page.evaluate(() => document.querySelectorAll('[data-lf-panel]').forEach((element) => { element.style.display = 'none'; }));
     await page.screenshot({ path: join(SHOTS, `${slug}-pointer.png`) });
-    console.log(`  pointer ${slug.padEnd(18)} off=${offDiff.toFixed(3)}% on=${onDiff.toFixed(3)}% speed0=${zeroDiff.toFixed(3)}% mode=${modeDiff.toFixed(3)}%`);
+    const zeroSummary = ZERO_TEST_MODES.map((m) => `${m}=${zeroDiffs[m].toFixed(3)}%`).join(' ');
+    console.log(`  pointer ${slug.padEnd(18)} off=${offDiff.toFixed(3)}% on=${onDiff.toFixed(3)}% mode=${modeDiff.toFixed(3)}% motion0=${motionDiff.toFixed(3)}% density0.5=${densityDiff.toFixed(3)}%`);
+    console.log(`          speed0  ${zeroSummary}`);
   }
 
   for (const slug of ORBIT_PIECES) {

@@ -58,6 +58,18 @@ jobs:
       - name: Test interactions
         run: npm run test-interactions
 
+      # Drives every mode live on every piece and asserts no two render
+      # identically — the only gate that proves all seven cursor-interaction
+      # modes actually did something, on all twelve pieces. Placed here,
+      # after the fast/specific checks above and before the slow, broad
+      # control audit below, for the same reason that audit runs last: this
+      # step is itself fast and specific relative to the audit, and a
+      # failure here must not be hidden behind a slower step that hasn't run
+      # yet. Do not move it after "Audit controls" — that would let a mode
+      # regression hide behind whatever the audit fails on first.
+      - name: Test cursor modes
+        run: npm run test-cursor-modes
+
       # Every piece x control combination, diffing rendered frames. Catches
       # a control that reads a value and changes nothing — a defect that has
       # shipped twice in this project and passed human review both times.

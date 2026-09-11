@@ -232,17 +232,25 @@ assets:
 ```bash
 npm install
 npx playwright install chromium   # one-time, for headless capture
+npm run build            # NOT run in CI — verify, then regenerate thumbs/ and downloads/, which are committed
+
+# Below this line, every command runs in CI (.github/workflows/checks.yml),
+# in EXACTLY this order (see that file's own comments for why — the last
+# one is deliberately last, slowest and broadest, so it can never hide a
+# faster/narrower step's failure behind itself), except the last two below,
+# which are visual-review tools with no pass/fail gate — read their output
+# yourself, nothing exits nonzero.
 npm run verify          # check pieces.json / pieces/ / README agree; no generation
-npm run build            # verify, then regenerate thumbs/ and downloads/
-npm run audit-controls   # empirically check every shared+piece control moves pixels
-node tools/test-presets.mjs <slug>   # preset mechanism + value range gate
-npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
+node tools/test-presets.mjs <slug>   # preset mechanism (one piece) + value/enum gate (all pieces, regardless of <slug>)
 npm run test-bake-fresh  # bakes every piece live, rather than reading committed downloads/
+npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
 npm run test-source      # Source buttons download exact unbaked piece files
 npm run test-interactions # pointer, orbit, animation, and baked-artifact browser QA
-node tools/test-cursor-modes.mjs     # every cursor mode live and mutually distinct, per piece
-node tools/preset-sheet.mjs <slug>   # render a piece's presets for review
-node tools/mode-sheet.mjs            # paired None-vs-mode 1:1 crops for visual review
+npm run test-cursor-modes # every cursor mode live and mutually distinct, per piece
+npm run audit-controls   # empirically check every shared+piece control moves pixels — LAST, deliberately
+
+node tools/preset-sheet.mjs <slug>   # NOT run in CI — render a piece's presets for review
+node tools/mode-sheet.mjs            # NOT run in CI — paired None-vs-mode 1:1 crops for visual review
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
