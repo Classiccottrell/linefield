@@ -151,6 +151,19 @@ const LIVE_THRESHOLD = 0.05; // % of sampled pixels changed, below this = no vis
 // asserts "with cursor response already active via the overlay, sliding
 // pointer's strength up changes pixels." The interaction as a whole is what
 // PREREQS.cursorInteraction (below) exercises the reverse of.
+//
+// Mirror statement for PREREQS.cursorInteraction, since it is easy to
+// overclaim here: pinning `pointer` to 1 makes "zero DEAD for
+// cursorInteraction" assert that the MODE-SELECTION MECHANISM is wired —
+// switching the dropdown changes what the shared overlay / a piece's own
+// branch does, given that pointer strength is already nonzero. It does
+// NOT assert "every mode is visible at this piece's shipped defaults":
+// pointer defaults to 0 on every piece, so an unpinned sweep of
+// cursorInteraction would read DEAD unconditionally regardless of whether
+// mode selection works at all, and this prereq exists to stop that
+// unconditional failure, not to certify any particular mode's look.
+// tools/test-cursor-modes.mjs is the gate that exercises THAT claim — every
+// mode, live and visually distinct, on every piece.
 const PREREQS = {
   colorMode: { colorA: '#ff2d2d', colorB: '#2de0ff' },
   pointer: { cursorInteraction: 'Particle Trail' },

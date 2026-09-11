@@ -10,7 +10,11 @@ import { DETERMINISTIC_INIT, stepFrames } from './deterministic.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = '/private/tmp/linefield-qa';
 const pieces = JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8'));
-const POINTER_PIECES = ['accretion', 'event-horizon', 'rainfall', 'synapse', 'tether'];
+// modeFactor (shared/cursor-modes.js) is the sole gate on cursor response
+// now, wired into every piece across Tasks 1-3 — there is no piece left
+// that legitimately sits outside this coverage, so this is all twelve, not
+// a hand-picked subset.
+const POINTER_PIECES = pieces.map((p) => p.slug);
 const ORBIT_PIECES = ['event-horizon', 'wireframe-lattice'];
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -31,6 +35,10 @@ function serveRepo() {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
 
+// DOM-driven, by label text — kept ONLY for the colour-picker block below,
+// which deliberately exercises the real <input>/<select> path a human drag
+// would use. Everywhere else in this file addresses controls by name via
+// setValue(), never by label or DOM position (see CONTRIBUTING.md).
 async function setControl(page, label, value) {
   await page.evaluate(({ label, value }) => {
     const row = [...document.querySelectorAll('.lf-panel .lf-row')]
@@ -41,6 +49,17 @@ async function setControl(page, label, value) {
     else input.value = String(value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, { label, value });
+}
+
+// Addresses a control by its `name` (e.g. 'pointer', 'cursorInteraction',
+// 'rotX') via the panel's own API, exactly like audit-controls.mjs and
+// test-cursor-modes.mjs do — survives whatever widget renders a control,
+// unlike setControl's label/DOM lookup above.
+async function setValue(page, name, value) {
+  await page.evaluate(
+    ({ name, value }) => window.__LF_PANEL__.setValue(name, value),
+    { name, value }
+  );
 }
 
 async function placeCursor(page, x = 440, y = 300) {
@@ -96,11 +115,15 @@ async function openPiece(page, base, slug, preview = true) {
   await page.waitForSelector('.lf-panel .lf-row');
 }
 
-async function variant(page, base, slug, { pointer = 0, speed, cursor, controls = {} } = {}) {
+// `mode` sets cursorInteraction; left unset, a piece keeps its 'None'
+// default, which is correct for the render/orbit checks below that have
+// nothing to do with cursor response.
+async function variant(page, base, slug, { pointer = 0, speed, mode, cursor, controls = {} } = {}) {
   await openPiece(page, base, slug);
-  await setControl(page, 'Pointer', pointer);
-  if (speed !== undefined) await setControl(page, 'Speed', speed);
-  for (const [label, value] of Object.entries(controls)) await setControl(page, label, value);
+  await setValue(page, 'pointer', pointer);
+  if (mode !== undefined) await setValue(page, 'cursorInteraction', mode);
+  if (speed !== undefined) await setValue(page, 'speed', speed);
+  for (const [name, value] of Object.entries(controls)) await setValue(page, name, value);
   if (cursor) await placeCursor(page, cursor.x, cursor.y);
   await stepFrames(page);
   return sample(page);
@@ -162,29 +185,63 @@ try {
     console.log(`  picker  ${slug.padEnd(18)} colorA->hue=${before.hue.toFixed(1)}->${after.hue.toFixed(1)} colorMode->${after.colorMode}`);
   }
 
+  // Pointer/cursorInteraction are two separate controls with two separate
+  // claims, each needing its own pin so a failure attributes to the right
+  // one — same shape as audit-controls.mjs's PREREQS, deliberately kept in
+  // sync with it:
+  //
+  // - Pointer-as-number (offDiff/onDiff): pinned to 'Particle Trail', the
+  //   shared overlay in shared/cursor-modes.js, never a per-piece mode.
+  //   Tasks 2/3 rewrote Attract/Grow/Shrink/Vortex per piece; a regression
+  //   in one of those would surface here as "Pointer response not
+  //   visible", misattributed to Pointer instead of to the mode that
+  //   actually broke (the bug b6d7242 fixed by repinning the audit the
+  //   same way).
+  // - Speed-0 survival (zeroDiff) is a different claim (db53b38: the
+  //   response must not route through values.speed) and Particle Trail
+  //   can't test it — it's driven by performance.now(), never touches
+  //   values.speed, so pinning it here would pass this assertion
+  //   unconditionally regardless of whether a piece's own mode has that
+  //   bug. Pin to 'Attract' instead, implemented on all twelve pieces (see
+  //   tools/test-cursor-modes.mjs's MODES).
+  // - cursorInteraction-as-enum (modeDiff): reusing pointerOn (Particle
+  //   Trail) against a second render under 'Grow' proves the dropdown
+  //   actually branches behaviour, not just that some mode is on. This is
+  //   a basic sanity check, not the full per-mode battery — that's
+  //   tools/test-cursor-modes.mjs's job, exercised there mode-by-mode,
+  //   piece-by-piece; this file doesn't reassert it.
   for (const slug of POINTER_PIECES) {
-    const baseline = await variant(page, base, slug, { pointer: 0 });
-    const pointerOff = await variant(page, base, slug, { pointer: 0, cursor: { x: 440, y: 300 } });
-    const pointerOn = await variant(page, base, slug, { pointer: 1, cursor: { x: 440, y: 300 } });
-    const pointerOnNoCursor = await variant(page, base, slug, { pointer: 1 });
-    const speedZero = await variant(page, base, slug, { pointer: 1, speed: 0, cursor: { x: 440, y: 300 } });
-    const speedZeroNoCursor = await variant(page, base, slug, { pointer: 1, speed: 0 });
+    const baseline = await variant(page, base, slug, { pointer: 0, mode: 'Particle Trail' });
+    const pointerOff = await variant(page, base, slug, { pointer: 0, mode: 'Particle Trail', cursor: { x: 440, y: 300 } });
+    const pointerOn = await variant(page, base, slug, { pointer: 1, mode: 'Particle Trail', cursor: { x: 440, y: 300 } });
+    const pointerOnNoCursor = await variant(page, base, slug, { pointer: 1, mode: 'Particle Trail' });
+    const speedZero = await variant(page, base, slug, { pointer: 1, mode: 'Attract', speed: 0, cursor: { x: 440, y: 300 } });
+    const speedZeroNoCursor = await variant(page, base, slug, { pointer: 1, mode: 'Attract', speed: 0 });
+    const modeB = await variant(page, base, slug, { pointer: 1, mode: 'Grow', cursor: { x: 440, y: 300 } });
     const offDiff = changedPercent(baseline, pointerOff);
     const onDiff = changedPercent(pointerOnNoCursor, pointerOn);
     const zeroDiff = changedPercent(speedZeroNoCursor, speedZero);
+    const modeDiff = changedPercent(pointerOn, modeB);
     assert.equal(offDiff, 0, `${slug}: Pointer 0 changed canvas (${offDiff.toFixed(3)}%)`);
+    // Margin note: Particle Trail is deliberately faint (density carries
+    // its visibility, not size/opacity — shared/cursor-modes.js), so this
+    // reads ~0.08-0.15% on most full-clear pieces against a 0.05% floor —
+    // real signal, thin margin. If this assertion fails on MANY pieces at
+    // once, suspect a retune of the overlay's own tuning (particle count,
+    // size, alpha), not a per-piece Pointer regression.
     assert.ok(onDiff >= 0.05, `${slug}: Pointer response not visible (${onDiff.toFixed(3)}%)`);
-    assert.ok(zeroDiff >= 0.05, `${slug}: Pointer response died at Speed 0 (${zeroDiff.toFixed(3)}%)`);
+    assert.ok(zeroDiff >= 0.05, `${slug}: Pointer response died at Speed 0 under Attract (${zeroDiff.toFixed(3)}%)`);
+    assert.ok(modeDiff >= 0.05, `${slug}: cursorInteraction has no effect (Particle Trail vs Grow, ${modeDiff.toFixed(3)}%)`);
     await page.evaluate(() => document.querySelectorAll('[data-lf-panel]').forEach((element) => { element.style.display = 'none'; }));
     await page.screenshot({ path: join(SHOTS, `${slug}-pointer.png`) });
-    console.log(`  pointer ${slug.padEnd(18)} off=${offDiff.toFixed(3)}% on=${onDiff.toFixed(3)}% speed0=${zeroDiff.toFixed(3)}%`);
+    console.log(`  pointer ${slug.padEnd(18)} off=${offDiff.toFixed(3)}% on=${onDiff.toFixed(3)}% speed0=${zeroDiff.toFixed(3)}% mode=${modeDiff.toFixed(3)}%`);
   }
 
   for (const slug of ORBIT_PIECES) {
     const baseImage = await variant(page, base, slug, { speed: 0 });
-    const angle = await variant(page, base, slug, { speed: 0, controls: { Angle: 37 } });
-    const pitch = await variant(page, base, slug, { speed: 0, controls: { Pitch: -23 } });
-    const yaw = await variant(page, base, slug, { speed: 0, controls: { Yaw: 61 } });
+    const angle = await variant(page, base, slug, { speed: 0, controls: { angle: 37 } });
+    const pitch = await variant(page, base, slug, { speed: 0, controls: { rotX: -23 } });
+    const yaw = await variant(page, base, slug, { speed: 0, controls: { rotY: 61 } });
     const angleDiff = changedPercent(baseImage, angle);
     const pitchDiff = changedPercent(baseImage, pitch);
     const yawDiff = changedPercent(baseImage, yaw);
@@ -194,8 +251,8 @@ try {
     assert.ok(changedPercent(angle, pitch) >= 0.05 && changedPercent(pitch, yaw) >= 0.05, `${slug}: camera controls not independent`);
 
     await openPiece(page, base, slug, false);
-    await setControl(page, 'Speed', 0);
-    await setControl(page, 'Pointer', 0);
+    await setValue(page, 'speed', 0);
+    await setValue(page, 'pointer', 0);
     await stepFrames(page);
     const beforeDrag = await sample(page);
     const beforeDragValues = await orbitValues(page);
@@ -208,8 +265,8 @@ try {
     assert.notEqual(afterDragValues.rotY, beforeDragValues.rotY, `${slug}: drag did not write back rotY`);
 
     await openPiece(page, base, slug, true);
-    await setControl(page, 'Speed', 0);
-    await setControl(page, 'Pointer', 0);
+    await setValue(page, 'speed', 0);
+    await setValue(page, 'pointer', 0);
     await stepFrames(page);
     const beforePreviewDrag = await sample(page);
     const beforePreviewValues = await orbitValues(page);
@@ -221,8 +278,8 @@ try {
     assert.deepEqual(afterPreviewValues, beforePreviewValues, `${slug}: preview drag changed rotX/rotY values`);
 
     for (const controls of [
-      { Angle: 0, Pitch: -90, Yaw: -180, Density: 0.1, Scale: 0, Pointer: 2 },
-      { Angle: 360, Pitch: 90, Yaw: 180, Density: 2, Scale: 2, Pointer: 2 },
+      { angle: 0, rotX: -90, rotY: -180, density: 0.1, scale: 0, pointer: 2 },
+      { angle: 360, rotX: 90, rotY: 180, density: 2, scale: 2, pointer: 2 },
     ]) {
       const image = await variant(page, base, slug, { speed: 0, cursor: { x: 440, y: 300 }, controls });
       assert.ok(variance(image) > 4, `${slug}: blank at control extremes ${JSON.stringify(controls)}`);

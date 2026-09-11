@@ -69,12 +69,37 @@ try {
     const bakePage = await bakeCtx.newPage();
     const bakeErrors = [];
     bakePage.on('pageerror', (e) => bakeErrors.push(String(e)));
+    // #btn-baked's own handler does bakeHtml(...).catch(err =>
+    // console.error(...)) — a rejection there never reaches 'pageerror', it
+    // only ever reaches 'console'. Without this listener a real bake
+    // failure produced no named cause at all: no download ever arrives,
+    // waitForEvent('download') hangs for its full default timeout, and the
+    // resulting TimeoutError (a) names nothing about what actually broke
+    // and (b) was uncaught here, aborting every remaining piece in the run
+    // instead of failing just this one.
+    bakePage.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('favicon')) bakeErrors.push(m.text()); });
     await bakePage.goto(`http://localhost:${PORT}/pieces/${slug}/`, { waitUntil: 'load' });
     await bakePage.waitForSelector('#btn-baked');
-    const [download] = await Promise.all([
-      bakePage.waitForEvent('download'),
-      bakePage.click('#btn-baked'),
-    ]);
+    let download;
+    try {
+      // Explicit, shorter than Playwright's 30s default: a real bake
+      // failure is a synchronous throw inside bakeHtml (caught and logged
+      // above), not slow work, so nothing legitimate needs 30s to not
+      // download. 5s bounds the loop's own worst case without changing
+      // what a healthy bake looks like.
+      [download] = await Promise.all([
+        bakePage.waitForEvent('download', { timeout: 5000 }),
+        bakePage.click('#btn-baked'),
+      ]);
+    } catch (timeoutErr) {
+      await bakeCtx.close();
+      failures.push(
+        bakeErrors.length
+          ? `${slug}: error while baking: ${bakeErrors.join('; ')}`
+          : `${slug}: bake produced no download and logged no error (${timeoutErr.message})`
+      );
+      continue;
+    }
     const bakedPath = join(tmpDir, `${slug}.html`);
     await download.saveAs(bakedPath);
     await bakeCtx.close();
