@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — meridian</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
@@ -26,10 +30,12 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+  import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'meridian';
   const canvas = document.getElementById('canvas');
@@ -61,12 +67,21 @@
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'sweep', label: 'Sweep', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+      { name: 'sweep', label: 'Sweep', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'motion' },
     ],
-    defaults: { hue: 150, hueB: 180, saturation: 0.5 },
+    defaults: { hue: 150, hueB: 180, saturation: 0.5, colorMode: 'gradient', colorA: '#00ff80', colorB: '#00ffff' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
+
+  // Each ribbon is one continuous stroked path, so per-mark scaling isn't
+  // available: Grow/Shrink amplify/damp the existing falloff-weighted
+  // deflection and its radius instead. Only 7 ribbons at rest (sparser than
+  // most pieces in the library), so the radius is wider than contour-grid's
+  // equivalent to keep Shrink's dimple comfortably above the gate threshold.
+  const DEFLECT_MAG = 90;
+  const DEFLECT_RADIUS = 320;
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -83,9 +98,17 @@
     const light = values.invert ? 0.35 : 0.6;
     const lineWidth = 2.2 + values.stroke * 3.6; // heavy; only tether is heavier
 
-    // Gate: off at pointer 0, eased by influence, local via falloff. No term
-    // routed through values.speed, so deflection survives Speed 0.
-    const k = values.pointer * pointer.influence;
+    // Gate: off at pointer 0, off when cursorInteraction is 'None', eased by
+    // influence, local via falloff. No term routed through values.speed or
+    // values.sweep (both user-zeroable), so deflection survives either at 0.
+    const k = modeFactor(values, pointer);
+    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
+    // (Pointer's max) quadruples magnitude AND falloff radius together,
+    // which on a sparse piece (7 ribbons) pulls nearly everything hard and
+    // destroys the piece's identity rather than swelling it. This holds
+    // Pointer 1..2 flat at the Pointer=1 amplitude (gate numbers
+    // unchanged) instead of compounding further.
+    const kAmp = Math.min(k, 1);
 
     // Drawing below happens in the pre-rotation local space that ctx.rotate
     // maps to screen space, but pointer.x/y are screen (canvas-pixel) space.
@@ -112,11 +135,8 @@
       const f = ribbons === 1 ? 0.5 : i / (ribbons - 1);
       const baseY = canvas.height * (0.12 + f * 0.76);
 
-      const [r, g, b] = hslToRgb(
-        values.hue + (values.hueB - values.hue) * f,
-        values.saturation,
-        light
-      );
+      const { h, s } = paletteHsl(values, f);
+      const [r, g, b] = hslToRgb(h, s, light);
       ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
 
       const pts = [];
@@ -126,24 +146,51 @@
         const n1 = simplex2(x * noiseScale + values.phase, f * 3 + t);
         const n2 = simplex2(x * noiseScale * 2.7 + values.phase, f * 3 + t * 1.4);
         let y = baseY + n1 * sweepAmp + n2 * flutterAmp;
+        let px = x;
         if (k) {
-          // Ribbons deflect around the pointer as they sweep past it: pushed
-          // away vertically, weighted by falloff. Falloff and direction both
-          // computed against the un-rotated pointer (plx, ply), not
-          // pointer.x/y directly — see note above ctx.save().
-          const dist = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / 240);
-          if (dist) {
+          // Falloff and direction both computed against the un-rotated
+          // pointer (plx, ply), not pointer.x/y directly — see note above
+          // ctx.save().
+          const mode = values.cursorInteraction;
+          if (mode === 'Grow' || mode === 'Shrink') {
+            const amp = mode === 'Grow' ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
+            const radius = DEFLECT_RADIUS * amp;
             // Direction keyed off baseY (constant per ribbon), not the
             // wobbled y — keying off y flips sign at STEP_PX granularity
             // wherever a ribbon crosses the pointer's y, spiking instead of
             // bowing.
-            const dir = baseY >= ply ? 1 : -1;
-            y += dir * dist * k * 90;
+            const dist = Math.max(0, 1 - Math.hypot(x - plx, baseY - ply) / radius);
+            if (dist) {
+              const dir = baseY >= ply ? 1 : -1;
+              y += dir * dist * DEFLECT_MAG * amp;
+            }
+          } else if (mode === 'Attract') {
+            const dist = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / DEFLECT_RADIUS);
+            // A smooth saturating curve, not Math.min(dist*k, cap): this
+            // pull runs along a shared horizontal target (ply), so ANY
+            // hard ceiling makes every x within the region where dist*k
+            // clears it collapse onto the exact same (constant) y and
+            // render as a dead-flat line segment with a hard crease at the
+            // ceiling's boundary — a plateau, not a swell. dist*k/(1+dist*k)
+            // is strictly monotonic and always < 1, so it inherits dist's
+            // own smooth shape instead of ever saturating to a constant —
+            // which also rules out overshoot past the cursor without a
+            // separate clamp.
+            if (dist) y += (ply - y) * ((dist * k) / (1 + dist * k));
+          } else if (mode === 'Vortex') {
+            const dist = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / DEFLECT_RADIUS);
+            if (dist) {
+              // True tangential rotation about the un-rotated pointer, not
+              // an offset toward/away from it.
+              const r = rotatePoint(x - plx, y - ply, 0, { roll: dist * k * 1.1 });
+              px = plx + r.x;
+              y = ply + r.y;
+            }
           }
         }
-        if (x === -margin) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-        pts.push([x, y]);
+        if (x === -margin) ctx.moveTo(px, y);
+        else ctx.lineTo(px, y);
+        pts.push([px, y]);
       }
 
       if (values.glow > 0) {
@@ -158,11 +205,19 @@
     }
 
     ctx.restore();
+
+    // Screen space, after restore and after the fillRect clear above — see
+    // shared/cursor-modes.js's draw-ordering contract.
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.6);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

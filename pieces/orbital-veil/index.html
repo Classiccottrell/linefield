@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — orbital-veil</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
@@ -26,9 +30,11 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+  import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'orbital-veil';
   const canvas = document.getElementById('canvas');
@@ -60,12 +66,27 @@
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'sweep', label: 'Sweep', type: 'range', min: 0.05, max: 1, step: 0.01, default: 0.62 },
+      { name: 'sweep', label: 'Sweep', type: 'range', min: 0.05, max: 1, step: 0.01, default: 0.62, category: 'form' },
     ],
-    defaults: { hue: 265, hueB: 330, saturation: 0.55 },
+    defaults: { hue: 265, hueB: 330, saturation: 0.55, colorMode: 'gradient', colorA: '#6a00ff', colorB: '#ff0080' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
+
+  // Each ring is one continuous stroked path, so per-mark scaling isn't
+  // available: all four modes get a per-point falloff-weighted radial
+  // pull/swell/rotation, mirroring interference. No canvas rotation
+  // transform is applied here, so pointer.x/y are usable directly.
+  const SWELL_MAG = 30;
+  // 200 (matching interference's own SWELL_RADIUS) left Shrink invisible at
+  // the review's parked cursor position: interference's two dense ripple
+  // sources keep many rings within 200px of any point, but orbital-veil's
+  // rings are spaced widely enough that only a sliver of one or two rings
+  // fell inside the falloff at a time. Widened to 340 (tether's radius) so
+  // enough ring length is affected at once to read, not to deepen Shrink's
+  // already-small per-point push.
+  const SWELL_RADIUS = 340;
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -85,13 +106,25 @@
 
     const light = values.invert ? 0.35 : 0.6;
 
-    // Orb tilts toward the pointer: a per-ring lateral shift driven by
-    // nx/ny, scaled by each ring's own radius so outer rings (the near side
-    // of the tilt) shift further than inner ones. Gated by k alone — no
-    // term routed through values.speed.
-    const k = values.pointer * pointer.influence;
-    const tiltX = pointer.nx * k;
-    const tiltY = pointer.ny * k;
+    // Off at pointer 0, off when cursorInteraction is 'None', eased by
+    // influence. No term routed through values.speed or values.sweep (both
+    // user-zeroable).
+    const k = modeFactor(values, pointer);
+    const mode = values.cursorInteraction;
+
+    // Cap the amplitude/radius/rotation input at k=1: uncapped, k=2
+    // (Pointer's max) quadruples Grow's magnitude AND falloff radius
+    // together (and widens Vortex's rotation radius the same way), which
+    // pulls nearly every ring hard and destroys the piece's identity. This
+    // holds Pointer 1..2 flat at the Pointer=1 strength (gate numbers
+    // unchanged) instead of compounding further.
+    const kAmp = Math.min(k, 1);
+
+    // The piece's one prior pointer response was a global nx/ny tilt with
+    // no positional falloff — against the "k and a positional falloff,
+    // nothing else" contract. Replaced below with a genuine per-point
+    // falloff pull/swell/rotation for all four modes, not kept for any of
+    // them.
 
     for (let i = 0; i < rings; i++) {
       const f = i / (rings - 1 || 1);
@@ -103,19 +136,46 @@
       const sweep = Math.PI * 2 * values.sweep;
       const start = rot;
 
-      const [r, g, b] = hslToRgb(
-        values.hue + (values.hueB - values.hue) * f,
-        values.saturation,
-        light
-      );
+      const { h, s } = paletteHsl(values, f);
+      const [r, g, b] = hslToRgb(h, s, light);
       ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
 
       const pts = [];
       ctx.beginPath();
       for (let s = 0; s <= SEG; s++) {
         const a = start + (s / SEG) * sweep;
-        const x = cx + Math.cos(a) * radius + tiltX * radius * 0.5;
-        const y = cy + Math.sin(a) * radius * tilt + tiltY * radius * 0.5;
+        let x = cx + Math.cos(a) * radius;
+        let y = cy + Math.sin(a) * radius * tilt;
+        if (k && mode === 'Attract') {
+          const f = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / SWELL_RADIUS);
+          if (f) {
+            // Clamp the EASE FRACTION, not f*k directly: k can reach 2
+            // (Pointer control's max), and a lerp factor above 1 overshoots
+            // the pointer and reflects the point past it.
+            const ease = Math.min(f * k, 1);
+            x += (pointer.x - x) * ease;
+            y += (pointer.y - y) * ease;
+          }
+        } else if (k && (mode === 'Grow' || mode === 'Shrink' || mode === 'Vortex')) {
+          const amp = mode === 'Shrink' ? 1 / (1 + kAmp * 1.5) : 1 + kAmp * 1.5;
+          const swellRadius = SWELL_RADIUS * amp;
+          const f = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / swellRadius);
+          if (f) {
+            if (mode === 'Vortex') {
+              // True tangential rotation about the pointer, not an offset
+              // toward/away from it.
+              const rp = rotatePoint(x - pointer.x, y - pointer.y, 0, { roll: f * kAmp * 1.1 });
+              x = pointer.x + rp.x;
+              y = pointer.y + rp.y;
+            } else {
+              const dx = x - pointer.x, dy = y - pointer.y;
+              const d = Math.hypot(dx, dy) || 1;
+              const push = f * SWELL_MAG * amp;
+              x += (dx / d) * push;
+              y += (dy / d) * push;
+            }
+          }
+        }
         if (s === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
@@ -130,11 +190,17 @@
       ctx.stroke();
       paths.push(pts);
     }
+
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

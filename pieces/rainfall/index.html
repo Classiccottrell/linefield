@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — rainfall</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
@@ -26,10 +30,11 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'rainfall';
   const canvas = document.getElementById('canvas');
@@ -48,6 +53,17 @@
   // Fraction of canvas height a streak crosses per second at speedMult=1,
   // values.speed=1 — slow enough that a single drop takes ~14s to fall.
   const BASE_FALL = 0.07;
+  // Grow/Shrink/Attract/Vortex fall off per-drop, unlike tether/meridian's
+  // single continuous path, but the same sparsity problem applies: only 28
+  // drops scattered across the canvas, each at its own independent point in
+  // the fall cycle, so a narrow radius catches at most two or three at any
+  // cursor position and the effect reads as nothing at normal viewing scale
+  // even though it passes the live-pixel gate. Widened well past
+  // contour-grid's 300/meridian's 320 for the same reason tether went to
+  // 340 — the sparsest pieces need the widest catchment — with no amplitude
+  // coupling to worry about here, since Grow/Shrink scale per-drop
+  // lineWidth, not radius-times-amplitude like the single-path pieces.
+  const DEFLECT_RADIUS = 480;
   let drops = [];
   let paths = [];
 
@@ -87,14 +103,15 @@
     extraControls: [
       // Off by default: a head-highlight dot is what sells "brighter head"
       // at a glance, but it's a distinct enough look to leave optional.
-      { name: 'glint', label: 'Head glint', type: 'checkbox', default: true },
+      { name: 'glint', label: 'Head glint', type: 'checkbox', default: true, category: 'ink' },
     ],
     // Cool, desaturated blue-grey — reads as overcast/rain, distinct from
     // tether's indigo (220/250) and wireframe-lattice's cyan (190/205).
-    defaults: { hue: 205, hueB: 195, saturation: 0.18 },
+    defaults: { hue: 205, hueB: 195, saturation: 0.18, colorMode: 'gradient', colorA: '#0095ff', colorB: '#00bfff' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
 
   seedDrops(Math.max(4, Math.round(BASE_COUNT * currentValues.density)));
 
@@ -113,7 +130,9 @@
     // Gentle wind sway, independent of fall speed — subtle by design so the
     // piece stays calm rather than turning into a gust.
     const swayAmount = W * 0.006 * values.motion;
-    const k = values.pointer * pointer.influence;
+    // The only gate: off at pointer 0, off when cursorInteraction is 'None',
+    // eased by influence.
+    const k = modeFactor(values, pointer);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
     const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
@@ -135,16 +154,34 @@
 
       const n = simplex2(d.sway, elapsed * 0.15 * values.motion);
       let x = d.x * W + n * swayAmount;
+      let lw = lineWidth;
       if (k) {
-        const f = Math.max(0, 1 - Math.hypot(x - plx, headY - ply) / 220);
-        x += (x >= plx ? 1 : -1) * f * k * 55;
+        const ddx = x - plx, ddy = headY - ply;
+        const dist = Math.hypot(ddx, ddy) || 1;
+        const f = Math.max(0, 1 - dist / DEFLECT_RADIUS);
+        if (f) {
+          if (values.cursorInteraction === 'Attract') {
+            x += -(ddx / dist) * f * k * 70;
+          } else if (values.cursorInteraction === 'Vortex') {
+            // Tangential: perpendicular to (drop - pointer); only the
+            // horizontal component is expressible since a drop's fall (y)
+            // is time-driven, but the sideways sweep still reads as orbit.
+            x += -(ddy / dist) * f * k * 70;
+          } else if (values.cursorInteraction === 'Grow') {
+            lw = lineWidth * (1 + f * k * 1.6);
+          } else if (values.cursorInteraction === 'Shrink') {
+            lw = Math.max(lineWidth * 0.15, lineWidth / (1 + f * k * 1.6));
+          }
+        }
       }
 
       const lightBase = values.invert ? 0.3 : 0.68;
       const headLight = Math.min(0.95, lightBase + 0.22);
       const tailLight = Math.max(0.04, lightBase - 0.4);
-      const [hr, hg, hb] = hslToRgb(values.hueB, values.saturation, headLight);
-      const [tr, tg, tb] = hslToRgb(values.hue, values.saturation, tailLight);
+      const stopB = paletteHsl(values, 1);
+      const [hr, hg, hb] = hslToRgb(stopB.h, stopB.s, headLight);
+      const stopA = paletteHsl(values, 0);
+      const [tr, tg, tb] = hslToRgb(stopA.h, stopA.s, tailLight);
 
       const grad = ctx.createLinearGradient(x, tailY, x, headY);
       grad.addColorStop(0, `rgba(${tr},${tg},${tb},0)`);
@@ -152,7 +189,7 @@
 
       ctx.strokeStyle = grad;
       if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 4;
+        ctx.lineWidth = lw + values.glow * 4;
         ctx.globalAlpha = values.glow * 0.22;
         ctx.beginPath();
         ctx.moveTo(x, tailY);
@@ -160,7 +197,7 @@
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      ctx.lineWidth = lineWidth;
+      ctx.lineWidth = lw;
       ctx.beginPath();
       ctx.moveTo(x, tailY);
       ctx.lineTo(x, headY);
@@ -170,7 +207,7 @@
         // Soft radial highlight at the head — bigger than the stroke itself
         // so "brighter head" reads clearly even at a glance, still small
         // enough relative to the canvas to stay calm rather than blobby.
-        const r = lineWidth * 3;
+        const r = lw * 3;
         const glintGrad = ctx.createRadialGradient(x, headY, 0, x, headY, r);
         glintGrad.addColorStop(0, `rgba(${hr},${hg},${hb},${values.opacity})`);
         glintGrad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
@@ -184,11 +221,19 @@
     }
 
     ctx.restore();
+
+    // Drawn after ctx.restore(), so overlay marks track the pointer's actual
+    // screen position rather than the piece's rotated coordinate space.
+    const stopB2 = paletteHsl(values, 1);
+    const [ovR, ovG, ovB] = hslToRgb(stopB2.h, stopB2.s, values.invert ? 0.3 : 0.68);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

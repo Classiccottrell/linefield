@@ -14,6 +14,94 @@ ambiguous labels are kept uncertain rather than treated as specifications.
 
 ---
 
+## Commissioned, not yet built
+
+Five pieces requested directly. Unlike everything below, these were not
+candidates to weigh — they were outstanding work, and all five have now
+shipped: `puddle`, `globe`, `matrix code`, `chain haze` and `stock market`
+(see below). ROADMAP's Next up has no scheduled work as a result.
+
+**`globe`** — shipped. A real 3D lat/long wire sphere via
+`shared/project.js`'s camera: latitude small-circles at radius `R·cos(lat)`
+plus longitude great-circles converging at both poles, tagged `3d`/`geometric`
+rather than `orb`. Distinct from `orbital-veil`, `accretion` and
+`event-horizon` on structure, not just hue — all three are flat screen-space
+discs squashed by a tilt factor; globe is genuine sphere geometry with a
+scale-driven depth fade (`shared/project.js`'s projected `scale` sets
+per-segment alpha, so the far hemisphere recedes) so it reads as a surface,
+not a mandala. Grow/Shrink displace the mesh along its own radius (a bulge/
+dent no orb piece has); Attract/Vortex stay screen-space, matching
+`wireframe-lattice`. Phase bunches latitude spacing toward the equator
+(vanishes at Phase 0, monotonic); Motion drives an axial wobble independent
+of Speed's constant spin.
+
+**`matrix code`** — shipped. A quantized column/row grid of `ctx.fillText`
+glyphs (`ui-monospace, "SF Mono", Menlo, Consolas, monospace` — no
+`@font-face`, no network font, so the baked single-file export renders
+standalone anywhere), the library's first non-stroke mark. Not rainfall
+wearing letters: rainfall is continuous-y streaks at random x with sway and
+one fixed identity per drop; matrix code is a rigid, no-sway cell grid where
+head position advances in whole glyph cells (discrete, not continuous) and
+each cell's character churns on its own deterministic clock (a hash of
+column/row/time-bucket, gated by `motion`) fully independent of the head
+passing over it — the two motions never touch. `stroke` gets a glyph-native
+reading (a `strokeText` outline pass scaled by the control, since there is
+no `lineWidth` to hook on a filled character); `scale` drives font size and
+therefore cell/column count; `density` narrows column width per
+CONTRIBUTING's density convention rather than resizing a persistent array —
+there is no persistent array, every cell is recomputed from `col`/`row`
+indices each frame. SVG export required a small, additive change to
+`shared/export.js`'s `exportSvg()`: an optional `texts` array of
+`{x, y, ch, size, fontFamily}` rendered as native SVG `<text>` elements,
+since a glyph has no line-segment geometry to export as a path — every other
+piece still calls it with only `paths` and is unaffected. **Glyph marks are
+now a capability the library has**, not just this one piece's technique; a
+future text-based piece can reuse the same `fillText`/`strokeText`/`texts`
+pattern instead of re-deriving it.
+
+**`puddle`** — shipped. A bounded, organic interference field: nested closed
+curves radius-displaced by the summed wave contributions of six emitters
+(golden-angle spaced, deterministic), rather than rings centred on any one
+source, so the pattern is genuine interference — crests crossing and
+cancelling — not the shared Ripples cursor mode (one expanding ring from the
+pointer) made permanent. The rim itself is an irregular, harmonic-perturbed
+boundary that damps the wave toward its edge instead of reflecting or
+tiling infinitely, which is the structural difference from `interference`.
+
+**`chain haze`** — shipped. Lines of chains receding into the distance, built
+from **repeated linked marks along a path** rather than a continuous stroke —
+the library's first repeated-linked-mark piece. Each chain is a sequence of
+discrete stroked ovals walking a straight line toward its own vanishing
+point (`FOV / (FOV + z)`, a scalar perspective divisor — not the shared 3D
+camera, which is more machinery than a straight receding line needs); links
+alternate a face-on ellipse (full width) and an edge-on ellipse (squashed to
+~35% width) at ~30% spacing overlap, which is what reads as interlocking
+links rather than a dashed/dotted line. Distinct from `tether` (one
+continuous stroked cable per line, no discrete marks): Grow/Shrink scale
+individual link size, matching `matrix-code`'s per-mark precedent, not
+`tether`'s amplify-an-existing-deformation. Depth fade borrows `globe`'s
+clamped-alpha shape but floors link scale at 0.38 so recession is carried by
+alpha and perspective bunching, never by shrinking a link below legibility.
+
+**`stock market`** — shipped. **Filled rectangle marks**, which no piece
+drew before this one — the library's first. It was the only candidate here
+whose subject is representational, which ROADMAP flagged as worth settling
+before it was built. Resolved the same way `globe` resolves "sphere without
+being literal continents": several independent tracks of bars, each marching
+and growing up or down from its own mid-line, with no axis, no gridline, no
+price label and no single fixed baseline. The structural cue that reads as
+"trading chart" (discrete bars, up/down state by colour and direction,
+continuous marching motion) survives; everything that would anchor it to a
+specific instrument or screenshot does not. Grow/Shrink scale a bar's own
+height/width, matching `matrix-code`'s per-mark precedent, not `chain-haze`'s
+per-link one only because there is no chain here — each bar is its own mark,
+independently addressable, same category as a glyph cell. Height and up/down
+state are a deterministic hash of (track, column, time-bucket) — no
+`Math.random`, no persistent array — read against the previous bucket's hash
+of the same function, so the "previous price" needs no stored state, only
+the same discipline `matrix-code`'s glyph churn and `chain-haze`'s march
+already established.
+
 ## Techniques the library doesn't have yet
 
 Three of these families need a capability no current piece has. Those are
@@ -66,17 +154,18 @@ These reuse what exists and would be faster to build, but each adds less.
 
 ### Spherical / orb family
 
-- **`meridian-globe`** — longitude lines wrapping a sphere, converging to a
-  bright point at the pole. Straightforward with the existing camera.
+- ~~**`meridian-globe`** — longitude lines wrapping a sphere, converging to a
+  bright point at the pole.~~ Built as `globe` (see "Commissioned, not yet
+  built" above) — latitude rings included as well, not longitude alone.
 - **`node-sphere`** — `synapse`'s network mapped onto a sphere's surface, so
   connections follow curvature. Combines `network` + `orb` + `3d`.
 
 **Caution, and it is a real one.** The library already has three `orb`-tagged
-pieces (`orbital-veil`, `accretion`, `event-horizon`). Adding two more
-spheres is the fastest route back to the failure this project already had
-once, where five pieces were individually fine and collectively looked like
-one thing. If only one sphere gets built, `node-sphere` is the better
-choice — it is a network first and a sphere second.
+pieces (`orbital-veil`, `accretion`, `event-horizon`) plus `globe`
+(`3d`/`geometric`, deliberately not tagged `orb`). A `node-sphere` would be
+the fourth sphere-shaped piece regardless of its tag — weigh that against
+the failure this project already had once, where five pieces were
+individually fine and collectively looked like one thing, before adding it.
 
 ### Perspective / geometric family
 
@@ -102,8 +191,10 @@ choice — it is a network first and a sphere second.
 - **Ripple rings** — concentric rings pulsing asynchronously rather than as a
   single synchronized wave. Needs an intended-look spec to distinguish it
   from `interference` and `orbital-veil`.
-- **Candlestick field** — stock-market-style vertical bodies and wicks across
-  the canvas. Composition, data semantics, and motion are not yet specified.
+~~**Candlestick field** — stock-market-style vertical bodies and wicks
+across the canvas.~~ Built as `stock market` (see "Commissioned, not yet
+built" above) — filled bars rather than open/high/low/close bodies-and-wicks,
+the abstraction the representational-subject tension there resolved to.
 
 ### Interaction vocabulary from the sketch
 
@@ -132,7 +223,7 @@ or density**, not on a free colour.
 shipped with a control that read a value and changed nothing, both passing
 review because the arithmetic looked right. Run `npm run audit-controls`.
 
-**Judge it against the other twelve, not just against its own intent.** That
+**Judge it against the other seventeen, not just against its own intent.** That
 is the check that catches a piece which is individually good and
 collectively redundant.
 

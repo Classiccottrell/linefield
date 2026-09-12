@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — synapse</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
@@ -26,10 +30,11 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'synapse';
   const canvas = document.getElementById('canvas');
@@ -79,12 +84,13 @@
       if (name === 'density') seedNodes(Math.max(8, Math.round(BASE_COUNT * values.density)));
     },
     extraControls: [
-      { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 90 },
+      { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 90, category: 'visual' },
     ],
-    defaults: { hue: 75, hueB: 45, saturation: 0.7 },
+    defaults: { hue: 75, hueB: 45, saturation: 0.7, colorMode: 'gradient', colorA: '#bfff00', colorB: '#ffbf00' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
 
   seedNodes(Math.max(8, Math.round(BASE_COUNT * currentValues.density)));
   window.addEventListener('resize', () =>
@@ -114,6 +120,10 @@
     const lineWidth = 0.25 + values.stroke * 0.8;
     ctx.lineWidth = lineWidth;
 
+    // The only gate: off at pointer 0, off when cursorInteraction is 'None',
+    // eased by influence.
+    const k = modeFactor(values, pointer);
+
     // Drift the nodes on a noise field, wrapping at the edges.
     for (const n of nodes) {
       const a =
@@ -121,6 +131,27 @@
         (values.angle * Math.PI) / 180;
       n.x += Math.cos(a) * drift - (n.x - n.homeX) * pull * stepDt;
       n.y += Math.sin(a) * drift - (n.y - n.homeY) * pull * stepDt;
+
+      if (k && (values.cursorInteraction === 'Attract' || values.cursorInteraction === 'Vortex')) {
+        // Uses only dt (real frame time), never values.speed, so the
+        // response survives Speed 0.
+        const f = pointer.falloff(n.x, n.y, 220);
+        if (f) {
+          if (values.cursorInteraction === 'Attract') {
+            const toward = Math.atan2(pointer.y - n.y, pointer.x - n.x);
+            const push = f * k * 110 * stepDt;
+            n.x += Math.cos(toward) * push;
+            n.y += Math.sin(toward) * push;
+          } else {
+            const away = Math.atan2(n.y - pointer.y, n.x - pointer.x);
+            const tangent = away + Math.PI / 2;
+            const push = f * k * 110 * stepDt;
+            n.x += Math.cos(tangent) * push;
+            n.y += Math.sin(tangent) * push;
+          }
+        }
+      }
+
       if (n.x < 0) n.x += canvas.width;
       if (n.x > canvas.width) n.x -= canvas.width;
       if (n.y < 0) n.y += canvas.height;
@@ -146,9 +177,10 @@
     }
 
     const reach2 = reach * reach;
-    const [r0, g0, b0] = hslToRgb(values.hue, values.saturation, light);
-    const [r1, g1, b1] = hslToRgb(values.hueB, values.saturation, light);
-    const pointerK = values.pointer * pointer.influence;
+    const stopA = paletteHsl(values, 0);
+    const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
+    const stopB = paletteHsl(values, 1);
+    const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
 
     for (let cy = 0; cy < rows; cy++) {
       for (let cx = 0; cx < cols; cx++) {
@@ -183,19 +215,32 @@
                 const cr = r0 + (r1 - r0) * mix;
                 const cg = g0 + (g1 - g0) * mix;
                 const cb = b0 + (b1 - b0) * mix;
-                const activation = pointerK * pointer.falloff((a.x + b.x) / 2, (a.y + b.y) / 2, 220);
+                const midF = k ? pointer.falloff((a.x + b.x) / 2, (a.y + b.y) / 2, 220) : 0;
+                // Activation brightens edges near the cursor under Attract/
+                // Vortex, where nodes are already moving; withheld under
+                // Grow/Shrink so those two stay distinguishable by width alone.
+                const activation =
+                  (values.cursorInteraction === 'Attract' || values.cursorInteraction === 'Vortex')
+                    ? k * midF : 0;
                 const alpha = Math.min(1, values.opacity * closeness * (0.25 + pulse * 0.75) * (1 + activation * 2));
 
+                let lw = lineWidth;
+                if (midF) {
+                  if (values.cursorInteraction === 'Grow') lw = lineWidth * (1 + midF * k * 1.6);
+                  else if (values.cursorInteraction === 'Shrink') lw = Math.max(lineWidth * 0.15, lineWidth / (1 + midF * k * 1.6));
+                }
+
                 ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${alpha})`;
+                ctx.lineWidth = lw;
                 ctx.beginPath();
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);
                 if (values.glow > 0) {
-                  ctx.lineWidth = lineWidth + values.glow * 2.5;
+                  ctx.lineWidth = lw + values.glow * 2.5;
                   ctx.globalAlpha = values.glow * 0.25;
                   ctx.stroke();
                   ctx.globalAlpha = 1;
-                  ctx.lineWidth = lineWidth;
+                  ctx.lineWidth = lw;
                 }
                 ctx.stroke();
                 paths.push([[a.x, a.y], [b.x, b.y]]);
@@ -205,11 +250,15 @@
         }
       }
     }
+
+    overlay.draw(ctx, `rgb(${r0},${g0},${b0})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

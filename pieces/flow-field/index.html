@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — flow-field</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
@@ -26,10 +30,11 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'flow-field';
   const canvas = document.getElementById('canvas');
@@ -74,16 +79,17 @@
     extraControls: [
       // Defaults off: continuous mode's long ribbons are this piece's identity.
       // In particle mode it renders short dashes that read too much like grain-field.
-      { name: 'mode', label: 'Particle mode', type: 'checkbox', default: false },
+      { name: 'mode', label: 'Particle mode', type: 'checkbox', default: false, category: 'visual' },
     ],
     // Pinned deliberately, not inherited. These happen to equal the shared
     // control defaults, but stating them here is what makes 200/280 visible as
     // TAKEN to the next contributor grepping pieces' `defaults` blocks for a
     // free hue — and keeps flow-field's violet if the shared defaults ever move.
-    defaults: { hue: 200, hueB: 280, saturation: 0.6 },
+    defaults: { hue: 200, hueB: 280, saturation: 0.6, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
 
   seedParticles(Math.round(BASE_COUNT * currentValues.density));
   window.addEventListener('resize', () =>
@@ -100,8 +106,10 @@
   }
 
   function drawFrame(dt, elapsed, values) {
-    const [r, g, b] = hslToRgb(values.hue, values.saturation, 0.55);
-    const [rB, gB, bB] = hslToRgb(values.hueB, values.saturation, 0.55);
+    const stopA = paletteHsl(values, 0);
+    const [r, g, b] = hslToRgb(stopA.h, stopA.s, 0.55);
+    const stopB = paletteHsl(values, 1);
+    const [rB, gB, bB] = hslToRgb(stopB.h, stopB.s, 0.55);
 
     // Low fade alpha: each frame only partially clears, so the streaks a
     // particle leaves behind persist long enough to read as flowing lines.
@@ -110,26 +118,44 @@
 
     paths = [];
     const lineWidth = 0.3 + values.stroke * 1.2;
+    // modeFactor is off at pointer 0, off when cursorInteraction is 'None'
+    // regardless of pointer, and eased rather than snapped when the cursor
+    // leaves. Nothing else.
+    const k = modeFactor(values, pointer);
 
     for (const p of particles) {
       let angle = fieldAngle(p.x, p.y, elapsed, values);
 
-      // Multiplied by BOTH the control and influence: off at pointer 0, and
-      // eased rather than snapped when the cursor leaves. Nothing else.
-      const k = values.pointer * pointer.influence;
       let pushX = 0, pushY = 0;
+      let lw = lineWidth;
       if (k) {
         const f = pointer.falloff(p.x, p.y, 260);
-        const away = Math.atan2(p.y - pointer.y, p.x - pointer.x);
-        angle += (away - angle) * f * k * 0.6;
-        // Direct positional nudge, deliberately NOT routed through
-        // `values.speed`/the speed-scaled `speed` below: that term is exactly
-        // zero at Speed 0, which would silence the pointer's entire effect at
-        // that setting. This term uses only dt (real frame time, for
-        // frame-rate independence) so pointer response survives Speed 0.
-        const push = f * k * 90 * (dt || 0.016);
-        pushX = Math.cos(away) * push;
-        pushY = Math.sin(away) * push;
+        if (f) {
+          if (values.cursorInteraction === 'Attract') {
+            const toward = Math.atan2(pointer.y - p.y, pointer.x - p.x);
+            angle += (toward - angle) * f * k * 0.6;
+            // Direct positional nudge, deliberately NOT routed through
+            // `values.speed`/the speed-scaled `speed` below: that term is
+            // exactly zero at Speed 0, which would silence the pointer's
+            // entire effect at that setting. This term uses only dt (real
+            // frame time, for frame-rate independence) so pointer response
+            // survives Speed 0.
+            const push = f * k * 90 * (dt || 0.016);
+            pushX = Math.cos(toward) * push;
+            pushY = Math.sin(toward) * push;
+          } else if (values.cursorInteraction === 'Vortex') {
+            const away = Math.atan2(p.y - pointer.y, p.x - pointer.x);
+            const tangent = away + Math.PI / 2;
+            angle += (tangent - angle) * f * k * 0.6;
+            const push = f * k * 90 * (dt || 0.016);
+            pushX = Math.cos(tangent) * push;
+            pushY = Math.sin(tangent) * push;
+          } else if (values.cursorInteraction === 'Grow') {
+            lw = lineWidth * (1 + f * k * 1.6);
+          } else if (values.cursorInteraction === 'Shrink') {
+            lw = Math.max(lineWidth * 0.15, lineWidth / (1 + f * k * 1.6));
+          }
+        }
       }
 
       // Base px/sec must stay well above lineWidth, or each frame's segment is
@@ -145,7 +171,7 @@
       const [fr, fg, fb] = values.invert ? [255 - cr, 255 - cg, 255 - cb] : [cr, cg, cb];
 
       ctx.strokeStyle = `rgba(${fr | 0},${fg | 0},${fb | 0},${values.opacity})`;
-      ctx.lineWidth = lineWidth;
+      ctx.lineWidth = lw;
 
       if (values.mode) {
         ctx.beginPath();
@@ -154,10 +180,10 @@
         if (values.glow > 0) {
           // Underlay pass: wider, dimmer stroke approximates bloom cheaply
           // (canvas shadowBlur costs 5-10x per draw call at this element count).
-          ctx.lineWidth = lineWidth + values.glow * 3;
+          ctx.lineWidth = lw + values.glow * 3;
           ctx.globalAlpha = values.glow * 0.25;
           ctx.stroke();
-          ctx.lineWidth = lineWidth;
+          ctx.lineWidth = lw;
           ctx.globalAlpha = 1;
         }
         ctx.stroke();
@@ -184,10 +210,10 @@
             ctx.lineTo(p.trail[i][0], p.trail[i][1]);
           }
           if (values.glow > 0) {
-            ctx.lineWidth = lineWidth + values.glow * 3;
+            ctx.lineWidth = lw + values.glow * 3;
             ctx.globalAlpha = values.glow * 0.25;
             ctx.stroke();
-            ctx.lineWidth = lineWidth;
+            ctx.lineWidth = lw;
             ctx.globalAlpha = 1;
           }
           ctx.stroke();
@@ -195,11 +221,15 @@
         }
       }
     }
+
+    overlay.draw(ctx, `rgb(${r},${g},${b})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

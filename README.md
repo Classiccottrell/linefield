@@ -73,7 +73,8 @@ the existing `<script type="module">`:
 <script>
   window.__LF_BAKED_VALUES__ = {
     scale: 1, speed: 0.6, stroke: 1, opacity: 1,
-    saturation: 0.5, hue: 210, hueB: 260,
+    saturation: 0.5, colorMode: 'gradient', hue: 210, hueB: 260,
+    colorA: '#3399ff', colorB: '#aa00ff',
     glow: 0, angle: 0, motion: 1, phase: 0,
     invert: false, density: 0.8,
   };
@@ -90,7 +91,7 @@ HTML export removes it separately, along with anything else marked
 `data-lf-panel`. Delete or hide that `<div class="lf-export-row">` if you
 are configuring a piece by hand and don't want it visible.
 
-Every one of the 14 shared controls may be set this way, plus any
+Every one of the 16 shared controls may be set this way, plus any
 piece-specific control — check that piece's `extraControls` for its names.
 But unlike the real Baked HTML export, which always writes every control's
 current value, a hand-written object is used as-is: it is not merged with
@@ -98,6 +99,13 @@ the piece's defaults. Any control you omit reads as `undefined`, which
 breaks rendering (an untuned canvas, no visible strokes) rather than
 falling back to a default. Set every control the piece defines — copy the
 full list above and edit values, don't trim it. Unknown keys are ignored.
+
+A piece's own rendering reads `hue`/`hueB`/`saturation`/`colorMode`/`invert`
+(via `paletteHsl()`, see CONTRIBUTING.md) — `colorA`/`colorB` are the
+picker's own hex display and are not read by drawing code, but the real
+Baked HTML export always includes them since it dumps the panel's full
+value set. Include them by hand too if you're hand-authoring rather than
+exporting, for consistency, though rendering does not require it.
 
 ## Presets
 
@@ -119,11 +127,13 @@ chip, since the configuration is no longer that preset. Picking a preset
 persists like any manual tuning, and "Reset to defaults" still returns to the
 piece's own defaults.
 
-The gallery shows all five as a strip of labelled swatches under each card.
+Presets live in each piece's own control panel. The gallery does not surface
+them — a homepage of seventeen cards each carrying five swatches was more
+inventory than invitation.
 
 ## Gallery
 
-`index.html` at the repo root shows all twelve pieces with live previews,
+`index.html` at the repo root shows all seventeen pieces with live previews,
 filtering, and per-piece downloads. Serve the repo and open `/`:
 
 ```bash
@@ -147,15 +157,51 @@ tooling" below and CONTRIBUTING.md.
 - `tether` — a few heavy cables strung taut and swaying
 - `event-horizon` — a polar grid bent inward by a gravity well
 - `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
+- `puddle` — bounded, organic interference rippling across a puddle's surface
+- `globe` — a latitude/longitude wire mesh bending into a spinning sphere
+- `matrix-code` — quantized columns of glyphs churning identity independently of their falling head
+- `chain-haze` — lines of chains receding into the distance, discrete linked ovals fading with depth
+- `stock-market` — tracks of rising and falling bars marching across the field, buy and sell rendered as filled rectangles
 
-Every piece shares 14 controls (scale, speed, stroke, opacity, saturation,
-hue, hue B, glow, angle, motion, phase, invert, density, pointer) plus its
-own piece-specific control. `density` multiplies the piece's base element
-count. `pointer` scales the piece's cursor response (0 by default, opt-in);
-each piece maps it to its own visual vocabulary and remains responsive at
-Speed 0. `wireframe-lattice` and `event-horizon` also provide Pitch and Yaw
-controls; Angle is roll, and dragging the canvas orbits the camera on direct
-piece pages. Gallery previews disable drag-to-orbit.
+Every piece shares 16 controls (cursor interaction, scale, speed, stroke,
+opacity, saturation, color mode, color A, color B, glow, angle, motion,
+phase, invert, density, pointer) plus its own piece-specific control. Color
+mode switches between a single hue (Solid) and a two-stop blend (Gradient,
+the default — every piece's own look); Color A/B are hex pickers, B shown
+only in Gradient mode. `density` multiplies the piece's base element count.
+`cursor interaction` selects one of seven modes, wired on all seventeen
+pieces. None does nothing. Grow enlarges marks near the cursor; Shrink
+narrows them. Attract pulls nearby marks toward the cursor; Vortex swirls
+them around it in place. Particle Trail scatters a fading dust of small
+particles that follows the cursor's recent path; Ripples sends expanding
+rings outward from wherever the cursor rests. Grow/Shrink/Attract/Vortex
+scale marks individually on element-based pieces and amplify or damp an
+existing local deformation on whole-path pieces (rings, bands, ribbons,
+cables) — canvas cannot vary a single path's stroke width partway along
+it, so a piece that draws a whole ring or ribbon as one path leans on
+motion it already has rather than literal per-mark scaling. Particle Trail
+and Ripples are a shared cursor-relative overlay, identical on every
+piece, layered on top of a piece's own drawing rather than replacing any
+of it.
+
+`pointer` scales whichever mode is selected and defaults to 0, since these
+are backgrounds — meant to hold still until a visitor's cursor invites
+otherwise — and each piece remains fully responsive to it at Speed 0.
+`cursorInteraction: None` and `pointer: 0` are two different ways to be
+off: the mode dropdown turns cursor response off regardless of pointer,
+while leaving a mode selected with pointer at 0 keeps it silent but ready
+— raising pointer later needs no other change. `wireframe-lattice` and
+`event-horizon` also provide Pitch and Yaw controls; Angle is roll, and
+dragging the canvas orbits the camera on direct piece pages. Gallery
+previews disable drag-to-orbit.
+
+The panel itself is sectioned into Interactions (cursor interaction,
+pointer, and Pitch/Yaw on the two 3D pieces), Color, and Visual — each a
+collapsible header with its own open/closed state, persisted per piece.
+Interactions opens by default; Color and Visual start closed, so the panel
+fits on screen at rest. Reset is a sticky footer, always visible at the
+panel's bottom edge regardless of scroll position. Below ~640px the panel
+docks as a bottom sheet, collapsed to a handle by default.
 
 ## Adding a new piece
 
@@ -191,21 +237,32 @@ assets:
 ```bash
 npm install
 npx playwright install chromium   # one-time, for headless capture
+npm run build            # NOT run in CI — verify, then regenerate thumbs/ and downloads/, which are committed
+
+# Below this line, every command runs in CI (.github/workflows/checks.yml),
+# in EXACTLY this order (see that file's own comments for why — the last
+# one is deliberately last, slowest and broadest, so it can never hide a
+# faster/narrower step's failure behind itself), except the last three
+# below, which are curation tools with no pass/fail gate — read their output
+# yourself, nothing exits nonzero.
 npm run verify          # check pieces.json / pieces/ / README agree; no generation
-npm run build            # verify, then regenerate thumbs/ and downloads/
-npm run audit-controls   # empirically check every shared+piece control moves pixels
-node tools/test-presets.mjs <slug>   # preset mechanism + value range gate
+node tools/test-presets.mjs <slug>   # preset mechanism (one piece) + value/enum gate (all pieces, regardless of <slug>)
+npm run test-bake-fresh  # bakes every piece live, rather than reading committed downloads/
 npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
 npm run test-source      # Source buttons download exact unbaked piece files
 npm run test-interactions # pointer, orbit, animation, and baked-artifact browser QA
-node tools/preset-sheet.mjs <slug>   # render a piece's presets for review
+npm run test-cursor-modes # every cursor mode live and mutually distinct, per piece
+npm run audit-controls   # empirically check every shared+piece control moves pixels — LAST, deliberately
+
+node tools/preset-sheet.mjs <slug>   # NOT run in CI — render a piece's presets for review
+node tools/mode-sheet.mjs            # NOT run in CI — paired None-vs-mode 1:1 crops for visual review
+npm run collection-metrics           # NOT run in CI — hue/sat/ink per piece, as ROADMAP's table
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
-canvas, captured at 1280×800), `thumbs/<slug>.<preset>.png` (sixty preset
-swatches at 240×150) and `downloads/<slug>.html` (each piece's own
+canvas, captured at 1280×800) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
-never reimplemented) for all twelve pieces, then renders `index.html` at
+never reimplemented) for all seventeen pieces, then renders `index.html` at
 the repo root from `tools/templates/gallery.html` and the manifest — the
 gallery page itself, with live hover/keyboard previews, tag filtering, and
 per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
@@ -223,6 +280,16 @@ review by inspection alone, which is why this exists as a script instead
 of a one-off check. It drives controls via `window.__LF_PANEL__.setValue`
 and reads `window.__LF_SPECS__`, not DOM position, so it survives whatever
 widget a control renders as.
+
+`tools/collection-metrics.mjs` measures the collection's spread — each
+piece's colourfulness-weighted mean hue, mean saturation, and ink coverage
+(the fraction of the frame it marks) — and prints ROADMAP's "Collection
+constraints" table ready to paste. It decodes the committed
+`thumbs/<slug>.png` itself with `node:zlib`, so it needs no browser and no
+dependency, and it measures what was last built: run `npm run build` first
+if a piece changed. There is no pass/fail gate — it answers "where is the
+hue wheel open, and which density is under-served", which is a judgement a
+human makes.
 
 The gallery's live hover/keyboard preview loads pieces with `?preview=1`.
 `shared/controls.js` checks for that flag and, when present, skips both

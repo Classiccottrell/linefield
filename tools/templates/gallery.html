@@ -71,18 +71,6 @@
     border:1px solid var(--line);padding:4px 8px;border-radius:2px;
   }
 
-  .presets{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:0 0 14px}
-  .pre{display:block;text-decoration:none;border:1px solid var(--line);border-radius:2px;
-    overflow:hidden;background:var(--ground)}
-  /* height:auto is load-bearing: the <img> carries a height attribute as a
-     presentational hint, which outranks aspect-ratio unless height is set. */
-  .pre img{width:100%;height:auto;display:block;aspect-ratio:16/10;object-fit:cover}
-  .pre span{display:block;padding:3px 4px;font:10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
-    letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:center}
-  .pre:hover{border-color:#3a3a46}
-  .pre:hover span{color:var(--text)}
-  .pre:focus-visible{outline:2px solid #6fb4c9;outline-offset:2px}
-  @media (max-width:420px){ .presets{grid-template-columns:repeat(3,1fr)} }
 
   .actions{display:flex;flex-wrap:wrap;gap:8px}
   .btn{

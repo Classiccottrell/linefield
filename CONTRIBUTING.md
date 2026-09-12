@@ -38,12 +38,19 @@ dependency. None of that reaches a user of a piece.
 
 1. Build the piece as described above.
 2. Add an entry to `pieces.json` — `slug`, `title`, `blurb`, `tags`, and the
-   `hue`/`hueB`/`saturation` from the piece's own `defaults` block. The
-   `defaults` block itself must list its keys in that exact order
+   `hue`/`hueB`/`saturation` from the piece's own `defaults` block. These
+   three must come FIRST in the `defaults` block and in that exact order
    (`hue`, then `hueB`, then `saturation`) — the verifier's parser is a
-   regex locked to that order.
+   regex locked to that order. `colorMode`/`colorA`/`colorB` (see "The 15
+   shared controls" below) may follow after; they are not read by the
+   manifest.
 3. Add a bullet to README's Pieces list.
 4. Run `npm run build`.
+5. Run `npm run collection-metrics` and paste its output over ROADMAP's
+   "Collection constraints" table, so the collection's hue/saturation/ink
+   spread still describes the library someone reads it against. Do this
+   after the build — it measures the committed thumbnails, so a piece with
+   no thumbnail yet has no row.
 
 The build verifies before it generates, and **fails** if the manifest, the
 pieces on disk, and the README disagree — including if a piece's palette has
@@ -58,17 +65,41 @@ unrelated `npm run build` is a byte-identical no-op — only pieces you
 actually touched will show a diff in `thumbs/`.
 
 **CI will not catch a forgotten rebuild.** CI (`.github/workflows/checks.yml`)
-runs `npm run verify` (manifest vs. pieces vs. README agreement) and
-`npm run audit-controls` (every control has a visible effect). It
-deliberately does not run `npm run build`, because the gallery, thumbnails
-and downloads are committed and GitHub Pages serves them directly —
-rebuilding in CI would rewrite those committed artifacts on every run and
-undo the determinism work above. This is an accepted gap, not an oversight:
-if you tune a piece and forget to re-run `npm run build`, the committed
-thumbnail and baked download for that piece go stale, `npm run verify`
-still passes (it checks the manifest, not pixels), and CI stays green.
-There is no automated check for this — re-running the build after any
-visual change is on you.
+runs, in order: `npm run verify` (manifest vs. pieces vs. README
+agreement), `node tools/test-presets.mjs synapse` (preset mechanism on one
+piece, preset value/enum data on all seventeen — see "Presets" below),
+`npm run test-bake-fresh` (bakes every piece live — the real `bakeHtml()`
+in `shared/export.js`, against today's source — and validates that
+output), `npm run test-baked` (every *committed* `downloads/*.html`
+renders standalone over `file://`), `npm run test-source` (Source buttons
+download exact unbaked piece files), `npm run test-interactions` (pointer,
+orbit, animation, and baked-artifact browser QA), `npm run test-cursor-modes`
+(every cursor mode live and mutually distinct, per piece — see "Cursor
+interaction" below), and `npm run audit-controls` (every control has a
+visible effect; run LAST, deliberately — it's the slowest, broadest check
+and the one most likely to fail mid-rollout of a new control, and a slow
+broad gate must never stand in front of fast specific ones and hide their
+results). `node tools/preset-sheet.mjs`, `node tools/mode-sheet.mjs`,
+`node tools/browser-matrix.mjs` and `npm run collection-metrics` are
+curation tools with no pass/fail gate and do not run in CI at all — read
+their output yourself. Neither bake
+check catches a forgotten rebuild, and saying so is
+not a contradiction of the heading above — it's the point. `test-bake-fresh`
+proves the bake *process* works against current source and says nothing
+about what's actually committed; `test-baked` proves the committed *bytes*
+still render standalone (catching a hand-edit, a truncated file, or output
+left over from a since-fixed broken bake) and is blind to a live process
+regression until someone next runs `npm run build`. A piece whose values
+were tuned but never rebuilt renders fine either way — nonzero variance, no
+errors — so both gates pass trivially on a stale download. CI deliberately
+does not run `npm run build` itself to refresh committed files, because the
+gallery, thumbnails and downloads are committed and GitHub Pages serves them
+directly — rebuilding in CI would rewrite those committed artifacts on
+every run and undo the determinism work above. This is an accepted gap, not
+an oversight: if you tune a piece and forget to re-run `npm run build`, the
+committed thumbnail and baked download for that piece go stale, every gate
+above still passes, and CI stays green. There is no automated check for
+this — re-running the build after any visual change is on you.
 
 ## Serving the project
 
@@ -84,35 +115,61 @@ npx serve .
 
 Then open `http://localhost:<port>/pieces/<piece-name>/`.
 
-## The 14 shared controls
+## The 16 shared controls
 
 Every piece gets these controls for free via `createControlPanel()`
-(`shared/controls.js`): `scale`, `speed`, `stroke`, `opacity`, `saturation`,
-`hue`, `hueB`, `glow`, `angle`, `motion`, `phase`, `invert`, `density`,
-`pointer`.
+(`shared/controls.js`): `cursorInteraction`, `pointer`, `scale`, `speed`,
+`stroke`, `opacity`, `saturation`, `colorMode`, `colorA`, `colorB`, `glow`,
+`angle`, `motion`, `phase`, `invert`, `density`.
 
-A new piece should make **each** of these visibly affect its render — don't
-leave a control wired up but inert. If a control doesn't map naturally onto
-your piece's visuals, find a reasonable interpretation (e.g. `angle` can
-rotate a field, `motion` can scale a secondary animation speed distinct
-from `speed`, `hueB` can drive a second color family) rather than skipping
-it.
+`cursorInteraction` (None / Grow / Shrink / Particle Trail / Ripples /
+Attract / Vortex) selects a cursor-response mode; `pointer` scales its
+strength. The vocabulary and the shared Trail/Ripples overlay live in
+`shared/cursor-modes.js` — see `modeFactor(values, pointer)`, which every
+mode multiplies by and which is 0 whenever `cursorInteraction` is `'None'`
+or `pointer` is 0. Per-mode behaviour (Grow/Shrink/Attract/Vortex) is wired
+piece by piece and is now live on all seventeen pieces. Element-based pieces
+(particles, dots, nodes) scale marks individually — see
+`pieces/flow-field/index.html` for the worked example. Whole-path pieces
+that stroke a ring/band/ribbon/cable as one path can't vary stroke width
+mid-path, so they amplify/damp an existing falloff-weighted local
+deformation instead — see `pieces/contour-grid/index.html`.
+
+`colorMode` (Solid/Gradient) and `colorA`/`colorB` (hex colour pickers,
+`colorB` only shown in Gradient mode) are the *authored* palette — a piece
+never reads them directly. Call `paletteHsl(values, f)` from
+`shared/color.js` instead: it returns `{ h, s }` for a 0-1 position along the
+ramp (`f=0` is stop A, `f=1` is stop B; Solid mode ignores `f` and always
+returns stop A), sourcing `s` from the shared `saturation` control. `hue` and
+`hueB` still exist in `values` — exact numeric degrees, hidden from the
+panel — but they are implementation values `colorA`/`colorB` drive one-way
+(pick a colour -> hue updates); a piece's own code should never read them.
+
+A new piece should make **each** authored control visibly affect its
+render — don't leave a control wired up but inert. If a control doesn't map
+naturally onto your piece's visuals, find a reasonable interpretation (e.g.
+`angle` can rotate a field, `motion` can scale a secondary animation speed
+distinct from `speed`, `colorB`/stop B can drive a second color family)
+rather than skipping it.
 
 ## Piece-specific controls (`extraControls`)
 
 Pass an `extraControls` array to `createControlPanel({ ... extraControls })`
 for controls unique to your piece (same spec shape as the shared controls —
 `name`, `label`, `type`, `min`/`max`/`step` or default, etc). These render
-below the 14 shared controls automatically. You can also add one after the
+below the 16 shared controls automatically. You can also add one after the
 panel exists with `panel.addControl({ ... })`.
 
 ## Defaults (`defaults`)
 
 Pass a `defaults` object to `createControlPanel({ ... defaults })` to set
-your piece's own default values, most importantly `hue` and `hueB`, so each
-piece in the library reads as visually distinct out of the box. Check the
-existing pieces' `defaults` blocks before picking colors to avoid
-duplicating another piece's palette.
+your piece's own default values: `hue`/`hueB` (exact degrees — most
+important, so each piece in the library reads as visually distinct out of
+the box) and `colorA`/`colorB` (the hex the picker shows for those same two
+hues on first load — a display value only, never decoded back for
+rendering, so it doesn't need to round-trip exactly). Check the existing
+pieces' `defaults` blocks before picking colors to avoid duplicating another
+piece's palette.
 
 Note a saved `localStorage` value always outranks a piece's `defaults` for
 a returning visitor — that's expected; "Reset to defaults" in the panel
@@ -136,10 +193,14 @@ renders — `applyValues` writes it straight into the values object the
 render reads, and the range input only clamps its own displayed position.
 `node tools/test-presets.mjs <slug>` checks every preset value against
 `window.__LF_SPECS__` (the resolved control specs, each carrying a `kind` of
-`'boolean'` or `'number'` — gate scripts must discriminate on `kind`, never
-on `type`) and fails naming the offending piece/preset/control/value/range,
-but keep values in range by construction rather than relying on the gate to
-catch it after the fact. `window.__LF_PANEL__.setValue(name, value, { persist
+`'boolean'`, `'color'`, `'enum'`, `'hidden'`, or `'number'` — gate scripts
+must discriminate on `kind`, never on `type`) and fails naming the
+offending piece/preset/control/value/range-or-options, but keep values in
+range (and enum values in vocabulary) by construction rather than relying
+on the gate to catch it after the fact. This check sweeps every piece in
+`pieces.json`, not just `<slug>` — preset data is piece-specific, unlike
+checks 1-7 in that file, which exercise the shared mechanism and are
+representative from one piece. `window.__LF_PANEL__.setValue(name, value, { persist
 })` is the panel's write path exposed for tooling — every gate script drives
 controls through it rather than querying `.lf-row` DOM by position.
 
@@ -158,6 +219,68 @@ state frame to frame, not values recomputed from scratch each frame), you
 must re-seed that array inside the panel's `onChange` callback when
 `density` changes — recomputing `count` alone won't resize an existing
 array. See `pieces/flow-field/index.html` for a worked example.
+
+## Cursor interaction
+
+`shared/cursor-modes.js` exports `CURSOR_MODES` (the seven-mode vocabulary
+the `cursorInteraction` control declares), `modeFactor(values, pointer)`
+(the strength every mode multiplies by — 0 whenever `cursorInteraction` is
+`'None'` or `pointer` is 0, and nothing else, so a user can always fully
+disable cursor response), and `createCursorOverlay()` (the shared
+Particle-Trail/Ripples renderer — implement it once here, not per piece).
+
+Wire it in a piece's `onFrame`:
+
+```js
+const overlay = createCursorOverlay();
+// ...
+onFrame(dt, elapsed) {
+  pointer.step();
+  const k = modeFactor(currentValues, pointer);
+  overlay.step(currentValues.cursorInteraction, k, pointer);
+  drawFrame(dt, elapsed, currentValues);   // the piece's own render
+}
+```
+
+**Draw-ordering contract, binding on every piece:** call `overlay.draw(ctx,
+colour, k)` as the LAST thing in the piece's own frame — after it has
+cleared the canvas and drawn everything else for that tick, never before.
+Fifteen of the seventeen pieces in this library do a full clear every frame
+— the exceptions are `flow-field` and `accretion`, which fade with a
+part-alpha fill so their marks leave trails; a
+piece that draws the overlay before its own clear/fillRect wipes the
+overlay's marks along with everything else. See
+`pieces/flow-field/index.html`'s `drawFrame()` — `overlay.draw(...)` is the
+last line in the function, after the frame's own drawing loop.
+
+Grow/Shrink/Attract/Vortex are per-piece behaviours: each piece interprets
+what "grow"/"shrink"/etc. means for its own geometry, gated on
+`modeFactor(values, pointer)`, dispatched by `values.cursorInteraction`.
+There is no shared implementation for these four — only the vocabulary and
+the gate.
+
+### What a new piece owes
+
+A new piece must implement all seven modes, not a subset — None, Grow,
+Shrink, Attract, Vortex per-piece plus the shared Particle Trail/Ripples
+overlay wired as shown above. Every mode's strength must flow through
+`modeFactor(values, pointer)` and nothing else: don't gate cursor response
+on `speed`, `motion`, `density`, or any other control a user can set to
+zero, since `modeFactor` is the one place `cursorInteraction: 'None'` and
+`pointer: 0` are honoured, and a second gate is a second way to leave a
+mode silently stuck on or off. At `pointer: 0` the piece must be
+byte-for-byte inert under cursor movement — `modeFactor` already returns 0
+there, so this falls out for free as long as nothing bypasses it.
+
+Run `npm run test-cursor-modes` (also enforced in CI) before calling a
+piece's cursor wiring done — it drives every mode live on every piece and
+asserts no two render identically. It is a change-detector, not a
+visibility check: a
+piece can pass it and still look like nothing moved to a human (see
+ROADMAP.md, "A diff percentage is not visibility"). Follow it with
+`node tools/mode-sheet.mjs` and look at the paired None-vs-mode crops
+yourself — that is the only instrument that answers whether the effect
+reads.
 
 ## Baked HTML export
 

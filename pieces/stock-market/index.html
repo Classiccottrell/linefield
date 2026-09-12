@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — stock market</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+
+  const PIECE_ID = 'stock-market';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // The library's first filled-rectangle mark (see CONTRIBUTING.md, "The 16
+  // shared controls" / ROADMAP.md's collection-constraints note on this
+  // piece). Deliberately NOT a literal chart widget: no axis, no gridlines,
+  // no price labels, no single fixed baseline. Several independent tracks
+  // of marching bars, each centred on its own mid-line and growing up or
+  // down from it, so the composition reads as generative rhythm — rise and
+  // fall, buy and sell — rather than a finance-app screenshot. This is the
+  // same move `globe` made for "sphere without being literal continents":
+  // keep the structural cue (discrete bars, up/down state, marching motion)
+  // and drop everything that would anchor it to a specific instrument.
+  function hash(a, b, c) {
+    let h = (a * 374761393 + b * 668265263 + c * 2246822519) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  // Deterministic pseudo-random in [0,1) from an integer hash — no
+  // Math.random anywhere, same discipline as matrix-code/chain-haze, so
+  // thumbnail capture (pinned clock) and the change-detector gates stay
+  // byte-identical against untouched source.
+  function rand01(a, b, c) {
+    return (hash(a, b, c) % 100000) / 100000;
+  }
+
+  const BASE_TRACKS = 4;
+  const BASE_COLS_PER_TRACK = 22;
+  const MARCH_RATE = 1.6; // whole bars/sec a track advances at speed=1
+  const BUCKET_SEC = 0.9; // how often a bar's height/state re-rolls, scaled by motion
+
+  const PRESETS = {
+    whisper: { opacity: 0.3, stroke: 0.4, density: 0.6, saturation: 0.12, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.4, density: 0.9, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 0.6, density: 1.1, saturation: 0.9, glow: 1.3 },
+    drift:   { opacity: 0.6, stroke: 0.7, density: 0.85, speed: 0.35, motion: 1.6 },
+    dense:   { opacity: 0.75, stroke: 0.5, density: 1.9, speed: 1.2 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // Bar width as a fraction of its column slot — 'form', matching
+      // chain-haze's linkAspect precedent for a piece-specific shape knob.
+      { name: 'barWidth', label: 'Bar width', type: 'range', min: 0.3, max: 0.9, step: 0.01, default: 0.62, category: 'form' },
+    ],
+    // 78/92: sits in the open span between synapse (54) and chain-haze (96)
+    // that ROADMAP.md's collection-constraints table leaves free — the
+    // 95-135 band it calls out is nearly claimed by puddle/matrix-code/
+    // chain-haze already. Differentiated on form (filled rectangles, the
+    // library's first) and aimed at the 0.11-0.19 ink-coverage band the
+    // table flags as empty, not on a wide hue gap.
+    defaults: { hue: 78, hueB: 92, saturation: 0.5, colorMode: 'gradient', colorA: '#9fd34a', colorB: '#d3654a' },
+  });
+  const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
+
+  let paths = [];
+
+  // Closed 4-corner polyline for SVG export — a rect has no path primitive
+  // in exportSvg's polyline-only contract, so it's sampled the same way
+  // chain-haze samples its ellipses.
+  function rectPath(x, y, w, h) {
+    return [[x, y], [x + w, y], [x + w, y + h], [x, y + h], [x, y]];
+  }
+
+  function drawFrame(dt, elapsed, values) {
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    paths = [];
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const tracks = Math.max(2, Math.round(BASE_TRACKS * Math.max(0.4, values.scale)));
+    // density's convention: more, narrower columns per track, not a
+    // resized persistent array — there is no persistent array, every bar
+    // is recomputed from track/col/bucket indices each frame.
+    const colsPerTrack = Math.max(6, Math.round(BASE_COLS_PER_TRACK * values.density));
+    const colW = W / colsPerTrack;
+    const barW = colW * values.barWidth;
+
+    const k = modeFactor(values, pointer);
+    const theta = (values.angle * Math.PI) / 180;
+    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
+    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
+    const plx = W / 2 + pdx * cosT - pdy * sinT;
+    const ply = H / 2 + pdx * sinT + pdy * cosT;
+
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(theta);
+    ctx.translate(-W / 2, -H / 2);
+
+    const bucket = Math.floor(elapsed * values.motion / BUCKET_SEC);
+    // `phase` offsets the marching sequence along x (static shift); `speed`
+    // marches whole columns over time; `motion` drives the independent
+    // re-roll clock above — none gates the others at zero.
+    const marchCols = elapsed * values.speed * MARCH_RATE + values.phase * colsPerTrack * 0.5;
+
+    for (let t = 0; t < tracks; t++) {
+      const tf = tracks === 1 ? 0.5 : t / (tracks - 1);
+      const midY = H * (0.18 + 0.64 * tf);
+      const maxBarH = (H / tracks) * 0.42 * Math.max(0.2, values.scale);
+
+      for (let col = -1; col < colsPerTrack + 1; col++) {
+        const globalCol = col + Math.floor(marchCols);
+        const localX = ((col - (marchCols % 1) + colsPerTrack) % colsPerTrack) * colW;
+
+        // Two consecutive re-rolls hashed by (track, globalCol, bucket) and
+        // its predecessor give a continuous-feeling walk without storing
+        // any state: the "previous price" is just bucket-1 of the same
+        // deterministic function, not a remembered value.
+        const prev = rand01(t, globalCol, bucket - 1);
+        const now = rand01(t, globalCol, bucket);
+        const delta = now - prev; // signed: >0 rise ("buy"), <0 fall ("sell")
+        const up = delta >= 0;
+        const mag = Math.min(1, Math.abs(delta) * 2.2 + 0.12);
+
+        let barH = maxBarH * mag;
+        let x = localX + (colW - barW) / 2;
+        let y = up ? midY - barH : midY;
+        let w = barW;
+
+        if (k) {
+          const cx = x + w / 2, cy = midY;
+          const ddx = cx - plx, ddy = cy - ply;
+          const dist = Math.hypot(ddx, ddy) || 1;
+          const f = Math.max(0, 1 - dist / 300);
+          if (f) {
+            const mode = values.cursorInteraction;
+            if (mode === 'Grow') {
+              const grow = 1 + f * k * 1.1;
+              barH *= grow;
+              w *= 1 + f * k * 0.4;
+              x = localX + (colW - w) / 2;
+              y = up ? midY - barH : midY;
+            } else if (mode === 'Shrink') {
+              const shrink = 1 / (1 + f * k * 1.4);
+              barH = Math.max(1, barH * shrink);
+              w = Math.max(1, w / (1 + f * k * 0.7));
+              x = localX + (colW - w) / 2;
+              y = up ? midY - barH : midY;
+            } else if (mode === 'Attract') {
+              x += (plx - cx) * f * k * 0.5;
+            } else if (mode === 'Vortex') {
+              y += -(ddx / dist) * f * k * 40;
+            }
+          }
+        }
+
+        const f01 = up ? 0.15 : 0.85;
+        const { h, s } = paletteHsl(values, f01);
+        const light = values.invert ? (up ? 0.32 : 0.42) : (up ? 0.62 : 0.55);
+        const [r, g, b] = hslToRgb(h, s, light);
+        const alpha = values.opacity * (0.55 + mag * 0.45);
+
+        if (values.glow > 0) {
+          ctx.fillStyle = `rgba(${r},${g},${b},${values.glow * 0.28 * alpha})`;
+          const pad = values.glow * 3;
+          ctx.fillRect(x - pad, y - pad, w + pad * 2, barH + pad * 2);
+        }
+
+        ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+        ctx.fillRect(x, y, w, barH);
+
+        if (values.stroke > 0) {
+          ctx.lineWidth = values.stroke * 1.6;
+          ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(1, alpha * 1.3)})`;
+          ctx.strokeRect(x, y, w, barH);
+        }
+
+        paths.push(rectPath(x, y, w, barH));
+      }
+    }
+
+    ctx.restore();
+
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.3 : 0.66);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

@@ -51,18 +51,23 @@ function serveRepo(port) {
 
 // Reads the control specs off window.__LF_SPECS__ instead of the DOM, so an
 // addressing scheme survives whatever widget renders a control. Discriminate
-// on `kind` (boolean/number), never on `type` — a future 'select'/'radio'
-// type must not silently alias to one of these two branches.
+// on `kind` (boolean/number/color/enum/hidden), never on `type`. 'hidden'
+// (hue/hueB) is filtered out here: it has no panel row and is not a control a
+// user can drive — colorA/colorB are its user-facing surface and are audited
+// instead.
 async function getControls(page) {
   return page.evaluate(() =>
-    (window.__LF_SPECS__ || []).map((spec, i) => ({
-      i,
-      name: spec.name,
-      label: spec.label,
-      kind: spec.kind,
-      min: spec.kind === 'number' ? Number(spec.min) : null,
-      max: spec.kind === 'number' ? Number(spec.max) : null,
-    }))
+    (window.__LF_SPECS__ || [])
+      .filter((spec) => spec.kind !== 'hidden')
+      .map((spec, i) => ({
+        i,
+        name: spec.name,
+        label: spec.label,
+        kind: spec.kind,
+        min: spec.kind === 'number' ? Number(spec.min) : null,
+        max: spec.kind === 'number' ? Number(spec.max) : null,
+        options: spec.kind === 'enum' ? spec.options : null,
+      }))
   );
 }
 
@@ -111,6 +116,60 @@ function diffScore(a, b) {
 
 const LIVE_THRESHOLD = 0.05; // % of sampled pixels changed, below this = no visible change
 
+// colorMode's mechanism (blend two stops vs. lock to stop A) is universal,
+// but whether flipping it MOVES PIXELS is bounded by how far apart a given
+// piece's own colorA/colorB happen to be — rainfall's are only 10deg apart
+// at saturation 0.18 by deliberate design ("quiet rain"), so the two modes
+// differ by ~2/255 per channel there: real, but under any noise-floor a
+// human or this script would call visible. That conflates "is colorMode
+// wired correctly" (a piece-independent question) with "are this piece's
+// default stops far apart" (a palette-authoring choice, already covered by
+// the hue/hueB manifest gate). Pin both stops to two maximally distinct
+// colours before probing colorMode specifically, so its own test isolates
+// the mechanism rather than inheriting a piece's palette choice.
+//
+// Same conflation for `pointer`/`cursorInteraction`: a piece's cursor
+// response is gated on BOTH being non-default at once (modeFactor in
+// shared/cursor-modes.js returns 0 unless cursorInteraction !== 'None' AND
+// pointer > 0, by design — pointer=0 or None must be fully inert). Probing
+// either control alone leaves the other at ITS default (pointer=0,
+// cursorInteraction='None'), so the response is zero regardless of what the
+// probed control does. Pin the other one on, same fix as colorMode above.
+//
+// Pinned to 'Particle Trail', not a per-piece mode like 'Attract': Particle
+// Trail is the shared overlay in shared/cursor-modes.js — one
+// implementation, already covered by tools/test-cursor-modes.mjs, that
+// per-piece work (Tasks 2/3 rewriting Attract/Grow/Shrink/Vortex on eleven
+// pieces) does not touch. Pinning to a per-piece mode would make this
+// PROBE's own result ride on whatever that mode currently happens to do —
+// `pointer` could read DEAD from a regression in Attract's rewrite, a
+// failure that belongs to Attract, misattributed to Pointer instead.
+//
+// What "Pointer LIVE" asserts, since this pin changes it: NOT "moving the
+// pointer slider alone, everything else at its own default, changes
+// pixels" — that reads DEAD by design at cursorInteraction='None'. It
+// asserts "with cursor response already active via the overlay, sliding
+// pointer's strength up changes pixels." The interaction as a whole is what
+// PREREQS.cursorInteraction (below) exercises the reverse of.
+//
+// Mirror statement for PREREQS.cursorInteraction, since it is easy to
+// overclaim here: pinning `pointer` to 1 makes "zero DEAD for
+// cursorInteraction" assert that the MODE-SELECTION MECHANISM is wired —
+// switching the dropdown changes what the shared overlay / a piece's own
+// branch does, given that pointer strength is already nonzero. It does
+// NOT assert "every mode is visible at this piece's shipped defaults":
+// pointer defaults to 0 on every piece, so an unpinned sweep of
+// cursorInteraction would read DEAD unconditionally regardless of whether
+// mode selection works at all, and this prereq exists to stop that
+// unconditional failure, not to certify any particular mode's look.
+// tools/test-cursor-modes.mjs is the gate that exercises THAT claim — every
+// mode, live and visually distinct, on every piece.
+const PREREQS = {
+  colorMode: { colorA: '#ff2d2d', colorB: '#2de0ff' },
+  pointer: { cursorInteraction: 'Particle Trail' },
+  cursorInteraction: { pointer: 1 },
+};
+
 async function renderVariant(page, base, slug, name, value) {
   await page.goto(`${base}/pieces/${slug}/?preview=1`, { waitUntil: 'load' });
   await page.waitForSelector('.lf-panel .lf-row');
@@ -127,6 +186,10 @@ async function renderVariant(page, base, slug, name, value) {
       clientY: r.top + r.height * 0.4,
     }));
   });
+  const prereq = name !== null ? PREREQS[name] : null;
+  if (prereq) {
+    for (const [n, v] of Object.entries(prereq)) await setControl(page, n, v);
+  }
   if (name !== null) await setControl(page, name, value);
   await stepFrames(page);
   return sample(page);
@@ -138,8 +201,17 @@ async function renderVariant(page, base, slug, name, value) {
 // the range instead and take the largest pairwise diff, so a control is only
 // called DEAD if it produces near-zero change between EVERY pair of test
 // points, not just the two that happened to alias.
+
+// Fixed, distinct hex points for a colour control — includes one grey
+// (achromatic: max===min channel) so hexToHue's "leave hue untouched on an
+// achromatic pick" guard (shared/color.js) is exercised here rather than
+// only in human testing.
+const COLOR_SAMPLE_POINTS = ['#ff2d2d', '#ffe22d', '#2dff5c', '#2de0ff', '#7a2dff', '#808080'];
+
 function samplePoints(control) {
   if (control.kind === 'boolean') return [false, true];
+  if (control.kind === 'enum') return control.options;
+  if (control.kind === 'color') return COLOR_SAMPLE_POINTS;
   const { min, max } = control;
   // Uneven fractions avoid aliasing discrete symmetries too: event-horizon's
   // 36 spokes repeat every 10deg, so quarter-turn samples all looked equal.

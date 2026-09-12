@@ -1,6 +1,6 @@
 {
   "name": "linefield",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "description": "Build tooling for the linefield gallery. The pieces themselves have no dependencies and no build step.",
@@ -8,9 +8,12 @@
     "build": "node tools/build.mjs",
     "verify": "node tools/build.mjs --verify-only",
     "audit-controls": "node tools/audit-controls.mjs",
+    "collection-metrics": "node tools/collection-metrics.mjs",
     "test-baked": "node tools/test-baked.mjs",
+    "test-bake-fresh": "node tools/test-bake-fresh.mjs",
     "test-source": "node tools/test-source.mjs",
     "test-interactions": "node tools/test-interactions.mjs",
+    "test-cursor-modes": "node tools/test-cursor-modes.mjs",
     "pack": "git archive --format=zip --prefix=linefield/ -o linefield-$npm_package_version.zip HEAD"
   },
   "devDependencies": {

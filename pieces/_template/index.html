@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — template</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
@@ -19,15 +23,32 @@
   1. Copy this whole folder to ../<your-piece-name>/ (kebab-case).
   2. Change <title> above.
   3. In the script below, replace the drawFrame() body with your own
-     rendering logic. Read `values` for the 14 shared controls (see
+     rendering logic. Read `values` for the 16 shared controls (see
      shared/controls.js for names/ranges) plus any piece-specific ones,
      which you add via the `extraControls` option to createControlPanel()
      (see the real pieces for examples) — or panel.addControl({...}) if
-     you need to add one after the panel is already constructed.
+     you need to add one after the panel is already constructed. Tag every
+     extra control with an explicit `category`: 'interaction' (cursor/camera
+     controls — Pitch/Yaw on the two 3D pieces), 'color', or the piece's own
+     sub-tag ('motion', 'form', 'ink' — see the real pieces; e.g. meridian's
+     `sweep` is motion, orbital-veil's `sweep` is form) — anything other than
+     'interaction'/'color' renders in the Visual section. It defaults to
+     Visual if omitted, but every piece in this library sets it explicitly
+     rather than relying on that default. For colour,
+     call `paletteHsl(values, f)` (shared/color.js) rather than reading
+     values.hue/hueB directly — those two are hidden implementation values
+     the colorA/colorB pickers drive, not controls themselves.
   4. Rebuild `paths` each frame if you want SVG export to work (array of
      point-arrays); otherwise SVG export will just produce an empty file.
   5. Pass a `defaults` palette to createControlPanel() (see below) so your
-     piece doesn't silently clone flow-field's hue.
+     piece doesn't silently clone flow-field's hue — include colorA/colorB
+     hex too, so the picker's initial swatch matches the piece's own look.
+  6. Wire in cursor modes (see the commented block in drawFrame() below,
+     and CONTRIBUTING.md's "Cursor interaction" section): `k = modeFactor(...)`
+     is the only gate, `overlay.step()` goes in onFrame, `overlay.draw()`
+     must be the LAST thing drawFrame() does, and Grow/Shrink/Attract/Vortex
+     need a piece-specific branch — there's no shared implementation for
+     those four, only for Particle Trail/Ripples (the overlay).
 -->
 
 <div class="lf-export-row" data-lf-panel>
@@ -42,8 +63,9 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
 
   const PIECE_ID = 'template';
@@ -80,7 +102,7 @@
     // Every piece must pick its own palette here. shared/controls.js's own
     // fallback defaults (hue 200 / hueB 280) belong to flow-field — a piece
     // that omits this block silently clones the flagship's look.
-    defaults: { hue: 130, hueB: 20, saturation: 0.5 },
+    defaults: { hue: 130, hueB: 20, saturation: 0.5, colorMode: 'gradient', colorA: '#00ff2b', colorB: '#ff5500' },
   });
   const currentValues = baked || panel.values;
 
@@ -89,33 +111,44 @@
   // some pieces ignore is a dead control, which this project has shipped
   // twice. See CONTRIBUTING.md.
   const pointer = createPointer({ canvas });
+  // Owns Particle Trail / Ripples — the two shared cursor modes with one
+  // implementation, not twelve. Grow/Shrink/Attract/Vortex have no shared
+  // form; each piece implements those four itself in drawFrame() below.
+  const overlay = createCursorOverlay();
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       // No argument: step() keeps its own clock, because influence is a
       // UI-response quantity and should not track animation timing.
       pointer.step();
+      // CONTRACT (shared/cursor-modes.js): step() may run anywhere in
+      // onFrame, but overlay.draw() below must be the LAST statement in
+      // drawFrame() — after this piece has cleared the canvas and drawn its
+      // own frame, never before. A full-clear piece's fillRect/clearRect
+      // wipes the overlay's marks along with everything else if draw() runs
+      // first.
+      overlay.step(currentValues.cursorInteraction, modeFactor(currentValues, pointer), pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });
 
   function drawFrame(dt, elapsed, values) {
-    const [r, g, b] = hslToRgb(values.hue, values.saturation, 0.5);
+    const { h, s } = paletteHsl(values, 0);
+    const [r, g, b] = hslToRgb(h, s, 0.5);
 
-    // Your pointer response goes here. `k` is the ONLY gate: at pointer 0 it
-    // is 0 and the piece must render byte-identically to having no cursor at
-    // all. Multiply by `pointer.falloff(x, y, radius)` for a local effect.
+    // `k` is the ONLY gate: 0 unless cursorInteraction !== 'None' AND
+    // pointer > 0, so at either default the piece must render
+    // byte-identically to having no cursor at all. Multiply by
+    // `pointer.falloff(x, y, radius)` for a local effect, per element (see
+    // the loop below), not once for the whole piece.
     //
     // Do NOT route the response through anything a user can set to zero —
     // `values.speed` in particular. flow-field's first version bent a heading
     // that only reached pixels via a speed-scaled term, so the cursor did
     // nothing at Speed 0 while looking correct at defaults. `dt` for
     // frame-rate normalisation is fine.
-    const k = values.pointer * pointer.influence;
-    if (k) {
-      // e.g. const f = pointer.falloff(x, y, 260);
-      //      offset += f * k * 40 * (dt || 0.016);
-    }
+    const k = modeFactor(values, pointer);
+
     ctx.fillStyle = 'rgba(10,10,13,0.15)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -135,16 +168,47 @@
     ctx.lineWidth = 1 + values.stroke * 3;
 
     for (let i = 0; i < count; i++) {
-      const angle =
+      let angle =
         elapsed * values.speed + values.phase + (i / count) * Math.PI * 2;
-      const x = cx + Math.cos(angle) * radius;
-      const y = cy + Math.sin(angle) * radius;
+      let x = cx + Math.cos(angle) * radius;
+      let y = cy + Math.sin(angle) * radius;
+
+      if (k) {
+        const f = pointer.falloff(x, y, 260);
+        // Uncomment the branch(es) your piece needs. Attract/Vortex bend a
+        // heading toward/around the cursor; Grow/Shrink scale a size/width
+        // (`ctx.lineWidth` here). Particle Trail and Ripples need no branch
+        // — the overlay above already draws them; just keep overlay.draw()
+        // as drawFrame()'s last statement, below.
+        //
+        // if (values.cursorInteraction === 'Attract') {
+        //   const toward = Math.atan2(pointer.y - y, pointer.x - x);
+        //   angle += (toward - angle) * f * k * 0.6;
+        //   x = cx + Math.cos(angle) * radius;
+        //   y = cy + Math.sin(angle) * radius;
+        // } else if (values.cursorInteraction === 'Vortex') {
+        //   const away = Math.atan2(y - pointer.y, x - pointer.x);
+        //   angle += (away + Math.PI / 2 - angle) * f * k * 0.6;
+        //   x = cx + Math.cos(angle) * radius;
+        //   y = cy + Math.sin(angle) * radius;
+        // } else if (values.cursorInteraction === 'Grow') {
+        //   ctx.lineWidth = (1 + values.stroke * 3) * (1 + f * k * 1.6);
+        // } else if (values.cursorInteraction === 'Shrink') {
+        //   ctx.lineWidth = Math.max(0.2, (1 + values.stroke * 3) / (1 + f * k * 1.6));
+        // }
+      }
+
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(x, y);
       ctx.stroke();
       paths.push([[cx, cy], [x, y]]);
     }
+
+    // CONTRACT (shared/cursor-modes.js): last statement in drawFrame(),
+    // after this piece's own drawing — see the comment on overlay.step()
+    // above for why.
+    overlay.draw(ctx, `rgb(${r},${g},${b})`, k);
   }
 
   loop.start();

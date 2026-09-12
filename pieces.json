@@ -82,5 +82,40 @@
     "blurb": "Sparse vertical streaks falling at their own speed, each with a brighter head.",
     "tags": ["sparse"],
     "hue": 205, "hueB": 195, "saturation": 0.18
+  },
+  {
+    "slug": "puddle",
+    "title": "Puddle",
+    "blurb": "Bounded, organic interference rippling across a puddle's surface.",
+    "tags": ["optical", "organic"],
+    "hue": 112, "hueB": 138, "saturation": 0.42
+  },
+  {
+    "slug": "globe",
+    "title": "Globe",
+    "blurb": "A latitude/longitude wire mesh bending into a spinning sphere.",
+    "tags": ["3d", "geometric"],
+    "hue": 340, "hueB": 355, "saturation": 0.4
+  },
+  {
+    "slug": "matrix-code",
+    "title": "Matrix Code",
+    "blurb": "Quantized columns of glyphs that churn identity independently of their falling head.",
+    "tags": ["glyph", "grid"],
+    "hue": 132, "hueB": 145, "saturation": 0.55
+  },
+  {
+    "slug": "chain-haze",
+    "title": "Chain Haze",
+    "blurb": "Lines of chains receding into the distance, discrete linked ovals fading with depth.",
+    "tags": ["depth", "geometric"],
+    "hue": 96, "hueB": 108, "saturation": 0.22
+  },
+  {
+    "slug": "stock-market",
+    "title": "Stock Market",
+    "blurb": "Tracks of rising and falling bars marching across the field, buy and sell rendered as filled rectangles.",
+    "tags": ["geometric", "grid"],
+    "hue": 78, "hueB": 92, "saturation": 0.5
   }
 ]

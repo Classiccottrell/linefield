@@ -9,8 +9,13 @@ Ordered roughly by how much it would add.
 
 ## Next up
 
-No scheduled work. Pointer interaction, full 3D orientation, drag-to-orbit,
-and exact Source export shipped in 1.3.0.
+No scheduled work. `puddle`, `globe`, `matrix code`, `chain haze` and
+`stock market` — the five commissioned pieces (see INSPIRATION.md) — have
+all shipped, `stock market` last (seventeenth piece), closing out that
+outstanding work. Pointer interaction, full 3D orientation, drag-to-orbit,
+and exact Source export shipped in 1.3.0. Seven cursor-interaction modes
+across all twelve pieces the library then held shipped in 1.4.0. The
+sectioned control panel, colour picker and mobile sheet shipped alongside.
 
 ---
 
@@ -24,10 +29,17 @@ when Motion is 0, since all animation lives in the motion-scaled layer.
 a horizontal translate. None is dead at default settings.
 
 **SVG export ignores `angle`** for pieces that rotate via canvas transform
-(`contour-grid`, `meridian`, `tether`) — their path points are recorded
-before the rotation is applied, so an exported SVG shows unrotated geometry.
-PNG export is unaffected. Fixing it properly means every rotating piece
-baking its transform into stored points.
+(`contour-grid`, `meridian`, `tether`, `matrix-code`, `chain-haze`) — their path/text
+points are recorded before the rotation is applied, so an exported SVG shows
+unrotated geometry. PNG export is unaffected. Fixing it properly means every
+rotating piece baking its transform into stored points.
+
+**`matrix-code` SVG export uses `<text>`, not `<polyline>`.** It is the
+library's first glyph-mark piece — a filled/stroked character has no line
+geometry to export as a path. `shared/export.js`'s `exportSvg()` gained an
+additive `texts` option (an array of `{x, y, ch, size, fontFamily}`) for
+this; every other piece still calls it with only `paths` and renders
+byte-identical output to before this option existed.
 
 **`wireframe-lattice` at exactly Pitch 0** loses a little real geometry. The
 camera's near plane sits at 20% of `fov` to keep SVG coordinates bounded,
@@ -50,40 +62,124 @@ exists; a full build reads defaults and presets off the running page via
 section, so a future limitations bullet leading with a backticked slug would
 be misread as a piece claim. Both fail loudly, neither fails silently.
 
+**Shrink cannot read on marks that are already near sub-pixel width.**
+`grain-field` and `synapse` draw their finest strokes close to the width
+floor a browser can render distinctly, and Shrink narrows from there.
+Widening the falloff radius was tried on both and did not help — it
+enlarges the affected area without deepening the effect, so the marks
+inside it dim rather than visibly narrow. Left as a limitation rather than
+a bug: the mode is wired correctly and reads on the other pieces.
+
+**`rainfall`'s Vortex reads as lateral wind, not rotation.** A drop's
+vertical position is time-driven rather than angle-driven, so only the
+horizontal component of the tangential motion a true vortex would apply is
+expressible in the draw model — the construction underneath is a genuine
+rotation, but nothing vertical can carry it. Fixing this means giving
+`rainfall` a second, angle-driven vertical term specifically for Vortex,
+which no other mode on this piece needs.
+
+**`flow-field`'s Grow/Shrink are invisible at Speed 0.** Both modes act
+only on `lineWidth`; flow-field draws each particle as a segment from `p.x`
+to `p.x + cos(angle) * 260 * values.speed * dt`, so at Speed 0 that segment
+has zero length, and a zero-length butt-capped stroke draws no pixels at
+any width. `tools/test-interactions.mjs`'s widened Speed-0 loop (added
+2026-09-11) measured this at 0.000% and excludes it explicitly via
+`SPEED0_KNOWN_DEAD`, with the same measurement recorded in that file's own
+comment — every OTHER piece clears the 0.05% floor under identical
+conditions (Grow 0.249-24.274%, Shrink 0.206-3.602%), so this is
+flow-field's draw model specifically, not a gate set too high. In the
+letter of CONTRIBUTING's contract this IS cursor response
+gated on `speed` — not through `modeFactor`, which is unaffected, but
+through the absence of any geometry for a wider line to apply to. Fixing it
+means giving flow-field a minimum segment length (or a dot fallback) when
+`values.speed` is 0, which changes rendered output and needs its own
+`npm run build` and visual review — deferred, not fixed in this pass.
+
+**`pieces/_template/` has no automated coverage at all.** It is excluded
+from `pieces.json`, and every gate that derives its piece list from that
+manifest — `tools/test-cursor-modes.mjs`, `tools/test-bake-fresh.mjs`,
+`tools/test-presets.mjs`'s check 8 sweep, and the build's capture paths —
+therefore never touches it. A regression in the scaffold that every new
+piece is forked from ships uncaught; only `CONTRIBUTING.md`'s manual
+"verify visually in a browser" step would catch it, and only if someone
+happens to open the template itself rather than a piece copied from it.
+
+**`accretion`'s Particle Trail reads boldest of the per-element pieces.**
+Judged against the five that existed when this was written; the three
+per-element pieces added since (`matrix-code`, `chain-haze`,
+`stock-market`) have not been compared against it. Its partial-clear fade
+compounds the overlay across frames — each frame's marks blend with what the
+previous frame already drew, rather than starting from a clean slate the way
+a full-clear piece does. Cosmetic, unresolved.
+
+**The Pointer-as-number assertion (`tools/test-interactions.mjs`) runs at a
+thin margin on most pieces** — measured 2026-09-11 at 0.087-0.126% against a
+0.05% floor on ten of the twelve pieces that existed at that date, before
+the five commissioned pieces landed (the exceptions are the two accumulator
+pieces: `flow-field` 15.309%, `accretion` 6.338%; the five newer pieces have
+not been re-measured, though the gate itself runs on them) — because it is
+pinned to the deliberately faint Particle Trail overlay, chosen so a
+regression in a per-piece mode cannot masquerade as a Pointer failure (see
+that assertion's own comment). A future retune of the overlay's tuning
+(particle count, size, alpha) could flip many pieces' margins at once and
+read as a Pointer regression across the board rather than what it actually
+is. The widened Speed-0 loop added alongside this measurement inherits the
+same fragility for its own Particle-Trail-at-Speed-0 case: 0.079-0.123% on
+the same ten pieces, same floor, same overlay, same risk.
+
 ---
 
-## Collection constraints for a thirteenth piece
+## Collection constraints for an eighteenth piece
 
-Measured across the twelve shipped pieces, from their generated thumbnails:
-mean rendered hue (weighted by colourfulness), mean saturation, and ink
-coverage — the fraction of pixels the piece actually marks.
+Measured across all seventeen shipped pieces, from their generated
+thumbnails: mean rendered hue (weighted by colourfulness), mean saturation,
+and ink coverage — the fraction of pixels the piece actually marks.
+
+Every row below is **generated**, not hand-recorded: run
+`npm run collection-metrics` and paste its output here. That tool
+(`tools/collection-metrics.mjs`) was written after the five commissioned
+pieces shipped without rows: with no tool, each addition either invented
+numbers or declined to, and declining left the table describing a library
+that no longer existed. It reproduces the twelve values published before it
+existed on 34 of 36 numbers; `wireframe-lattice`'s ink reads 0.108 against a
+published 0.107, and that single digit is the only change to a pre-existing
+row. Rebuild thumbnails (`npm run build`) before trusting a
+regenerated table — it measures the committed PNGs, not the live piece.
 
 | Hue | Sat | Ink | Piece |
 |---:|---:|---:|---|
 | 21 | 0.49 | 0.043 | `accretion` |
 | 24 | 0.42 | 0.048 | `contour-grid` |
 | 54 | 0.30 | 0.047 | `synapse` |
+| 87 | 0.52 | 0.205 | `stock-market` |
+| 106 | 0.16 | 0.030 | `chain-haze` |
+| 133 | 0.38 | 0.064 | `puddle` |
+| 146 | 0.51 | 0.042 | `matrix-code` |
 | 166 | 0.48 | 0.073 | `meridian` |
 | 177 | 0.12 | 0.035 | `grain-field` |
-| 200 | 0.34 | 0.107 | `wireframe-lattice` |
+| 200 | 0.34 | 0.108 | `wireframe-lattice` |
 | 213 | 0.12 | 0.011 | `rainfall` |
 | 235 | 0.24 | 0.066 | `tether` |
 | 247 | 0.51 | 0.195 | `event-horizon` |
 | 254 | 0.58 | 0.318 | `interference` |
 | 261 | 0.90 | 0.341 | `flow-field` |
 | 305 | 0.48 | 0.096 | `orbital-veil` |
+| 342 | 0.34 | 0.044 | `globe` |
 
-**The hue wheel is nearly full.** Roughly 95–135 is the only open band, and it
-abuts `meridian`. A new piece should differentiate on **form or density**, not
-expect a free colour. `rainfall` is the worked example: it landed at hue 213,
-in the most crowded band in the table, and still reads as distinct because at
-saturation 0.12 the hue barely registers and its ink coverage is a third of
-the next-sparsest piece.
+**The hue wheel is full.** The 95–135 band the five commissioned pieces were
+aimed at is now occupied by `chain-haze` (106) and `puddle` (133), and
+`globe` (342) closed the last wide gap. What remains are four gaps of
+roughly 35–45°: 261–305, 305–342, 342–21 across the wrap, and 54–87. None
+is the free colour the early library had. A new piece should differentiate on
+**form or density**, not expect a free hue. `rainfall` is the worked example:
+it landed at hue 213, in the most crowded band in the table, and still reads
+as distinct because at saturation 0.12 the hue barely registers and its ink
+coverage is a third of the next-sparsest piece.
 
-**Ink coverage is the axis with the most room left.** Eight of the twelve sit
-between 0.04 and 0.11. `rainfall` at 0.011 and `flow-field` at 0.341 are the
-poles, and almost nothing occupies the middle-high range between 0.11 and
-0.19.
+**Ink coverage is the axis with the most room left.** Ten of the seventeen
+sit between 0.04 and 0.11. `rainfall` at 0.011 and `flow-field` at 0.341 are
+the poles, and the middle-high range between 0.11 and 0.19 is still empty —
+five pieces later, nothing landed in it.
 
 **`meridian` and `tether` remain the weakest pair.** Found twice, by different
 methods — once by comparing rendered frames pixel-by-pixel, once by looking at
@@ -168,3 +264,29 @@ blank-canvas check, which hid the problem instead of fixing it.
 pieces that were each individually correct and collectively looked like one
 thing five times, because every review judged a piece against its own intent
 and never against the others.
+
+**A diff percentage is not visibility.** `event-horizon`'s Shrink changed
+10.67% of sampled pixels and was invisible to a human, because the change
+sat entirely within the disc's own silhouette. Conversely `rainfall`'s
+Shrink measured twice the gate threshold and was invisible because only
+about three of thirty drops fell inside the falloff radius. Every
+threshold-based gate in this repo inherits this limit: it proves something
+changed, never that anyone can see it.
+
+**A review instrument must answer the question you are asking.** The first
+collection sheets showed the twelve pieces of the day under one mode,
+full-frame. That
+compares pieces to each other but never to their own baseline, and a
+1280-wide frame squeezed into a grid column loses any local effect.
+Rebuilt as paired 1:1 crops — None beside the mode, same seed and frame
+count, cropped to the cursor. The earlier instrument produced a confident
+"inconclusive" that the better one overturned in both directions. This
+sharpens two entries above: "Judge at the viewport that ships" and "Judge
+the collection, not just the piece" both assume the instrument shows what
+it claims to; this is what happens when it doesn't.
+
+**A named mode means one thing; the mechanism may differ.** Grow is
+literal on eight pieces and amplification on nine, because canvas cannot
+vary stroke width within a single path. What keeps that honest is looking
+at all seventeen under each mode and asking whether they read as the same
+intent — which no automated gate can answer.

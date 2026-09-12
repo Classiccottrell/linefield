@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — accretion</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
@@ -26,9 +30,10 @@
 <script type="module">
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
-  import { hslToRgb } from '../../shared/color.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'accretion';
   const canvas = document.getElementById('canvas');
@@ -79,12 +84,13 @@
       if (name === 'density') seedMotes(Math.max(20, Math.round(BASE_COUNT * values.density)));
     },
     extraControls: [
-      { name: 'spin', label: 'Spin', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+      { name: 'spin', label: 'Spin', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'motion' },
     ],
-    defaults: { hue: 10, hueB: 40, saturation: 0.8 },
+    defaults: { hue: 10, hueB: 40, saturation: 0.8, colorMode: 'gradient', colorA: '#ff2b00', colorB: '#ffaa00' },
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
 
   seedMotes(Math.max(20, Math.round(BASE_COUNT * currentValues.density)));
   window.addEventListener('resize', () =>
@@ -115,13 +121,35 @@
     const rNorm = (r) => 1 - Math.min(1, Math.max(0, (r - CORE) / Math.max(1, rim - CORE)));
     const drawAngle = (a, r) => a + baseAngle + twist * rNorm(r) + bunch * Math.sin(ARMS * a);
 
-    const [r0, g0, b0] = hslToRgb(values.hue, values.saturation, light);
-    const [r1, g1, b1] = hslToRgb(values.hueB, values.saturation, light);
-    const k = values.pointer * pointer.influence;
+    const stopA = paletteHsl(values, 0);
+    const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
+    const stopB = paletteHsl(values, 1);
+    const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
+    // The only gate: off at pointer 0, off when cursorInteraction is 'None',
+    // eased by influence.
+    const k = modeFactor(values, pointer);
     const lens = (x, y) => {
       if (!k) return [x, y];
       const f = pointer.falloff(x, y, 240);
-      return [x + (pointer.x - x) * f * k * 0.15, y + (pointer.y - y) * f * k * 0.15];
+      if (!f) return [x, y];
+      if (values.cursorInteraction === 'Attract') {
+        return [x + (pointer.x - x) * f * k * 0.22, y + (pointer.y - y) * f * k * 0.22];
+      }
+      if (values.cursorInteraction === 'Vortex') {
+        // Tangential: perpendicular to (point - pointer), so motes orbit
+        // rather than approach.
+        const dx = x - pointer.x, dy = y - pointer.y;
+        return [x - dy * f * k * 0.22, y + dx * f * k * 0.22];
+      }
+      return [x, y];
+    };
+    const widthMod = (x, y) => {
+      if (!k) return 1;
+      const f = pointer.falloff(x, y, 240);
+      if (!f) return 1;
+      if (values.cursorInteraction === 'Grow') return 1 + f * k * 1.6;
+      if (values.cursorInteraction === 'Shrink') return Math.max(0.15, 1 / (1 + f * k * 1.6));
+      return 1;
     };
 
     for (const m of motes) {
@@ -161,25 +189,30 @@
       const cg = g0 + (g1 - g0) * (1 - heat);
       const cb = b0 + (b1 - b0) * (1 - heat);
 
+      const lw = lineWidth * widthMod(x1, y1);
       ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${values.opacity})`;
       ctx.beginPath();
       ctx.moveTo(x0, y0);
       ctx.lineTo(x1, y1);
       if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.lineWidth = lw + values.glow * 3;
         ctx.globalAlpha = values.glow * 0.25;
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      ctx.lineWidth = lineWidth;
+      ctx.lineWidth = lw;
       ctx.stroke();
       paths.push([[x0, y0], [x1, y1]]);
     }
+
+    overlay.draw(ctx, `rgb(${r0},${g0},${b0})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

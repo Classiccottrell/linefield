@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — matrix code</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+
+  const PIECE_ID = 'matrix-code';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // No @font-face, no network font: a baked single-file export must render
+  // standalone with whatever the OS provides. This stack resolves to a real
+  // monospace on every desktop/mobile platform Playwright covers.
+  const FONT_STACK = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+
+  // Pure ASCII by design (see glyphSet control below) — keeps the baked
+  // file's byte content unambiguous under file:// with no explicit
+  // Content-Type charset param, which the katakana alternative would put in
+  // question. Escapes, not literals, for the same reason.
+  const GLYPH_SETS = {
+    ascii: '01!?#$%&*+-/<>[]{}=ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+    binary: '01'.split(''),
+    // Half-width katakana range, written as escapes so the source file
+    // itself stays pure-ASCII bytes end to end, baked file included.
+    kana: Array.from({ length: 56 }, (_, i) => String.fromCharCode(0xff66 + i)),
+  };
+
+  // Deterministic hash, not Math.random(): thumbnail capture pins the clock
+  // and expects a byte-identical re-render for an untouched piece, and
+  // test-cursor-modes/audit-controls are change-detectors that would pass
+  // trivially (green for the wrong reason) if glyph identity re-rolled every
+  // frame regardless of what motion/churn control did.
+  function hash(a, b, c) {
+    let h = (a * 374761393 + b * 668265263 + c * 2246822519) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+
+  // Not rainfall: rainfall is continuous-y streaks at random x with sway and
+  // a fixed identity per drop. This is a quantized column/row grid — no
+  // sway, no per-drop randomness — where each cell's glyph identity churns
+  // on its own clock independent of the column's head position. The head
+  // advancing and a cell's character changing are two unrelated processes;
+  // conflating them is exactly "rainfall wearing letters".
+  const BASE_FONT = 20;
+  const TRAIL_LEN = 16;
+  const ROWS_PER_SEC = 7;
+  const CHURN_PER_SEC = 2.4;
+
+  const PRESETS = {
+    whisper: { opacity: 0.35, stroke: 0.3, density: 0.7, saturation: 0.15, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.6, density: 1, saturation: 0, glow: 0 },
+    neon:    { opacity: 1, stroke: 0.8, density: 1.1, saturation: 0.95, glow: 1.4 },
+    drift:   { opacity: 0.6, stroke: 0.6, density: 0.9, speed: 0.4, motion: 1.8 },
+    dense:   { opacity: 0.85, stroke: 0.5, density: 1.8, speed: 1.3 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      { name: 'glyphSet', label: 'Glyph set', type: 'select', options: ['ascii', 'binary', 'kana'], default: 'ascii', category: 'form' },
+    ],
+    // 125-150: the open band past puddle (112/138), differentiated on form
+    // and ink coverage rather than colour — see ROADMAP.md's
+    // collection-constraints table. Classic phosphor-green reading at low
+    // saturation so it doesn't read as a straight puddle clone.
+    defaults: { hue: 132, hueB: 145, saturation: 0.55, colorMode: 'gradient', colorA: '#00ff6a', colorB: '#33ff9e' },
+  });
+  const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
+
+  let texts = [];
+
+  function drawFrame(dt, elapsed, values) {
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    texts = [];
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const fontSize = BASE_FONT * Math.max(0.3, values.scale);
+    ctx.font = `${fontSize}px ${FONT_STACK}`;
+    // Real per-glyph measurement, not a hardcoded ratio — required by the
+    // brief and correct for whatever monospace the OS actually resolves.
+    const glyphW = ctx.measureText('0').width || fontSize * 0.6;
+    const cellH = fontSize * 1.15;
+    // density's convention (CONTRIBUTING "Density convention") is a count
+    // derived from the control; here it's column count via cell width, so a
+    // higher density packs more, narrower columns rather than resizing a
+    // persistent array — there is no persistent array, everything below is
+    // recomputed from col/row indices each frame.
+    const cellW = glyphW * 2.1 / Math.max(0.2, values.density);
+    const cols = Math.max(3, Math.ceil(W / cellW));
+    const totalRows = Math.ceil(H / cellH) + TRAIL_LEN + 4;
+
+    const glyphs = GLYPH_SETS[values.glyphSet] || GLYPH_SETS.ascii;
+    const churnBucket = Math.floor(elapsed * values.motion * CHURN_PER_SEC);
+
+    const k = modeFactor(values, pointer);
+    const theta = (values.angle * Math.PI) / 180;
+    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
+    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
+    const plx = W / 2 + pdx * cosT - pdy * sinT;
+    const ply = H / 2 + pdx * sinT + pdy * cosT;
+    // SVG export ignores `angle` for this piece too (see ROADMAP.md, "Known
+    // limitations, accepted") — path/text positions below are recorded in
+    // the rotated canvas space, same accepted gap as contour-grid/meridian/
+    // tether.
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(theta);
+    ctx.translate(-W / 2, -H / 2);
+
+    const lightBase = values.invert ? 0.28 : 0.6;
+    const headLight = Math.min(0.97, lightBase + 0.35);
+
+    for (let col = 0; col < cols; col++) {
+      const x = col * cellW + cellW / 2;
+      // Golden-ratio fractional offset per column, not Math.random(): pure
+      // function of `col` alone, so it's identical on every frame and every
+      // reload without any stored/seeded state.
+      const colSeed = (col * 0.6180339887) % 1;
+      const headRowF = elapsed * values.speed * ROWS_PER_SEC + colSeed * totalRows + values.phase * cols * 0.5;
+      const headRow = Math.floor(headRowF % totalRows);
+
+      for (let i = 0; i < TRAIL_LEN; i++) {
+        const row = headRow - i;
+        if (row < 0) continue;
+        let y = row * cellH + cellH;
+        if (y > H + cellH) continue;
+
+        const gi = hash(col, row, churnBucket) % glyphs.length;
+        const ch = glyphs[gi];
+
+        let px = x;
+        let sizeMult = 1;
+        if (k) {
+          const ddx = px - plx, ddy = y - ply;
+          const dist = Math.hypot(ddx, ddy) || 1;
+          // Wider catchment than rainfall's single-point-per-drop 480: a
+          // column here is a stack of many cells, each independently
+          // gated by its own distance, so without widening the radius only
+          // one or two cells in the whole grid would ever be in range at
+          // once and the effect would read as noise, not response.
+          const f = Math.max(0, 1 - dist / 560);
+          if (f) {
+            if (values.cursorInteraction === 'Attract') {
+              // Bends the WHOLE column into an arc around the pointer,
+              // per-cell — structurally unlike rainfall's single x-nudge
+              // per drop, since a column here is a stack, not a point.
+              px = x - (ddx / dist) * f * k * 46;
+            } else if (values.cursorInteraction === 'Vortex') {
+              px = x - (ddy / dist) * f * k * 46;
+            } else if (values.cursorInteraction === 'Grow') {
+              sizeMult = 1 + f * k * 0.9;
+            } else if (values.cursorInteraction === 'Shrink') {
+              sizeMult = Math.max(0.2, 1 / (1 + f * k * 1.4));
+            }
+          }
+        }
+
+        const isHead = i === 0;
+        const fade = 1 - i / TRAIL_LEN;
+        const alpha = values.opacity * (isHead ? 1 : fade * fade);
+        const light = isHead ? headLight : Math.max(0.04, lightBase * fade);
+        const f01 = isHead ? 1 : Math.max(0, 1 - i / TRAIL_LEN);
+        const stop = paletteHsl(values, f01);
+        const [r, g, b] = hslToRgb(stop.h, stop.s, light);
+        const cellSize = fontSize * sizeMult;
+
+        if (values.glow > 0 && isHead) {
+          ctx.font = `${cellSize * (1 + values.glow * 0.4)}px ${FONT_STACK}`;
+          ctx.globalAlpha = values.glow * 0.35;
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillText(ch, px, y);
+          ctx.globalAlpha = 1;
+        }
+
+        ctx.font = `${cellSize}px ${FONT_STACK}`;
+        ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+        ctx.fillText(ch, px, y);
+        // `stroke` has no lineWidth to hook for a filled glyph mark — the
+        // glyph-native reading is an outline pass whose width scales with
+        // it, thickening the character itself rather than a path.
+        if (values.stroke > 0) {
+          ctx.lineWidth = values.stroke * 1.1;
+          ctx.strokeStyle = `rgba(${r},${g},${b},${alpha * 0.6})`;
+          ctx.strokeText(ch, px, y);
+        }
+
+        texts.push({ x: px, y, ch, size: cellSize, fontFamily: FONT_STACK });
+      }
+    }
+
+    ctx.restore();
+
+    const stopB = paletteHsl(values, 1);
+    const [ovR, ovG, ovB] = hslToRgb(stopB.h, stopB.s, values.invert ? 0.3 : 0.68);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  // Glyph marks have no line geometry, so `paths` stays empty here and the
+  // text elements carry the export instead — see shared/export.js's
+  // `texts` option, added for this piece and additive/no-op for the other
+  // fourteen, which never pass it.
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg([], { width: canvas.width, height: canvas.height, texts }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
+</content>
+</invoke>
