@@ -2,6 +2,7 @@
 node_modules/
 *.log
 .playwright-cli/
+.worktrees/
 linefield-*.zip
 
 # SDD scratch (ledger, briefs, review packages)
