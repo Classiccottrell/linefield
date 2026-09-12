@@ -12,11 +12,11 @@ Replace these pieces one-for-one:
 
 | Remove | Add | Technique retained |
 |---|---|---|
-| `puddle` | `undertow` | bounded wave interference |
+| `puddle` | `lacuna` | bounded wave interference |
 | `globe` | `parallax` | spatial projection and depth |
 | `matrix-code` | `cipher-bloom` | glyph marks |
 | `chain-haze` | `driftwork` | linked elliptical marks |
-| `stock-market` | `signal-fold` | filled rectangular marks |
+| `stock-market` | `pleat` | filled rectangular marks |
 
 Remove the shared cursor-mode selector, pointer-strength control, cursor overlays, and per-piece Grow/Shrink/Attract/Vortex branches from all seventeen pieces and the piece template.
 
@@ -37,9 +37,20 @@ Each replacement must have:
 
 The default palette is subordinate to form. Exact hues are tuned against the full collection rather than treated as part of a piece's identity.
 
+### Reference lessons
+
+The [Filament presentation](https://vanta.supply/vault/filament) reinforces four useful qualities without supplying designs to reproduce:
+
+- a piece is understood first by its silhouette, not its algorithm or name;
+- mostly monochrome fields gain depth from one controlled luminous anchor;
+- density gradients, occlusion, and cropping create more presence than uniform detail;
+- a background reserves a quiet region where foreground content can live.
+
+Each replacement therefore declares a preferred text-safe zone during visual review, keeps its brightest event away from that zone, and must still read in a low-saturation preset. The reference's shared controls describe the artwork itself rather than generic cursor modes, which further supports keeping Wake outside the piece contract.
+
 ## Replacement pieces
 
-### Undertow
+### Lacuna
 
 An off-centre calm zone is surrounded by broken caustic arcs. Several phase-shifted wave sources deform elliptical fronts; only locally coherent portions are drawn, leaving reflective fragments rather than a closed puddle outline. Arc density gathers on one side and opens on the other, producing a clear sweeping silhouette.
 
@@ -73,7 +84,7 @@ Small alternating ellipses follow two broad currents that cross into an S-shaped
 
 The default uses cool violet-grey with low saturation and medium coverage concentrated around the crossing.
 
-### Signal Fold
+### Pleat
 
 Filled rectangles sample a low-resolution traveling field. Height, orientation, and visibility combine into two folded bands separated by sharp cuts of negative space. Adjacent marks move coherently, so the result reads as a material surface or signal mass rather than independent chart bars.
 
