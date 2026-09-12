@@ -4,7 +4,30 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] — 2026-09-10
+
+### Added
+
+- **Seven cursor-interaction modes on all twelve pieces**: None, Grow,
+  Shrink, Particle Trail, Ripples, Attract, Vortex. `cursorInteraction`
+  selects the mode and `pointer` (0-2, default 0) scales it; `modeFactor`
+  in `shared/cursor-modes.js` is the single gate both read, so
+  `cursorInteraction: 'None'` and `pointer: 0` are two independent ways to
+  be off. Grow/Shrink/Attract/Vortex are literal per-mark scaling on the
+  five pieces that stroke each element separately (`flow-field`,
+  `grain-field`, `synapse`, `accretion`, `rainfall`) and amplification of
+  the piece's existing local deformation on the seven that draw whole
+  rings, ribbons and cables as single paths — canvas cannot vary stroke
+  width within one path. Particle Trail and Ripples are one shared overlay
+  in `shared/cursor-modes.js`, identical on every piece.
+- `tools/test-cursor-modes.mjs` — drives every mode live on every piece and
+  asserts no two render identically; run it before calling a piece's
+  cursor wiring done (not yet wired into CI).
+- `tools/mode-sheet.mjs` — paired None-vs-mode 1:1 crops, cropped to the
+  cursor, for the visual review a diff percentage can't substitute for.
+- `tools/test-bake-fresh.mjs` — bakes every piece live rather than reading
+  committed `downloads/*.html`, so a bake regression is caught even when
+  the artifacts themselves haven't been regenerated yet.
 
 ### Changed
 
@@ -38,7 +61,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   was rendering.
 - **Baked exports inline the full shared-module import graph.** The inliner
   only walked each piece's own top-level imports, so the first
-  shared-module-importing-a-shared-module broke all twelve downloads.
+  shared-module-importing-a-shared-module (`shared/cursor-modes.js` pulled
+  in by every piece) produced twelve blank exports. Fixed by walking the
+  full import graph with a topological sort, so a shared module that
+  itself imports a shared module inlines in dependency order.
+- **`npm run audit-controls` ran mid-sequence in CI.** A failing
+  `audit-controls` step aborted the job before five later gates ran, so a
+  dead control could hide a real regression behind it. Moved to run last,
+  so every other gate always reports regardless of whether the controls
+  audit passes.
 
 ## [1.3.0] — 2026-09-07
 

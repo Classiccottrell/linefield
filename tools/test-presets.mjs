@@ -32,10 +32,10 @@ const check = (name, ok, detail = '') => {
 const server = await serveRepo(PORT);
 const browser = await chromium.launch();
 
-async function open(query = '') {
+async function open(query = '', targetSlug = slug) {
   const ctx = await browser.newContext({ viewport: { width: 900, height: 600 } });
   const page = await ctx.newPage();
-  await page.goto(`${base}/pieces/${slug}/${query}`, { waitUntil: 'load' });
+  await page.goto(`${base}/pieces/${targetSlug}/${query}`, { waitUntil: 'load' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(600);
@@ -156,38 +156,66 @@ async function open(query = '') {
   await ctx.close();
 }
 
-// 8. Every preset value names a real control and sits within its declared
-// range. applyValues writes the raw preset number straight into the values
-// object the render reads; the range input only clamps its own displayed
-// position, so a preset can silently draw past what the control claims is
-// possible unless something checks this independently of the panel UI.
+// 8. Every preset value names a real control, sits within its declared
+// range if numeric, and is a declared option if enum. applyValues writes
+// the raw preset value straight into the values object the render reads;
+// a range input only clamps its own displayed position and a <select>
+// silently ignores an out-of-vocabulary .value while the state object
+// keeps whatever was passed in — neither self-corrects, so this must check
+// independently of the panel UI. (clampValue in shared/controls.js DOES
+// reject an out-of-options enum, but only on a subsequent setValue call —
+// it falls back to the CURRENT value, not the default, so a bad enum
+// preset would silently strand whatever the previous preset left there.)
+//
+// Runs across every piece in pieces.json, not just `slug`. Checks 1-7
+// above exercise the shared preset MECHANISM (applyValues, chip wiring,
+// ?preset= on load) — one piece is representative evidence for that, since
+// the mechanism is shared code. This check instead validates each piece's
+// own preset DATA, which is piece-specific and not exercised at all by
+// running only `slug`; CI invokes this file with one slug argument
+// (`node tools/test-presets.mjs synapse`), so without sweeping here this
+// check would only ever validate synapse's own five presets. It's cheap to
+// sweep — a page.evaluate reading two already-declared globals per piece,
+// no chip clicks, no waitForTimeout — unlike checks 3/4/5/7 above, which is
+// why only this one sweeps all twelve while the rest stay pinned to one.
 {
-  const { ctx, page } = await open();
-  const violations = await page.evaluate(() => {
-    const specs = window.__LF_SPECS__ || [];
-    const specByName = Object.fromEntries(specs.map((s) => [s.name, s]));
-    const out = [];
-    for (const [presetName, map] of Object.entries(window.__LF_PRESETS__ || {})) {
-      for (const [key, value] of Object.entries(map)) {
-        const spec = specByName[key];
-        if (!spec) { out.push(`${presetName}.${key}: no control named "${key}"`); continue; }
-        const hasBounds = typeof spec.min === 'number' && typeof spec.max === 'number';
-        if (!hasBounds) {
-          if (typeof value === 'number') {
-            out.push(`${presetName}.${key}=${value}: control "${key}" declares no numeric min/max, cannot range-check`);
+  const allSlugs = JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8')).map((p) => p.slug);
+  const violations = [];
+  for (const pieceSlug of allSlugs) {
+    const { ctx, page } = await open('', pieceSlug);
+    const pieceViolations = await page.evaluate(() => {
+      const specs = window.__LF_SPECS__ || [];
+      const specByName = Object.fromEntries(specs.map((s) => [s.name, s]));
+      const out = [];
+      for (const [presetName, map] of Object.entries(window.__LF_PRESETS__ || {})) {
+        for (const [key, value] of Object.entries(map)) {
+          const spec = specByName[key];
+          if (!spec) { out.push(`${presetName}.${key}: no control named "${key}"`); continue; }
+          if (spec.kind === 'enum') {
+            if (!spec.options.includes(value)) {
+              out.push(`${presetName}.${key}=${JSON.stringify(value)}: not one of ${JSON.stringify(spec.options)}`);
+            }
+            continue;
           }
-          continue;
-        }
-        if (typeof value === 'number' && (value < spec.min || value > spec.max)) {
-          out.push(`${presetName}.${key}=${value} outside [${spec.min}, ${spec.max}]`);
+          const hasBounds = typeof spec.min === 'number' && typeof spec.max === 'number';
+          if (!hasBounds) {
+            if (typeof value === 'number') {
+              out.push(`${presetName}.${key}=${value}: control "${key}" declares no numeric min/max, cannot range-check`);
+            }
+            continue;
+          }
+          if (typeof value === 'number' && (value < spec.min || value > spec.max)) {
+            out.push(`${presetName}.${key}=${value} outside [${spec.min}, ${spec.max}]`);
+          }
         }
       }
-    }
-    return out;
-  });
-  check('preset values are within control ranges', violations.length === 0,
-    violations.map((v) => `${slug}.${v}`).join('; '));
-  await ctx.close();
+      return out;
+    });
+    violations.push(...pieceViolations.map((v) => `${pieceSlug}.${v}`));
+    await ctx.close();
+  }
+  check('preset values are within control ranges and enum vocabularies (all pieces)',
+    violations.length === 0, violations.join('; '));
 }
 
 await browser.close();

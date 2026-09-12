@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — puddle</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+  import { rotatePoint } from '../../shared/project.js';
+
+  const PIECE_ID = 'puddle';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Nested closed curves are derived each frame, no persistent state — see
+  // "Determinism" note below. Ring count comes from density.
+  const BASE_RINGS = 22;
+  const SEG = 72; // polygon segments per ring, for SVG export fidelity
+  const N_EMITTERS = 6; // interference sources, positions derived from index (no Math.random)
+  let paths = [];
+
+  const PRESETS = {
+    whisper: { opacity: 0.18, stroke: 0.5, density: 0.4, saturation: 0.12, glow: 0 },
+    ink:     { opacity: 0.95, stroke: 1.3, density: 0.6, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.85, stroke: 0.8, density: 1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.3, stroke: 0.55, density: 0.45, speed: 0.3, motion: 1.6, saturation: 0.3 },
+    dense:   { opacity: 0.75, stroke: 0.65, density: 1.7, speed: 0.65, saturation: 0.5, glow: 0 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    // Puddle takes the one open band in the hue wheel (ROADMAP.md's
+    // collection-constraints table): ~95-135 abuts meridian (166) but
+    // reads as pond/rainwater green rather than crowding it. hueB stays
+    // inside the same band so the gradient's colourfulness-weighted mean
+    // hue doesn't drift into meridian/interference territory.
+    defaults: { hue: 112, hueB: 138, saturation: 0.42, colorMode: 'gradient', colorA: '#3ecf7e', colorB: '#7fe0a8' },
+  });
+  const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
+
+  // Wave field constants. WAVEK is spatial frequency (radians per px);
+  // CSPEED converts values.speed into a propagation rate. AMP_BASE is per-
+  // emitter displacement amplitude in px before values.scale.
+  const WAVEK = 0.085;
+  const CSPEED = 1.7;
+  const AMP_BASE = 3.4;
+  const EMITTER_RANGE_FRAC = 1.3; // × boundary radius, exponential falloff
+  const CURSOR_RADIUS = 220;
+
+  // Emitter positions and phases are derived from index j alone — golden-
+  // angle spacing, no Math.random. Determinism matters here: the build's
+  // thumbnail capture and audit-controls.mjs pin Math.random and manually
+  // step the clock, and a stateless derivation keeps a re-run of `npm run
+  // build` a byte-identical no-op.
+  function emitterBase(j) {
+    const ang = j * 2.399963229728653; // golden angle
+    const rFrac = 0.15 + 0.55 * ((j * 0.6180339887498949) % 1);
+    const phase = j * 1.7;
+    const driftRate = 0.12 + (j % 3) * 0.05;
+    return { ang, rFrac, phase, driftRate };
+  }
+  const EMITTERS = [];
+  for (let j = 0; j < N_EMITTERS; j++) EMITTERS.push(emitterBase(j));
+
+  // The puddle's own irregular, bounded rim — two low-order harmonics on
+  // top of a circle. `rot` slowly turns the harmonics (via values.motion,
+  // never values.speed, so the wave propagation and the boundary wobble
+  // are independently controllable) and `angRot` applies values.angle
+  // mathematically (rotating the harmonic phase), not via ctx.rotate, so
+  // SVG export stays correct — see contour-grid/meridian/tether's
+  // documented "SVG export ignores angle" limitation, which this avoids.
+  function edgeRadius(a, R0, elapsed, values, angRot) {
+    const rot = elapsed * values.motion * 0.05;
+    const aa = a + angRot;
+    return R0 * (1
+      + 0.13 * Math.cos(3 * aa + rot)
+      + 0.07 * Math.cos(5 * aa - rot * 1.6 + 0.7));
+  }
+
+  // Summed interference field at (x, y): genuine interference (crests
+  // cross and cancel between emitters), not a single expanding ring from
+  // one source — the shared Ripples cursor mode already does that (one
+  // ring per pointer contact, canvas-wide). Nonzero at elapsed=0 and
+  // speed=0 (the sin's spatial term + values.phase supply a real still-
+  // frame pattern), so Grow/Shrink always have geometry to deform — see
+  // flow-field's documented Speed-0 dead-mode limitation, which this
+  // avoids by construction.
+  function waveField(x, y, elapsed, values, emitterPos, range) {
+    let sum = 0;
+    for (const e of emitterPos) {
+      const dx = x - e.x, dy = y - e.y;
+      const d = Math.hypot(dx, dy);
+      const falloff = Math.exp(-d / range);
+      sum += AMP_BASE * values.scale *
+        Math.sin(WAVEK * d - elapsed * values.speed * CSPEED + e.phase + values.phase * Math.PI * 2) *
+        falloff;
+    }
+    return sum;
+  }
+
+  function drawFrame(dt, elapsed, values) {
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    paths = [];
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const R0 = Math.min(canvas.width, canvas.height) * 0.32 * values.scale;
+    const rings = Math.max(4, Math.round(BASE_RINGS * values.density));
+    const angRot = (values.angle * Math.PI) / 180;
+    const range = R0 * EMITTER_RANGE_FRAC;
+    const mode = values.cursorInteraction;
+    const k = modeFactor(values, pointer);
+    // Cap Pointer's strength at 1 for amplitude/rotation terms — Pointer's
+    // control max is 2, and uncapped it would double amplitude AND falloff
+    // radius together (see interference's identical `kAmp` comment).
+    const kAmp = Math.min(k, 1);
+
+    // Attract: emitters ease toward the pointer. Recomputed fresh each
+    // frame from the stateless base position (no persistent mutation), so
+    // this still needs no density re-seed. Clamp the EASE FRACTION, not k,
+    // for the same overshoot reason interference's Attract comment gives.
+    const ease = mode === 'Attract' ? Math.min(kAmp, 1) * 0.5 : 0;
+    const emitterPos = EMITTERS.map((e) => {
+      const drift = elapsed * values.motion * e.driftRate * 0.2;
+      let ex = cx + Math.cos(e.ang + angRot + drift) * R0 * e.rFrac;
+      let ey = cy + Math.sin(e.ang + angRot + drift) * R0 * e.rFrac;
+      if (ease) {
+        ex += (pointer.x - ex) * ease;
+        ey += (pointer.y - ey) * ease;
+      }
+      return { x: ex, y: ey, phase: e.phase };
+    });
+
+    ctx.lineWidth = 0.4 + values.stroke * 0.9;
+    const lineWidth = ctx.lineWidth;
+    const light = values.invert ? 0.35 : 0.6;
+
+    for (let i = 1; i <= rings; i++) {
+      const frac = i / rings;
+      const stop = paletteHsl(values, frac);
+      const [r, g, b] = hslToRgb(stop.h, stop.s, light);
+      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
+
+      const pts = [];
+      ctx.beginPath();
+      for (let s = 0; s <= SEG; s++) {
+        const a = (s / SEG) * Math.PI * 2;
+        const base = edgeRadius(a, R0, elapsed, values, angRot) * frac;
+        let x = cx + Math.cos(a) * base;
+        let y = cy + Math.sin(a) * base;
+
+        const disp = waveField(x, y, elapsed, values, emitterPos, range);
+        // Edge damping: the wave dies out against the puddle's own rim
+        // rather than reflecting, so the outermost rings read as a bounded
+        // surface, not an infinite regular grid (the trait the spec calls
+        // out as the difference from `interference`).
+        const edgeDamp = 1 - Math.pow(frac, 6);
+        const rr = base + disp * edgeDamp;
+        x = cx + Math.cos(a) * rr;
+        y = cy + Math.sin(a) * rr;
+
+        if (k && (mode === 'Grow' || mode === 'Shrink' || mode === 'Vortex')) {
+          const f = pointer.falloff(x, y, CURSOR_RADIUS);
+          if (f) {
+            if (mode === 'Vortex') {
+              const rp = rotatePoint(x - pointer.x, y - pointer.y, 0, { roll: f * kAmp * 1.1 });
+              x = pointer.x + rp.x;
+              y = pointer.y + rp.y;
+            } else {
+              // Grow/Shrink modulate the wave's own radial displacement
+              // rather than lineWidth, so the effect stays visible even at
+              // near-hairline stroke widths (see ROADMAP's grain-field/
+              // synapse Shrink-on-sub-pixel-strokes limitation, avoided
+              // here by construction).
+              const ampMul = mode === 'Shrink' ? 1 / (1 + f * kAmp * 1.8) : 1 + f * kAmp * 1.8;
+              const extra = rr - base;
+              const rr2 = base + extra * ampMul;
+              x = cx + Math.cos(a) * rr2;
+              y = cy + Math.sin(a) * rr2;
+            }
+          }
+        }
+
+        if (s === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        pts.push([x, y]);
+      }
+      ctx.closePath();
+
+      if (values.glow > 0) {
+        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.globalAlpha = values.glow * 0.25;
+        ctx.stroke();
+        ctx.lineWidth = lineWidth;
+        ctx.globalAlpha = 1;
+      }
+      ctx.stroke();
+      paths.push(pts);
+    }
+
+    const mid = paletteHsl(values, 0.5);
+    const [ovR, ovG, ovB] = hslToRgb(mid.h, mid.s, light);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

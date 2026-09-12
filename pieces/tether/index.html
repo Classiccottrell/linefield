@@ -34,6 +34,8 @@
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+  import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'tether';
   const canvas = document.getElementById('canvas');
@@ -88,6 +90,15 @@
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
+
+  // Each cable is one continuous stroked path, so per-mark scaling isn't
+  // available: Grow/Shrink amplify/damp the existing falloff-weighted
+  // deflection and its radius. Only 6 cables at rest — the sparsest piece
+  // in the library — so the radius is wider than contour-grid's equivalent
+  // to keep Shrink's dimple comfortably above the gate threshold.
+  const DEFLECT_MAG = 110;
+  const DEFLECT_RADIUS = 340;
 
   seedCables(Math.max(2, Math.round(BASE_COUNT * currentValues.density)));
 
@@ -102,7 +113,17 @@
     const light = values.invert ? 0.35 : 0.65;
     const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than meridian
     const noiseScale = 0.9 * (0.3 + values.scale);
-    const k = values.pointer * pointer.influence;
+    // Off at pointer 0, off when cursorInteraction is 'None', eased by
+    // influence. No term routed through values.speed or values.slack (both
+    // user-zeroable), so deflection survives either at 0.
+    const k = modeFactor(values, pointer);
+    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
+    // (Pointer's max) quadruples magnitude AND falloff radius together,
+    // which on this piece (6 cables, the sparsest in the library) pulls
+    // nearly every cable hard and destroys the piece's identity rather
+    // than swelling it. This holds Pointer 1..2 flat at the Pointer=1
+    // amplitude (gate numbers unchanged) instead of compounding further.
+    const kAmp = Math.min(k, 1);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
     const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
@@ -129,6 +150,15 @@
       const sway = Math.sin(t + c.j + values.phase * Math.PI);
       const sag = H * 0.16 * values.slack * (0.55 + 0.45 * sway);
 
+      // Grow/Shrink's push direction, fixed per cable (chord midpoint vs.
+      // the pointer), not per sample. Keying it off the per-sample py (as
+      // the piece did before cursor modes existed) flips sign wherever the
+      // cable's own droop/shiver crosses the pointer's y — at high enough
+      // magnitude that flip is a near-vertical jump between adjacent
+      // samples, not a bow, and reads as the cable snapping into a sharp
+      // V/box rather than swelling.
+      const pushDir = (ay + by) / 2 >= ply ? 1 : -1;
+
       const { h, s } = paletteHsl(values, f);
       const [r, g, b] = hslToRgb(h, s, light);
       ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
@@ -145,13 +175,39 @@
         const shiver =
           simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
         let py = y + droop + shiver;
+        let px = x;
         if (k) {
-          const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / 240);
-          py += (py >= ply ? 1 : -1) * f * k * 80 * (4 * u * (1 - u));
+          // Envelope fades to 0 at both anchors, same as droop/shiver above,
+          // so cursor response never tugs a cable's fixed endpoints.
+          const envelope = 4 * u * (1 - u);
+          const mode = values.cursorInteraction;
+          if (mode === 'Grow' || mode === 'Shrink') {
+            const amp = mode === 'Grow' ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
+            const radius = DEFLECT_RADIUS * amp;
+            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / radius);
+            if (f) py += pushDir * f * DEFLECT_MAG * amp * envelope;
+          } else if (mode === 'Attract') {
+            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
+            // Clamp f*k alone, THEN apply envelope outside the clamp — same
+            // shape as Grow/Shrink above (envelope scales an already-bounded
+            // magnitude). Clamping the product f*k*envelope would flatten
+            // the envelope into a plateau at high k, reintroducing pull
+            // nearer the anchors than the envelope intends.
+            if (f) py += (ply - py) * Math.min(f * k, 1) * envelope;
+          } else if (mode === 'Vortex') {
+            const f = Math.max(0, 1 - Math.hypot(x - plx, py - ply) / DEFLECT_RADIUS);
+            if (f) {
+              // True tangential rotation about the un-rotated pointer, not
+              // an offset toward/away from it.
+              const r = rotatePoint(x - plx, py - ply, 0, { roll: f * k * envelope * 1.1 });
+              px = plx + r.x;
+              py = ply + r.y;
+            }
+          }
         }
-        if (s === 0) ctx.moveTo(x, py);
-        else ctx.lineTo(x, py);
-        pts.push([x, py]);
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+        pts.push([px, py]);
       }
 
       if (values.glow > 0) {
@@ -166,11 +222,19 @@
     }
 
     ctx.restore();
+
+    // Screen space, after restore and after the fillRect clear above — see
+    // shared/cursor-modes.js's draw-ordering contract.
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.65);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

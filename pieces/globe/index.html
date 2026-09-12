@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — globe</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { createCamera, rotatePoint } from '../../shared/project.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createOrbit, createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+
+  const PIECE_ID = 'globe';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Ring/meridian counts derive per frame from density — no persistent
+  // array. SEG_* are per-curve segment resolution, for SVG export fidelity
+  // and smooth circles at rest.
+  const BASE_LATS = 10;  // latitude rings, excluding the two poles
+  const BASE_LONS = 16;  // longitude meridians, pole to pole
+  const SEG_LAT = 64;
+  const SEG_LON = 48;
+  const MAX_LAT_DEG = 82; // stops short of the poles so a ring never degenerates to a point
+  const FOV = 650;
+  let paths = [];
+
+  // Distinct from the three orb pieces (orbital-veil, accretion,
+  // event-horizon), which are all flat screen-space discs squashed by a
+  // tilt factor. globe is a real 3D sphere — latitude small-circles at
+  // radius R*cos(lat) plus longitude great-circles converging at the
+  // poles, both walked through shared/project.js's perspective camera,
+  // same as wireframe-lattice. Structure, not colour, is the differentiator.
+  const PRESETS = {
+    whisper: { opacity: 0.28, stroke: 1, density: 0.55, saturation: 0.08, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.6, density: 0.75, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 0.85, density: 1.1, saturation: 0.95, glow: 1.1 },
+    drift:   { opacity: 0.5, stroke: 0.8, density: 0.65, speed: 0.3, motion: 1.7 },
+    dense:   { opacity: 0.62, stroke: 0.6, density: 1.8, speed: 0.7, glow: 0 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 18, category: 'interaction' },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
+    ],
+    // Hue 340/355: the biggest open gap left in the hue wheel (ROADMAP's
+    // collection-constraints table) is 305->370(=10), the arc past
+    // orbital-veil's 305/330 stop pair and short of accretion's 10. Picked
+    // deliberately inside that gap rather than measured — same caveat
+    // ROADMAP records for puddle's hue. Tagged 3d/geometric, not orb, so
+    // the gallery doesn't re-collapse globe into the ring cluster it was
+    // built to read apart from.
+    defaults: { hue: 340, hueB: 355, saturation: 0.4, colorMode: 'gradient', colorA: '#e6316f', colorB: '#f2154a' },
+  });
+  const currentValues = baked || panel.values;
+  const pointer = createPointer({ canvas });
+  const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
+  // In panel mode the drag writes straight into rotX/rotY through setValue —
+  // the only write path — so the Pitch/Yaw sliders and the rendered camera
+  // never disagree. A baked export has no panel to write through, so it
+  // mutates currentValues directly, clamped to the same ranges the panel
+  // would have enforced.
+  const orbit = createOrbit({
+    canvas,
+    onOrbit: (dPitch, dYaw) => {
+      const dPitchDeg = (dPitch * 180) / Math.PI;
+      const dYawDeg = (dYaw * 180) / Math.PI;
+      if (panel) {
+        panel.setValue('rotX', panel.values.rotX + dPitchDeg, { persist: false });
+        panel.setValue('rotY', panel.values.rotY + dYawDeg, { persist: false });
+      } else {
+        currentValues.rotX = clampDeg(currentValues.rotX + dPitchDeg, -90, 90);
+        currentValues.rotY = clampDeg(currentValues.rotY + dYawDeg, -180, 180);
+      }
+    },
+    onSettle: () => {
+      if (!panel) return;
+      panel.setValue('rotX', panel.values.rotX, { persist: true });
+      panel.setValue('rotY', panel.values.rotY, { persist: true });
+    },
+  });
+
+  const camera = createCamera({ fov: FOV });
+  const overlay = createCursorOverlay();
+  // Screen-space falloff radius shared by every cursor mode below.
+  const WARP_RADIUS = 220;
+
+  // Grow/Shrink displace the sphere's OWN surface outward/inward along its
+  // radius (a genuine bulge/dent in world space, falloff-weighted by the
+  // point's projected screen distance to the pointer — mirrors
+  // wireframe-lattice's heightAt) — a behaviour none of the three orb
+  // pieces has, since they only ever nudge already-flat screen-space
+  // points. Attract/Vortex stay screen-space, like wireframe-lattice's
+  // warpProjected, since "toward the cursor" and "rotate about the
+  // cursor" are screen-space ideas once a point is projected.
+  function bulgeR(dirX, dirY, dirZ, R, mode, kAmp) {
+    if (!kAmp || (mode !== 'Grow' && mode !== 'Shrink')) return R;
+    const approx = camera.project(dirX * R, dirY * R, dirZ * R);
+    if (approx.scale <= 0) return R;
+    const grow = mode === 'Grow';
+    const lAmp = grow ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
+    const f = pointer.falloff(approx.x, approx.y, WARP_RADIUS * lAmp);
+    if (!f) return R;
+    const push = f * R * 0.22 * lAmp;
+    return grow ? R + push : R - push;
+  }
+
+  function warpProjected(pts, mode, kAmp) {
+    if (!kAmp || (mode !== 'Attract' && mode !== 'Vortex')) return pts;
+    for (const p of pts) {
+      if (p.scale <= 0) continue;
+      const f = pointer.falloff(p.x, p.y, WARP_RADIUS);
+      if (!f) continue;
+      if (mode === 'Attract') {
+        // Clamp the EASE FRACTION, not just kAmp: f*kAmp can still exceed 1
+        // near the pointer, and a lerp factor above 1 overshoots the
+        // pointer and reflects the point past it.
+        const ease = Math.min(f * kAmp, 1);
+        p.x += (pointer.x - p.x) * ease;
+        p.y += (pointer.y - p.y) * ease;
+      } else {
+        const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * kAmp * 1.1 });
+        p.x = pointer.x + r.x;
+        p.y = pointer.y + r.y;
+      }
+    }
+    return pts;
+  }
+
+  // Draws one already-projected polyline. Walks in order and breaks the
+  // run at any point behind the camera (scale <= 0) instead of filtering —
+  // a skipped interior point must start a new subpath, not get bridged
+  // over. Each segment is stroked individually so its own average `scale`
+  // (the projection's perspective divisor — larger is nearer) can drive a
+  // per-segment alpha: the far hemisphere recedes instead of reading flat,
+  // which is the depth cue a lat/long wire mesh needs to read as a surface
+  // rather than a mandala.
+  function strokeRun(pts, values, lineWidth, rgb) {
+    const run = pts.filter((p) => p.scale > 0);
+    // Still record broken sub-runs for SVG fidelity.
+    let cur = [];
+    for (const p of pts) {
+      if (p.scale > 0) cur.push([p.x, p.y]);
+      else if (cur.length >= 2) { paths.push(cur); cur = []; }
+      else cur = [];
+    }
+    if (cur.length >= 2) paths.push(cur);
+    if (run.length < 2) return;
+
+    const [r, g, b] = rgb;
+    ctx.lineWidth = lineWidth;
+    for (let i = 0; i < run.length - 1; i++) {
+      // A point right at the run's seam (scale <= 0 neighbour skipped) can
+      // still be drawn against the next in-front point — fine, since both
+      // endpoints here are already filtered to scale > 0.
+      const a = run[i], b2 = run[i + 1];
+      const avgScale = (a.scale + b2.scale) / 2;
+      const depthAlpha = Math.max(0.22, Math.min(1, avgScale * 0.72));
+      const alpha = values.opacity * depthAlpha;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+      if (values.glow > 0) {
+        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.globalAlpha = values.glow * 0.25 * depthAlpha;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b2.x, b2.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = lineWidth;
+      }
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b2.x, b2.y);
+      ctx.stroke();
+    }
+  }
+
+  function drawFrame(dt, elapsed, values) {
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    paths = [];
+    // R stays under 0.8*FOV even at Scale's max (2), so the near-plane cap
+    // in shared/project.js (20% of fov ahead of the lens) never silently
+    // swallows the sphere's front cap: 0.35*2 = 0.7 < 0.8.
+    const R = FOV * 0.35 * values.scale;
+    const lats = Math.max(3, Math.round(BASE_LATS * values.density));
+    const lons = Math.max(4, Math.round(BASE_LONS * values.density));
+    const light = values.invert ? 0.35 : 0.62;
+    const baseWidth = 0.3 + values.stroke * 1.0;
+
+    // Speed drives the continuous spin — the piece's headline motion, so a
+    // spinning globe survives Speed 0 as a still frame rather than going
+    // inert (the read is just frozen, not gone). Motion drives an
+    // independent axial wobble (precession), a small oscillation on tilt
+    // distinct from the yaw spin — Motion 0 flattens it to a fixed tilt,
+    // Speed 0 leaves it oscillating; neither is a proxy for the other.
+    const spin = elapsed * values.speed * 0.35;
+    const wobble = Math.sin(elapsed * values.motion * 0.22) * 6 * (Math.PI / 180);
+
+    camera.set({
+      tilt: (values.rotX * Math.PI) / 180 + wobble,
+      yaw: (values.rotY * Math.PI) / 180 + spin,
+      roll: (values.angle * Math.PI) / 180,
+      cx: canvas.width / 2,
+      cy: canvas.height / 2,
+    });
+
+    // Off at pointer 0, off when cursorInteraction is 'None', eased by
+    // influence. No term routed through values.speed or values.motion
+    // (both user-zeroable).
+    const k = modeFactor(values, pointer);
+    const mode = values.cursorInteraction;
+    // Cap the amplitude/radius input at k=1 — uncapped, k=2 (Pointer's max)
+    // would compound the bulge/falloff radius together, destroying the
+    // sphere's identity rather than swelling/denting it (same reasoning as
+    // wireframe-lattice's kAmp).
+    const kAmp = Math.min(k, 1);
+
+    // Phase RESTRUCTURES the latitude spacing rather than translating the
+    // whole mesh (translation on a rotationally symmetric, already-spinning
+    // figure is imperceptible — see event-horizon's own note on why it
+    // warps radius instead of yaw). warpLat is the identity at Phase 0 and
+    // stays monotonic in v across [-1, 1], so rings never cross; increasing
+    // Phase bunches rings toward the equator.
+    const warpLat = (v) => Math.sign(v) * Math.pow(Math.abs(v), 1 + values.phase * 1.5);
+
+    // --- Latitude rings (small circles at fixed y, radius R*cos(lat)) ---
+    for (let i = 0; i < lats; i++) {
+      const u = lats === 1 ? 0.5 : i / (lats - 1);
+      const v = warpLat(u * 2 - 1); // -1..1
+      const latDeg = v * MAX_LAT_DEG;
+      const lat = (latDeg * Math.PI) / 180;
+      const ringR = Math.cos(lat);
+      const y = Math.sin(lat);
+
+      const f = (i + 0.5) / lats;
+      const { h, s } = paletteHsl(values, f);
+      const [r, g, b] = hslToRgb(h, s, light);
+
+      const pts = [];
+      for (let s = 0; s <= SEG_LAT; s++) {
+        const a = (s / SEG_LAT) * Math.PI * 2;
+        const dx = Math.cos(a) * ringR;
+        const dz = Math.sin(a) * ringR;
+        const rr = bulgeR(dx, y, dz, R, mode, kAmp);
+        pts.push([dx * rr, y * rr, dz * rr]);
+      }
+      strokeRun(warpProjected(camera.projectPath(pts), mode, kAmp), values, baseWidth, [r, g, b]);
+    }
+
+    // --- Longitude meridians (great circles through both poles) ---
+    for (let j = 0; j < lons; j++) {
+      const lon = (j / lons) * Math.PI * 2;
+      const f = j / lons;
+      const { h, s } = paletteHsl(values, f);
+      const [r, g, b] = hslToRgb(h, s, light);
+
+      const pts = [];
+      for (let s = 0; s <= SEG_LON; s++) {
+        const lat = (s / SEG_LON) * Math.PI - Math.PI / 2; // -90..90 (pole to pole)
+        const cLat = Math.cos(lat);
+        const dx = Math.cos(lon) * cLat;
+        const dy = Math.sin(lat);
+        const dz = Math.sin(lon) * cLat;
+        const rr = bulgeR(dx, dy, dz, R, mode, kAmp);
+        pts.push([dx * rr, dy * rr, dz * rr]);
+      }
+      strokeRun(warpProjected(camera.projectPath(pts), mode, kAmp), values, baseWidth * 0.85, [r, g, b]);
+    }
+
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

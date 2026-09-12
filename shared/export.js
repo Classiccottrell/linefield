@@ -25,7 +25,11 @@ export function exportPng(canvas, { multiplier = 1 } = {}) {
   scaled.toBlob((blob) => download('linefield.png', blob), 'image/png');
 }
 
-export function exportSvg(paths, { width = 800, height = 600 } = {}) {
+// `texts` is optional and additive — glyph-mark pieces (matrix-code) pass
+// SVG native <text> elements instead of polylines, since a glyph has no
+// meaningful line-segment geometry to export. Stroke-path pieces never pass
+// it, so their output is byte-identical to before this option existed.
+export function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -33,7 +37,14 @@ export function exportSvg(paths, { width = 800, height = 600 } = {}) {
     })
     .join('\n');
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}\n</svg>`;
+  const textEls = texts
+    .map(({ x, y, ch, size, fontFamily }) => {
+      const safeCh = String(ch).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${fontFamily || 'monospace'}" font-size="${size.toFixed(2)}" fill="black">${safeCh}</text>`;
+    })
+    .join('\n');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}${polylines && textEls ? '\n' : ''}${textEls}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
 }
@@ -70,13 +81,29 @@ function stripInnerImports(src) {
   return src.replace(INNER_SHARED_IMPORT_RE, '');
 }
 
-// BFS over the shared-module import graph, not just the piece's own
-// top-level imports. Scanning only the piece script is exactly the
-// hand-maintained-list failure this function's own comment already warns
-// about, one level removed: a shared module's OWN imports were invisible to
-// it, so a new cross-shared-module import survived verbatim into a classic
-// (non-module) inline script — a SyntaxError this file's <script> tag has no
-// listener for, producing a validly-loading, blank-canvas download. See
+// Topological sort (post-order DFS) over the shared-module import graph, not
+// just the piece's own top-level imports, and NOT discovery (BFS) order.
+// Scanning only the piece script is exactly the hand-maintained-list failure
+// this function's own comment already warns about, one level removed: a
+// shared module's OWN imports were invisible to it, so a new cross-shared-
+// module import survived verbatim into a classic (non-module) inline script.
+//
+// BFS discovery order is not enough once a shared module reads another
+// shared module's binding at TOP LEVEL (module-evaluation time), not just
+// inside a function body called later. controls.js is always a piece's
+// first import, so BFS always placed it first in the concatenated output —
+// fine for `hexToHue` (from color.js), which is only called inside
+// `setValue`, deferred to call time; broken for `CURSOR_MODES` (from
+// cursor-modes.js), which controls.js's top-level `const SHARED_CONTROLS =
+// [...]` reads immediately. cursor-modes.js, discovered as controls.js's own
+// import, was concatenated AFTER controls.js under BFS — a real
+// ReferenceError: Cannot access 'CURSOR_MODES' before initialization, in
+// every downloaded file, that loaded without error and rendered blank.
+//
+// A post-order DFS guarantees every module's dependencies appear before it
+// in the emitted output, independent of whether the consumer reads the
+// dependency's binding at top level or lazily inside a function — the
+// general fix, not a per-call-site workaround. See
 // skills/building-generative-backgrounds/SKILL.md, "Inlining and bundling".
 async function inlineSharedModules(pieceScriptSrc) {
   const strippedPieceSrc = pieceScriptSrc.replace(SHARED_IMPORT_RE, '');
@@ -85,15 +112,17 @@ async function inlineSharedModules(pieceScriptSrc) {
     throw new Error('bakeHtml: the piece imports no shared modules — refusing to bake a file that would render blank');
   }
 
-  const seen = new Set();
-  const order = [];
   const srcByPath = new Map();
-  const queue = [...initial];
-  while (queue.length) {
-    const path = queue.shift();
-    if (seen.has(path)) continue;
-    seen.add(path);
-    order.push(path);
+  const order = []; // post-order: a module's dependencies land before it
+  const done = new Set();
+  const visiting = new Set(); // cycle guard — a real cycle would recurse forever otherwise
+
+  async function visit(path) {
+    if (done.has(path)) return;
+    if (visiting.has(path)) {
+      throw new Error(`bakeHtml: circular shared-module import detected at ${path}`);
+    }
+    visiting.add(path);
     const res = await fetch(path);
     if (!res.ok) throw new Error(`bakeHtml: could not fetch ${path} (${res.status})`);
     const src = await res.text();
@@ -103,8 +132,13 @@ async function inlineSharedModules(pieceScriptSrc) {
     // reached both ways (e.g. color.js: directly by the piece, and via
     // controls.js) is only ever inlined once.
     const inner = [...src.matchAll(INNER_SHARED_IMPORT_RE)].map((m) => `../../shared/${m[1]}`);
-    for (const p of inner) if (!seen.has(p)) queue.push(p);
+    for (const p of inner) await visit(p);
+    visiting.delete(path);
+    done.add(path);
+    order.push(path);
   }
+
+  for (const path of initial) await visit(path);
 
   const bodies = order.map((path) => {
     const src = srcByPath.get(path);

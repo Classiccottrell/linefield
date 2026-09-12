@@ -31,9 +31,10 @@
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
-  import { createCamera } from '../../shared/project.js';
+  import { createCamera, rotatePoint } from '../../shared/project.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createOrbit, createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'event-horizon';
   const canvas = document.getElementById('canvas');
@@ -101,6 +102,17 @@
   });
 
   const camera = createCamera({ fov: 700 });
+  const overlay = createCursorOverlay();
+  // Shrink's ease factor (below) tops out at ~0.072 of a point's distance
+  // to the pointer — deliberately small so Grow's lens bulge has the
+  // headroom it needs without overshooting. At 260 that pull only reached
+  // grid lines close to the disc's own converging center, where the
+  // perspective warp already dominates and swallows a further few-percent
+  // nudge. Widened to 420 so the pull also reaches the event horizon's own
+  // silhouette — where a contracting edge against the black disc is what
+  // actually reads as "shrink" here — without changing the ease factor
+  // itself (still tuning the catchment, not deepening the per-point pull).
+  const LENS_RADIUS = 420;
 
   function strokePts(pts, values, lineWidth, rgb) {
     // Walk in order and break the run at any point behind the camera
@@ -169,14 +181,56 @@
     const phaseWobble = Math.sin(values.phase * Math.PI * 1.5);
     const warpU = (u) => Math.max(0, Math.min(1, u + 0.4 * u * (1 - u) * phaseWobble));
     const radiusAt = (u) => horizon + (extent - horizon) * Math.pow(warpU(u), 1 + values.mass * 0.9);
-    const pointerK = values.pointer * pointer.influence;
+    // Off at pointer 0, off when cursorInteraction is 'None', eased by
+    // influence. No term routed through values.speed or values.mass (both
+    // user-zeroable).
+    const pointerK = modeFactor(values, pointer);
+    const pointerMode = values.cursorInteraction;
+    // Cap the amplitude/radius/rotation input at pointerK=1: uncapped,
+    // pointerK=2 (Pointer's max) quadruples Grow's amp AND is itself
+    // multiplied into the pull magnitude again below, compounding to a
+    // pull factor that can exceed 1 near the pointer (the same overshoot/
+    // reflect hazard as the Attract fix, plus a falloff radius wide enough
+    // to reach most of the disc) — together they can destroy the piece's
+    // identity rather than swelling it. This holds Pointer 1..2 flat at
+    // the Pointer=1 strength (gate numbers unchanged) instead of
+    // compounding further.
+    const pointerKAmp = Math.min(pointerK, 1);
     const projectWithLens = (pts) => {
       const projected = camera.projectPath(pts);
       if (!pointerK) return projected;
       for (const p of projected) {
-        const f = pointer.falloff(p.x, p.y, 260);
-        p.x += (pointer.x - p.x) * f * pointerK * 0.18;
-        p.y += (pointer.y - p.y) * f * pointerK * 0.18;
+        if (pointerMode === 'Grow' || pointerMode === 'Shrink') {
+          // Grow/Shrink scale the lens's existing pull magnitude and radius
+          // by the same amp — this IS the piece's existing Attract-like
+          // behaviour, amplified/damped rather than replaced.
+          const amp = pointerMode === 'Grow' ? 1 + pointerKAmp * 1.5 : 1 / (1 + pointerKAmp * 1.5);
+          const f = pointer.falloff(p.x, p.y, LENS_RADIUS * amp);
+          if (f) {
+            const ease = Math.min(f * pointerKAmp * 0.18 * amp, 1);
+            p.x += (pointer.x - p.x) * ease;
+            p.y += (pointer.y - p.y) * ease;
+          }
+        } else if (pointerMode === 'Attract') {
+          // The lens already pulls projected points toward the pointer —
+          // unchanged from before wiring, just scoped to this mode. Max
+          // factor here is pointerK*0.18 = 0.36, already well under 1, so
+          // no overshoot clamp is needed.
+          const f = pointer.falloff(p.x, p.y, LENS_RADIUS);
+          if (f) {
+            p.x += (pointer.x - p.x) * f * pointerK * 0.18;
+            p.y += (pointer.y - p.y) * f * pointerK * 0.18;
+          }
+        } else if (pointerMode === 'Vortex') {
+          // True tangential rotation about the pointer, not an offset
+          // toward/away from it.
+          const f = pointer.falloff(p.x, p.y, LENS_RADIUS);
+          if (f) {
+            const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * pointerKAmp * 1.1 });
+            p.x = pointer.x + r.x;
+            p.y = pointer.y + r.y;
+          }
+        }
       }
       return projected;
     };
@@ -210,11 +264,17 @@
       }
       strokePts(projectWithLens(pts), values, lineWidth * 0.7, [r, g, b]);
     }
+
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, pointerK);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

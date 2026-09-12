@@ -34,6 +34,7 @@
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'grain-field';
   const canvas = document.getElementById('canvas');
@@ -84,6 +85,7 @@
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
 
   seedGrains(Math.round(BASE_COUNT * currentValues.density));
   window.addEventListener('resize', () =>
@@ -101,12 +103,15 @@
     const drift = 14 * values.speed * (dt || 0.016);
     const len = values.grain;
     const light = values.invert ? 0.4 : 0.62;
+    const stopA = paletteHsl(values, 0);
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
 
     const lineWidth = 0.3 + values.stroke * 0.9;
     ctx.lineWidth = lineWidth;
 
-    // Gate: off at pointer 0, eased by influence, local via falloff.
-    const k = values.pointer * pointer.influence;
+    // The only gate: off at pointer 0, off when cursorInteraction is 'None',
+    // eased by influence.
+    const k = modeFactor(values, pointer);
 
     for (const gr of grains) {
       const n = simplex2(gr.x * noiseScale + values.phase, gr.y * noiseScale + t);
@@ -115,16 +120,28 @@
       gr.x += Math.cos(a) * drift;
       gr.y += Math.sin(a) * drift;
 
+      let lw = lineWidth;
       if (k) {
-        // Grain parts around the pointer: pushed directly away, weighted by
-        // falloff. Uses only dt (real frame time), never values.speed, so
-        // the parting survives Speed 0.
+        // Uses only dt (real frame time), never values.speed, so the
+        // response survives Speed 0.
         const f = pointer.falloff(gr.x, gr.y, 200);
         if (f) {
-          const away = Math.atan2(gr.y - pointer.y, gr.x - pointer.x);
-          const push = f * k * 140 * (dt || 0.016);
-          gr.x += Math.cos(away) * push;
-          gr.y += Math.sin(away) * push;
+          if (values.cursorInteraction === 'Attract') {
+            const toward = Math.atan2(pointer.y - gr.y, pointer.x - gr.x);
+            const push = f * k * 140 * (dt || 0.016);
+            gr.x += Math.cos(toward) * push;
+            gr.y += Math.sin(toward) * push;
+          } else if (values.cursorInteraction === 'Vortex') {
+            const away = Math.atan2(gr.y - pointer.y, gr.x - pointer.x);
+            const tangent = away + Math.PI / 2;
+            const push = f * k * 140 * (dt || 0.016);
+            gr.x += Math.cos(tangent) * push;
+            gr.y += Math.sin(tangent) * push;
+          } else if (values.cursorInteraction === 'Grow') {
+            lw = lineWidth * (1 + f * k * 1.6);
+          } else if (values.cursorInteraction === 'Shrink') {
+            lw = Math.max(lineWidth * 0.15, lineWidth / (1 + f * k * 1.6));
+          }
         }
       }
 
@@ -138,6 +155,7 @@
       const { h, s } = paletteHsl(values, mix);
       const [r, g, b] = hslToRgb(h, s, light);
       ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
+      ctx.lineWidth = lw;
 
       const ex = gr.x + Math.cos(a) * len;
       const ey = gr.y + Math.sin(a) * len;
@@ -145,20 +163,24 @@
       ctx.moveTo(gr.x, gr.y);
       ctx.lineTo(ex, ey);
       if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.lineWidth = lw + values.glow * 3;
         ctx.globalAlpha = values.glow * 0.25;
         ctx.stroke();
-        ctx.lineWidth = lineWidth;
+        ctx.lineWidth = lw;
         ctx.globalAlpha = 1;
       }
       ctx.stroke();
       paths.push([[gr.x, gr.y], [ex, ey]]);
     }
+
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

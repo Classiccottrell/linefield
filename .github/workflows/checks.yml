@@ -27,23 +27,29 @@ jobs:
       - name: Verify manifest
         run: npm run verify
 
-      # Every piece x control combination, diffing rendered frames. Catches
-      # a control that reads a value and changes nothing — a defect that has
-      # shipped twice in this project and passed human review both times.
-      - name: Audit controls
-        run: npm run audit-controls
-
       # Presets are a piece-declared vocabulary; this exercises the
       # mechanism end to end for one piece. `npm run verify` never runs
       # this because --verify-only exits before launching a browser.
       - name: Verify preset mechanism
         run: node tools/test-presets.mjs synapse
 
-      # Every downloads/*.html loaded over file://, from a directory with
-      # no shared/ sibling — the promise a baked export makes. Catches a
-      # shared module silently missing from the bake, which has shipped
-      # blank exports before while every other gate reported green.
-      - name: Test baked exports
+      # Bakes each piece live (clicks its real "Baked HTML" button,
+      # exercising today's shared/export.js) and validates that output. This
+      # proves the bake PROCESS works against current source; it says
+      # nothing about what's committed in downloads/ — that's the next step.
+      - name: Test fresh bake (live bake process)
+        run: npm run test-bake-fresh
+
+      # Every committed downloads/*.html loaded over file://, from a
+      # directory with no shared/ sibling — the promise a baked export
+      # makes. Proves the committed BYTES still render standalone: catches
+      # a hand-edit, a truncated file, or output left over from a since-
+      # fixed broken bake. It is blind to a live regression in the bake
+      # process itself until someone next runs `npm run build` — that's
+      # what the step above is for. Neither step catches a piece that was
+      # visually tuned and never rebuilt (see CONTRIBUTING.md, "CI will not
+      # catch a forgotten rebuild") — there is no automated check for that.
+      - name: Test baked exports (committed artifact)
         run: npm run test-baked
 
       - name: Test source exports
@@ -51,6 +57,36 @@ jobs:
 
       - name: Test interactions
         run: npm run test-interactions
+
+      # Drives every mode live on every piece and asserts no two render
+      # identically — the only gate that proves all seven cursor-interaction
+      # modes actually did something, on all twelve pieces. Placed here,
+      # after the fast/specific checks above and before the slow, broad
+      # control audit below, for the same reason that audit runs last: this
+      # step is itself fast and specific relative to the audit, and a
+      # failure here must not be hidden behind a slower step that hasn't run
+      # yet. Do not move it after "Audit controls" — that would let a mode
+      # regression hide behind whatever the audit fails on first.
+      - name: Test cursor modes
+        run: npm run test-cursor-modes
+
+      # Every piece x control combination, diffing rendered frames. Catches
+      # a control that reads a value and changes nothing — a defect that has
+      # shipped twice in this project and passed human review both times.
+      #
+      # Deliberately LAST, not first, and not `continue-on-error` (that
+      # would stop it failing the build at all — the opposite of the
+      # point). GitHub Actions stops a job at its first failing step with
+      # no such override anywhere in this file, and this is currently the
+      # slowest, broadest check and the one most likely to fail legitimately
+      # mid-rollout (e.g. a new shared control not yet wired into every
+      # piece) — running it first hid every faster, more specific check
+      # behind it, including the two bake gates above, for the entire time
+      # it was failing. A slow, broad gate must never stand in front of
+      # fast, specific ones: when this legitimately fails, the other
+      # results should already be in the same run, not hidden behind it.
+      - name: Audit controls
+        run: npm run audit-controls
 
       # Deliberately not building here. The gallery, thumbnails and
       # downloads are committed, and GitHub Pages serves them directly.

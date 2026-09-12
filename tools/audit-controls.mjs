@@ -127,8 +127,47 @@ const LIVE_THRESHOLD = 0.05; // % of sampled pixels changed, below this = no vis
 // the hue/hueB manifest gate). Pin both stops to two maximally distinct
 // colours before probing colorMode specifically, so its own test isolates
 // the mechanism rather than inheriting a piece's palette choice.
+//
+// Same conflation for `pointer`/`cursorInteraction`: a piece's cursor
+// response is gated on BOTH being non-default at once (modeFactor in
+// shared/cursor-modes.js returns 0 unless cursorInteraction !== 'None' AND
+// pointer > 0, by design — pointer=0 or None must be fully inert). Probing
+// either control alone leaves the other at ITS default (pointer=0,
+// cursorInteraction='None'), so the response is zero regardless of what the
+// probed control does. Pin the other one on, same fix as colorMode above.
+//
+// Pinned to 'Particle Trail', not a per-piece mode like 'Attract': Particle
+// Trail is the shared overlay in shared/cursor-modes.js — one
+// implementation, already covered by tools/test-cursor-modes.mjs, that
+// per-piece work (Tasks 2/3 rewriting Attract/Grow/Shrink/Vortex on eleven
+// pieces) does not touch. Pinning to a per-piece mode would make this
+// PROBE's own result ride on whatever that mode currently happens to do —
+// `pointer` could read DEAD from a regression in Attract's rewrite, a
+// failure that belongs to Attract, misattributed to Pointer instead.
+//
+// What "Pointer LIVE" asserts, since this pin changes it: NOT "moving the
+// pointer slider alone, everything else at its own default, changes
+// pixels" — that reads DEAD by design at cursorInteraction='None'. It
+// asserts "with cursor response already active via the overlay, sliding
+// pointer's strength up changes pixels." The interaction as a whole is what
+// PREREQS.cursorInteraction (below) exercises the reverse of.
+//
+// Mirror statement for PREREQS.cursorInteraction, since it is easy to
+// overclaim here: pinning `pointer` to 1 makes "zero DEAD for
+// cursorInteraction" assert that the MODE-SELECTION MECHANISM is wired —
+// switching the dropdown changes what the shared overlay / a piece's own
+// branch does, given that pointer strength is already nonzero. It does
+// NOT assert "every mode is visible at this piece's shipped defaults":
+// pointer defaults to 0 on every piece, so an unpinned sweep of
+// cursorInteraction would read DEAD unconditionally regardless of whether
+// mode selection works at all, and this prereq exists to stop that
+// unconditional failure, not to certify any particular mode's look.
+// tools/test-cursor-modes.mjs is the gate that exercises THAT claim — every
+// mode, live and visually distinct, on every piece.
 const PREREQS = {
   colorMode: { colorA: '#ff2d2d', colorB: '#2de0ff' },
+  pointer: { cursorInteraction: 'Particle Trail' },
+  cursorInteraction: { pointer: 1 },
 };
 
 async function renderVariant(page, base, slug, name, value) {

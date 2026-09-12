@@ -33,6 +33,8 @@
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createPointer } from '../../shared/pointer.js';
+  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+  import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'interference';
   const canvas = document.getElementById('canvas');
@@ -70,12 +72,28 @@
   });
   const currentValues = baked || panel.values;
   const pointer = createPointer({ canvas });
+  const overlay = createCursorOverlay();
+
+  // Every ring is one continuous stroked path, so per-mark scaling isn't
+  // available. No canvas rotation transform is applied here (unlike
+  // contour-grid/meridian/tether), so pointer.x/y are usable directly —
+  // no un-rotate step needed.
+  const SWELL_MAG = 34;
+  const SWELL_RADIUS = 200;
 
   // One family of concentric rings, centred at (cx, cy).
-  function drawFamily(cx, cy, rings, spacing, rgb, values) {
+  function drawFamily(cx, cy, rings, spacing, rgb, values, k) {
     const [r, g, b] = rgb;
     ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
     const lineWidth = ctx.lineWidth;
+    const mode = values.cursorInteraction;
+    // Cap the amplitude/radius/rotation input at k=1: uncapped, k=2
+    // (Pointer's max) quadruples Grow's magnitude AND falloff radius
+    // together (and widens Vortex's rotation radius the same way), which
+    // pulls nearly every ring hard and destroys the piece's identity. This
+    // holds Pointer 1..2 flat at the Pointer=1 strength (gate numbers
+    // unchanged) instead of compounding further.
+    const kAmp = Math.min(k, 1);
 
     for (let i = 1; i <= rings; i++) {
       const radius = i * spacing;
@@ -83,8 +101,32 @@
       ctx.beginPath();
       for (let s = 0; s <= SEG; s++) {
         const a = (s / SEG) * Math.PI * 2;
-        const x = cx + Math.cos(a) * radius;
-        const y = cy + Math.sin(a) * radius;
+        let x = cx + Math.cos(a) * radius;
+        let y = cy + Math.sin(a) * radius;
+        if (k && (mode === 'Grow' || mode === 'Shrink' || mode === 'Vortex')) {
+          const amp = mode === 'Shrink' ? 1 / (1 + kAmp * 1.5) : 1 + kAmp * 1.5;
+          const swellRadius = SWELL_RADIUS * amp;
+          const f = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / swellRadius);
+          if (f) {
+            if (mode === 'Vortex') {
+              // True tangential rotation about the pointer, not an offset
+              // toward/away from it.
+              const rp = rotatePoint(x - pointer.x, y - pointer.y, 0, { roll: f * kAmp * 1.1 });
+              x = pointer.x + rp.x;
+              y = pointer.y + rp.y;
+            } else {
+              // Radial swell, always outward: Grow amplifies the magnitude
+              // and radius by amp; Shrink is the identical formula with
+              // amp < 1, so the bulge contracts to a smaller, weaker dimple
+              // rather than reversing direction.
+              const dx = x - pointer.x, dy = y - pointer.y;
+              const d = Math.hypot(dx, dy) || 1;
+              const push = f * SWELL_MAG * amp;
+              x += (dx / d) * push;
+              y += (dy / d) * push;
+            }
+          }
+        }
         if (s === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
@@ -122,26 +164,39 @@
     const dy = Math.sin(dir) * sep;
 
     const light = values.invert ? 0.35 : 0.6;
+    // Off at pointer 0, off when cursorInteraction is 'None', eased by
+    // influence. No term routed through values.speed or values.split (both
+    // user-zeroable).
+    const k = modeFactor(values, pointer);
+
     const stopA = paletteHsl(values, 0);
     drawFamily(cx - dx, cy - dy, rings, spacing,
-      hslToRgb(stopA.h, stopA.s, light), values);
+      hslToRgb(stopA.h, stopA.s, light), values, k);
 
-    // Second family's centre eases toward the pointer by k: a plain blend
-    // gated by the control*influence product, no term scaled by values.speed.
-    const k = values.pointer * pointer.influence;
-    // Clamp the EASE FRACTION, not k: k can reach 2 (pointer control's max),
-    // and a lerp factor above 1 overshoots the pointer and reflects past it.
-    const ease = Math.min(k, 1);
-    const cx2 = (cx + dx) + (pointer.x - (cx + dx)) * ease;
-    const cy2 = (cy + dy) + (pointer.y - (cy + dy)) * ease;
+    // Second family's centre eases toward the pointer: Attract only — this
+    // was the piece's one existing pointer response, now scoped to the mode
+    // it matches rather than firing for every mode. Clamp the EASE FRACTION,
+    // not k: k can reach 2 (pointer control's max), and a lerp factor above
+    // 1 overshoots the pointer and reflects past it.
+    let cx2 = cx + dx, cy2 = cy + dy;
+    if (k && values.cursorInteraction === 'Attract') {
+      const ease = Math.min(k, 1);
+      cx2 = (cx + dx) + (pointer.x - (cx + dx)) * ease;
+      cy2 = (cy + dy) + (pointer.y - (cy + dy)) * ease;
+    }
     const stopB = paletteHsl(values, 1);
     drawFamily(cx2, cy2, rings, spacing,
-      hslToRgb(stopB.h, stopB.s, light), values);
+      hslToRgb(stopB.h, stopB.s, light), values, k);
+
+    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
+    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       pointer.step();
+      const k = modeFactor(currentValues, pointer);
+      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

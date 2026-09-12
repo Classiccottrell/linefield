@@ -157,6 +157,11 @@ tooling" below and CONTRIBUTING.md.
 - `tether` — a few heavy cables strung taut and swaying
 - `event-horizon` — a polar grid bent inward by a gravity well
 - `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
+- `puddle` — bounded, organic interference rippling across a puddle's surface
+- `globe` — a latitude/longitude wire mesh bending into a spinning sphere
+- `matrix-code` — quantized columns of glyphs churning identity independently of their falling head
+- `chain-haze` — lines of chains receding into the distance, discrete linked ovals fading with depth
+- `stock-market` — tracks of rising and falling bars marching across the field, buy and sell rendered as filled rectangles
 
 Every piece shares 16 controls (cursor interaction, scale, speed, stroke,
 opacity, saturation, color mode, color A, color B, glow, angle, motion,
@@ -164,11 +169,28 @@ phase, invert, density, pointer) plus its own piece-specific control. Color
 mode switches between a single hue (Solid) and a two-stop blend (Gradient,
 the default — every piece's own look); Color A/B are hex pickers, B shown
 only in Gradient mode. `density` multiplies the piece's base element count.
-`pointer` scales the piece's cursor response (0 by default, opt-in); each
-piece maps it to its own visual vocabulary and remains responsive at Speed
-0. `cursor interaction` currently ships with a single option, `None` — the
-control exists for a future sub-project (Grow, Shrink, Particle Trail,
-Ripples, Attract, Vortex) and does nothing yet. `wireframe-lattice` and
+`cursor interaction` selects one of seven modes, wired on all twelve
+pieces. None does nothing. Grow enlarges marks near the cursor; Shrink
+narrows them. Attract pulls nearby marks toward the cursor; Vortex swirls
+them around it in place. Particle Trail scatters a fading dust of small
+particles that follows the cursor's recent path; Ripples sends expanding
+rings outward from wherever the cursor rests. Grow/Shrink/Attract/Vortex
+scale marks individually on element-based pieces and amplify or damp an
+existing local deformation on whole-path pieces (rings, bands, ribbons,
+cables) — canvas cannot vary a single path's stroke width partway along
+it, so a piece that draws a whole ring or ribbon as one path leans on
+motion it already has rather than literal per-mark scaling. Particle Trail
+and Ripples are a shared cursor-relative overlay, identical on every
+piece, layered on top of a piece's own drawing rather than replacing any
+of it.
+
+`pointer` scales whichever mode is selected and defaults to 0, since these
+are backgrounds — meant to hold still until a visitor's cursor invites
+otherwise — and each piece remains fully responsive to it at Speed 0.
+`cursorInteraction: None` and `pointer: 0` are two different ways to be
+off: the mode dropdown turns cursor response off regardless of pointer,
+while leaving a mode selected with pointer at 0 keeps it silent but ready
+— raising pointer later needs no other change. `wireframe-lattice` and
 `event-horizon` also provide Pitch and Yaw controls; Angle is roll, and
 dragging the canvas orbits the camera on direct piece pages. Gallery
 previews disable drag-to-orbit.
@@ -215,14 +237,25 @@ assets:
 ```bash
 npm install
 npx playwright install chromium   # one-time, for headless capture
+npm run build            # NOT run in CI — verify, then regenerate thumbs/ and downloads/, which are committed
+
+# Below this line, every command runs in CI (.github/workflows/checks.yml),
+# in EXACTLY this order (see that file's own comments for why — the last
+# one is deliberately last, slowest and broadest, so it can never hide a
+# faster/narrower step's failure behind itself), except the last two below,
+# which are visual-review tools with no pass/fail gate — read their output
+# yourself, nothing exits nonzero.
 npm run verify          # check pieces.json / pieces/ / README agree; no generation
-npm run build            # verify, then regenerate thumbs/ and downloads/
-npm run audit-controls   # empirically check every shared+piece control moves pixels
-node tools/test-presets.mjs <slug>   # preset mechanism + value range gate
+node tools/test-presets.mjs <slug>   # preset mechanism (one piece) + value/enum gate (all pieces, regardless of <slug>)
+npm run test-bake-fresh  # bakes every piece live, rather than reading committed downloads/
 npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
 npm run test-source      # Source buttons download exact unbaked piece files
 npm run test-interactions # pointer, orbit, animation, and baked-artifact browser QA
-node tools/preset-sheet.mjs <slug>   # render a piece's presets for review
+npm run test-cursor-modes # every cursor mode live and mutually distinct, per piece
+npm run audit-controls   # empirically check every shared+piece control moves pixels — LAST, deliberately
+
+node tools/preset-sheet.mjs <slug>   # NOT run in CI — render a piece's presets for review
+node tools/mode-sheet.mjs            # NOT run in CI — paired None-vs-mode 1:1 crops for visual review
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's

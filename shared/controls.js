@@ -1,6 +1,7 @@
 // shared/controls.js
 
 import { hexToHue } from './color.js';
+import { CURSOR_MODES } from './cursor-modes.js';
 
 // `category` routes a control to one of the panel's tiers — 'interaction',
 // 'color', or the default 'visual' — and is presentation-only: it changes
@@ -8,12 +9,14 @@ import { hexToHue } from './color.js';
 // order, which every gate that isn't the panel itself still reads flat.
 const SHARED_CONTROLS = [
   // The seven cursor-interaction modes (Grow, Shrink, Particle Trail,
-  // Ripples, Attract, Vortex, None) are a separate sub-project. This ships
-  // the control, not the behaviours: a real, audit-drivable select with a
-  // single option. Its single sample point means audit-controls.mjs has no
-  // second point to diff against and reports it DEAD — expected for an
-  // intentionally inert control, not a bug.
-  { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: ['None'], default: 'None', category: 'interaction' },
+  // Ripples, Attract, Vortex, None). The behaviours are wired per-piece
+  // (see shared/cursor-modes.js); this declares the shared vocabulary so
+  // it is never duplicated per piece. Until a piece reads it, this control
+  // and `pointer` audit DEAD there (tools/audit-controls.mjs's PREREQS pins
+  // the other one on when probing either in isolation, but a piece with no
+  // wiring at all still shows no effect) — expected on every piece not yet
+  // wired, not a bug.
+  { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: CURSOR_MODES, default: 'None', category: 'interaction' },
   { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0, category: 'interaction' },
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
@@ -210,6 +213,23 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   }
 
   const values = { ...defaults, ...saved.values };
+  // A saved localStorage blob is a plain object spread above, not a
+  // setValue() call, so it never reaches clampValue's enum-membership check
+  // (see below) — a stale blob holding a mode string that was since removed
+  // or renamed (e.g. a future rename of one of the seven cursor-interaction
+  // modes) would land in `values` unvalidated: the <select> falls back to
+  // whatever its first <option> happens to be while `values` keeps the
+  // stale string, the exact divergence that check exists to prevent. Not
+  // reachable today (every currently-saved value was written by setValue,
+  // which already validates), but reachable the moment a spec's `options`
+  // changes under an existing save. Re-validate every enum field on load,
+  // same fallback rule as clampValue: an out-of-vocabulary value reverts to
+  // that control's own default, not just "whatever was previously in scope".
+  for (const spec of allSpecs) {
+    if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
+      values[spec.name] = defaults[spec.name];
+    }
+  }
   let collapsed = saved.collapsed || false;
   // Mobile-sheet collapse is a separate, unpersisted flag: it starts
   // collapsed every load (handle-only, per the brief) and is scoped to the
@@ -329,6 +349,15 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   // Pitch/Yaw divergence this stage exists to remove, reintroduced. Not
   // applied to booleans (kind === 'boolean') or to a name with no known spec.
   function clampValue(spec, v) {
+    // Enum membership is not optional: a value outside spec.options must be
+    // rejected rather than written, or __LF_VALUES__ and the rendered <select>
+    // diverge (the <select> silently ignores an out-of-range .value while
+    // the state object keeps whatever was passed in). Falls back to the
+    // control's current value, the same "previous value stands" rule a
+    // number's clamp already applies at its min/max.
+    if (spec?.kind === 'enum') {
+      return spec.options.includes(v) ? v : values[spec.name];
+    }
     if (!spec || spec.kind !== 'number' || typeof spec.min !== 'number' || typeof spec.max !== 'number') {
       return v;
     }
@@ -630,9 +659,17 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
       specByName[spec.name] = spec;
       allSpecs.push(spec);
       defaults[spec.name] = spec.default;
-      if (!(spec.name in values)) values[spec.name] = spec.default;
+      // Route through setValue — THE write path (see above) — rather than
+      // writing `values` directly. setValue's own render() optional-chains
+      // through `controllers[name]` (undefined until buildRow below runs),
+      // so calling it first is a harmless no-op render and leaves `values`
+      // holding the exact number buildRow then reads for the row's initial
+      // DOM state. Same precedence `{ ...defaults, ...saved.values }` uses
+      // at panel construction: a value already in `values` (e.g. restored
+      // from localStorage before this control existed) wins over the spec's
+      // own default, never silently overwritten.
+      setValue(spec.name, spec.name in values ? values[spec.name] : spec.default);
       buildRow(spec);
-      persist();
     },
   };
 }
