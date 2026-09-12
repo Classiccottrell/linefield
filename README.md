@@ -128,12 +128,12 @@ persists like any manual tuning, and "Reset to defaults" still returns to the
 piece's own defaults.
 
 Presets live in each piece's own control panel. The gallery does not surface
-them — a homepage of twelve cards each carrying five swatches was more
+them — a homepage of seventeen cards each carrying five swatches was more
 inventory than invitation.
 
 ## Gallery
 
-`index.html` at the repo root shows all twelve pieces with live previews,
+`index.html` at the repo root shows all seventeen pieces with live previews,
 filtering, and per-piece downloads. Serve the repo and open `/`:
 
 ```bash
@@ -169,7 +169,7 @@ phase, invert, density, pointer) plus its own piece-specific control. Color
 mode switches between a single hue (Solid) and a two-stop blend (Gradient,
 the default — every piece's own look); Color A/B are hex pickers, B shown
 only in Gradient mode. `density` multiplies the piece's base element count.
-`cursor interaction` selects one of seven modes, wired on all twelve
+`cursor interaction` selects one of seven modes, wired on all seventeen
 pieces. None does nothing. Grow enlarges marks near the cursor; Shrink
 narrows them. Attract pulls nearby marks toward the cursor; Vortex swirls
 them around it in place. Particle Trail scatters a fading dust of small
@@ -242,8 +242,8 @@ npm run build            # NOT run in CI — verify, then regenerate thumbs/ and
 # Below this line, every command runs in CI (.github/workflows/checks.yml),
 # in EXACTLY this order (see that file's own comments for why — the last
 # one is deliberately last, slowest and broadest, so it can never hide a
-# faster/narrower step's failure behind itself), except the last two below,
-# which are visual-review tools with no pass/fail gate — read their output
+# faster/narrower step's failure behind itself), except the last three
+# below, which are curation tools with no pass/fail gate — read their output
 # yourself, nothing exits nonzero.
 npm run verify          # check pieces.json / pieces/ / README agree; no generation
 node tools/test-presets.mjs <slug>   # preset mechanism (one piece) + value/enum gate (all pieces, regardless of <slug>)
@@ -256,12 +256,13 @@ npm run audit-controls   # empirically check every shared+piece control moves pi
 
 node tools/preset-sheet.mjs <slug>   # NOT run in CI — render a piece's presets for review
 node tools/mode-sheet.mjs            # NOT run in CI — paired None-vs-mode 1:1 crops for visual review
+npm run collection-metrics           # NOT run in CI — hue/sat/ink per piece, as ROADMAP's table
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
 canvas, captured at 1280×800) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
-never reimplemented) for all twelve pieces, then renders `index.html` at
+never reimplemented) for all seventeen pieces, then renders `index.html` at
 the repo root from `tools/templates/gallery.html` and the manifest — the
 gallery page itself, with live hover/keyboard previews, tag filtering, and
 per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
@@ -279,6 +280,16 @@ review by inspection alone, which is why this exists as a script instead
 of a one-off check. It drives controls via `window.__LF_PANEL__.setValue`
 and reads `window.__LF_SPECS__`, not DOM position, so it survives whatever
 widget a control renders as.
+
+`tools/collection-metrics.mjs` measures the collection's spread — each
+piece's colourfulness-weighted mean hue, mean saturation, and ink coverage
+(the fraction of the frame it marks) — and prints ROADMAP's "Collection
+constraints" table ready to paste. It decodes the committed
+`thumbs/<slug>.png` itself with `node:zlib`, so it needs no browser and no
+dependency, and it measures what was last built: run `npm run build` first
+if a piece changed. There is no pass/fail gate — it answers "where is the
+hue wheel open, and which density is under-served", which is a judgement a
+human makes.
 
 The gallery's live hover/keyboard preview loads pieces with `?preview=1`.
 `shared/controls.js` checks for that flag and, when present, skips both

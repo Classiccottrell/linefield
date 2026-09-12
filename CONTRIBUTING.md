@@ -46,6 +46,11 @@ dependency. None of that reaches a user of a piece.
    manifest.
 3. Add a bullet to README's Pieces list.
 4. Run `npm run build`.
+5. Run `npm run collection-metrics` and paste its output over ROADMAP's
+   "Collection constraints" table, so the collection's hue/saturation/ink
+   spread still describes the library someone reads it against. Do this
+   after the build — it measures the committed thumbnails, so a piece with
+   no thumbnail yet has no row.
 
 The build verifies before it generates, and **fails** if the manifest, the
 pieces on disk, and the README disagree — including if a piece's palette has
@@ -62,7 +67,7 @@ actually touched will show a diff in `thumbs/`.
 **CI will not catch a forgotten rebuild.** CI (`.github/workflows/checks.yml`)
 runs, in order: `npm run verify` (manifest vs. pieces vs. README
 agreement), `node tools/test-presets.mjs synapse` (preset mechanism on one
-piece, preset value/enum data on all twelve — see "Presets" below),
+piece, preset value/enum data on all seventeen — see "Presets" below),
 `npm run test-bake-fresh` (bakes every piece live — the real `bakeHtml()`
 in `shared/export.js`, against today's source — and validates that
 output), `npm run test-baked` (every *committed* `downloads/*.html`
@@ -74,9 +79,10 @@ interaction" below), and `npm run audit-controls` (every control has a
 visible effect; run LAST, deliberately — it's the slowest, broadest check
 and the one most likely to fail mid-rollout of a new control, and a slow
 broad gate must never stand in front of fast specific ones and hide their
-results). `node tools/preset-sheet.mjs`, `node tools/mode-sheet.mjs`, and
-`node tools/browser-matrix.mjs` are visual-review tools with no pass/fail
-gate and do not run in CI at all — read their output yourself. Neither bake
+results). `node tools/preset-sheet.mjs`, `node tools/mode-sheet.mjs`,
+`node tools/browser-matrix.mjs` and `npm run collection-metrics` are
+curation tools with no pass/fail gate and do not run in CI at all — read
+their output yourself. Neither bake
 check catches a forgotten rebuild, and saying so is
 not a contradiction of the heading above — it's the point. `test-bake-fresh`
 proves the bake *process* works against current source and says nothing
@@ -122,7 +128,7 @@ strength. The vocabulary and the shared Trail/Ripples overlay live in
 `shared/cursor-modes.js` — see `modeFactor(values, pointer)`, which every
 mode multiplies by and which is 0 whenever `cursorInteraction` is `'None'`
 or `pointer` is 0. Per-mode behaviour (Grow/Shrink/Attract/Vortex) is wired
-piece by piece and is now live on all twelve pieces. Element-based pieces
+piece by piece and is now live on all seventeen pieces. Element-based pieces
 (particles, dots, nodes) scale marks individually — see
 `pieces/flow-field/index.html` for the worked example. Whole-path pieces
 that stroke a ring/band/ribbon/cable as one path can't vary stroke width
@@ -239,7 +245,9 @@ onFrame(dt, elapsed) {
 **Draw-ordering contract, binding on every piece:** call `overlay.draw(ctx,
 colour, k)` as the LAST thing in the piece's own frame — after it has
 cleared the canvas and drawn everything else for that tick, never before.
-Ten of the twelve pieces in this library do a full clear every frame; a
+Fifteen of the seventeen pieces in this library do a full clear every frame
+— the exceptions are `flow-field` and `accretion`, which fade with a
+part-alpha fill so their marks leave trails; a
 piece that draws the overlay before its own clear/fillRect wipes the
 overlay's marks along with everything else. See
 `pieces/flow-field/index.html`'s `drawFrame()` — `overlay.draw(...)` is the

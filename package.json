@@ -8,6 +8,7 @@
     "build": "node tools/build.mjs",
     "verify": "node tools/build.mjs --verify-only",
     "audit-controls": "node tools/audit-controls.mjs",
+    "collection-metrics": "node tools/collection-metrics.mjs",
     "test-baked": "node tools/test-baked.mjs",
     "test-bake-fresh": "node tools/test-bake-fresh.mjs",
     "test-source": "node tools/test-source.mjs",

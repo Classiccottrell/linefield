@@ -223,7 +223,7 @@ or density**, not on a free colour.
 shipped with a control that read a value and changed nothing, both passing
 review because the arithmetic looked right. Run `npm run audit-controls`.
 
-**Judge it against the other twelve, not just against its own intent.** That
+**Judge it against the other seventeen, not just against its own intent.** That
 is the check that catches a piece which is individually good and
 collectively redundant.
 
