@@ -32,8 +32,6 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { createPointer } from '../../shared/pointer.js';
-  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'matrix-code';
   const canvas = document.getElementById('canvas');
@@ -65,7 +63,7 @@
 
   // Deterministic hash, not Math.random(): thumbnail capture pins the clock
   // and expects a byte-identical re-render for an untouched piece, and
-  // test-cursor-modes/audit-controls are change-detectors that would pass
+  // The control audit is a change-detector that would pass
   // trivially (green for the wrong reason) if glyph identity re-rolled every
   // frame regardless of what motion/churn control did.
   function hash(a, b, c) {
@@ -108,8 +106,6 @@
     defaults: { hue: 132, hueB: 145, saturation: 0.55, colorMode: 'gradient', colorA: '#00ff6a', colorB: '#33ff9e' },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
-  const overlay = createCursorOverlay();
 
   let texts = [];
 
@@ -139,12 +135,8 @@
     const glyphs = GLYPH_SETS[values.glyphSet] || GLYPH_SETS.ascii;
     const churnBucket = Math.floor(elapsed * values.motion * CHURN_PER_SEC);
 
-    const k = modeFactor(values, pointer);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
-    const plx = W / 2 + pdx * cosT - pdy * sinT;
-    const ply = H / 2 + pdx * sinT + pdy * cosT;
     // SVG export ignores `angle` for this piece too (see ROADMAP.md, "Known
     // limitations, accepted") — path/text positions below are recorded in
     // the rotated canvas space, same accepted gap as contour-grid/meridian/
@@ -177,30 +169,6 @@
 
         let px = x;
         let sizeMult = 1;
-        if (k) {
-          const ddx = px - plx, ddy = y - ply;
-          const dist = Math.hypot(ddx, ddy) || 1;
-          // Wider catchment than rainfall's single-point-per-drop 480: a
-          // column here is a stack of many cells, each independently
-          // gated by its own distance, so without widening the radius only
-          // one or two cells in the whole grid would ever be in range at
-          // once and the effect would read as noise, not response.
-          const f = Math.max(0, 1 - dist / 560);
-          if (f) {
-            if (values.cursorInteraction === 'Attract') {
-              // Bends the WHOLE column into an arc around the pointer,
-              // per-cell — structurally unlike rainfall's single x-nudge
-              // per drop, since a column here is a stack, not a point.
-              px = x - (ddx / dist) * f * k * 46;
-            } else if (values.cursorInteraction === 'Vortex') {
-              px = x - (ddy / dist) * f * k * 46;
-            } else if (values.cursorInteraction === 'Grow') {
-              sizeMult = 1 + f * k * 0.9;
-            } else if (values.cursorInteraction === 'Shrink') {
-              sizeMult = Math.max(0.2, 1 / (1 + f * k * 1.4));
-            }
-          }
-        }
 
         const isHead = i === 0;
         const fade = 1 - i / TRAIL_LEN;
@@ -239,14 +207,10 @@
 
     const stopB = paletteHsl(values, 1);
     const [ovR, ovG, ovB] = hslToRgb(stopB.h, stopB.s, values.invert ? 0.3 : 0.68);
-    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

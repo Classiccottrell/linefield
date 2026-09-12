@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.5,"colorMode":"gradient","colorA":"#ff9500","colorB":"#ff4000","hue":35,"hueB":15,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"relief":1};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.5,"colorMode":"gradient","colorA":"#ff9500","colorB":"#ff4000","hue":35,"hueB":15,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"relief":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -208,149 +208,14 @@ function paletteHsl(values, f) {
 }
 
 
-// --- inlined: ../../shared/cursor-modes.js ---
-// shared/cursor-modes.js
-// A leaf module: no imports, matching every other shared module, so the bake
-// inliner picks it up from a piece's own import line.
-
-const CURSOR_MODES = [
-  'None', 'Grow', 'Shrink', 'Particle Trail', 'Ripples', 'Attract', 'Vortex',
-];
-
-// Trail and Ripples are cursor effects, not piece effects, so they live here
-// once rather than twelve times. They keep their OWN aged memory and redraw
-// every surviving mark from scratch each frame: ten pieces clear the canvas
-// fully each frame (marks would vanish) and two repaint translucent to
-// accumulate trails (marks would smear at the piece's fade rate, untunable).
-//
-// CONTRACT, binding on every piece that wires this in (see CONTRIBUTING.md,
-// "Cursor interaction"): call `.draw()` AFTER the piece has cleared the
-// canvas and drawn its own frame for this tick — as the very last thing in
-// the frame, not before it. `.step()` has no such constraint; call it
-// whenever convenient in onFrame, typically right after `pointer.step()`.
-// A piece that draws BEFORE its own clear renders nothing: a full-clear
-// piece's fillRect/clearRect wipes the overlay's marks along with
-// everything else drawn that frame. Ten of the twelve pieces in this
-// library do a full clear every frame, so this is the common case, not an
-// edge case.
-function createCursorOverlay() {
-  let marks = [];
-  let lastX = null, lastY = null;
-
-  return {
-    // Called once per frame from the piece's onFrame, before drawing.
-    step(mode, k, pointer) {
-      if (!k || (mode !== 'Particle Trail' && mode !== 'Ripples')) {
-        if (marks.length) marks = [];
-        return;
-      }
-      const now = performance.now();
-      if (mode === 'Particle Trail' && pointer.active) {
-        const moved = lastX === null || Math.hypot(pointer.x - lastX, pointer.y - lastY) > 6;
-        // A movement-only trigger leaves nothing to sample once the cursor
-        // stops (or, under the deterministic harness's single pointermove,
-        // once the last particle's life has elapsed against a run that
-        // steps thousands of ms) — that read as inert on every full-clear
-        // piece, which repaints from nothing each frame and so has no
-        // accumulated trace once the emission expires. Throttled re-emission
-        // while the pointer is present, mirroring Ripples below, keeps the
-        // trail alive regardless of whether the cursor is moving.
-        const lastDot = marks.length ? marks[marks.length - 1] : null;
-        const stale = !lastDot || now - lastDot.born > 45;
-        if (moved || stale) {
-          // Dust, not beads: a scattered cluster of small, faint, varied-
-          // size particles around the cursor (not centred on a single
-          // point), each drifting apart as it ages. Density (particle
-          // count) carries the effect's visibility, not size or opacity —
-          // those stay small/low so the overlay doesn't outweigh a piece's
-          // own marks (grain-field's fine specks are the tuning floor).
-          const n = 22;
-          for (let i = 0; i < n; i++) {
-            const ang = Math.random() * Math.PI * 2;
-            const rad = Math.random() * 11;
-            marks.push({
-              kind: 'dot',
-              x: pointer.x + Math.cos(ang) * rad,
-              y: pointer.y + Math.sin(ang) * rad,
-              born: now, life: 650 + Math.random() * 450,
-              r: 0.5 + Math.random() * 1.6,
-              alphaMul: 0.3 + Math.random() * 0.35,
-              dx: (Math.random() - 0.5) * 50,
-              dy: (Math.random() - 0.5) * 50,
-            });
-          }
-          lastX = pointer.x; lastY = pointer.y;
-        }
-      }
-      if (mode === 'Ripples' && pointer.active) {
-        const last = marks[marks.length - 1];
-        if (!last || now - last.born > 260) {
-          marks.push({ kind: 'ring', x: pointer.x, y: pointer.y, born: now, life: 1400 });
-        }
-      }
-      marks = marks.filter((m) => now - m.born < m.life);
-      if (marks.length > 400) marks = marks.slice(-400);
-    },
-
-    // Called after the piece has drawn its own frame.
-    draw(ctx, colour, k) {
-      if (!marks.length || !k) return;
-      const now = performance.now();
-      ctx.save();
-      for (const m of marks) {
-        const age = (now - m.born) / m.life;
-        if (age >= 1) continue;
-        const alpha = (1 - age) * k;
-        if (m.kind === 'dot') {
-          ctx.globalAlpha = Math.min(alpha * (m.alphaMul ?? 1), 1);
-          ctx.fillStyle = colour;
-          ctx.beginPath();
-          ctx.arc(m.x + m.dx * age, m.y + m.dy * age, m.r, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          ctx.globalAlpha = Math.min(alpha * 0.7, 1);
-          ctx.strokeStyle = colour;
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(m.x, m.y, 12 + age * 190, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-    },
-
-    reset() { marks = []; lastX = null; lastY = null; },
-  };
-}
-
-// The strength every per-piece mode multiplies by. `pointer` is the intensity
-// control, `influence` eases the cursor entering and leaving. Nothing else —
-// in particular never `values.speed`, which a user can set to zero.
-function modeFactor(values, pointer) {
-  if (values.cursorInteraction === 'None') return 0;
-  return values.pointer * pointer.influence;
-}
-
-
 // --- inlined: ../../shared/controls.js ---
 // shared/controls.js
-
 
 // `category` routes a control to one of the panel's tiers — 'interaction',
 // 'color', or the default 'visual' — and is presentation-only: it changes
 // which DOM section a row renders in, never __LF_SPECS__'s declaration
 // order, which every gate that isn't the panel itself still reads flat.
 const SHARED_CONTROLS = [
-  // The seven cursor-interaction modes (Grow, Shrink, Particle Trail,
-  // Ripples, Attract, Vortex, None). The behaviours are wired per-piece
-  // (see shared/cursor-modes.js); this declares the shared vocabulary so
-  // it is never duplicated per piece. Until a piece reads it, this control
-  // and `pointer` audit DEAD there (tools/audit-controls.mjs's PREREQS pins
-  // the other one on when probing either in isolation, but a piece with no
-  // wiring at all still shows no effect) — expected on every piece not yet
-  // wired, not a bug.
-  { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: CURSOR_MODES, default: 'None', category: 'interaction' },
-  { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0, category: 'interaction' },
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
@@ -1307,139 +1172,6 @@ function describeForAI({ pieceName, values }) {
 }
 
 
-// --- inlined: ../../shared/pointer.js ---
-// shared/pointer.js
-// Tracks the cursor relative to one canvas. A leaf module: no imports, no
-// state beyond its own listeners.
-
-function createPointer({ canvas, enabled = true }) {
-  const p = {
-    x: 0, y: 0, nx: 0, ny: 0, vx: 0, vy: 0,
-    active: false, influence: 0,
-  };
-
-  let lastX = 0, lastY = 0, lastT = 0;
-
-  function onMove(e) {
-    const r = canvas.getBoundingClientRect();
-    const x = (e.clientX - r.left) * (canvas.width / r.width);
-    const y = (e.clientY - r.top) * (canvas.height / r.height);
-    const t = performance.now();
-    const dt = lastT ? Math.max((t - lastT) / 1000, 1 / 240) : 0;
-    if (dt) { p.vx = (x - lastX) / dt; p.vy = (y - lastY) / dt; }
-    p.x = x; p.y = y;
-    p.nx = (x / canvas.width) * 2 - 1;
-    p.ny = (y / canvas.height) * 2 - 1;
-    p.active = true;
-    lastX = x; lastY = y; lastT = t;
-  }
-  function onEnter() { p.active = true; }
-  function onLeave() { p.active = false; }
-
-  if (enabled) {
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerenter', onEnter);
-    canvas.addEventListener('pointerleave', onLeave);
-  }
-
-  // Called once per frame by the piece. `influence` rises while the pointer
-  // is over the canvas and eases back to 0 when it leaves, so a piece never
-  // snaps as the cursor exits.
-  //
-  // It takes NO dt argument and keeps its own clock, deliberately. Influence
-  // is a UI-response quantity — how present the cursor is right now — not
-  // an animation quantity, so it should not track animation timing at all.
-  // Accepting a piece's dt would couple the two regardless of how that
-  // piece happens to apply values.speed downstream; keeping its own clock
-  // keeps cursor response independent of any piece's animation rate,
-  // including at Speed 0.
-  //
-  // performance.now() is safe under the deterministic harness: it is not
-  // frozen, it is a controlled clock that stepFrames advances 16ms per frame,
-  // so influence rises normally during an audit and two runs stay identical.
-  let stepT = 0;
-  p.step = () => {
-    const now = performance.now();
-    const dt = stepT ? Math.min((now - stepT) / 1000, 0.1) : 0;
-    stepT = now;
-    if (!dt) return;
-    const target = p.active ? 1 : 0;
-    const rate = p.active ? 6 : 2.5;
-    p.influence += (target - p.influence) * Math.min(rate * dt, 1);
-    const decay = Math.exp(-4 * dt);
-    p.vx *= decay; p.vy *= decay;
-  };
-
-  // 0..1 proximity of a canvas point to the pointer, for pieces that
-  // modulate locally rather than globally.
-  p.falloff = (x, y, radius) => {
-    if (!radius) return 0;
-    const d = Math.hypot(x - p.x, y - p.y);
-    return Math.max(0, 1 - d / radius);
-  };
-
-  p.destroy = () => {
-    canvas.removeEventListener('pointermove', onMove);
-    canvas.removeEventListener('pointerenter', onEnter);
-    canvas.removeEventListener('pointerleave', onLeave);
-  };
-
-  return p;
-}
-
-// Stateless delta emitter: holds no pitch/yaw of its own. Each drag move
-// calls onOrbit(dPitchRad, dYawRad) with the frame's delta only; the caller
-// (a piece, via panel.setValue) owns where that delta lands, so the panel's
-// Pitch/Yaw sliders and the rendered camera can never read two different
-// numbers. onSettle fires once on pointerup, for the caller to persist the
-// drag's final position without writing to localStorage on every move.
-function createOrbit({
-  canvas,
-  enabled = new URLSearchParams(location.search).get('preview') !== '1',
-  sensitivity = 0.008,
-  onOrbit = () => {},
-  onSettle = () => {},
-} = {}) {
-  let dragging = false;
-  let lastX = 0, lastY = 0;
-
-  function onDown(e) {
-    if (e.button !== 0) return;
-    dragging = true;
-    lastX = e.clientX; lastY = e.clientY;
-    canvas.setPointerCapture?.(e.pointerId);
-  }
-  function onMove(e) {
-    if (!dragging) return;
-    const dYaw = (e.clientX - lastX) * sensitivity;
-    const dPitch = (e.clientY - lastY) * sensitivity;
-    lastX = e.clientX; lastY = e.clientY;
-    onOrbit(dPitch, dYaw);
-  }
-  function onUp(e) {
-    dragging = false;
-    canvas.releasePointerCapture?.(e.pointerId);
-    onSettle();
-  }
-
-  if (enabled) {
-    canvas.addEventListener('pointerdown', onDown);
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerup', onUp);
-    canvas.addEventListener('pointercancel', onUp);
-  }
-
-  return {
-    destroy() {
-      canvas.removeEventListener('pointerdown', onDown);
-      canvas.removeEventListener('pointermove', onMove);
-      canvas.removeEventListener('pointerup', onUp);
-      canvas.removeEventListener('pointercancel', onUp);
-    },
-  };
-}
-
-
 // --- inlined: ../../shared/project.js ---
 // shared/project.js
 // 3D -> 2D projection for pieces that want perspective geometry.
@@ -1515,8 +1247,6 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
 
 
 
-
-
   const PIECE_ID = 'contour-grid';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -1552,8 +1282,6 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     defaults: { hue: 35, hueB: 15, saturation: 0.5, colorMode: 'gradient', colorA: '#ff9500', colorB: '#ff4000' },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
-  const overlay = createCursorOverlay();
 
   // The bulge is one continuous stroked path per band, so per-mark scaling
   // (flow-field's approach) isn't available: Grow/Shrink amplify/damp this
@@ -1579,17 +1307,15 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     const lineWidth = 0.4 + values.stroke * 1.1;
     ctx.lineWidth = lineWidth;
 
-    // Gate: off at pointer 0, off when cursorInteraction is 'None', eased by
+    // Former interaction behavior removed.
     // influence, local via falloff. Uses no term scaled by values.speed (or
     // values.relief, which a user can set to 0), so the bulge survives both.
-    const k = modeFactor(values, pointer);
     // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
     // (Pointer's max) quadruples magnitude AND falloff radius together,
     // which on a sparse piece pulls nearly everything hard and destroys
     // the piece's identity rather than swelling it. This holds Pointer
     // 1..2 flat at the Pointer=1 amplitude (gate numbers unchanged)
     // instead of compounding further.
-    const kAmp = Math.min(k, 1);
 
     // Drawing below happens in the pre-rotation local space that ctx.rotate
     // maps to screen space, but pointer.x/y are screen (canvas-pixel) space.
@@ -1601,9 +1327,6 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     const rcx = canvas.width / 2, rcy = canvas.height / 2;
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-    const pdx = pointer.x - rcx, pdy = pointer.y - rcy;
-    const plx = rcx + pdx * cosT - pdy * sinT;
-    const ply = rcy + pdx * sinT + pdy * cosT;
 
     ctx.save();
     ctx.translate(rcx, rcy);
@@ -1628,43 +1351,7 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
         const n2 = simplex2(x * noiseScale + values.phase + 137, baseY * noiseScale + t);
         let y = baseY + n1 * baseAmp + n2 * moveAmp;
         let px = x;
-        if (k) {
-          // Falloff against the un-rotated pointer (plx, ply), not pointer.x/y
-          // directly — see note above ctx.save().
-          const mode = values.cursorInteraction;
-          if (mode === 'Grow' || mode === 'Shrink') {
-            const amp = mode === 'Grow' ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
-            const radius = BULGE_RADIUS * amp;
-            const f = Math.max(0, 1 - Math.hypot(x - plx, baseY - ply) / radius);
-            if (f) y -= f * BULGE_MAG * amp;
-          } else if (mode === 'Attract') {
-            const f = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / BULGE_RADIUS);
-            // A smooth saturating curve, not Math.min(f*k, cap): this pull
-            // runs along a shared horizontal target (ply), so ANY hard
-            // ceiling (1, or a lower constant) makes every x within the
-            // region where f*k clears it collapse onto the exact same
-            // (constant) y and render as a dead-flat line segment with a
-            // hard crease at the ceiling's boundary — a plateau, not a
-            // swell. f*k/(1+f*k) is strictly monotonic in f*k and always
-            // < 1, so it inherits f's own smooth shape (single peak at the
-            // closest x, continuously varying, no flat interval) instead
-            // of ever saturating to a constant — which also rules out
-            // overshoot past the cursor without a separate clamp.
-            if (f) y += (ply - y) * ((f * k) / (1 + f * k));
-          } else if (mode === 'Vortex') {
-            const f = Math.max(0, 1 - Math.hypot(x - plx, y - ply) / BULGE_RADIUS);
-            if (f) {
-              // True tangential rotation of the sampled point about the
-              // un-rotated pointer, not an offset toward/away from it —
-              // rotatePoint's roll term is exactly 2D rotation when tilt/yaw
-              // are left at 0 (z stays 0 throughout).
-              const r = rotatePoint(x - plx, y - ply, 0, { roll: f * k * 1.1 });
-              px = plx + r.x;
-              y = ply + r.y;
-            }
-          }
-        }
-        if (x === -margin) ctx.moveTo(px, y);
+          if (x === -margin) ctx.moveTo(px, y);
         else ctx.lineTo(px, y);
         pts.push([px, y]);
       }
@@ -1687,14 +1374,10 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     // rotated/offset from the visible cursor, or get wiped by the clear.
     const stopA = paletteHsl(values, 0);
     const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.6);
-    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

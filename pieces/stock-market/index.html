@@ -32,8 +32,6 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { createPointer } from '../../shared/pointer.js';
-  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'stock-market';
   const canvas = document.getElementById('canvas');
@@ -101,8 +99,6 @@
     defaults: { hue: 78, hueB: 92, saturation: 0.5, colorMode: 'gradient', colorA: '#9fd34a', colorB: '#d3654a' },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
-  const overlay = createCursorOverlay();
 
   let paths = [];
 
@@ -129,12 +125,8 @@
     const colW = W / colsPerTrack;
     const barW = colW * values.barWidth;
 
-    const k = modeFactor(values, pointer);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
-    const plx = W / 2 + pdx * cosT - pdy * sinT;
-    const ply = H / 2 + pdx * sinT + pdy * cosT;
 
     ctx.save();
     ctx.translate(W / 2, H / 2);
@@ -171,32 +163,6 @@
         let y = up ? midY - barH : midY;
         let w = barW;
 
-        if (k) {
-          const cx = x + w / 2, cy = midY;
-          const ddx = cx - plx, ddy = cy - ply;
-          const dist = Math.hypot(ddx, ddy) || 1;
-          const f = Math.max(0, 1 - dist / 300);
-          if (f) {
-            const mode = values.cursorInteraction;
-            if (mode === 'Grow') {
-              const grow = 1 + f * k * 1.1;
-              barH *= grow;
-              w *= 1 + f * k * 0.4;
-              x = localX + (colW - w) / 2;
-              y = up ? midY - barH : midY;
-            } else if (mode === 'Shrink') {
-              const shrink = 1 / (1 + f * k * 1.4);
-              barH = Math.max(1, barH * shrink);
-              w = Math.max(1, w / (1 + f * k * 0.7));
-              x = localX + (colW - w) / 2;
-              y = up ? midY - barH : midY;
-            } else if (mode === 'Attract') {
-              x += (plx - cx) * f * k * 0.5;
-            } else if (mode === 'Vortex') {
-              y += -(ddx / dist) * f * k * 40;
-            }
-          }
-        }
 
         const f01 = up ? 0.15 : 0.85;
         const { h, s } = paletteHsl(values, f01);
@@ -227,14 +193,10 @@
 
     const stopA = paletteHsl(values, 0);
     const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.3 : 0.66);
-    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

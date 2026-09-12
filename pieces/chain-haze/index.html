@@ -32,8 +32,6 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { createPointer } from '../../shared/pointer.js';
-  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
   import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'chain-haze';
@@ -92,8 +90,6 @@
     defaults: { hue: 96, hueB: 108, saturation: 0.22, colorMode: 'gradient', colorA: '#8fae9e', colorB: '#7fa0c2' },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
-  const overlay = createCursorOverlay();
 
   // Perspective divisor (see CONTRIBUTING.md "3D pieces" for the shared
   // camera — deliberately NOT used here: a straight receding line needs
@@ -140,12 +136,8 @@
                                   // links read as beads on a string, not chain
     const zSpan = step * linksPerChain;
 
-    const k = modeFactor(values, pointer);
     const theta = (values.angle * Math.PI) / 180;
     const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
-    const plx = W / 2 + pdx * cosT - pdy * sinT;
-    const ply = H / 2 + pdx * sinT + pdy * cosT;
 
     ctx.save();
     ctx.translate(W / 2, H / 2);
@@ -193,25 +185,6 @@
         let linkScale = Math.max(MIN_SCALE, p);
         const depthAlpha = Math.max(0.22, Math.min(1, p * 0.95));
 
-        if (k) {
-          const mode = values.cursorInteraction;
-          const f = pointer.falloff(cx, cy, 260);
-          if (f) {
-            if (mode === 'Grow') {
-              linkScale *= 1 + f * k * 1.4;
-            } else if (mode === 'Shrink') {
-              linkScale = Math.max(0.12, linkScale / (1 + f * k * 1.4));
-            } else if (mode === 'Attract') {
-              const ease = Math.min(f * k, 1);
-              cx += (plx - cx) * ease;
-              cy += (ply - cy) * ease;
-            } else if (mode === 'Vortex') {
-              const r = rotatePoint(cx - plx, cy - ply, 0, { roll: f * k * 1.1 });
-              cx = plx + r.x;
-              cy = ply + r.y;
-            }
-          }
-        }
 
         const rx = (linkLen / 2) * linkScale;
         // Alternating orientation: even links read face-on (full width),
@@ -247,14 +220,10 @@
 
     const stopA = paletteHsl(values, 0);
     const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.32 : 0.66);
-    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

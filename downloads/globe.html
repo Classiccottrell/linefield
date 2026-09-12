@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.4,"colorMode":"gradient","colorA":"#e6316f","colorB":"#f2154a","hue":340,"hueB":355,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":18,"rotY":0};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.4,"colorMode":"gradient","colorA":"#e6316f","colorB":"#f2154a","hue":340,"hueB":355,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":18,"rotY":0};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -208,149 +208,14 @@ function paletteHsl(values, f) {
 }
 
 
-// --- inlined: ../../shared/cursor-modes.js ---
-// shared/cursor-modes.js
-// A leaf module: no imports, matching every other shared module, so the bake
-// inliner picks it up from a piece's own import line.
-
-const CURSOR_MODES = [
-  'None', 'Grow', 'Shrink', 'Particle Trail', 'Ripples', 'Attract', 'Vortex',
-];
-
-// Trail and Ripples are cursor effects, not piece effects, so they live here
-// once rather than twelve times. They keep their OWN aged memory and redraw
-// every surviving mark from scratch each frame: ten pieces clear the canvas
-// fully each frame (marks would vanish) and two repaint translucent to
-// accumulate trails (marks would smear at the piece's fade rate, untunable).
-//
-// CONTRACT, binding on every piece that wires this in (see CONTRIBUTING.md,
-// "Cursor interaction"): call `.draw()` AFTER the piece has cleared the
-// canvas and drawn its own frame for this tick — as the very last thing in
-// the frame, not before it. `.step()` has no such constraint; call it
-// whenever convenient in onFrame, typically right after `pointer.step()`.
-// A piece that draws BEFORE its own clear renders nothing: a full-clear
-// piece's fillRect/clearRect wipes the overlay's marks along with
-// everything else drawn that frame. Ten of the twelve pieces in this
-// library do a full clear every frame, so this is the common case, not an
-// edge case.
-function createCursorOverlay() {
-  let marks = [];
-  let lastX = null, lastY = null;
-
-  return {
-    // Called once per frame from the piece's onFrame, before drawing.
-    step(mode, k, pointer) {
-      if (!k || (mode !== 'Particle Trail' && mode !== 'Ripples')) {
-        if (marks.length) marks = [];
-        return;
-      }
-      const now = performance.now();
-      if (mode === 'Particle Trail' && pointer.active) {
-        const moved = lastX === null || Math.hypot(pointer.x - lastX, pointer.y - lastY) > 6;
-        // A movement-only trigger leaves nothing to sample once the cursor
-        // stops (or, under the deterministic harness's single pointermove,
-        // once the last particle's life has elapsed against a run that
-        // steps thousands of ms) — that read as inert on every full-clear
-        // piece, which repaints from nothing each frame and so has no
-        // accumulated trace once the emission expires. Throttled re-emission
-        // while the pointer is present, mirroring Ripples below, keeps the
-        // trail alive regardless of whether the cursor is moving.
-        const lastDot = marks.length ? marks[marks.length - 1] : null;
-        const stale = !lastDot || now - lastDot.born > 45;
-        if (moved || stale) {
-          // Dust, not beads: a scattered cluster of small, faint, varied-
-          // size particles around the cursor (not centred on a single
-          // point), each drifting apart as it ages. Density (particle
-          // count) carries the effect's visibility, not size or opacity —
-          // those stay small/low so the overlay doesn't outweigh a piece's
-          // own marks (grain-field's fine specks are the tuning floor).
-          const n = 22;
-          for (let i = 0; i < n; i++) {
-            const ang = Math.random() * Math.PI * 2;
-            const rad = Math.random() * 11;
-            marks.push({
-              kind: 'dot',
-              x: pointer.x + Math.cos(ang) * rad,
-              y: pointer.y + Math.sin(ang) * rad,
-              born: now, life: 650 + Math.random() * 450,
-              r: 0.5 + Math.random() * 1.6,
-              alphaMul: 0.3 + Math.random() * 0.35,
-              dx: (Math.random() - 0.5) * 50,
-              dy: (Math.random() - 0.5) * 50,
-            });
-          }
-          lastX = pointer.x; lastY = pointer.y;
-        }
-      }
-      if (mode === 'Ripples' && pointer.active) {
-        const last = marks[marks.length - 1];
-        if (!last || now - last.born > 260) {
-          marks.push({ kind: 'ring', x: pointer.x, y: pointer.y, born: now, life: 1400 });
-        }
-      }
-      marks = marks.filter((m) => now - m.born < m.life);
-      if (marks.length > 400) marks = marks.slice(-400);
-    },
-
-    // Called after the piece has drawn its own frame.
-    draw(ctx, colour, k) {
-      if (!marks.length || !k) return;
-      const now = performance.now();
-      ctx.save();
-      for (const m of marks) {
-        const age = (now - m.born) / m.life;
-        if (age >= 1) continue;
-        const alpha = (1 - age) * k;
-        if (m.kind === 'dot') {
-          ctx.globalAlpha = Math.min(alpha * (m.alphaMul ?? 1), 1);
-          ctx.fillStyle = colour;
-          ctx.beginPath();
-          ctx.arc(m.x + m.dx * age, m.y + m.dy * age, m.r, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          ctx.globalAlpha = Math.min(alpha * 0.7, 1);
-          ctx.strokeStyle = colour;
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(m.x, m.y, 12 + age * 190, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-    },
-
-    reset() { marks = []; lastX = null; lastY = null; },
-  };
-}
-
-// The strength every per-piece mode multiplies by. `pointer` is the intensity
-// control, `influence` eases the cursor entering and leaving. Nothing else —
-// in particular never `values.speed`, which a user can set to zero.
-function modeFactor(values, pointer) {
-  if (values.cursorInteraction === 'None') return 0;
-  return values.pointer * pointer.influence;
-}
-
-
 // --- inlined: ../../shared/controls.js ---
 // shared/controls.js
-
 
 // `category` routes a control to one of the panel's tiers — 'interaction',
 // 'color', or the default 'visual' — and is presentation-only: it changes
 // which DOM section a row renders in, never __LF_SPECS__'s declaration
 // order, which every gate that isn't the panel itself still reads flat.
 const SHARED_CONTROLS = [
-  // The seven cursor-interaction modes (Grow, Shrink, Particle Trail,
-  // Ripples, Attract, Vortex, None). The behaviours are wired per-piece
-  // (see shared/cursor-modes.js); this declares the shared vocabulary so
-  // it is never duplicated per piece. Until a piece reads it, this control
-  // and `pointer` audit DEAD there (tools/audit-controls.mjs's PREREQS pins
-  // the other one on when probing either in isolation, but a piece with no
-  // wiring at all still shows no effect) — expected on every piece not yet
-  // wired, not a bug.
-  { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: CURSOR_MODES, default: 'None', category: 'interaction' },
-  { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0, category: 'interaction' },
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
@@ -1439,7 +1304,6 @@ function createOrbit({
 
 
 
-
   const PIECE_ID = 'globe';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -1495,7 +1359,6 @@ function createOrbit({
     defaults: { hue: 340, hueB: 355, saturation: 0.4, colorMode: 'gradient', colorA: '#e6316f', colorB: '#f2154a' },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
   // In panel mode the drag writes straight into rotX/rotY through setValue —
   // the only write path — so the Pitch/Yaw sliders and the rendered camera
@@ -1523,52 +1386,6 @@ function createOrbit({
   });
 
   const camera = createCamera({ fov: FOV });
-  const overlay = createCursorOverlay();
-  // Screen-space falloff radius shared by every cursor mode below.
-  const WARP_RADIUS = 220;
-
-  // Grow/Shrink displace the sphere's OWN surface outward/inward along its
-  // radius (a genuine bulge/dent in world space, falloff-weighted by the
-  // point's projected screen distance to the pointer — mirrors
-  // wireframe-lattice's heightAt) — a behaviour none of the three orb
-  // pieces has, since they only ever nudge already-flat screen-space
-  // points. Attract/Vortex stay screen-space, like wireframe-lattice's
-  // warpProjected, since "toward the cursor" and "rotate about the
-  // cursor" are screen-space ideas once a point is projected.
-  function bulgeR(dirX, dirY, dirZ, R, mode, kAmp) {
-    if (!kAmp || (mode !== 'Grow' && mode !== 'Shrink')) return R;
-    const approx = camera.project(dirX * R, dirY * R, dirZ * R);
-    if (approx.scale <= 0) return R;
-    const grow = mode === 'Grow';
-    const lAmp = grow ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
-    const f = pointer.falloff(approx.x, approx.y, WARP_RADIUS * lAmp);
-    if (!f) return R;
-    const push = f * R * 0.22 * lAmp;
-    return grow ? R + push : R - push;
-  }
-
-  function warpProjected(pts, mode, kAmp) {
-    if (!kAmp || (mode !== 'Attract' && mode !== 'Vortex')) return pts;
-    for (const p of pts) {
-      if (p.scale <= 0) continue;
-      const f = pointer.falloff(p.x, p.y, WARP_RADIUS);
-      if (!f) continue;
-      if (mode === 'Attract') {
-        // Clamp the EASE FRACTION, not just kAmp: f*kAmp can still exceed 1
-        // near the pointer, and a lerp factor above 1 overshoots the
-        // pointer and reflects the point past it.
-        const ease = Math.min(f * kAmp, 1);
-        p.x += (pointer.x - p.x) * ease;
-        p.y += (pointer.y - p.y) * ease;
-      } else {
-        const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * kAmp * 1.1 });
-        p.x = pointer.x + r.x;
-        p.y = pointer.y + r.y;
-      }
-    }
-    return pts;
-  }
-
   // Draws one already-projected polyline. Walks in order and breaks the
   // run at any point behind the camera (scale <= 0) instead of filtering —
   // a skipped interior point must start a new subpath, not get bridged
@@ -1648,17 +1465,6 @@ function createOrbit({
       cy: canvas.height / 2,
     });
 
-    // Off at pointer 0, off when cursorInteraction is 'None', eased by
-    // influence. No term routed through values.speed or values.motion
-    // (both user-zeroable).
-    const k = modeFactor(values, pointer);
-    const mode = values.cursorInteraction;
-    // Cap the amplitude/radius input at k=1 — uncapped, k=2 (Pointer's max)
-    // would compound the bulge/falloff radius together, destroying the
-    // sphere's identity rather than swelling/denting it (same reasoning as
-    // wireframe-lattice's kAmp).
-    const kAmp = Math.min(k, 1);
-
     // Phase RESTRUCTURES the latitude spacing rather than translating the
     // whole mesh (translation on a rotationally symmetric, already-spinning
     // figure is imperceptible — see event-horizon's own note on why it
@@ -1685,10 +1491,9 @@ function createOrbit({
         const a = (s / SEG_LAT) * Math.PI * 2;
         const dx = Math.cos(a) * ringR;
         const dz = Math.sin(a) * ringR;
-        const rr = bulgeR(dx, y, dz, R, mode, kAmp);
-        pts.push([dx * rr, y * rr, dz * rr]);
+        pts.push([dx * R, y * R, dz * R]);
       }
-      strokeRun(warpProjected(camera.projectPath(pts), mode, kAmp), values, baseWidth, [r, g, b]);
+      strokeRun(camera.projectPath(pts), values, baseWidth, [r, g, b]);
     }
 
     // --- Longitude meridians (great circles through both poles) ---
@@ -1705,22 +1510,17 @@ function createOrbit({
         const dx = Math.cos(lon) * cLat;
         const dy = Math.sin(lat);
         const dz = Math.sin(lon) * cLat;
-        const rr = bulgeR(dx, dy, dz, R, mode, kAmp);
-        pts.push([dx * rr, dy * rr, dz * rr]);
+        pts.push([dx * R, dy * R, dz * R]);
       }
-      strokeRun(warpProjected(camera.projectPath(pts), mode, kAmp), values, baseWidth * 0.85, [r, g, b]);
+      strokeRun(camera.projectPath(pts), values, baseWidth * 0.85, [r, g, b]);
     }
 
     const stopA = paletteHsl(values, 0);
     const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
-    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

@@ -33,8 +33,7 @@
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { createCamera, rotatePoint } from '../../shared/project.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { createOrbit, createPointer } from '../../shared/pointer.js';
-  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
+  import { createOrbit } from '../../shared/pointer.js';
 
   const PIECE_ID = 'globe';
   const canvas = document.getElementById('canvas');
@@ -91,7 +90,6 @@
     defaults: { hue: 340, hueB: 355, saturation: 0.4, colorMode: 'gradient', colorA: '#e6316f', colorB: '#f2154a' },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
   // In panel mode the drag writes straight into rotX/rotY through setValue —
   // the only write path — so the Pitch/Yaw sliders and the rendered camera
@@ -119,52 +117,6 @@
   });
 
   const camera = createCamera({ fov: FOV });
-  const overlay = createCursorOverlay();
-  // Screen-space falloff radius shared by every cursor mode below.
-  const WARP_RADIUS = 220;
-
-  // Grow/Shrink displace the sphere's OWN surface outward/inward along its
-  // radius (a genuine bulge/dent in world space, falloff-weighted by the
-  // point's projected screen distance to the pointer — mirrors
-  // wireframe-lattice's heightAt) — a behaviour none of the three orb
-  // pieces has, since they only ever nudge already-flat screen-space
-  // points. Attract/Vortex stay screen-space, like wireframe-lattice's
-  // warpProjected, since "toward the cursor" and "rotate about the
-  // cursor" are screen-space ideas once a point is projected.
-  function bulgeR(dirX, dirY, dirZ, R, mode, kAmp) {
-    if (!kAmp || (mode !== 'Grow' && mode !== 'Shrink')) return R;
-    const approx = camera.project(dirX * R, dirY * R, dirZ * R);
-    if (approx.scale <= 0) return R;
-    const grow = mode === 'Grow';
-    const lAmp = grow ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
-    const f = pointer.falloff(approx.x, approx.y, WARP_RADIUS * lAmp);
-    if (!f) return R;
-    const push = f * R * 0.22 * lAmp;
-    return grow ? R + push : R - push;
-  }
-
-  function warpProjected(pts, mode, kAmp) {
-    if (!kAmp || (mode !== 'Attract' && mode !== 'Vortex')) return pts;
-    for (const p of pts) {
-      if (p.scale <= 0) continue;
-      const f = pointer.falloff(p.x, p.y, WARP_RADIUS);
-      if (!f) continue;
-      if (mode === 'Attract') {
-        // Clamp the EASE FRACTION, not just kAmp: f*kAmp can still exceed 1
-        // near the pointer, and a lerp factor above 1 overshoots the
-        // pointer and reflects the point past it.
-        const ease = Math.min(f * kAmp, 1);
-        p.x += (pointer.x - p.x) * ease;
-        p.y += (pointer.y - p.y) * ease;
-      } else {
-        const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * kAmp * 1.1 });
-        p.x = pointer.x + r.x;
-        p.y = pointer.y + r.y;
-      }
-    }
-    return pts;
-  }
-
   // Draws one already-projected polyline. Walks in order and breaks the
   // run at any point behind the camera (scale <= 0) instead of filtering —
   // a skipped interior point must start a new subpath, not get bridged
@@ -244,17 +196,6 @@
       cy: canvas.height / 2,
     });
 
-    // Off at pointer 0, off when cursorInteraction is 'None', eased by
-    // influence. No term routed through values.speed or values.motion
-    // (both user-zeroable).
-    const k = modeFactor(values, pointer);
-    const mode = values.cursorInteraction;
-    // Cap the amplitude/radius input at k=1 — uncapped, k=2 (Pointer's max)
-    // would compound the bulge/falloff radius together, destroying the
-    // sphere's identity rather than swelling/denting it (same reasoning as
-    // wireframe-lattice's kAmp).
-    const kAmp = Math.min(k, 1);
-
     // Phase RESTRUCTURES the latitude spacing rather than translating the
     // whole mesh (translation on a rotationally symmetric, already-spinning
     // figure is imperceptible — see event-horizon's own note on why it
@@ -281,10 +222,9 @@
         const a = (s / SEG_LAT) * Math.PI * 2;
         const dx = Math.cos(a) * ringR;
         const dz = Math.sin(a) * ringR;
-        const rr = bulgeR(dx, y, dz, R, mode, kAmp);
-        pts.push([dx * rr, y * rr, dz * rr]);
+        pts.push([dx * R, y * R, dz * R]);
       }
-      strokeRun(warpProjected(camera.projectPath(pts), mode, kAmp), values, baseWidth, [r, g, b]);
+      strokeRun(camera.projectPath(pts), values, baseWidth, [r, g, b]);
     }
 
     // --- Longitude meridians (great circles through both poles) ---
@@ -301,22 +241,17 @@
         const dx = Math.cos(lon) * cLat;
         const dy = Math.sin(lat);
         const dz = Math.sin(lon) * cLat;
-        const rr = bulgeR(dx, dy, dz, R, mode, kAmp);
-        pts.push([dx * rr, dy * rr, dz * rr]);
+        pts.push([dx * R, dy * R, dz * R]);
       }
-      strokeRun(warpProjected(camera.projectPath(pts), mode, kAmp), values, baseWidth * 0.85, [r, g, b]);
+      strokeRun(camera.projectPath(pts), values, baseWidth * 0.85, [r, g, b]);
     }
 
     const stopA = paletteHsl(values, 0);
     const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
-    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });
