@@ -169,7 +169,7 @@ invert, density) plus its own piece-specific control. Color
 mode switches between a single hue (Solid) and a two-stop blend (Gradient,
 the default — every piece's own look); Color A/B are hex pickers, B shown
 only in Gradient mode. `density` multiplies the piece's base element count.
-`wireframe-lattice`, `event-horizon`, and `globe` also provide Pitch and Yaw
+`wireframe-lattice` and `event-horizon` also provide Pitch and Yaw
 controls; Angle is roll, and
 dragging the canvas orbits the camera on direct piece pages. Gallery
 previews disable drag-to-orbit.

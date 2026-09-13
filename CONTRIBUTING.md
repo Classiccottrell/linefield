@@ -142,7 +142,7 @@ rather than skipping it.
 Pass an `extraControls` array to `createControlPanel({ ... extraControls })`
 for controls unique to your piece (same spec shape as the shared controls —
 `name`, `label`, `type`, `min`/`max`/`step` or default, etc). These render
-below the 16 shared controls automatically. You can also add one after the
+below the 14 shared visual controls automatically. You can also add one after the
 panel exists with `panel.addControl({ ... })`.
 
 ## Defaults (`defaults`)
