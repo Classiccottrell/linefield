@@ -250,6 +250,17 @@ try {
   await stepFrames(page, 1);
   assert.equal(await overlayVariance(), 0, 'zero-strength Wake drew pixels');
   await page.evaluate(() => window.__LF_WAKE__.setStrength(0.65));
+  for (let x = 100; x <= 200; x += 20) {
+    await page.mouse.move(x, 500);
+    await stepFrames(page, 1);
+  }
+  await stepFrames(page, 12);
+  await stepFrames(page, 31);
+  const settledPulseInk = await page.locator('[data-lf-wake]').evaluate((canvas) => {
+    const { data } = canvas.getContext('2d').getImageData(196, 496, 9, 9);
+    return data.reduce((sum, value, index) => sum + (index % 4 === 3 ? value : 0), 0);
+  });
+  assert.equal(settledPulseInk, 0, 'Wake repeated a settled pulse');
   const beforeResize = await page.locator('[data-lf-wake]').evaluate((canvas) => [canvas.width, canvas.height]);
   await page.setViewportSize({ width: 960, height: 640 });
   await page.waitForTimeout(50);

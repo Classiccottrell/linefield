@@ -23,6 +23,7 @@ export function createWake({
   let destroyed = false;
   let frame = 0;
   let pulse = null;
+  let pulsed = false;
   let lastMove = 0;
 
   overlay.dataset.lfWake = '';
@@ -38,6 +39,7 @@ export function createWake({
   function reset() {
     points.length = 0;
     pulse = null;
+    pulsed = false;
     clear();
   }
 
@@ -59,8 +61,13 @@ export function createWake({
 
   function drawStrand(offset, index, now) {
     if (points.length < 2) return;
-    const speed = Math.min(1, Math.hypot(pointer.vx, pointer.vy) / Math.max(target.width, target.height, 1) / 3);
-    const width = Math.max(1, (2 + speed * 0.012) * amount);
+    const rect = target.getBoundingClientRect();
+    const speed = Math.hypot(
+      pointer.vx * rect.width / Math.max(target.width, 1),
+      pointer.vy * rect.height / Math.max(target.height, 1),
+    );
+    const alphaSpeed = Math.min(1, speed / 240);
+    const width = (2 + speed * 0.012) * amount;
     const first = points[0];
     context.beginPath();
     context.moveTo(first.x + first.nx * offset * width, first.y + first.ny * offset * width);
@@ -77,7 +84,7 @@ export function createWake({
       );
     }
     const age = Math.max(0, 1 - (now - first.t) / 900);
-    context.globalAlpha = age * (0.44 - Math.abs(index) * 0.1) * (0.4 + speed * 0.6);
+    context.globalAlpha = age * (0.44 - Math.abs(index) * 0.1) * (0.4 + alphaSpeed * 0.6);
     context.strokeStyle = color;
     context.lineWidth = Math.max(1, amount * (1.5 - Math.abs(index) * 0.25));
     context.stroke();
@@ -128,12 +135,14 @@ export function createWake({
         if (points.length > 32) points.shift();
         lastMove = now;
         pulse = null;
+        pulsed = false;
       }
     }
     while (points[0] && now - points[0].t > 900) points.shift();
-    if (active && amount && !pulse && points.length >= 6 && now - lastMove >= 180) {
+    if (active && amount && !pulse && !pulsed && points.length >= 6 && now - lastMove >= 180) {
       const point = points.at(-1);
       pulse = { x: point.x, y: point.y, t: now };
+      pulsed = true;
     }
     draw(now);
     frame = requestAnimationFrame(tick);
