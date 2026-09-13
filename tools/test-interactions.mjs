@@ -227,6 +227,46 @@ try {
     assert.equal(await page.locator('[data-lf-panel]').count(), 0, `${slug}: baked artifact exposes controls`);
   }
 
+  await page.goto(`${base}/interactions/wake/`, { waitUntil: 'load' });
+  assert.equal(await page.locator('[data-lf-wake]').count(), 1, 'Wake overlay missing');
+
+  const overlayVariance = () => page.locator('[data-lf-wake]').evaluate((canvas) => {
+    const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    let sum = 0, square = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4 * 37) {
+      const light = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      sum += light; square += light * light; n++;
+    }
+    return square / n - (sum / n) ** 2;
+  });
+
+  assert.equal(await overlayVariance(), 0, 'disabled Wake drew pixels');
+  await page.locator('#wake-enabled').check();
+  await page.mouse.move(200, 300);
+  await page.mouse.move(760, 360, { steps: 12 });
+  await stepFrames(page, 12);
+  assert.ok(await overlayVariance() > 0, 'enabled Wake drew nothing');
+  await page.evaluate(() => window.__LF_WAKE__.setStrength(0));
+  await stepFrames(page, 1);
+  assert.equal(await overlayVariance(), 0, 'zero-strength Wake drew pixels');
+  await page.evaluate(() => window.__LF_WAKE__.setStrength(0.65));
+  const beforeResize = await page.locator('[data-lf-wake]').evaluate((canvas) => [canvas.width, canvas.height]);
+  await page.setViewportSize({ width: 960, height: 640 });
+  await page.waitForTimeout(50);
+  const afterResize = await page.locator('[data-lf-wake]').evaluate((canvas) => [canvas.width, canvas.height]);
+  assert.notDeepEqual(afterResize, beforeResize, 'Wake overlay did not resize');
+  assert.equal(await overlayVariance(), 0, 'resize retained stale Wake history');
+  await page.evaluate(() => window.__LF_WAKE__.setEnabled(false));
+  assert.equal(await overlayVariance(), 0, 'disabling Wake did not clear it');
+  const badTarget = await page.evaluate(async () => {
+    const { createWake } = await import('/interactions/wake.js');
+    try { createWake({ target: document.body }); return ''; }
+    catch (error) { return String(error); }
+  });
+  assert.match(badTarget, /Wake target must be a canvas element/);
+  await page.evaluate(() => window.__LF_WAKE__.destroy());
+  assert.equal(await page.locator('[data-lf-wake]').count(), 0, 'destroy left overlay attached');
+
   assert.deepEqual(errors, [], `browser errors:\n${errors.join('\n')}`);
   console.log(`\ninteraction QA passed; screenshots: ${SHOTS}`);
 } finally {
