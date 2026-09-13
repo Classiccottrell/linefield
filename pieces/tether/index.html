@@ -33,7 +33,6 @@
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'tether';
   const canvas = document.getElementById('canvas');
@@ -88,14 +87,6 @@
   });
   const currentValues = baked || panel.values;
 
-  // Each cable is one continuous stroked path, so per-mark scaling isn't
-  // available: Grow/Shrink amplify/damp the existing falloff-weighted
-  // deflection and its radius. Only 6 cables at rest — the sparsest piece
-  // in the library — so the radius is wider than contour-grid's equivalent
-  // to keep Shrink's dimple comfortably above the gate threshold.
-  const DEFLECT_MAG = 110;
-  const DEFLECT_RADIUS = 340;
-
   seedCables(Math.max(2, Math.round(BASE_COUNT * currentValues.density)));
 
   function drawFrame(dt, elapsed, values) {
@@ -109,17 +100,7 @@
     const light = values.invert ? 0.35 : 0.65;
     const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than meridian
     const noiseScale = 0.9 * (0.3 + values.scale);
-    // Former interaction behavior removed.
-    // influence. No term routed through values.speed or values.slack (both
-    // user-zeroable), so deflection survives either at 0.
-    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
-    // (Pointer's max) quadruples magnitude AND falloff radius together,
-    // which on this piece (6 cables, the sparsest in the library) pulls
-    // nearly every cable hard and destroys the piece's identity rather
-    // than swelling it. This holds Pointer 1..2 flat at the Pointer=1
-    // amplitude (gate numbers unchanged) instead of compounding further.
     const theta = (values.angle * Math.PI) / 180;
-    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
 
     ctx.save();
     ctx.translate(W / 2, H / 2);
@@ -176,10 +157,6 @@
 
     ctx.restore();
 
-    // Screen space, after restore and after the fillRect clear above — see
-    // shared/cursor-modes.js's draw-ordering contract.
-    const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.65);
   }
 
   const loop = createLoop({

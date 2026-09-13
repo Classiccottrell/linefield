@@ -33,7 +33,6 @@
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'meridian';
   const canvas = document.getElementById('canvas');
@@ -71,14 +70,6 @@
   });
   const currentValues = baked || panel.values;
 
-  // Each ribbon is one continuous stroked path, so per-mark scaling isn't
-  // available: Grow/Shrink amplify/damp the existing falloff-weighted
-  // deflection and its radius instead. Only 7 ribbons at rest (sparser than
-  // most pieces in the library), so the radius is wider than contour-grid's
-  // equivalent to keep Shrink's dimple comfortably above the gate threshold.
-  const DEFLECT_MAG = 90;
-  const DEFLECT_RADIUS = 320;
-
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -94,25 +85,8 @@
     const light = values.invert ? 0.35 : 0.6;
     const lineWidth = 2.2 + values.stroke * 3.6; // heavy; only tether is heavier
 
-    // Former interaction behavior removed.
-    // influence, local via falloff. No term routed through values.speed or
-    // values.sweep (both user-zeroable), so deflection survives either at 0.
-    // Cap Grow/Shrink's amplitude input at k=1: uncapped, k=2
-    // (Pointer's max) quadruples magnitude AND falloff radius together,
-    // which on a sparse piece (7 ribbons) pulls nearly everything hard and
-    // destroys the piece's identity rather than swelling it. This holds
-    // Pointer 1..2 flat at the Pointer=1 amplitude (gate numbers
-    // unchanged) instead of compounding further.
-
-    // Drawing below happens in the pre-rotation local space that ctx.rotate
-    // maps to screen space, but pointer.x/y are screen (canvas-pixel) space.
-    // Un-rotate the pointer about the same centre/angle the canvas transform
-    // uses, so falloff is evaluated in the same space the geometry is drawn
-    // in — otherwise deflection drifts away from the visible cursor as soon
-    // as Angle leaves 0.
     const rcx = canvas.width / 2, rcy = canvas.height / 2;
     const theta = (values.angle * Math.PI) / 180;
-    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
 
     ctx.save();
     ctx.translate(rcx, rcy);
@@ -156,10 +130,6 @@
 
     ctx.restore();
 
-    // Screen space, after restore and after the fillRect clear above — see
-    // shared/cursor-modes.js's draw-ordering contract.
-    const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.35 : 0.6);
   }
 
   const loop = createLoop({

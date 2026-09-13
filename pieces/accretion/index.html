@@ -121,11 +121,6 @@
     const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
     const stopB = paletteHsl(values, 1);
     const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
-    // The only gate is now removed.
-    // eased by influence.
-;
-;
-
     for (const m of motes) {
       const prevA = m.a;
       const prevR = m.r;
