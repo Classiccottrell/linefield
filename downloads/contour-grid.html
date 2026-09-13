@@ -411,18 +411,9 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   }
 
   const values = { ...defaults, ...saved.values };
-  // A saved localStorage blob is a plain object spread above, not a
-  // setValue() call, so it never reaches clampValue's enum-membership check
-  // (see below) — a stale blob holding a mode string that was since removed
-  // or renamed (e.g. a future rename of one of the seven cursor-interaction
-  // modes) would land in `values` unvalidated: the <select> falls back to
-  // whatever its first <option> happens to be while `values` keeps the
-  // stale string, the exact divergence that check exists to prevent. Not
-  // reachable today (every currently-saved value was written by setValue,
-  // which already validates), but reachable the moment a spec's `options`
-  // changes under an existing save. Re-validate every enum field on load,
-  // same fallback rule as clampValue: an out-of-vocabulary value reverts to
-  // that control's own default, not just "whatever was previously in scope".
+  // Saved values bypass setValue(), so validate enum membership on load.
+  // An option removed or renamed since the save falls back to the control's
+  // resolved default, keeping the rendered select and values in sync.
   for (const spec of allSpecs) {
     if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
       values[spec.name] = defaults[spec.name];
@@ -476,8 +467,8 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   body.className = 'lf-body';
   panel.appendChild(body);
 
-  // Two tiers, per the brief: Interactions (cursor response, kept separate
-  // from background configuration on purpose) divided from Color+Visual.
+  // The panel configures artwork visuals: camera angles in Interactions,
+  // palette in Color, and the remaining rendering parameters in Visual.
   // Each section is a toggle-button header plus a body a category routes
   // rows into — `sectionOf` below is the single place that mapping lives.
   // Collapsing hides `.lf-section-body` via CSS only: rows stay in the DOM
@@ -1209,13 +1200,6 @@ function describeForAI({ pieceName, values }) {
     defaults: { hue: 35, hueB: 15, saturation: 0.5, colorMode: 'gradient', colorA: '#ff9500', colorB: '#ff4000' },
   });
   const currentValues = baked || panel.values;
-
-  // The bulge is one continuous stroked path per band, so per-mark scaling
-  // (flow-field's approach) isn't available: Grow/Shrink amplify/damp this
-  // existing falloff-weighted offset and its radius instead, rather than
-  // varying ctx.lineWidth mid-path.
-  const BULGE_MAG = 70;
-  const BULGE_RADIUS = 300;
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';

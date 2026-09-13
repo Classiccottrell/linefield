@@ -202,18 +202,9 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   }
 
   const values = { ...defaults, ...saved.values };
-  // A saved localStorage blob is a plain object spread above, not a
-  // setValue() call, so it never reaches clampValue's enum-membership check
-  // (see below) — a stale blob holding a mode string that was since removed
-  // or renamed (e.g. a future rename of one of the seven cursor-interaction
-  // modes) would land in `values` unvalidated: the <select> falls back to
-  // whatever its first <option> happens to be while `values` keeps the
-  // stale string, the exact divergence that check exists to prevent. Not
-  // reachable today (every currently-saved value was written by setValue,
-  // which already validates), but reachable the moment a spec's `options`
-  // changes under an existing save. Re-validate every enum field on load,
-  // same fallback rule as clampValue: an out-of-vocabulary value reverts to
-  // that control's own default, not just "whatever was previously in scope".
+  // Saved values bypass setValue(), so validate enum membership on load.
+  // An option removed or renamed since the save falls back to the control's
+  // resolved default, keeping the rendered select and values in sync.
   for (const spec of allSpecs) {
     if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
       values[spec.name] = defaults[spec.name];
@@ -267,8 +258,8 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   body.className = 'lf-body';
   panel.appendChild(body);
 
-  // Two tiers, per the brief: Interactions (cursor response, kept separate
-  // from background configuration on purpose) divided from Color+Visual.
+  // The panel configures artwork visuals: camera angles in Interactions,
+  // palette in Color, and the remaining rendering parameters in Visual.
   // Each section is a toggle-button header plus a body a category routes
   // rows into — `sectionOf` below is the single place that mapping lives.
   // Collapsing hides `.lf-section-body` via CSS only: rows stay in the DOM
