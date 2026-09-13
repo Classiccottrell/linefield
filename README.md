@@ -163,45 +163,27 @@ tooling" below and CONTRIBUTING.md.
 - `chain-haze` — lines of chains receding into the distance, discrete linked ovals fading with depth
 - `stock-market` — tracks of rising and falling bars marching across the field, buy and sell rendered as filled rectangles
 
-Every piece shares 16 controls (cursor interaction, scale, speed, stroke,
-opacity, saturation, color mode, color A, color B, glow, angle, motion,
-phase, invert, density, pointer) plus its own piece-specific control. Color
+Every piece shares 14 visual controls (scale, speed, stroke, opacity,
+saturation, color mode, color A, color B, glow, angle, motion, phase,
+invert, density) plus its own piece-specific control. Color
 mode switches between a single hue (Solid) and a two-stop blend (Gradient,
 the default — every piece's own look); Color A/B are hex pickers, B shown
 only in Gradient mode. `density` multiplies the piece's base element count.
-`cursor interaction` selects one of seven modes, wired on all seventeen
-pieces. None does nothing. Grow enlarges marks near the cursor; Shrink
-narrows them. Attract pulls nearby marks toward the cursor; Vortex swirls
-them around it in place. Particle Trail scatters a fading dust of small
-particles that follows the cursor's recent path; Ripples sends expanding
-rings outward from wherever the cursor rests. Grow/Shrink/Attract/Vortex
-scale marks individually on element-based pieces and amplify or damp an
-existing local deformation on whole-path pieces (rings, bands, ribbons,
-cables) — canvas cannot vary a single path's stroke width partway along
-it, so a piece that draws a whole ring or ribbon as one path leans on
-motion it already has rather than literal per-mark scaling. Particle Trail
-and Ripples are a shared cursor-relative overlay, identical on every
-piece, layered on top of a piece's own drawing rather than replacing any
-of it.
-
-`pointer` scales whichever mode is selected and defaults to 0, since these
-are backgrounds — meant to hold still until a visitor's cursor invites
-otherwise — and each piece remains fully responsive to it at Speed 0.
-`cursorInteraction: None` and `pointer: 0` are two different ways to be
-off: the mode dropdown turns cursor response off regardless of pointer,
-while leaving a mode selected with pointer at 0 keeps it silent but ready
-— raising pointer later needs no other change. `wireframe-lattice` and
-`event-horizon` also provide Pitch and Yaw controls; Angle is roll, and
+`wireframe-lattice`, `event-horizon`, and `globe` also provide Pitch and Yaw
+controls; Angle is roll, and
 dragging the canvas orbits the camera on direct piece pages. Gallery
 previews disable drag-to-orbit.
 
-The panel itself is sectioned into Interactions (cursor interaction,
-pointer, and Pitch/Yaw on the two 3D pieces), Color, and Visual — each a
+The panel itself is sectioned into Interactions (Pitch/Yaw on the 3D pieces),
+Color, and Visual — each a
 collapsible header with its own open/closed state, persisted per piece.
 Interactions opens by default; Color and Visual start closed, so the panel
 fits on screen at rest. Reset is a sticky footer, always visible at the
 panel's bottom edge regardless of scroll position. Below ~640px the panel
 docks as a bottom sheet, collapsed to a handle by default.
+
+Wake is a separate optional interaction mechanism for any canvas, not baked
+into pieces. Open it from the gallery's Wake link.
 
 ## Adding a new piece
 
@@ -250,12 +232,10 @@ node tools/test-presets.mjs <slug>   # preset mechanism (one piece) + value/enum
 npm run test-bake-fresh  # bakes every piece live, rather than reading committed downloads/
 npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
 npm run test-source      # Source buttons download exact unbaked piece files
-npm run test-interactions # pointer, orbit, animation, and baked-artifact browser QA
-npm run test-cursor-modes # every cursor mode live and mutually distinct, per piece
+npm run test-interactions # Wake, orbit, animation, and baked-artifact browser QA
 npm run audit-controls   # empirically check every shared+piece control moves pixels — LAST, deliberately
 
 node tools/preset-sheet.mjs <slug>   # NOT run in CI — render a piece's presets for review
-node tools/mode-sheet.mjs            # NOT run in CI — paired None-vs-mode 1:1 crops for visual review
 npm run collection-metrics           # NOT run in CI — hue/sat/ink per piece, as ROADMAP's table
 ```
 

@@ -41,8 +41,8 @@ dependency. None of that reaches a user of a piece.
    `hue`/`hueB`/`saturation` from the piece's own `defaults` block. These
    three must come FIRST in the `defaults` block and in that exact order
    (`hue`, then `hueB`, then `saturation`) — the verifier's parser is a
-   regex locked to that order. `colorMode`/`colorA`/`colorB` (see "The 15
-   shared controls" below) may follow after; they are not read by the
+   regex locked to that order. `colorMode`/`colorA`/`colorB` (see "The 14
+   shared visual controls" below) may follow after; they are not read by the
    manifest.
 3. Add a bullet to README's Pieces list.
 4. Run `npm run build`.
@@ -72,15 +72,13 @@ piece, preset value/enum data on all seventeen — see "Presets" below),
 in `shared/export.js`, against today's source — and validates that
 output), `npm run test-baked` (every *committed* `downloads/*.html`
 renders standalone over `file://`), `npm run test-source` (Source buttons
-download exact unbaked piece files), `npm run test-interactions` (pointer,
-orbit, animation, and baked-artifact browser QA), `npm run test-cursor-modes`
-(every cursor mode live and mutually distinct, per piece — see "Cursor
-interaction" below), and `npm run audit-controls` (every control has a
+download exact unbaked piece files), `npm run test-interactions` (Wake,
+orbit, animation, and baked-artifact browser QA), and `npm run audit-controls` (every control has a
 visible effect; run LAST, deliberately — it's the slowest, broadest check
 and the one most likely to fail mid-rollout of a new control, and a slow
 broad gate must never stand in front of fast specific ones and hide their
-results). `node tools/preset-sheet.mjs`, `node tools/mode-sheet.mjs`,
-`node tools/browser-matrix.mjs` and `npm run collection-metrics` are
+results). `node tools/preset-sheet.mjs`, `node tools/browser-matrix.mjs`
+and `npm run collection-metrics` are
 curation tools with no pass/fail gate and do not run in CI at all — read
 their output yourself. Neither bake
 check catches a forgotten rebuild, and saying so is
@@ -115,25 +113,12 @@ npx serve .
 
 Then open `http://localhost:<port>/pieces/<piece-name>/`.
 
-## The 16 shared controls
+## The 14 shared visual controls
 
 Every piece gets these controls for free via `createControlPanel()`
-(`shared/controls.js`): `cursorInteraction`, `pointer`, `scale`, `speed`,
-`stroke`, `opacity`, `saturation`, `colorMode`, `colorA`, `colorB`, `glow`,
-`angle`, `motion`, `phase`, `invert`, `density`.
-
-`cursorInteraction` (None / Grow / Shrink / Particle Trail / Ripples /
-Attract / Vortex) selects a cursor-response mode; `pointer` scales its
-strength. The vocabulary and the shared Trail/Ripples overlay live in
-`shared/cursor-modes.js` — see `modeFactor(values, pointer)`, which every
-mode multiplies by and which is 0 whenever `cursorInteraction` is `'None'`
-or `pointer` is 0. Per-mode behaviour (Grow/Shrink/Attract/Vortex) is wired
-piece by piece and is now live on all seventeen pieces. Element-based pieces
-(particles, dots, nodes) scale marks individually — see
-`pieces/flow-field/index.html` for the worked example. Whole-path pieces
-that stroke a ring/band/ribbon/cable as one path can't vary stroke width
-mid-path, so they amplify/damp an existing falloff-weighted local
-deformation instead — see `pieces/contour-grid/index.html`.
+(`shared/controls.js`): `scale`, `speed`, `stroke`, `opacity`, `saturation`,
+`colorMode`, `colorA`, `colorB`, `glow`, `angle`, `motion`, `phase`,
+`invert`, `density`.
 
 `colorMode` (Solid/Gradient) and `colorA`/`colorB` (hex colour pickers,
 `colorB` only shown in Gradient mode) are the *authored* palette — a piece
@@ -220,67 +205,16 @@ must re-seed that array inside the panel's `onChange` callback when
 `density` changes — recomputing `count` alone won't resize an existing
 array. See `pieces/flow-field/index.html` for a worked example.
 
-## Cursor interaction
+## Optional interaction mechanisms
 
-`shared/cursor-modes.js` exports `CURSOR_MODES` (the seven-mode vocabulary
-the `cursorInteraction` control declares), `modeFactor(values, pointer)`
-(the strength every mode multiplies by — 0 whenever `cursorInteraction` is
-`'None'` or `pointer` is 0, and nothing else, so a user can always fully
-disable cursor response), and `createCursorOverlay()` (the shared
-Particle-Trail/Ripples renderer — implement it once here, not per piece).
-
-Wire it in a piece's `onFrame`:
+Wake is not baked into pieces. Add it to any canvas that needs it:
 
 ```js
-const overlay = createCursorOverlay();
-// ...
-onFrame(dt, elapsed) {
-  pointer.step();
-  const k = modeFactor(currentValues, pointer);
-  overlay.step(currentValues.cursorInteraction, k, pointer);
-  drawFrame(dt, elapsed, currentValues);   // the piece's own render
-}
+import { createWake } from './interactions/wake.js';
+
+const wake = createWake({ target: document.querySelector('canvas') });
+wake.setEnabled(true);
 ```
-
-**Draw-ordering contract, binding on every piece:** call `overlay.draw(ctx,
-colour, k)` as the LAST thing in the piece's own frame — after it has
-cleared the canvas and drawn everything else for that tick, never before.
-Fifteen of the seventeen pieces in this library do a full clear every frame
-— the exceptions are `flow-field` and `accretion`, which fade with a
-part-alpha fill so their marks leave trails; a
-piece that draws the overlay before its own clear/fillRect wipes the
-overlay's marks along with everything else. See
-`pieces/flow-field/index.html`'s `drawFrame()` — `overlay.draw(...)` is the
-last line in the function, after the frame's own drawing loop.
-
-Grow/Shrink/Attract/Vortex are per-piece behaviours: each piece interprets
-what "grow"/"shrink"/etc. means for its own geometry, gated on
-`modeFactor(values, pointer)`, dispatched by `values.cursorInteraction`.
-There is no shared implementation for these four — only the vocabulary and
-the gate.
-
-### What a new piece owes
-
-A new piece must implement all seven modes, not a subset — None, Grow,
-Shrink, Attract, Vortex per-piece plus the shared Particle Trail/Ripples
-overlay wired as shown above. Every mode's strength must flow through
-`modeFactor(values, pointer)` and nothing else: don't gate cursor response
-on `speed`, `motion`, `density`, or any other control a user can set to
-zero, since `modeFactor` is the one place `cursorInteraction: 'None'` and
-`pointer: 0` are honoured, and a second gate is a second way to leave a
-mode silently stuck on or off. At `pointer: 0` the piece must be
-byte-for-byte inert under cursor movement — `modeFactor` already returns 0
-there, so this falls out for free as long as nothing bypasses it.
-
-Run `npm run test-cursor-modes` (also enforced in CI) before calling a
-piece's cursor wiring done — it drives every mode live on every piece and
-asserts no two render identically. It is a change-detector, not a
-visibility check: a
-piece can pass it and still look like nothing moved to a human (see
-ROADMAP.md, "A diff percentage is not visibility"). Follow it with
-`node tools/mode-sheet.mjs` and look at the paired None-vs-mode crops
-yourself — that is the only instrument that answers whether the effect
-reads.
 
 ## Baked HTML export
 
