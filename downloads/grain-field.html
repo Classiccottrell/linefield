@@ -1239,12 +1239,10 @@ function describeForAI({ pieceName, values }) {
     const drift = 14 * values.speed * (dt || 0.016);
     const len = values.grain;
     const light = values.invert ? 0.4 : 0.62;
-    const stopA = paletteHsl(values, 0);
 
     const lineWidth = 0.3 + values.stroke * 0.9;
     ctx.lineWidth = lineWidth;
 
-    // eased by influence.
 
     for (const gr of grains) {
       const n = simplex2(gr.x * noiseScale + values.phase, gr.y * noiseScale + t);

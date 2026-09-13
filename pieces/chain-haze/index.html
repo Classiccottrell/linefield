@@ -92,8 +92,8 @@
 
   // Perspective divisor (see CONTRIBUTING.md "3D pieces" for the shared
   // camera — deliberately NOT used here: a straight receding line needs
-  // only a scalar divisor, not full pitch/yaw/orbit, and pulling in
-  // createCamera/createOrbit would drag rotX/rotY persistence and
+  // only a scalar divisor, not persistent pitch/yaw state, which would drag
+  // rotX/rotY persistence and
   // test-interactions coverage this piece doesn't need). Saturates toward 0
   // as z grows, which both shrinks and bunches distant links together —
   // the correct perspective read for evenly-spaced world depth.
@@ -217,7 +217,6 @@
 
     ctx.restore();
 
-    const stopA = paletteHsl(values, 0);
   }
 
   const loop = createLoop({
