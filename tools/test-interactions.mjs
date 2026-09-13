@@ -137,6 +137,10 @@ try {
     if (message.type() === 'error' && !message.text().includes('favicon')) errors.push(message.text());
   });
 
+  await page.goto(`${base}/`, { waitUntil: 'load' });
+  assert.equal(await page.locator('#grid [data-interaction]').count(), 0, 'Wake rendered as a piece');
+  assert.equal(await page.locator('a[href="interactions/wake/"]').count(), 1, 'Wake gallery link missing');
+
   for (const { slug } of pieces) {
     await openPiece(page, base, slug);
     const controlNames = await page.evaluate(() => window.__LF_SPECS__.map((spec) => spec.name));
