@@ -32,7 +32,6 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'orbital-veil';
   const canvas = document.getElementById('canvas');
@@ -70,20 +69,6 @@
   });
   const currentValues = baked || panel.values;
 
-  // Each ring is one continuous stroked path, so per-mark scaling isn't
-  // available: all four modes get a per-point falloff-weighted radial
-  // pull/swell/rotation, mirroring interference. No canvas rotation
-  // transform is applied here, so pointer.x/y are usable directly.
-  const SWELL_MAG = 30;
-  // 200 (matching interference's own SWELL_RADIUS) left Shrink invisible at
-  // the review's parked cursor position: interference's two dense ripple
-  // sources keep many rings within 200px of any point, but orbital-veil's
-  // rings are spaced widely enough that only a sliver of one or two rings
-  // fell inside the falloff at a time. Widened to 340 (tether's radius) so
-  // enough ring length is affected at once to read, not to deepen Shrink's
-  // already-small per-point push.
-  const SWELL_RADIUS = 340;
-
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -101,23 +86,6 @@
     ctx.lineWidth = lineWidth;
 
     const light = values.invert ? 0.35 : 0.6;
-
-    // Former interaction behavior removed.
-    // influence. No term routed through values.speed or values.sweep (both
-    // user-zeroable).
-
-    // Cap the amplitude/radius/rotation input at k=1: uncapped, k=2
-    // (Pointer's max) quadruples Grow's magnitude AND falloff radius
-    // together (and widens Vortex's rotation radius the same way), which
-    // pulls nearly every ring hard and destroys the piece's identity. This
-    // holds Pointer 1..2 flat at the Pointer=1 strength (gate numbers
-    // unchanged) instead of compounding further.
-
-    // The piece's one prior pointer response was a global nx/ny tilt with
-    // no positional falloff — against the "k and a positional falloff,
-    // nothing else" contract. Replaced below with a genuine per-point
-    // falloff pull/swell/rotation for all four modes, not kept for any of
-    // them.
 
     for (let i = 0; i < rings; i++) {
       const f = i / (rings - 1 || 1);
@@ -155,7 +123,6 @@
     }
 
     const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
   }
 
   const loop = createLoop({

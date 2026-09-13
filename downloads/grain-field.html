@@ -1086,12 +1086,8 @@ function stripInnerImports(src) {
 // inside a function body called later. controls.js is always a piece's
 // first import, so BFS always placed it first in the concatenated output —
 // fine for `hexToHue` (from color.js), which is only called inside
-// `setValue`, deferred to call time; broken for `CURSOR_MODES` (from
-// cursor-modes.js), which controls.js's top-level `const SHARED_CONTROLS =
-// [...]` reads immediately. cursor-modes.js, discovered as controls.js's own
-// import, was concatenated AFTER controls.js under BFS — a real
-// ReferenceError: Cannot access 'CURSOR_MODES' before initialization, in
-// every downloaded file, that loaded without error and rendered blank.
+// `setValue`, deferred to call time. A shared module that reads an imported
+// binding at top level instead must have that dependency emitted first.
 //
 // A post-order DFS guarantees every module's dependencies appear before it
 // in the emitted output, independent of whether the consumer reads the
@@ -1244,12 +1240,10 @@ function describeForAI({ pieceName, values }) {
     const len = values.grain;
     const light = values.invert ? 0.4 : 0.62;
     const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
 
     const lineWidth = 0.3 + values.stroke * 0.9;
     ctx.lineWidth = lineWidth;
 
-    // Former interaction behavior removed.
     // eased by influence.
 
     for (const gr of grains) {

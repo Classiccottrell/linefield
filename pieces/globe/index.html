@@ -31,7 +31,7 @@
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
-  import { createCamera, rotatePoint } from '../../shared/project.js';
+  import { createCamera } from '../../shared/project.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createOrbit } from '../../shared/pointer.js';
 
@@ -247,7 +247,6 @@
     }
 
     const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
   }
 
   const loop = createLoop({

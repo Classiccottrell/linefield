@@ -32,7 +32,6 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { rotatePoint } from '../../shared/project.js';
 
   const PIECE_ID = 'chain-haze';
   const canvas = document.getElementById('canvas');
@@ -219,7 +218,6 @@
     ctx.restore();
 
     const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.32 : 0.66);
   }
 
   const loop = createLoop({
