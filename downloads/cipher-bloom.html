@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — chain haze</title>
+<title>linefield — cipher bloom</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.22,"colorMode":"gradient","colorA":"#8fae9e","colorB":"#7fa0c2","hue":96,"hueB":108,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"linkAspect":0.55};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":0.5,"stroke":0.55,"opacity":0.88,"saturation":0.22,"colorMode":"gradient","colorA":"#d3a565","colorB":"#e7d9a6","hue":42,"hueB":76,"invert":false,"glow":0,"angle":347,"motion":0.55,"phase":0,"density":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -937,7 +937,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -946,13 +946,25 @@ function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
     .join('\n');
 
   const textEls = texts
-    .map(({ x, y, ch, size, fontFamily }) => {
+    .map(({ x, y, ch, size, fontFamily, anchor, baseline, rotation, strokeWidth }) => {
       const safeCh = String(ch).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${fontFamily || 'monospace'}" font-size="${size.toFixed(2)}" fill="black">${safeCh}</text>`;
+      const safeFont = String(fontFamily || 'monospace').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const placement = `${['start', 'middle', 'end'].includes(anchor) ? ` text-anchor="${anchor}"` : ''}${['central', 'middle', 'alphabetic', 'hanging'].includes(baseline) ? ` dominant-baseline="${baseline}"` : ''}${Number.isFinite(rotation) ? ` transform="rotate(${rotation} ${x} ${y})"` : ''}`;
+      const stroke = Number.isFinite(strokeWidth) && strokeWidth > 0 ? ` stroke="black" stroke-width="${strokeWidth}"` : '';
+      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${safeFont}" font-size="${size.toFixed(2)}" fill="black"${placement}${stroke}>${safeCh}</text>`;
     })
     .join('\n');
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}${polylines && textEls ? '\n' : ''}${textEls}\n</svg>`;
+  // Filled-mark pieces supply already-transformed corners; existing path
+  // and text callers retain their exact serialization when this is empty.
+  const polygonEls = polygons.map(({ points, fill = 'black', opacity = 1 }) => {
+    const pointsAttr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
 }
@@ -1088,7 +1100,7 @@ function describeForAI({ pieceName, values }) {
 
 
 
-  const PIECE_ID = 'chain-haze';
+  const PIECE_ID = 'cipher-bloom';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1099,33 +1111,24 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // Element-based, not a path piece: each chain is a sequence of discrete
-  // linked marks (stroked ovals) walking a straight line toward a per-chain
-  // vanishing point, not one continuous stroke — the structural difference
-  // from `tether`. No Math.random() anywhere and no persistent array —
-  // every link's position is a pure function of (chain index, link index,
-  // elapsed) recomputed each frame, same discipline as `matrix-code`, so
-  // there is no density re-seed trap and thumbnail capture stays
-  // byte-identical against a pinned clock.
-  const BASE_CHAINS = 7;
-  const BASE_LINKS = 24;
-  const FOV = 520; // perspective divisor strength — see persp() below
-  const MARCH_RATE = 90; // world-depth units/sec a chain advances at speed=1
-  const MIN_SCALE = 0.38; // hard floor: below this an oval reads as a dot,
-                            // which is exactly the "dashed line pretending
-                            // to be chain" failure this piece exists to avoid
-  let paths = [];
+  const GLYPHS = ['·', '+', '×', '∷', '∧', '⌁', '░', '▒', '╱', '╲'];
+  const FONT_STACK = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+  let texts = [];
+  let travel = 0;
+  let identities = 0;
 
-  // Sparse, heavy-stroked territory (`meridian`/`tether`) is already the
-  // library's weakest pair per ROADMAP.md's collection-constraints table.
-  // Many links per chain across several chains pushes ink coverage into the
-  // empty 0.11-0.19 band rather than adding to that cluster.
+  function hash(a, b, t = 0) {
+    let h = (a * 374761393 + b * 668265263 + t * 2246822519) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274122517);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
   const PRESETS = {
-    whisper: { opacity: 0.28, stroke: 0.4, density: 0.6, saturation: 0.08, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.7, density: 0.9, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.92, stroke: 1, density: 1.2, saturation: 0.9, glow: 1.2 },
-    drift:   { opacity: 0.55, stroke: 0.8, density: 0.85, speed: 0.35, motion: 1.7 },
-    dense:   { opacity: 0.7, stroke: 0.6, density: 1.8, speed: 1.1 },
+    whisper: { opacity: 0.35, stroke: 0.2, density: 0.5, scale: 0.75, saturation: 0.08, motion: 0.4, phase: 0.4 },
+    ink:     { opacity: 0.9, stroke: 1.2, density: 0.75, scale: 1.2, saturation: 0, angle: 352, phase: 0.6 },
+    neon:    { opacity: 0.86, stroke: 0.75, density: 1.15, scale: 0.8, saturation: 0.65, glow: 0.8, angle: 335, phase: 0.2 },
+    drift:   { opacity: 0.6, stroke: 0.45, density: 0.68, scale: 1.35, speed: 0.25, motion: 0.6, phase: 1.2, angle: 355 },
+    dense:   { opacity: 0.8, stroke: 0.7, density: 1.65, scale: 0.9, speed: 0.6, angle: 340, phase: 0.75 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1133,145 +1136,69 @@ function describeForAI({ pieceName, values }) {
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    extraControls: [
-      { name: 'linkAspect', label: 'Link aspect', type: 'range', min: 0.3, max: 0.9, step: 0.01, default: 0.55, category: 'form' },
-    ],
-    // 96/108: the last open slice below `puddle` (112/138) and
-    // `matrix-code` (132/145) in the 95-135 band ROADMAP.md flags as the
-    // only open one — picked deliberately, not measured, same caveat those
-    // two record. Low saturation reads as cold, oxidised steel, which also
-    // happens to suit chain links thematically.
-    defaults: { hue: 96, hueB: 108, saturation: 0.22, colorMode: 'gradient', colorA: '#8fae9e', colorB: '#7fa0c2' },
+    defaults: { hue: 42, hueB: 76, saturation: 0.22, colorMode: 'gradient', colorA: '#d3a565', colorB: '#e7d9a6', opacity: 0.88, stroke: 0.55, angle: 347, speed: 0.5, motion: 0.55 },
   });
   const currentValues = baked || panel.values;
-
-  // Perspective divisor (see CONTRIBUTING.md "3D pieces" for the shared
-  // camera — deliberately NOT used here: a straight receding line needs
-  // only a scalar divisor, not persistent pitch/yaw state, which would drag
-  // rotX/rotY persistence and
-  // test-interactions coverage this piece doesn't need). Saturates toward 0
-  // as z grows, which both shrinks and bunches distant links together —
-  // the correct perspective read for evenly-spaced world depth.
-  function persp(z) {
-    return FOV / (FOV + Math.max(0, z));
-  }
-
-  // Samples an ellipse (rotated, centred) into a polyline so SVG export has
-  // real geometry — `exportSvg` only understands point arrays, and unlike
-  // `matrix-code`'s glyph marks (which have a `texts` escape hatch) an oval
-  // mark has no equivalent; it must be sampled.
-  const ELLIPSE_SEG = 14;
-  function sampleEllipse(cx, cy, rx, ry, rot) {
-    const cosR = Math.cos(rot), sinR = Math.sin(rot);
-    const pts = [];
-    for (let k = 0; k <= ELLIPSE_SEG; k++) {
-      const a = (k / ELLIPSE_SEG) * Math.PI * 2;
-      const ex = rx * Math.cos(a), ey = ry * Math.sin(a);
-      pts.push([cx + ex * cosR - ey * sinR, cy + ex * sinR + ey * cosR]);
-    }
-    return pts;
-  }
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    paths = [];
+    texts = [];
     const W = canvas.width;
     const H = canvas.height;
-    const light = values.invert ? 0.32 : 0.66;
-
-    const chains = Math.max(2, Math.round(BASE_CHAINS * values.density));
-    const linksPerChain = Math.max(6, Math.round(BASE_LINKS * values.density));
-
-    const aspect = values.linkAspect;
-    const linkLen = 30 * values.scale; // world-space link length (pre-perspective)
-    const step = linkLen * 1.5; // ~30% overlap between consecutive links — abutting
-                                  // links read as beads on a string, not chain
-    const zSpan = step * linksPerChain;
-
-    const theta = (values.angle * Math.PI) / 180;
-    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-
-    ctx.save();
-    ctx.translate(W / 2, H / 2);
-    ctx.rotate(theta);
-    ctx.translate(-W / 2, -H / 2);
-
-    // `phase` offsets the whole link sequence along the path (a static
-    // shift, independent of the marching driven by `speed`); `speed`
-    // marches links toward the vanishing point over time; `motion` drives
-    // an independent lateral sway distinct from both — none gates the
-    // others out at zero.
-    const marchOffset = elapsed * values.speed * MARCH_RATE + values.phase * zSpan * 0.5;
-
-    for (let c = 0; c < chains; c++) {
-      const cf = chains === 1 ? 0.5 : c / (chains - 1);
-      const anchorX = W * (0.06 + 0.88 * cf);
-      const anchorY = H * (0.94 + 0.02 * Math.sin(c * 2.1));
-      // Each chain's own vanishing point drifts slightly so the whole
-      // library of lines doesn't converge on one identical pixel.
-      const vanishX = W * (0.46 + 0.08 * Math.sin(c * 1.7 + 0.6));
-      const vanishY = H * (0.08 + 0.05 * Math.cos(c * 1.3));
-      const tangent = Math.atan2(vanishY - anchorY, vanishX - anchorX);
-      const perpX = -Math.sin(tangent), perpY = Math.cos(tangent);
-
-      const chainSeed = c * 12.9898;
-      const chainPhase = ((c / chains) * zSpan) % zSpan;
-
-      const { h, s } = paletteHsl(values, cf);
-
-      for (let i = 0; i < linksPerChain; i++) {
-        let z = ((i * step - marchOffset + chainPhase) % zSpan + zSpan) % zSpan;
-        const p = persp(z);
-
-        let cx = vanishX + (anchorX - vanishX) * p;
-        let cy = vanishY + (anchorY - vanishY) * p;
-
-        // Lateral sway, perpendicular to the chain's own path direction —
-        // `motion` scales it, `speed`/`density` play no part, so it
-        // survives Speed 0 (a frozen-but-non-degenerate chain, same
-        // precedent as `globe`'s wobble).
-        const sway = Math.sin(elapsed * 0.9 + chainSeed + i * 0.35) * 6 * values.motion * p;
-        cx += perpX * sway;
-        cy += perpY * sway;
-
-        let linkScale = Math.max(MIN_SCALE, p);
-        const depthAlpha = Math.max(0.22, Math.min(1, p * 0.95));
-
-
-        const rx = (linkLen / 2) * linkScale;
-        // Alternating orientation: even links read face-on (full width),
-        // odd links read edge-on (squashed to ~35% width) — the same
-        // ellipse major axis (rx, along the chain's tangent), alternating
-        // minor axis, is what reads as interlocking links rather than a
-        // dotted/dashed line pretending to be chain.
-        const ryFull = (linkLen / 2) * aspect * linkScale;
-        const ry = i % 2 === 0 ? ryFull : ryFull * 0.35;
-
-        const [r, g, b] = hslToRgb(h, s, light);
-        const alpha = values.opacity * depthAlpha;
-
-        ctx.lineWidth = 1 + values.stroke * 3;
-        if (values.glow > 0) {
-          ctx.strokeStyle = `rgba(${r},${g},${b},${values.glow * 0.3 * depthAlpha})`;
-          ctx.lineWidth = (1 + values.stroke * 3) + values.glow * 3;
-          ctx.beginPath();
-          ctx.ellipse(cx, cy, rx, ry, tangent, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.lineWidth = 1 + values.stroke * 3;
-        }
-        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx, ry, tangent, 0, Math.PI * 2);
-        ctx.stroke();
-
-        paths.push(sampleEllipse(cx, cy, rx, ry, tangent));
-      }
+    const unit = Math.min(W / 1280, H / 800);
+    const size = (8 + values.scale * 12) * unit;
+    const cols = Math.max(18, Math.round(86 * Math.sqrt(values.density)));
+    const rows = Math.max(8, Math.round(30 * Math.sqrt(values.density)));
+    const theta = values.angle * Math.PI / 180;
+    const c = Math.cos(theta), s = Math.sin(theta);
+    const cx = W * 0.58, cy = H * 0.54;
+    const breadth = H * (0.07 + values.scale * 0.12);
+    const strokeWidth = values.stroke * size * 0.038;
+    travel += dt * values.speed * 0.025;
+    identities += dt * values.motion * 1.4;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+      const u = ((col + 0.5) / cols + travel) % 1;
+      const v = ((row + 0.5 + (hash(col, row, 1) - 0.5) * 0.8) / rows) * 2 - 1;
+      const core = Math.exp(-v * v / 0.09);
+      const shoulder = Math.exp(-v * v / 0.42);
+      const edge = Math.pow(Math.sin(u * Math.PI), 0.8);
+      // Occupancy and jitter stay attached to each mark. Motion changes
+      // its identity, not its presence, avoiding whole-band flicker.
+      if (hash(col, row, 2) > (0.13 + core * 0.78) * edge) continue;
+      const rawX = W * (0.13 + u) + (hash(col, row, 3) - 0.5) * size * 0.6;
+      const center = H * (0.59 + Math.sin(u * 5 + values.phase * 1.4) * 0.045 + Math.sin(travel * 1.2) * 0.03);
+      const rawY = center + v * breadth * (0.45 + 0.55 * edge);
+      const dx = rawX - cx, dy = rawY - cy;
+      const x = cx + dx * c - dy * s, y = cy + dx * s + dy * c;
+      if (x < -size || x > W + size || y < -size || y > H + size) continue;
+      const stop = paletteHsl(values, u);
+      const light = values.invert ? 0.3 : 0.43 + core * 0.4;
+      const [r, g, b] = hslToRgb(stop.h, stop.s, light);
+      const alpha = values.opacity * edge * shoulder * (0.23 + core * 0.77);
+      const bucket = Math.floor(identities + hash(col, row, 4) * 3);
+      const ch = GLYPHS[Math.floor(hash(col + 11, row + 7, bucket) * GLYPHS.length)];
+      // Three type sizes retain irregular texture without churning the
+      // browser's font cache with hundreds of unique fonts every frame.
+      const glyphSize = size * (0.7 + Math.floor(hash(col, row, 5) * 3) * 0.2);
+      const rotation = values.angle + (hash(col, row, 6) - 0.5) * 14;
+      const turn = rotation * Math.PI / 180;
+      ctx.setTransform(Math.cos(turn), Math.sin(turn), -Math.sin(turn), Math.cos(turn), x, y);
+      ctx.font = `${glyphSize}px ${FONT_STACK}`;
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.strokeStyle = ctx.fillStyle;
+      ctx.lineWidth = strokeWidth;
+      ctx.shadowColor = `rgb(${r},${g},${b})`;
+      ctx.shadowBlur = values.glow * core * 7 * unit;
+      ctx.fillText(ch, 0, 0);
+      if (strokeWidth > 0) ctx.strokeText(ch, 0, 0);
+      texts.push({ x, y, ch, size: glyphSize, fontFamily: FONT_STACK, anchor: 'middle', baseline: 'central', rotation, strokeWidth });
     }
-
-    ctx.restore();
-
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.shadowBlur = 0;
   }
 
   const loop = createLoop({
@@ -1283,10 +1210,9 @@ function describeForAI({ pieceName, values }) {
 
   document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
   document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
-  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg([], { width: canvas.width, height: canvas.height, texts }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
-    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
-      .catch((err) => console.error('bakeHtml failed', err));
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
   });
   document.getElementById('btn-source')?.addEventListener('click', () => {
     exportSource().catch((err) => console.error('exportSource failed', err));

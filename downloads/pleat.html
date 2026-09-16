@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — matrix code</title>
+<title>linefield — pleat</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,9 +127,7 @@
 
 
 
-
-
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.55,"colorMode":"gradient","colorA":"#00ff6a","colorB":"#33ff9e","hue":132,"hueB":145,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"glyphSet":"ascii"};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":0.55,"stroke":1.1,"opacity":0.9,"saturation":0.3,"colorMode":"gradient","colorA":"#c88d7e","colorB":"#e8d8bd","hue":12,"hueB":38,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -939,7 +937,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -954,7 +952,16 @@ function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
     })
     .join('\n');
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}${polylines && textEls ? '\n' : ''}${textEls}\n</svg>`;
+  // Filled-mark pieces supply already-transformed corners; existing path
+  // and text callers retain their exact serialization when this is empty.
+  const polygonEls = polygons.map(({ points, fill = 'black', opacity = 1 }) => {
+    const pointsAttr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
 }
@@ -1090,7 +1097,7 @@ function describeForAI({ pieceName, values }) {
 
 
 
-  const PIECE_ID = 'matrix-code';
+  const PIECE_ID = 'pleat';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1101,51 +1108,15 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // No @font-face, no network font: a baked single-file export must render
-  // standalone with whatever the OS provides. This stack resolves to a real
-  // monospace on every desktop/mobile platform Playwright covers.
-  const FONT_STACK = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
-
-  // Pure ASCII by design (see glyphSet control below) — keeps the baked
-  // file's byte content unambiguous under file:// with no explicit
-  // Content-Type charset param, which the katakana alternative would put in
-  // question. Escapes, not literals, for the same reason.
-  const GLYPH_SETS = {
-    ascii: '01!?#$%&*+-/<>[]{}=ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
-    binary: '01'.split(''),
-    // Half-width katakana range, written as escapes so the source file
-    // itself stays pure-ASCII bytes end to end, baked file included.
-    kana: Array.from({ length: 56 }, (_, i) => String.fromCharCode(0xff66 + i)),
-  };
-
-  // Deterministic hash, not Math.random(): thumbnail capture pins the clock
-  // and expects a byte-identical re-render for an untouched piece, and
-  // The control audit is a change-detector that would pass
-  // trivially (green for the wrong reason) if glyph identity re-rolled every
-  // frame regardless of what motion/churn control did.
-  function hash(a, b, c) {
-    let h = (a * 374761393 + b * 668265263 + c * 2246822519) | 0;
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    return (h ^ (h >>> 16)) >>> 0;
-  }
-
-  // Not rainfall: rainfall is continuous-y streaks at random x with sway and
-  // a fixed identity per drop. This is a quantized column/row grid — no
-  // sway, no per-drop randomness — where each cell's glyph identity churns
-  // on its own clock independent of the column's head position. The head
-  // advancing and a cell's character changing are two unrelated processes;
-  // conflating them is exactly "rainfall wearing letters".
-  const BASE_FONT = 20;
-  const TRAIL_LEN = 16;
-  const ROWS_PER_SEC = 7;
-  const CHURN_PER_SEC = 2.4;
+  let polygons = [];
+  let travel = 0;
 
   const PRESETS = {
-    whisper: { opacity: 0.35, stroke: 0.3, density: 0.7, saturation: 0.15, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.6, density: 1, saturation: 0, glow: 0 },
-    neon:    { opacity: 1, stroke: 0.8, density: 1.1, saturation: 0.95, glow: 1.4 },
-    drift:   { opacity: 0.6, stroke: 0.6, density: 0.9, speed: 0.4, motion: 1.8 },
-    dense:   { opacity: 0.85, stroke: 0.5, density: 1.8, speed: 1.3 },
+    whisper: { opacity: 0.34, stroke: 0.55, density: 0.52, scale: 0.65, motion: 0.55, saturation: 0.12 },
+    ink:     { opacity: 0.9, stroke: 1.5, density: 0.8, scale: 1.1, motion: 0.8, saturation: 0, angle: 352 },
+    neon:    { opacity: 0.85, stroke: 0.8, density: 1.1, scale: 0.8, motion: 1.45, saturation: 0.65, glow: 0.8, phase: 0.5 },
+    drift:   { opacity: 0.62, stroke: 0.85, density: 0.68, scale: 1.3, speed: 0.28, motion: 1.6, phase: 1.2, angle: 8 },
+    dense:   { opacity: 0.82, stroke: 1.25, density: 1.7, scale: 1.15, speed: 0.62, motion: 0.7, phase: 0.65, angle: 355 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1153,115 +1124,83 @@ function describeForAI({ pieceName, values }) {
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    extraControls: [
-      { name: 'glyphSet', label: 'Glyph set', type: 'select', options: ['ascii', 'binary', 'kana'], default: 'ascii', category: 'form' },
-    ],
-    // 125-150: the open band past puddle (112/138), differentiated on form
-    // and ink coverage rather than colour — see ROADMAP.md's
-    // collection-constraints table. Classic phosphor-green reading at low
-    // saturation so it doesn't read as a straight puddle clone.
-    defaults: { hue: 132, hueB: 145, saturation: 0.55, colorMode: 'gradient', colorA: '#00ff6a', colorB: '#33ff9e' },
+    defaults: { hue: 12, hueB: 38, saturation: 0.3, colorMode: 'gradient', colorA: '#c88d7e', colorB: '#e8d8bd', opacity: 0.9, stroke: 1.1, speed: 0.55 },
   });
   const currentValues = baked || panel.values;
-
-  let texts = [];
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    texts = [];
+    polygons = [];
+    travel += dt * values.speed * 0.065;
     const W = canvas.width;
     const H = canvas.height;
+    const cx = W * 0.64;
+    const cy = H * 0.53;
+    const theta = values.angle * Math.PI / 180;
+    const ct = Math.cos(theta), st = Math.sin(theta);
+    const columns = Math.max(16, Math.round(94 * values.density));
+    const rows = Math.max(4, Math.round(15 * values.density));
+    const breadth = H * (0.065 + values.scale * 0.095);
+    const depth = H * (0.045 + values.motion * 0.18);
+    const gap = H * 0.029;
+    const crease = 0.52 + Math.sin(travel * 0.7) * 0.09;
+    const advance = (travel * columns) % 1;
 
-    const fontSize = BASE_FONT * Math.max(0.3, values.scale);
-    ctx.font = `${fontSize}px ${FONT_STACK}`;
-    // Real per-glyph measurement, not a hardcoded ratio — required by the
-    // brief and correct for whatever monospace the OS actually resolves.
-    const glyphW = ctx.measureText('0').width || fontSize * 0.6;
-    const cellH = fontSize * 1.15;
-    // density's convention (CONTRIBUTING "Density convention") is a count
-    // derived from the control; here it's column count via cell width, so a
-    // higher density packs more, narrower columns rather than resizing a
-    // persistent array — there is no persistent array, everything below is
-    // recomputed from col/row indices each frame.
-    const cellW = glyphW * 2.1 / Math.max(0.2, values.density);
-    const cols = Math.max(3, Math.ceil(W / cellW));
-    const totalRows = Math.ceil(H / cellH) + TRAIL_LEN + 4;
+    // Two sampled surfaces share the same cut. All four rectangle corners
+    // are transformed here, so Canvas and SVG receive identical geometry.
+    for (let band = 0; band < 2; band++) {
+      const side = band === 0 ? -1 : 1;
+      for (let col = 0; col < columns; col++) {
+        const u = (col + advance) / columns;
+        const d = u - crease;
+        const roundedCrease = Math.sqrt(d * d + 0.0008);
+        const ridge = 1 - roundedCrease / 0.7;
+        const cut = H * 0.65 - depth * ridge;
+        const slope = depth * d / (0.7 * roundedCrease * W * 0.95);
+        const tilt = Math.atan(slope);
+        const ca = Math.cos(tilt), sa = Math.sin(tilt);
+        const foldOffset = values.phase * (band === 0 ? 1 : -1);
+        const facing = 0.5 + 0.5 * Math.sin(u * 8 - travel * 1.8 + foldOffset);
+        const width = breadth * (0.55 + 0.45 * facing);
+        const edge = Math.min(1, u * 13, (1 - u) * 20);
+        const x0 = W * (0.23 + u * 0.95);
+        const markWidth = W * 0.95 / columns * (0.3 + values.stroke * 0.3);
 
-    const glyphs = GLYPH_SETS[values.glyphSet] || GLYPH_SETS.ascii;
-    const churnBucket = Math.floor(elapsed * values.motion * CHURN_PER_SEC);
-
-    const theta = (values.angle * Math.PI) / 180;
-    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-    // SVG export ignores `angle` for this piece too (see ROADMAP.md, "Known
-    // limitations, accepted") — path/text positions below are recorded in
-    // the rotated canvas space, same accepted gap as contour-grid/meridian/
-    // tether.
-    ctx.save();
-    ctx.translate(W / 2, H / 2);
-    ctx.rotate(theta);
-    ctx.translate(-W / 2, -H / 2);
-
-    const lightBase = values.invert ? 0.28 : 0.6;
-    const headLight = Math.min(0.97, lightBase + 0.35);
-
-    for (let col = 0; col < cols; col++) {
-      const x = col * cellW + cellW / 2;
-      // Golden-ratio fractional offset per column, not Math.random(): pure
-      // function of `col` alone, so it's identical on every frame and every
-      // reload without any stored/seeded state.
-      const colSeed = (col * 0.6180339887) % 1;
-      const headRowF = elapsed * values.speed * ROWS_PER_SEC + colSeed * totalRows + values.phase * cols * 0.5;
-      const headRow = Math.floor(headRowF % totalRows);
-
-      for (let i = 0; i < TRAIL_LEN; i++) {
-        const row = headRow - i;
-        if (row < 0) continue;
-        let y = row * cellH + cellH;
-        if (y > H + cellH) continue;
-
-        const gi = hash(col, row, churnBucket) % glyphs.length;
-        const ch = glyphs[gi];
-
-        let px = x;
-        let sizeMult = 1;
-
-        const isHead = i === 0;
-        const fade = 1 - i / TRAIL_LEN;
-        const alpha = values.opacity * (isHead ? 1 : fade * fade);
-        const light = isHead ? headLight : Math.max(0.04, lightBase * fade);
-        const f01 = isHead ? 1 : Math.max(0, 1 - i / TRAIL_LEN);
-        const stop = paletteHsl(values, f01);
-        const [r, g, b] = hslToRgb(stop.h, stop.s, light);
-        const cellSize = fontSize * sizeMult;
-
-        if (values.glow > 0 && isHead) {
-          ctx.font = `${cellSize * (1 + values.glow * 0.4)}px ${FONT_STACK}`;
-          ctx.globalAlpha = values.glow * 0.35;
-          ctx.fillStyle = `rgb(${r},${g},${b})`;
-          ctx.fillText(ch, px, y);
-          ctx.globalAlpha = 1;
+        for (let row = 0; row < rows; row++) {
+          const v = (row + 0.5) / rows;
+          const y0 = cut + side * (gap + width * v);
+          const markHeight = width / rows * (0.42 + values.scale * 0.25);
+          const points = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => {
+            const lx = sx * markWidth / 2, ly = sy * markHeight / 2;
+            const x = x0 + lx * ca - ly * sa - cx;
+            const y = y0 + lx * sa + ly * ca - cy;
+            return [cx + x * ct - y * st, cy + x * st + y * ct];
+          });
+          const stop = paletteHsl(values, band === 0 ? v * 0.26 : 0.7 + v * 0.3);
+          const highlight = Math.exp(-d * d / 0.004);
+          const light = values.invert
+            ? 0.24 + facing * 0.15
+            : 0.47 + band * 0.17 + facing * 0.1 + highlight * 0.1;
+          const [r, g, b] = hslToRgb(stop.h, stop.s, light);
+          const color = `rgb(${r},${g},${b})`;
+          const alpha = values.opacity * edge * (0.68 + facing * 0.32) * (1 - v * 0.15);
+          ctx.beginPath();
+          ctx.moveTo(...points[0]);
+          for (let i = 1; i < points.length; i++) ctx.lineTo(...points[i]);
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.globalAlpha = alpha;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = values.glow * 7;
+          ctx.fill();
+          polygons.push({ points, fill: color, opacity: alpha });
         }
-
-        ctx.font = `${cellSize}px ${FONT_STACK}`;
-        ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
-        ctx.fillText(ch, px, y);
-        // `stroke` has no lineWidth to hook for a filled glyph mark — the
-        // glyph-native reading is an outline pass whose width scales with
-        // it, thickening the character itself rather than a path.
-        if (values.stroke > 0) {
-          ctx.lineWidth = values.stroke * 1.1;
-          ctx.strokeStyle = `rgba(${r},${g},${b},${alpha * 0.6})`;
-          ctx.strokeText(ch, px, y);
-        }
-
-        texts.push({ x: px, y, ch, size: cellSize, fontFamily: FONT_STACK });
       }
     }
-
-    ctx.restore();
-
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
   }
 
   const loop = createLoop({
@@ -1273,11 +1212,7 @@ function describeForAI({ pieceName, values }) {
 
   document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
   document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
-  // Glyph marks have no line geometry, so `paths` stays empty here and the
-  // text elements carry the export instead — see shared/export.js's
-  // `texts` option, added for this piece and additive/no-op for the other
-  // fourteen, which never pass it.
-  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg([], { width: canvas.width, height: canvas.height, texts }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg([], { width: canvas.width, height: canvas.height, polygons }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
     bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
   });

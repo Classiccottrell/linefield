@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — globe</title>
+<title>linefield — lacuna</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.4,"colorMode":"gradient","colorA":"#e6316f","colorB":"#f2154a","hue":340,"hueB":355,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":18,"rotY":0};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.24,"colorMode":"gradient","colorA":"#7aa8b8","colorB":"#b7d4d7","hue":198,"hueB":224,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -905,74 +905,6 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
-// --- inlined: ../../shared/project.js ---
-// shared/project.js
-// 3D -> 2D projection for pieces that want perspective geometry.
-//
-// Shaped as an extension point: behaviour is configured through an options
-// bag on a camera object, so future capability (roll, camera position, an
-// orthographic mode) arrives as a new option that existing callers ignore,
-// rather than a changed signature at every call site.
-//
-// Deliberately absent, by choice rather than oversight: depth sorting and
-// occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
-
-// Rotate a point: yaw about Y, pitch about X, then roll about Z.
-function rotatePoint(x, y, z, { tilt = 0, yaw = 0, roll = 0 } = {}) {
-  const cyaw = Math.cos(yaw);
-  const syaw = Math.sin(yaw);
-  const rx = x * cyaw - z * syaw;
-  let rz = x * syaw + z * cyaw;
-
-  const ct = Math.cos(tilt);
-  const st = Math.sin(tilt);
-  const ry = y * ct - rz * st;
-  rz = y * st + rz * ct;
-
-  const cr = Math.cos(roll);
-  const sr = Math.sin(roll);
-  return { x: rx * cr - ry * sr, y: rx * sr + ry * cr, z: rz };
-}
-
-function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 } = {}) {
-  const opt = { tilt, yaw, roll, fov, cx, cy };
-
-  function project(x, y, z) {
-    const r = rotatePoint(x, y, z, opt);
-    const denom = opt.fov + r.z;
-    // Near plane sits at 20% of the fov ahead of the lens (not at the lens
-    // itself), capping scale at 1/0.2 = 5x. Without this, points just past
-    // the lens (denom -> 0) blow up toward arbitrary magnification, which
-    // canvas draw calls and exported paths share the same coordinates for —
-    // canvas just clips silently at the screen edge, export doesn't. A
-    // blown-up point lands off the visible frame whenever the near-plane
-    // crossing is off the camera's optical axis, which any meaningful tilt
-    // guarantees; a tilt at or near zero (camera roughly in the plane of
-    // the geometry) is the degenerate exception where a dropped point can
-    // still be near-frame, and dropping it can visibly change the render.
-    // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
-    // steps) at which event-horizon's SVG export at Scale 2, an angle
-    // exposing the near plane, has no coordinate over magnitude 5000. At
-    // or beyond the near plane there is no meaningful projection; scale 0
-    // is the caller's signal to skip this point.
-    const nearPlane = opt.fov * 0.2;
-    if (denom <= nearPlane) return { x: 0, y: 0, scale: 0 };
-    const scale = opt.fov / denom;
-    return { x: opt.cx + r.x * scale, y: opt.cy + r.y * scale, scale };
-  }
-
-  return {
-    project,
-    projectPath(points) {
-      return points.map((p) => project(p[0], p[1], p[2]));
-    },
-    set(partial) {
-      Object.assign(opt, partial);
-    },
-  };
-}
-
-
 // --- inlined: ../../shared/export.js ---
 // shared/export.js
 
@@ -1156,8 +1088,7 @@ function describeForAI({ pieceName, values }) {
 
 
 
-
-  const PIECE_ID = 'globe';
+  const PIECE_ID = 'lacuna';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1168,29 +1099,16 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // Ring/meridian counts derive per frame from density — no persistent
-  // array. SEG_* are per-curve segment resolution, for SVG export fidelity
-  // and smooth circles at rest.
-  const BASE_LATS = 10;  // latitude rings, excluding the two poles
-  const BASE_LONS = 16;  // longitude meridians, pole to pole
-  const SEG_LAT = 64;
-  const SEG_LON = 48;
-  const MAX_LAT_DEG = 82; // stops short of the poles so a ring never degenerates to a point
-  const FOV = 650;
+  const BASE_FRONTS = 18;
+  const SEG = 88;
   let paths = [];
 
-  // Distinct from the three orb pieces (orbital-veil, accretion,
-  // event-horizon), which are all flat screen-space discs squashed by a
-  // tilt factor. globe is a real 3D sphere — latitude small-circles at
-  // radius R*cos(lat) plus longitude great-circles converging at the
-  // poles, both walked through shared/project.js's perspective camera,
-  // same as wireframe-lattice. Structure, not colour, is the differentiator.
   const PRESETS = {
-    whisper: { opacity: 0.28, stroke: 1, density: 0.55, saturation: 0.08, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.6, density: 0.75, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.9, stroke: 0.85, density: 1.1, saturation: 0.95, glow: 1.1 },
-    drift:   { opacity: 0.5, stroke: 0.8, density: 0.65, speed: 0.3, motion: 1.7 },
-    dense:   { opacity: 0.62, stroke: 0.6, density: 1.8, speed: 0.7, glow: 0 },
+    whisper: { opacity: 0.18, stroke: 0.45, density: 0.55, saturation: 0.05, glow: 0 },
+    ink:     { opacity: 0.88, stroke: 1.25, density: 0.72, saturation: 0, angle: 18 },
+    neon:    { opacity: 0.72, stroke: 0.72, density: 1.12, saturation: 0.68, glow: 1.05 },
+    drift:   { opacity: 0.34, stroke: 0.55, density: 0.68, speed: 0.28, motion: 1.55, phase: 0.7 },
+    dense:   { opacity: 0.58, stroke: 0.48, density: 1.65, speed: 0.62, angle: 338 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1198,148 +1116,70 @@ function describeForAI({ pieceName, values }) {
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    extraControls: [
-      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 18, category: 'interaction' },
-      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
-    ],
-    // Hue 340/355: the biggest open gap left in the hue wheel (ROADMAP's
-    // collection-constraints table) is 305->370(=10), the arc past
-    // orbital-veil's 305/330 stop pair and short of accretion's 10. Picked
-    // deliberately inside that gap rather than measured — same caveat
-    // ROADMAP records for puddle's hue. Tagged 3d/geometric, not orb, so
-    // the gallery doesn't re-collapse globe into the ring cluster it was
-    // built to read apart from.
-    defaults: { hue: 340, hueB: 355, saturation: 0.4, colorMode: 'gradient', colorA: '#e6316f', colorB: '#f2154a' },
+    defaults: { hue: 198, hueB: 224, saturation: 0.24, colorMode: 'gradient', colorA: '#7aa8b8', colorB: '#b7d4d7' },
   });
   const currentValues = baked || panel.values;
-  const camera = createCamera({ fov: FOV });
-  // Draws one already-projected polyline. Walks in order and breaks the
-  // run at any point behind the camera (scale <= 0) instead of filtering —
-  // a skipped interior point must start a new subpath, not get bridged
-  // over. Each segment is stroked individually so its own average `scale`
-  // (the projection's perspective divisor — larger is nearer) can drive a
-  // per-segment alpha: the far hemisphere recedes instead of reading flat,
-  // which is the depth cue a lat/long wire mesh needs to read as a surface
-  // rather than a mandala.
-  function strokeRun(pts, values, lineWidth, rgb) {
-    const run = pts.filter((p) => p.scale > 0);
-    // Still record broken sub-runs for SVG fidelity.
-    let cur = [];
-    for (const p of pts) {
-      if (p.scale > 0) cur.push([p.x, p.y]);
-      else if (cur.length >= 2) { paths.push(cur); cur = []; }
-      else cur = [];
-    }
-    if (cur.length >= 2) paths.push(cur);
-    if (run.length < 2) return;
-
-    const [r, g, b] = rgb;
-    ctx.lineWidth = lineWidth;
-    for (let i = 0; i < run.length - 1; i++) {
-      // A point right at the run's seam (scale <= 0 neighbour skipped) can
-      // still be drawn against the next in-front point — fine, since both
-      // endpoints here are already filtered to scale > 0.
-      const a = run[i], b2 = run[i + 1];
-      const avgScale = (a.scale + b2.scale) / 2;
-      const depthAlpha = Math.max(0.22, Math.min(1, avgScale * 0.72));
-      const alpha = values.opacity * depthAlpha;
-      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
-        ctx.globalAlpha = values.glow * 0.25 * depthAlpha;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b2.x, b2.y);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        ctx.lineWidth = lineWidth;
-      }
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b2.x, b2.y);
-      ctx.stroke();
-    }
-  }
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     paths = [];
-    // R stays under 0.8*FOV even at Scale's max (2), so the near-plane cap
-    // in shared/project.js (20% of fov ahead of the lens) never silently
-    // swallows the sphere's front cap: 0.35*2 = 0.7 < 0.8.
-    const R = FOV * 0.35 * values.scale;
-    const lats = Math.max(3, Math.round(BASE_LATS * values.density));
-    const lons = Math.max(4, Math.round(BASE_LONS * values.density));
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W * 0.62;
+    const cy = H * 0.48;
+    const theta = values.angle * Math.PI / 180;
+    const fronts = Math.max(4, Math.round(BASE_FRONTS * values.density));
     const light = values.invert ? 0.35 : 0.62;
-    const baseWidth = 0.3 + values.stroke * 1.0;
+    const baseWidth = 0.35 + values.stroke * 0.9;
 
-    // Speed drives the continuous spin — the piece's headline motion, so a
-    // spinning globe survives Speed 0 as a still frame rather than going
-    // inert (the read is just frozen, not gone). Motion drives an
-    // independent axial wobble (precession), a small oscillation on tilt
-    // distinct from the yaw spin — Motion 0 flattens it to a fixed tilt,
-    // Speed 0 leaves it oscillating; neither is a proxy for the other.
-    const spin = elapsed * values.speed * 0.35;
-    const wobble = Math.sin(elapsed * values.motion * 0.22) * 6 * (Math.PI / 180);
-
-    camera.set({
-      tilt: (values.rotX * Math.PI) / 180 + wobble,
-      yaw: (values.rotY * Math.PI) / 180 + spin,
-      roll: (values.angle * Math.PI) / 180,
-      cx: canvas.width / 2,
-      cy: canvas.height / 2,
-    });
-
-    // Phase RESTRUCTURES the latitude spacing rather than translating the
-    // whole mesh (translation on a rotationally symmetric, already-spinning
-    // figure is imperceptible — see event-horizon's own note on why it
-    // warps radius instead of yaw). warpLat is the identity at Phase 0 and
-    // stays monotonic in v across [-1, 1], so rings never cross; increasing
-    // Phase bunches rings toward the equator.
-    const warpLat = (v) => Math.sign(v) * Math.pow(Math.abs(v), 1 + values.phase * 1.5);
-
-    // --- Latitude rings (small circles at fixed y, radius R*cos(lat)) ---
-    for (let i = 0; i < lats; i++) {
-      const u = lats === 1 ? 0.5 : i / (lats - 1);
-      const v = warpLat(u * 2 - 1); // -1..1
-      const latDeg = v * MAX_LAT_DEG;
-      const lat = (latDeg * Math.PI) / 180;
-      const ringR = Math.cos(lat);
-      const y = Math.sin(lat);
-
-      const f = (i + 0.5) / lats;
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
-
-      const pts = [];
-      for (let s = 0; s <= SEG_LAT; s++) {
-        const a = (s / SEG_LAT) * Math.PI * 2;
-        const dx = Math.cos(a) * ringR;
-        const dz = Math.sin(a) * ringR;
-        pts.push([dx * R, y * R, dz * R]);
+    for (let front = 0; front < fronts; front++) {
+      const segments = [];
+      let current = [];
+      const phase = front * 0.71;
+      for (let s = 0; s <= SEG; s++) {
+        const u = s / SEG;
+        const a = (-0.9 + u * 1.8) * Math.PI;
+        const drift = elapsed * values.motion * 0.08;
+        const wave = Math.sin(a * 3 + phase - elapsed * values.speed * 0.9 + values.phase * Math.PI * 2);
+        const radius = (70 + front * 15) * values.scale + wave * (5 + front * 0.12);
+        const keep = Math.sin(a * 2.3 + front * 0.8 + drift) > -0.18;
+        if (!keep) {
+          if (current.length > 1) segments.push(current);
+          current = [];
+          continue;
+        }
+        const ex = Math.cos(a) * radius;
+        const ey = Math.sin(a) * radius * 0.58;
+        const x = cx + ex * Math.cos(theta) - ey * Math.sin(theta);
+        const y = cy + ex * Math.sin(theta) + ey * Math.cos(theta);
+        current.push([x, y]);
       }
-      strokeRun(camera.projectPath(pts), values, baseWidth, [r, g, b]);
-    }
+      if (current.length > 1) segments.push(current);
 
-    // --- Longitude meridians (great circles through both poles) ---
-    for (let j = 0; j < lons; j++) {
-      const lon = (j / lons) * Math.PI * 2;
-      const f = j / lons;
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
-
-      const pts = [];
-      for (let s = 0; s <= SEG_LON; s++) {
-        const lat = (s / SEG_LON) * Math.PI - Math.PI / 2; // -90..90 (pole to pole)
-        const cLat = Math.cos(lat);
-        const dx = Math.cos(lon) * cLat;
-        const dy = Math.sin(lat);
-        const dz = Math.sin(lon) * cLat;
-        pts.push([dx * R, dy * R, dz * R]);
+      const stop = paletteHsl(values, fronts === 1 ? 0.5 : front / (fronts - 1));
+      const [r, g, b] = hslToRgb(stop.h, stop.s, light);
+      const frontAlpha = values.opacity * (0.42 + 0.58 * (front / fronts));
+      for (const segment of segments) {
+        const meanX = segment.reduce((sum, point) => sum + point[0], 0) / segment.length;
+        const quiet = Math.max(0.16, Math.min(1, (meanX / W + 0.08) / 0.92));
+        const alpha = frontAlpha * quiet;
+        ctx.beginPath();
+        ctx.moveTo(segment[0][0], segment[0][1]);
+        for (let i = 1; i < segment.length; i++) ctx.lineTo(segment[i][0], segment[i][1]);
+        ctx.lineCap = 'round';
+        ctx.lineWidth = baseWidth;
+        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+        if (values.glow > 0 && alpha > values.opacity * 0.46) {
+          ctx.globalAlpha = values.glow * 0.18;
+          ctx.lineWidth = baseWidth + values.glow * 2.4;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        ctx.stroke();
+        paths.push(segment);
       }
-      strokeRun(camera.projectPath(pts), values, baseWidth * 0.85, [r, g, b]);
     }
 
   }
@@ -1355,8 +1195,7 @@ function describeForAI({ pieceName, values }) {
   document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
   document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
-    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
-      .catch((err) => console.error('bakeHtml failed', err));
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
   });
   document.getElementById('btn-source')?.addEventListener('click', () => {
     exportSource().catch((err) => console.error('exportSource failed', err));

@@ -29,7 +29,7 @@ export function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-export function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
+export function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -38,13 +38,25 @@ export function exportSvg(paths, { width = 800, height = 600, texts = [] } = {})
     .join('\n');
 
   const textEls = texts
-    .map(({ x, y, ch, size, fontFamily }) => {
+    .map(({ x, y, ch, size, fontFamily, anchor, baseline, rotation, strokeWidth }) => {
       const safeCh = String(ch).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${fontFamily || 'monospace'}" font-size="${size.toFixed(2)}" fill="black">${safeCh}</text>`;
+      const safeFont = String(fontFamily || 'monospace').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const placement = `${['start', 'middle', 'end'].includes(anchor) ? ` text-anchor="${anchor}"` : ''}${['central', 'middle', 'alphabetic', 'hanging'].includes(baseline) ? ` dominant-baseline="${baseline}"` : ''}${Number.isFinite(rotation) ? ` transform="rotate(${rotation} ${x} ${y})"` : ''}`;
+      const stroke = Number.isFinite(strokeWidth) && strokeWidth > 0 ? ` stroke="black" stroke-width="${strokeWidth}"` : '';
+      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${safeFont}" font-size="${size.toFixed(2)}" fill="black"${placement}${stroke}>${safeCh}</text>`;
     })
     .join('\n');
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}${polylines && textEls ? '\n' : ''}${textEls}\n</svg>`;
+  // Filled-mark pieces supply already-transformed corners; existing path
+  // and text callers retain their exact serialization when this is empty.
+  const polygonEls = polygons.map(({ points, fill = 'black', opacity = 1 }) => {
+    const pointsAttr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
 }

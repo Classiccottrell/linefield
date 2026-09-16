@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — stock market</title>
+<title>linefield — parallax</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.5,"colorMode":"gradient","colorA":"#9fd34a","colorB":"#d3654a","hue":78,"hueB":92,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"barWidth":0.62};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.3,"colorMode":"gradient","colorA":"#bd7f94","colorB":"#e0b26f","hue":344,"hueB":24,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1088,7 +1088,7 @@ function describeForAI({ pieceName, values }) {
 
 
 
-  const PIECE_ID = 'stock-market';
+  const PIECE_ID = 'parallax';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1099,40 +1099,16 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // The library's first filled-rectangle mark (see CONTRIBUTING.md, "The 16
-  // shared controls" / ROADMAP.md's collection-constraints note on this
-  // piece). Deliberately NOT a literal chart widget: no axis, no gridlines,
-  // no price labels, no single fixed baseline. Several independent tracks
-  // of marching bars, each centred on its own mid-line and growing up or
-  // down from it, so the composition reads as generative rhythm — rise and
-  // fall, buy and sell — rather than a finance-app screenshot. This is the
-  // same move `globe` made for "sphere without being literal continents":
-  // keep the structural cue (discrete bars, up/down state, marching motion)
-  // and drop everything that would anchor it to a specific instrument.
-  function hash(a, b, c) {
-    let h = (a * 374761393 + b * 668265263 + c * 2246822519) | 0;
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    return (h ^ (h >>> 16)) >>> 0;
-  }
-  // Deterministic pseudo-random in [0,1) from an integer hash — no
-  // Math.random anywhere, same discipline as matrix-code/chain-haze, so
-  // thumbnail capture (pinned clock) and the change-detector gates stay
-  // byte-identical against untouched source.
-  function rand01(a, b, c) {
-    return (hash(a, b, c) % 100000) / 100000;
-  }
-
-  const BASE_TRACKS = 4;
-  const BASE_COLS_PER_TRACK = 22;
-  const MARCH_RATE = 1.6; // whole bars/sec a track advances at speed=1
-  const BUCKET_SEC = 0.9; // how often a bar's height/state re-rolls, scaled by motion
+  const BASE_FRONTS = 18;
+  const SEG = 88;
+  let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.3, stroke: 0.4, density: 0.6, saturation: 0.12, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.4, density: 0.9, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.95, stroke: 0.6, density: 1.1, saturation: 0.9, glow: 1.3 },
-    drift:   { opacity: 0.6, stroke: 0.7, density: 0.85, speed: 0.35, motion: 1.6 },
-    dense:   { opacity: 0.75, stroke: 0.5, density: 1.9, speed: 1.2 },
+    whisper: { opacity: 0.18, stroke: 0.45, density: 0.48, saturation: 0.05, glow: 0 },
+    ink:     { opacity: 0.88, stroke: 1.25, density: 0.7, saturation: 0, angle: 28 },
+    neon:    { opacity: 0.72, stroke: 0.72, density: 1.08, saturation: 0.62, glow: 1.05 },
+    drift:   { opacity: 0.34, stroke: 0.55, density: 0.65, speed: 0.24, motion: 1.55, phase: 0.7 },
+    dense:   { opacity: 0.58, stroke: 0.48, density: 1.58, speed: 0.62, angle: 338 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1140,112 +1116,56 @@ function describeForAI({ pieceName, values }) {
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    extraControls: [
-      // Bar width as a fraction of its column slot — 'form', matching
-      // chain-haze's linkAspect precedent for a piece-specific shape knob.
-      { name: 'barWidth', label: 'Bar width', type: 'range', min: 0.3, max: 0.9, step: 0.01, default: 0.62, category: 'form' },
-    ],
-    // 78/92: sits in the open span between synapse (54) and chain-haze (96)
-    // that ROADMAP.md's collection-constraints table leaves free — the
-    // 95-135 band it calls out is nearly claimed by puddle/matrix-code/
-    // chain-haze already. Differentiated on form (filled rectangles, the
-    // library's first) and aimed at the 0.11-0.19 ink-coverage band the
-    // table flags as empty, not on a wide hue gap.
-    defaults: { hue: 78, hueB: 92, saturation: 0.5, colorMode: 'gradient', colorA: '#9fd34a', colorB: '#d3654a' },
+    defaults: { hue: 344, hueB: 24, saturation: 0.3, colorMode: 'gradient', colorA: '#bd7f94', colorB: '#e0b26f' },
   });
   const currentValues = baked || panel.values;
-
-  let paths = [];
-
-  // Closed 4-corner polyline for SVG export — a rect has no path primitive
-  // in exportSvg's polyline-only contract, so it's sampled the same way
-  // chain-haze samples its ellipses.
-  function rectPath(x, y, w, h) {
-    return [[x, y], [x + w, y], [x + w, y + h], [x, y + h], [x, y]];
-  }
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     paths = [];
-    const W = canvas.width;
-    const H = canvas.height;
-
-    const tracks = Math.max(2, Math.round(BASE_TRACKS * Math.max(0.4, values.scale)));
-    // density's convention: more, narrower columns per track, not a
-    // resized persistent array — there is no persistent array, every bar
-    // is recomputed from track/col/bucket indices each frame.
-    const colsPerTrack = Math.max(6, Math.round(BASE_COLS_PER_TRACK * values.density));
-    const colW = W / colsPerTrack;
-    const barW = colW * values.barWidth;
-
-    const theta = (values.angle * Math.PI) / 180;
-    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-
-    ctx.save();
-    ctx.translate(W / 2, H / 2);
-    ctx.rotate(theta);
-    ctx.translate(-W / 2, -H / 2);
-
-    const bucket = Math.floor(elapsed * values.motion / BUCKET_SEC);
-    // `phase` offsets the marching sequence along x (static shift); `speed`
-    // marches whole columns over time; `motion` drives the independent
-    // re-roll clock above — none gates the others at zero.
-    const marchCols = elapsed * values.speed * MARCH_RATE + values.phase * colsPerTrack * 0.5;
-
-    for (let t = 0; t < tracks; t++) {
-      const tf = tracks === 1 ? 0.5 : t / (tracks - 1);
-      const midY = H * (0.18 + 0.64 * tf);
-      const maxBarH = (H / tracks) * 0.42 * Math.max(0.2, values.scale);
-
-      for (let col = -1; col < colsPerTrack + 1; col++) {
-        const globalCol = col + Math.floor(marchCols);
-        const localX = ((col - (marchCols % 1) + colsPerTrack) % colsPerTrack) * colW;
-
-        // Two consecutive re-rolls hashed by (track, globalCol, bucket) and
-        // its predecessor give a continuous-feeling walk without storing
-        // any state: the "previous price" is just bucket-1 of the same
-        // deterministic function, not a remembered value.
-        const prev = rand01(t, globalCol, bucket - 1);
-        const now = rand01(t, globalCol, bucket);
-        const delta = now - prev; // signed: >0 rise ("buy"), <0 fall ("sell")
-        const up = delta >= 0;
-        const mag = Math.min(1, Math.abs(delta) * 2.2 + 0.12);
-
-        let barH = maxBarH * mag;
-        let x = localX + (colW - barW) / 2;
-        let y = up ? midY - barH : midY;
-        let w = barW;
-
-
-        const f01 = up ? 0.15 : 0.85;
-        const { h, s } = paletteHsl(values, f01);
-        const light = values.invert ? (up ? 0.32 : 0.42) : (up ? 0.62 : 0.55);
-        const [r, g, b] = hslToRgb(h, s, light);
-        const alpha = values.opacity * (0.55 + mag * 0.45);
-
-        if (values.glow > 0) {
-          ctx.fillStyle = `rgba(${r},${g},${b},${values.glow * 0.28 * alpha})`;
-          const pad = values.glow * 3;
-          ctx.fillRect(x - pad, y - pad, w + pad * 2, barH + pad * 2);
-        }
-
-        ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
-        ctx.fillRect(x, y, w, barH);
-
-        if (values.stroke > 0) {
-          ctx.lineWidth = values.stroke * 1.6;
-          ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(1, alpha * 1.3)})`;
-          ctx.strokeRect(x, y, w, barH);
-        }
-
-        paths.push(rectPath(x, y, w, barH));
+    const W = canvas.width, H = canvas.height;
+    const theta = values.angle * Math.PI / 180;
+    const lines = Math.max(8, Math.round(24 * values.density));
+    const light = values.invert ? 0.35 : 0.62;
+    const width = 0.35 + values.stroke * 0.9;
+    const lensX = W * (0.58 + Math.sin(elapsed * values.motion * 0.16 + values.phase) * 0.035);
+    const lensY = H * 0.5;
+    const sampleCount = Math.max(26, Math.round(42 * values.scale));
+    for (let row = 0; row < lines; row++) {
+      const offset = (row - lines / 2) * (H / lines) * 0.82;
+      const points = [];
+      for (let i = 0; i <= sampleCount; i++) {
+        const t = i / sampleCount;
+        let x = -W * 0.15 + t * W * 1.3;
+        let y = H * 0.18 + t * H * 0.72 + offset;
+        const rx = (x - lensX) / (190 * values.scale);
+        const ry = (y - lensY) / (125 * values.scale);
+        const d2 = rx * rx + ry * ry;
+        if (d2 < 0.62) { if (points.length > 1) paths.push(points.splice(0)); continue; }
+        const bend = Math.exp(-d2 * 1.4) * (1.15 + 0.25 * Math.sin(elapsed * values.motion + values.phase * Math.PI));
+        x += rx * bend * 95;
+        y += ry * bend * 62;
+        const tx = (x - W / 2) * Math.cos(theta) - (y - H / 2) * Math.sin(theta) + W / 2;
+        const ty = (x - W / 2) * Math.sin(theta) + (y - H / 2) * Math.cos(theta) + H / 2;
+        points.push([tx, ty]);
       }
+      if (points.length > 1) paths.push(points);
     }
-
-    ctx.restore();
-
+    for (let i = 0; i < paths.length; i++) {
+      const path = paths[i];
+      const mid = path[Math.floor(path.length / 2)];
+      const dist = Math.hypot((mid[0] - lensX) / 220, (mid[1] - lensY) / 150);
+      const rim = Math.max(0.18, Math.min(1, 1.25 - Math.abs(dist - 1.05) * 1.5));
+      const stop = paletteHsl(values, i / Math.max(1, paths.length - 1));
+      const [r, g, b] = hslToRgb(stop.h, stop.s, light);
+      ctx.beginPath(); ctx.moveTo(path[0][0], path[0][1]);
+      for (let j = 1; j < path.length; j++) ctx.lineTo(path[j][0], path[j][1]);
+      ctx.lineCap = 'round'; ctx.lineWidth = width;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity * rim})`;
+      if (values.glow > 0 && rim > 0.7) { ctx.globalAlpha = values.glow * 0.16; ctx.lineWidth = width + values.glow * 2.5; ctx.stroke(); ctx.globalAlpha = 1; }
+      ctx.stroke();
+    }
   }
 
   const loop = createLoop({

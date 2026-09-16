@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — puddle</title>
+<title>linefield — driftwork</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.42,"colorMode":"gradient","colorA":"#3ecf7e","colorB":"#7fe0a8","hue":112,"hueB":138,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":0.55,"stroke":0.9,"opacity":0.88,"saturation":0.16,"colorMode":"gradient","colorA":"#a6a1b8","colorB":"#beb3c6","hue":250,"hueB":278,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -937,7 +937,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -952,7 +952,16 @@ function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
     })
     .join('\n');
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}${polylines && textEls ? '\n' : ''}${textEls}\n</svg>`;
+  // Filled-mark pieces supply already-transformed corners; existing path
+  // and text callers retain their exact serialization when this is empty.
+  const polygonEls = polygons.map(({ points, fill = 'black', opacity = 1 }) => {
+    const pointsAttr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
 }
@@ -1088,7 +1097,7 @@ function describeForAI({ pieceName, values }) {
 
 
 
-  const PIECE_ID = 'puddle';
+  const PIECE_ID = 'driftwork';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1099,19 +1108,16 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // Nested closed curves are derived each frame, no persistent state — see
-  // "Determinism" note below. Ring count comes from density.
-  const BASE_RINGS = 22;
-  const SEG = 72; // polygon segments per ring, for SVG export fidelity
-  const N_EMITTERS = 6; // interference sources, positions derived from index (no Math.random)
   let paths = [];
+  let travel = 0;
+  let evolution = 0;
 
   const PRESETS = {
-    whisper: { opacity: 0.18, stroke: 0.5, density: 0.4, saturation: 0.12, glow: 0 },
-    ink:     { opacity: 0.95, stroke: 1.3, density: 0.6, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.85, stroke: 0.8, density: 1, saturation: 0.9, glow: 1.1 },
-    drift:   { opacity: 0.3, stroke: 0.55, density: 0.45, speed: 0.3, motion: 1.6, saturation: 0.3 },
-    dense:   { opacity: 0.75, stroke: 0.65, density: 1.7, speed: 0.65, saturation: 0.5, glow: 0 },
+    whisper: { opacity: 0.32, stroke: 0.55, density: 0.52, scale: 0.7, motion: 0.5, saturation: 0.06 },
+    ink:     { opacity: 0.9, stroke: 1.3, density: 0.7, scale: 1.2, saturation: 0, angle: 350, phase: 0.3 },
+    neon:    { opacity: 0.82, stroke: 0.8, density: 1.1, scale: 0.85, saturation: 0.55, glow: 0.8, phase: 0.65 },
+    drift:   { opacity: 0.65, stroke: 0.75, density: 0.72, scale: 1.3, speed: 0.22, motion: 1.6, phase: 1.1 },
+    dense:   { opacity: 0.76, stroke: 0.8, density: 1.65, scale: 0.85, speed: 0.5, angle: 346, phase: 0.45 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1119,132 +1125,79 @@ function describeForAI({ pieceName, values }) {
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    // Puddle takes the one open band in the hue wheel (ROADMAP.md's
-    // collection-constraints table): ~95-135 abuts meridian (166) but
-    // reads as pond/rainwater green rather than crowding it. hueB stays
-    // inside the same band so the gradient's colourfulness-weighted mean
-    // hue doesn't drift into meridian/interference territory.
-    defaults: { hue: 112, hueB: 138, saturation: 0.42, colorMode: 'gradient', colorA: '#3ecf7e', colorB: '#7fe0a8' },
+    defaults: { hue: 250, hueB: 278, saturation: 0.16, colorMode: 'gradient', colorA: '#a6a1b8', colorB: '#beb3c6', opacity: 0.88, stroke: 0.9, speed: 0.55 },
   });
   const currentValues = baked || panel.values;
-
-  // Wave field constants. WAVEK is spatial frequency (radians per px);
-  // CSPEED converts values.speed into a propagation rate. AMP_BASE is per-
-  // emitter displacement amplitude in px before values.scale.
-  const WAVEK = 0.085;
-  const CSPEED = 1.7;
-  const AMP_BASE = 3.4;
-  const EMITTER_RANGE_FRAC = 1.3; // × boundary radius, exponential falloff
-
-  // Emitter positions and phases are derived from index j alone — golden-
-  // angle spacing, no Math.random. Determinism matters here: the build's
-  // thumbnail capture and audit-controls.mjs pin Math.random and manually
-  // step the clock, and a stateless derivation keeps a re-run of `npm run
-  // build` a byte-identical no-op.
-  function emitterBase(j) {
-    const ang = j * 2.399963229728653; // golden angle
-    const rFrac = 0.15 + 0.55 * ((j * 0.6180339887498949) % 1);
-    const phase = j * 1.7;
-    const driftRate = 0.12 + (j % 3) * 0.05;
-    return { ang, rFrac, phase, driftRate };
-  }
-  const EMITTERS = [];
-  for (let j = 0; j < N_EMITTERS; j++) EMITTERS.push(emitterBase(j));
-
-  // The puddle's own irregular, bounded rim — two low-order harmonics on
-  // top of a circle. `rot` slowly turns the harmonics (via values.motion,
-  // never values.speed, so the wave propagation and the boundary wobble
-  // are independently controllable) and `angRot` applies values.angle
-  // mathematically (rotating the harmonic phase), not via ctx.rotate, so
-  // SVG export stays correct — see contour-grid/meridian/tether's
-  // documented "SVG export ignores angle" limitation, which this avoids.
-  function edgeRadius(a, R0, elapsed, values, angRot) {
-    const rot = elapsed * values.motion * 0.05;
-    const aa = a + angRot;
-    return R0 * (1
-      + 0.13 * Math.cos(3 * aa + rot)
-      + 0.07 * Math.cos(5 * aa - rot * 1.6 + 0.7));
-  }
-
-  // Summed interference field at (x, y): genuine interference crests cross
-  // and cancel between independently derived emitters.
-  function waveField(x, y, elapsed, values, emitterPos, range) {
-    let sum = 0;
-    for (const e of emitterPos) {
-      const dx = x - e.x, dy = y - e.y;
-      const d = Math.hypot(dx, dy);
-      const falloff = Math.exp(-d / range);
-      sum += AMP_BASE * values.scale *
-        Math.sin(WAVEK * d - elapsed * values.speed * CSPEED + e.phase + values.phase * Math.PI * 2) *
-        falloff;
-    }
-    return sum;
-  }
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     paths = [];
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const R0 = Math.min(canvas.width, canvas.height) * 0.32 * values.scale;
-    const rings = Math.max(4, Math.round(BASE_RINGS * values.density));
-    const angRot = (values.angle * Math.PI) / 180;
-    const range = R0 * EMITTER_RANGE_FRAC;
-    const emitterPos = EMITTERS.map((e) => {
-      const drift = elapsed * values.motion * e.driftRate * 0.2;
-      const ex = cx + Math.cos(e.ang + angRot + drift) * R0 * e.rFrac;
-      const ey = cy + Math.sin(e.ang + angRot + drift) * R0 * e.rFrac;
-      return { x: ex, y: ey, phase: e.phase };
-    });
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W * 0.6;
+    const cy = H * 0.57;
+    const theta = values.angle * Math.PI / 180;
+    const ct = Math.cos(theta), st = Math.sin(theta);
+    const lanes = Math.max(3, Math.round(12 * Math.sqrt(values.density)));
+    const links = Math.max(16, Math.round(72 * Math.sqrt(values.density)));
+    const unit = Math.min(W / 1280, H / 800);
+    const separation = H * (0.1 + values.scale * 0.105);
+    travel += dt * values.speed * 0.038;
+    evolution += dt * values.motion * 0.12;
 
-    ctx.lineWidth = 0.4 + values.stroke * 0.9;
-    const lineWidth = ctx.lineWidth;
-    const light = values.invert ? 0.35 : 0.6;
-
-    for (let i = 1; i <= rings; i++) {
-      const frac = i / rings;
-      const stop = paletteHsl(values, frac);
-      const [r, g, b] = hslToRgb(stop.h, stop.s, light);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-
-      const pts = [];
-      ctx.beginPath();
-      for (let s = 0; s <= SEG; s++) {
-        const a = (s / SEG) * Math.PI * 2;
-        const base = edgeRadius(a, R0, elapsed, values, angRot) * frac;
-        let x = cx + Math.cos(a) * base;
-        let y = cy + Math.sin(a) * base;
-
-        const disp = waveField(x, y, elapsed, values, emitterPos, range);
-        // Edge damping: the wave dies out against the puddle's own rim
-        // rather than reflecting, so the outermost rings read as a bounded
-        // surface, not an infinite regular grid (the trait the spec calls
-        // out as the difference from `interference`).
-        const edgeDamp = 1 - Math.pow(frac, 6);
-        const rr = base + disp * edgeDamp;
-        x = cx + Math.cos(a) * rr;
-        y = cy + Math.sin(a) * rr;
-
-
-        if (s === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-        pts.push([x, y]);
+    for (let stream = 0; stream < 2; stream++) {
+      const side = stream === 0 ? -1 : 1;
+      const offset = stream * 0.7 + side * values.phase * 0.55;
+      for (let lane = 0; lane < lanes; lane++) {
+        const across = (lane + 0.5) / lanes - 0.5;
+        for (let link = 0; link < links; link++) {
+          const u = ((link + lane * 0.37) / links + travel * side + 10) % 1;
+          const a = u * Math.PI * 1.8 + offset - 0.6;
+          const sway = Math.sin(evolution + u * 4) * H * 0.035 * values.motion;
+          const x0 = W * (0.03 + u * 0.99);
+          const y0 = H * (0.62 - u * 0.08) + side * Math.sin(a) * separation + sway;
+          const dy = -H * 0.08 + side * Math.cos(a) * Math.PI * 1.8 * separation
+            + Math.cos(evolution + u * 4) * H * 0.14 * values.motion;
+          const tangent = Math.atan2(dy, W * 0.99);
+          const ca = Math.cos(tangent), sa = Math.sin(tangent);
+          const depth = 0.5 + 0.5 * Math.sin(a + stream * 1.4);
+          const spread = H * (0.085 + values.scale * 0.06) * (0.65 + depth * 0.35);
+          const px = x0 - sa * across * spread;
+          const py = y0 + ca * across * spread;
+          const size = unit * (3.5 + values.scale * 5.5) * (0.65 + depth * 0.5);
+          const rx = size * (link % 2 === 0 ? 1.1 : 0.85);
+          const ry = size * (link % 2 === 0 ? 0.42 : 0.18);
+          const points = [];
+          // Closed, tangent-aligned ellipses use the same mathematical
+          // corners on canvas and in the existing SVG polyline exporter.
+          for (let point = 0; point < 16; point++) {
+            const t = point / 16 * Math.PI * 2;
+            const lx = Math.cos(t) * rx, ly = Math.sin(t) * ry;
+            const x = px + lx * ca - ly * sa - cx;
+            const y = py + lx * sa + ly * ca - cy;
+            points.push([cx + x * ct - y * st, cy + x * st + y * ct]);
+          }
+          points.push(points[0]);
+          const fade = Math.pow(Math.sin(u * Math.PI), 1.2);
+          const quiet = Math.min(1, Math.max(0, (px / W - 0.04) / 0.23));
+          const alpha = values.opacity * fade * quiet * (0.32 + depth * 0.68) * (1 - Math.abs(across) * 0.8);
+          const stop = paletteHsl(values, (stream + depth) / 2);
+          const [r, g, b] = hslToRgb(stop.h, stop.s, values.invert ? 0.25 + depth * 0.12 : 0.55 + depth * 0.25);
+          ctx.beginPath();
+          ctx.moveTo(...points[0]);
+          for (let i = 1; i < points.length; i++) ctx.lineTo(...points[i]);
+          ctx.lineWidth = unit * (0.3 + values.stroke * 0.95) * (0.65 + depth * 0.55);
+          ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+          ctx.shadowColor = `rgb(${r},${g},${b})`;
+          ctx.shadowBlur = values.glow * 5 * unit;
+          ctx.stroke();
+          paths.push(points);
+        }
       }
-      ctx.closePath();
-
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
-        ctx.globalAlpha = values.glow * 0.25;
-        ctx.stroke();
-        ctx.lineWidth = lineWidth;
-        ctx.globalAlpha = 1;
-      }
-      ctx.stroke();
-      paths.push(pts);
     }
-
+    ctx.shadowBlur = 0;
   }
 
   const loop = createLoop({
