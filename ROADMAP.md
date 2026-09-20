@@ -238,6 +238,178 @@ chunk is closed or has already shipped independently.
 documentation, and no unnamed follow-up work. Publishing/merging is a
 separate action from preparing that handoff.
 
+---
+
+## Intake — 2026-09-19
+
+New work from a single review session, broken into named chunks the same
+way as 1–7. None of these are scoped to start automatically — each begins
+only when named, per the delivery rules above. Two items below are cross-
+project notes, not buildable chunks yet.
+
+### Chunk 8 — Marketing home page
+
+**Outcome:** A real landing page for linefield as a product, distinct from
+the plain piece gallery `index.html` already is. Uses an actual piece as
+its own hero background (dogfooding, not a screenshot), shows a sample of
+what a visitor finds in the full gallery, and documents — in plain
+language, not API reference — how a designer would drop a piece into their
+own design-system project.
+
+**Scope:** New file(s) under a `home/` or `site/` directory (does not
+replace `index.html`, the gallery). No new dependency; same
+no-build-step-for-pieces discipline does not apply here since this is a
+site page, not a piece, but keep it framework-free consistent with the
+rest of the repo.
+
+- [ ] Build two visual directions. Both must use a real linefield piece
+  live as the hero background (pick pieces that read well behind text —
+  see CONTRIBUTING's "text-safe zone" guidance from the redesign spec).
+- [ ] Both directions include a gallery-sample section (a curated handful
+  of pieces, not all seventeen) and a "how to use this in your project"
+  section: pasting a piece, the shared-controls contract, baked vs. source
+  export, MIT license.
+- [ ] Present both for a choice; the chosen direction gets a further polish
+  pass — this is the one explicitly called out to be "super sexy," not the
+  rejected direction.
+- [ ] Add basic, real controls on the page (not decorative) — enough to
+  demonstrate the shared-control contract a visitor would actually use.
+
+**Finish line:** One shipped landing page, one archived alternate, both
+functional (not mockups) since the whole point is showing the product
+working live.
+
+### Chunk 9 — Bring globe back
+
+**Outcome:** `globe` returns to the collection as an eighteenth piece,
+alongside `parallax` rather than instead of it — the redesign removed it
+as a replacement-for, but it's wanted back as an addition.
+
+**Scope:** Restore `pieces/globe/index.html` (available in git history at
+`ecde851` on `main`, pre-redesign) as a piece distinct from `parallax`
+despite both being depth/projection pieces — needs a real differentiation
+pass since `parallax`'s whole existence was "replace globe with something
+that reads less like the existing orb family." Re-run it through the
+current (post-redesign) contract: Wake instead of cursor modes, current
+shared control set.
+
+- [x] Decide and document how `globe` and `parallax` coexist without
+  reading as the same piece twice — this is the actual design work, not
+  the restoration. Decision: `globe` is a real 3D sphere (lat/long rings
+  and meridians through `shared/project.js`'s perspective camera, silhouette
+  a circle that reads as a solid, occludable body) where `parallax` is a
+  flat diagonal fan/lens with no depth axis at all — same distinction
+  already used to separate it from the orb family (`orbital-veil`,
+  `accretion`, `event-horizon`), which are flat screen-space discs.
+  Confirmed visually, not just asserted: generated thumbnails
+  (`thumbs/globe.png` vs. `thumbs/parallax.png`, `thumbs/orbital-veil.png`,
+  `thumbs/event-horizon.png`, `thumbs/accretion.png`) show distinct
+  silhouettes at gallery-card size. Palette also moved off the old
+  340/355 hue (now occupied by `parallax`'s own 344/24) into the 59–166
+  gap — see collection-constraints below.
+- [x] Restore/rebuild the piece against current `shared/`, add its
+  `pieces.json` entry, README bullet, thumbnail, download.
+- [x] Re-run collection-metrics; note globe's hue placement against the
+  now-full wheel (see the collection-constraints table below).
+
+**Finish line:** Eighteen pieces, `globe` and `parallax` both read as
+distinct compositions at gallery-card size. Met.
+
+### Chunk 10 — Palette: retire purple, adopt ClassicCottrell green
+
+**Outcome:** Purple is removed from the shared UI (control panel, page
+chrome — not individual pieces' own hue defaults, which are each piece's
+authored identity) and replaced with ClassicCottrell green `#437057`.
+
+**Scope:** `shared/controls.js`'s panel CSS and any other shared-UI
+surface using a purple accent. Does not touch per-piece `hue`/`hueB`
+defaults in `pieces.json` — that's the art, not the UI chrome.
+
+- [x] Audit every purple hardcoded in shared UI CSS (grep for common purple
+  hex ranges, don't rely on memory of what looked purple).
+- [x] Swap to `#437057` and its needed tints/shades for hover/active/focus
+  states, checked in both the light default and any dark-mode variant.
+
+**Finish line:** No purple left in the control panel or page chrome;
+`#437057` reads correctly at every interactive state.
+
+### Chunk 11 — Refresh Tether, Rainfall, Flow Field
+
+**Outcome:** These three pre-redesign pieces get a quality pass so they
+don't read as a visibly older generation next to Pleat/Driftwork/Cipher
+Bloom/Parallax/Lacuna. This is a visual/compositional refresh, not a
+rewrite — keep each piece's identity (per ROADMAP's own "meridian and
+tether remain the weakest pair" note below, `tether` already has a known
+weakness worth addressing here rather than opening a separate item for
+it).
+
+**Scope:** `pieces/tether/index.html`, `pieces/rainfall/index.html`,
+`pieces/flow-field/index.html` and their generated assets. `flow-field`
+already got a technical hardening pass (resize batcher, dt-clamp) in the
+merge that closed PR #5's conflict — this chunk is about its visual
+quality, a separate concern from that.
+
+- [ ] One named piece at a time, per the delivery rules — do not let a
+  finished piece expand into the next.
+- [ ] Judge each against the current collection's bar (silhouette read at
+  card size, negative space, a mark vocabulary not already carried more
+  strongly by another piece) rather than against its own prior version.
+- [ ] Refresh presets, thumbnail, download for each on completion.
+
+**Finish line:** All three read as belonging to the same collection as the
+five newest pieces, judged side by side, not each against its own history.
+
+### Chunk 12 — Wake: promote and expand
+
+**Outcome:** Wake moves from wherever it currently sits to the top of its
+section/page, gets a fuller description (what it is, why it's separate
+from per-piece cursor decoration), and gains real configuration — knobs
+and switches enabling different behaviors, not just on/off.
+
+**Scope:** `interactions/wake.js`, `interactions/wake/index.html`, its
+docs. Depends on Chunk 6 (Wake's stationary-pointer fade bug) closing
+first — do not layer new configuration surface onto a mechanism with a
+known-broken fade.
+
+- [ ] Close Chunk 6's fade bug first if not already closed.
+- [ ] Reorder Wake's section to the top wherever it's presented (gallery,
+  docs, and the new home page from Chunk 8 if that lands first).
+- [ ] Write a fuller description: what Wake is, why it exists outside the
+  per-piece control contract, what it does versus what removed cursor
+  modes did.
+- [ ] Design and add real configuration — specific knobs/switches remain
+  open; scope them against what Wake's current single-mechanism design can
+  actually support before adding surface area for its own sake.
+
+**Finish line:** Wake is presented first, its description explains itself
+without external context, and its configuration is real (state that
+changes behavior), not decorative.
+
+### Exploratory — ASCII art brought to life
+
+Not yet a chunk: a named idea, not a scoped deliverable. The glyph-mark
+capability already exists (built for `matrix-code`, carried into
+`cipher-bloom`); this would be a new piece or technique using arbitrary
+ASCII-art source rather than a fixed character set. Needs a design pass —
+what makes it distinct from `cipher-bloom` — before it becomes a chunk
+with an outcome and a scope. Tied to the Linefield+Forma idea below; may
+belong to whichever product turns out to own "bring static art to life"
+as a shared pattern.
+
+### Cross-project note — Forma alignment
+
+Not a linefield chunk: linefield and `Projects/Forma` (a separate 3D
+shape-playground product, React + three.js, MIT) currently share UI only
+partially, and the goal is eventual shared design patterns/design system
+between them. Real existing link, not aspirational: linefield's own
+`shared/anim.js`/`resize.js`/`quality.js` hardening (merged into this
+branch resolving PR #5's conflict) explicitly ports logic from
+`cc-webgl`, an engine Forma's own BRIEF.md also references
+(`cc-webgl`'s `ResourceRegistry`). That shared substrate is the honest
+starting point for alignment — not a rewrite of either product's UI.
+Needs its own scoping pass in Forma's own repo/roadmap before it becomes
+buildable work here; recorded so it isn't lost, not started.
+
 ## Next task prompt
 
 > Finish roadmap chunk 4: Parallax only. Make Speed move the field through the
@@ -305,58 +477,46 @@ happens to open the template itself rather than a piece copied from it.
 
 ## Collection constraints for an eighteenth piece
 
-Historical baseline: the table below measures the removed artworks. Do not
-use it to judge the replacement set until chunk 7 refreshes these numbers.
-
-Measured across all seventeen shipped pieces, from their generated
-thumbnails: mean rendered hue (weighted by colourfulness), mean saturation,
-and ink coverage — the fraction of pixels the piece actually marks.
+Refreshed by chunk 9 (`globe` restored). Measured across all eighteen
+shipped pieces, from their generated thumbnails: mean rendered hue (weighted
+by colourfulness), mean saturation, and ink coverage — the fraction of
+pixels the piece actually marks.
 
 Every row below is **generated**, not hand-recorded: run
-`npm run collection-metrics` and paste its output here. That tool
-(`tools/collection-metrics.mjs`) was written after the five commissioned
-pieces shipped without rows: with no tool, each addition either invented
-numbers or declined to, and declining left the table describing a library
-that no longer existed. It reproduces the twelve values published before it
-existed on 34 of 36 numbers; `wireframe-lattice`'s ink reads 0.108 against a
-published 0.107, and that single digit is the only change to a pre-existing
-row. Rebuild thumbnails (`npm run build`) before trusting a
-regenerated table — it measures the committed PNGs, not the live piece.
+`npm run collection-metrics` and paste its output here. Rebuild thumbnails
+(`npm run build`) before trusting a regenerated table — it measures the
+committed PNGs, not the live piece.
 
 | Hue | Sat | Ink | Piece |
 |---:|---:|---:|---|
+| 7 | 0.20 | 0.122 | `parallax` |
+| 19 | 0.24 | 0.133 | `pleat` |
 | 21 | 0.49 | 0.043 | `accretion` |
 | 24 | 0.42 | 0.048 | `contour-grid` |
 | 54 | 0.30 | 0.047 | `synapse` |
-| 87 | 0.52 | 0.205 | `stock-market` |
-| 106 | 0.16 | 0.030 | `chain-haze` |
-| 133 | 0.38 | 0.064 | `puddle` |
-| 146 | 0.51 | 0.042 | `matrix-code` |
+| 59 | 0.11 | 0.043 | `cipher-bloom` |
+| 122 | 0.33 | 0.043 | `globe` |
 | 166 | 0.48 | 0.073 | `meridian` |
 | 177 | 0.12 | 0.035 | `grain-field` |
 | 200 | 0.34 | 0.108 | `wireframe-lattice` |
 | 213 | 0.12 | 0.011 | `rainfall` |
+| 220 | 0.25 | 0.028 | `lacuna` |
 | 235 | 0.24 | 0.066 | `tether` |
 | 247 | 0.51 | 0.195 | `event-horizon` |
+| 253 | 0.17 | 0.120 | `driftwork` |
 | 254 | 0.58 | 0.318 | `interference` |
 | 261 | 0.90 | 0.341 | `flow-field` |
 | 305 | 0.48 | 0.096 | `orbital-veil` |
-| 342 | 0.34 | 0.044 | `globe` |
 
-**The hue wheel is full.** The 95–135 band the five commissioned pieces were
-aimed at is now occupied by `chain-haze` (106) and `puddle` (133), and
-`globe` (342) closed the last wide gap. What remains are four gaps of
-roughly 35–45°: 261–305, 305–342, 342–21 across the wrap, and 54–87. None
-is the free colour the early library had. A new piece should differentiate on
-**form or density**, not expect a free hue. `rainfall` is the worked example:
-it landed at hue 213, in the most crowded band in the table, and still reads
-as distinct because at saturation 0.12 the hue barely registers and its ink
-coverage is a third of the next-sparsest piece.
-
-**Ink coverage is the axis with the most room left.** Ten of the seventeen
-sit between 0.04 and 0.11. `rainfall` at 0.011 and `flow-field` at 0.341 are
-the poles, and the middle-high range between 0.11 and 0.19 is still empty —
-five pieces later, nothing landed in it.
+**`globe` landed at hue 122** (authored 105/130 gradient), squarely in the
+59–166 gap between `cipher-bloom` and `meridian` — the widest untouched arc
+on the wheel, confirmed against every piece's full hue→hueB ramp, not just
+start hues (a start-hue-only scan wrongly suggested 285→344, which
+`orbital-veil`'s 265→330 ramp actually crosses). No adjacent-hue collision.
+Ink coverage (0.043) sits with the sparse cluster (`accretion`,
+`contour-grid`, `synapse`, `cipher-bloom`) rather than crowding any single
+piece — a wireframe sphere's rendered mark density is inherently sparse, no
+special tuning needed to land there.
 
 **`meridian` and `tether` remain the weakest pair.** Found twice, by different
 methods — once by comparing rendered frames pixel-by-pixel, once by looking at
