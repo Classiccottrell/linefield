@@ -314,9 +314,9 @@ authored identity) and replaced with ClassicCottrell green `#437057`.
 surface using a purple accent. Does not touch per-piece `hue`/`hueB`
 defaults in `pieces.json` — that's the art, not the UI chrome.
 
-- [ ] Audit every purple hardcoded in shared UI CSS (grep for common purple
+- [x] Audit every purple hardcoded in shared UI CSS (grep for common purple
   hex ranges, don't rely on memory of what looked purple).
-- [ ] Swap to `#437057` and its needed tints/shades for hover/active/focus
+- [x] Swap to `#437057` and its needed tints/shades for hover/active/focus
   states, checked in both the light default and any dark-mode variant.
 
 **Finish line:** No purple left in the control panel or page chrome;
