@@ -154,7 +154,7 @@ and dissolving edges; roughly half the composition remains quiet.
 **Finish line:** A complete typographic artwork with functioning controls
 and usable SVG text output, not just a newly named page.
 
-## Chunk 4 — Parallax: finish depth and movement
+## Chunk 4 — Parallax: in progress
 
 **Outcome:** A diagonal fan divides around an implied volume, with visible
 near/far depth and a quiet centre.

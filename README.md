@@ -158,7 +158,7 @@ tooling" below and CONTRIBUTING.md.
 - `event-horizon` — a polar grid bent inward by a gravity well
 - `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
 - `lacuna` — broken caustic arcs gathering around an off-centre calm zone
-- `parallax` — a diagonal line field dividing around an invisible volume
+- `parallax` — a rose-to-amber fan parting around an invisible volume, with near strands moving faster than distant lines
 - `cipher-bloom` — irregular glyph fragments gathering around a bright oblique core and dissolving into warm chalk and shadow
 - `driftwork` — alternating violet-grey ellipse marks following two crossing currents, with depth and dissolving edges
 - `pleat` — coral and ivory rectangular marks gathering into two folded surfaces with a clean cut between them

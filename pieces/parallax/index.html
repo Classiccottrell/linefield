@@ -44,16 +44,16 @@
   window.addEventListener('resize', resize);
   resize();
 
-  const BASE_FRONTS = 18;
-  const SEG = 88;
   let paths = [];
+  let travel = 0;
+  let lensTime = 0;
 
   const PRESETS = {
-    whisper: { opacity: 0.18, stroke: 0.45, density: 0.48, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 0.88, stroke: 1.25, density: 0.7, saturation: 0, angle: 28 },
-    neon:    { opacity: 0.72, stroke: 0.72, density: 1.08, saturation: 0.62, glow: 1.05 },
-    drift:   { opacity: 0.34, stroke: 0.55, density: 0.65, speed: 0.24, motion: 1.55, phase: 0.7 },
-    dense:   { opacity: 0.58, stroke: 0.48, density: 1.58, speed: 0.62, angle: 338 },
+    whisper: { opacity: 0.4, stroke: 0.55, density: 0.55, scale: 0.7, motion: 0.45, saturation: 0.08 },
+    ink:     { opacity: 0.9, stroke: 1.4, density: 0.7, scale: 1.2, saturation: 0, angle: 12, phase: 0.4 },
+    neon:    { opacity: 0.85, stroke: 1.1, density: 1.1, scale: 0.85, saturation: 0.6, glow: 0.9, phase: 0.65 },
+    drift:   { opacity: 0.65, stroke: 0.8, density: 0.75, scale: 1.3, speed: 0.25, motion: 1.5, phase: 1.2, angle: 352 },
+    dense:   { opacity: 0.8, stroke: 0.75, density: 1.65, scale: 0.9, speed: 0.65, angle: 344, phase: 0.3 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -61,7 +61,7 @@
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    defaults: { hue: 344, hueB: 24, saturation: 0.3, colorMode: 'gradient', colorA: '#bd7f94', colorB: '#e0b26f' },
+    defaults: { hue: 344, hueB: 24, saturation: 0.3, colorMode: 'gradient', colorA: '#bd7f94', colorB: '#e0b26f', opacity: 0.9, stroke: 1.1, speed: 0.55 },
   });
   const currentValues = baked || panel.values;
 
@@ -71,45 +71,64 @@
     paths = [];
     const W = canvas.width, H = canvas.height;
     const theta = values.angle * Math.PI / 180;
-    const lines = Math.max(8, Math.round(24 * values.density));
-    const light = values.invert ? 0.35 : 0.62;
-    const width = 0.35 + values.stroke * 0.9;
-    const lensX = W * (0.58 + Math.sin(elapsed * values.motion * 0.16 + values.phase) * 0.035);
-    const lensY = H * 0.5;
-    const sampleCount = Math.max(26, Math.round(42 * values.scale));
+    const ct = Math.cos(theta), st = Math.sin(theta);
+    const lines = Math.max(6, Math.round(36 * values.density));
+    const unit = Math.min(W / 1280, H / 800);
+    travel += dt * values.speed * 0.018;
+    lensTime += dt * values.motion * 0.12;
+    const lensX = W * (0.61 + Math.sin(lensTime) * 0.04 * values.motion);
+    const lensY = H * (0.47 + Math.cos(lensTime * 0.7) * 0.035 * values.motion);
+    const radiusX = W * (0.07 + values.scale * 0.09);
+    const radiusY = H * (0.07 + values.scale * 0.11);
+    // Travel over the short hue arc keeps rose-to-amber from crossing the
+    // entire rainbow when the authored palette straddles zero degrees.
+    const palette = { ...values, hueB: values.hue + ((values.hueB - values.hue + 540) % 360) - 180 };
     for (let row = 0; row < lines; row++) {
-      const offset = (row - lines / 2) * (H / lines) * 0.82;
-      const points = [];
-      for (let i = 0; i <= sampleCount; i++) {
-        const t = i / sampleCount;
-        let x = -W * 0.15 + t * W * 1.3;
-        let y = H * 0.18 + t * H * 0.72 + offset;
-        const rx = (x - lensX) / (190 * values.scale);
-        const ry = (y - lensY) / (125 * values.scale);
+      const depth = (row % 4) / 3;
+      const lane = ((row + 0.5) / lines + travel * (0.3 + depth * 0.9) + values.phase * 0.13) % 1 - 0.5;
+      const segments = [];
+      let points = [];
+      for (let i = 0; i <= 180; i++) {
+        const t = i / 180;
+        let x = W * (-0.15 + t * 1.3);
+        let y = H * (0.84 - t * 0.58 + lane * (0.68 + t * 0.48));
+        const rx = (x - lensX) / radiusX;
+        const ry = (y - lensY) / radiusY;
         const d2 = rx * rx + ry * ry;
-        if (d2 < 0.62) { if (points.length > 1) paths.push(points.splice(0)); continue; }
-        const bend = Math.exp(-d2 * 1.4) * (1.15 + 0.25 * Math.sin(elapsed * values.motion + values.phase * Math.PI));
-        x += rx * bend * 95;
-        y += ry * bend * 62;
-        const tx = (x - W / 2) * Math.cos(theta) - (y - H / 2) * Math.sin(theta) + W / 2;
-        const ty = (x - W / 2) * Math.sin(theta) + (y - H / 2) * Math.cos(theta) + H / 2;
+        if (d2 < 1) {
+          if (points.length > 1) segments.push(points);
+          points = []; // Always clear, including a single point before a cut.
+          continue;
+        }
+        const bend = Math.exp(-Math.pow((Math.sqrt(d2) - 1) / 0.72, 2))
+          * (0.23 + values.motion * 0.13) * (0.6 + depth * 0.5);
+        x += rx * radiusX * bend * 0.3;
+        y += ry * radiusY * bend;
+        const tx = (x - W / 2) * ct - (y - H / 2) * st + W / 2;
+        const ty = (x - W / 2) * st + (y - H / 2) * ct + H / 2;
         points.push([tx, ty]);
       }
-      if (points.length > 1) paths.push(points);
-    }
-    for (let i = 0; i < paths.length; i++) {
-      const path = paths[i];
-      const mid = path[Math.floor(path.length / 2)];
-      const dist = Math.hypot((mid[0] - lensX) / 220, (mid[1] - lensY) / 150);
-      const rim = Math.max(0.18, Math.min(1, 1.25 - Math.abs(dist - 1.05) * 1.5));
-      const stop = paletteHsl(values, i / Math.max(1, paths.length - 1));
-      const [r, g, b] = hslToRgb(stop.h, stop.s, light);
-      ctx.beginPath(); ctx.moveTo(path[0][0], path[0][1]);
-      for (let j = 1; j < path.length; j++) ctx.lineTo(path[j][0], path[j][1]);
-      ctx.lineCap = 'round'; ctx.lineWidth = width;
-      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity * rim})`;
-      if (values.glow > 0 && rim > 0.7) { ctx.globalAlpha = values.glow * 0.16; ctx.lineWidth = width + values.glow * 2.5; ctx.stroke(); ctx.globalAlpha = 1; }
-      ctx.stroke();
+      if (points.length > 1) segments.push(points);
+      const width = unit * (0.25 + values.stroke * (0.35 + depth * 2.5));
+      const stop = paletteHsl(palette, depth * 0.85 + row / lines * 0.15);
+      const [r, g, b] = hslToRgb(stop.h, stop.s, values.invert ? 0.25 + depth * 0.15 : 0.45 + depth * 0.3);
+      const fade = Math.min(1, (0.5 - Math.abs(lane)) * 9);
+      const alpha = values.opacity * (0.16 + depth * depth * 0.84) * fade;
+      for (const path of segments) {
+        ctx.beginPath(); ctx.moveTo(...path[0]);
+        for (let j = 1; j < path.length; j++) ctx.lineTo(...path[j]);
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+        if (values.glow > 0) {
+          ctx.globalAlpha = values.glow * 0.15;
+          ctx.lineWidth = width + values.glow * 4 * unit;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        ctx.lineWidth = width;
+        ctx.stroke();
+        paths.push(path);
+      }
     }
   }
 
