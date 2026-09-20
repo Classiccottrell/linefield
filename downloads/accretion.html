@@ -867,33 +867,66 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
 // --- inlined: ../../shared/anim.js ---
 // shared/anim.js
 
+// Max per-frame dt (seconds) after a tab-switch/GC stall, so a single huge
+// frame doesn't fling particles across the canvas. Ported from
+// cc-webgl/src/core/FrameScheduler.ts's DT_CLAMP_SECONDS.
+const ANIM_DT_CLAMP_SECONDS = 0.1;
+
 function createLoop({ onFrame, speed = 1 }) {
   let running = false;
+  let paused = false;
   let lastTime = 0;
   let elapsed = 0;
   let rafId = null;
   let currentSpeed = speed;
 
   function tick(now) {
-    if (!running) return;
-    const dt = lastTime ? (now - lastTime) / 1000 : 0;
+    if (!running || paused) return;
+    const rawDt = lastTime ? (now - lastTime) / 1000 : 0;
+    const clampedDt = Math.min(Math.max(rawDt, 0), ANIM_DT_CLAMP_SECONDS);
     lastTime = now;
-    const scaledDt = dt * currentSpeed;
+    const scaledDt = clampedDt * currentSpeed;
     elapsed += scaledDt;
     onFrame(scaledDt, elapsed);
     rafId = requestAnimationFrame(tick);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined') return;
+    if (document.hidden) {
+      paused = true;
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    } else if (running && paused) {
+      paused = false;
+      // Reset the sentinel instead of computing a real dt, so resume doesn't
+      // produce a giant catch-up frame — same reasoning as start()'s reset.
+      lastTime = 0;
+      rafId = requestAnimationFrame(tick);
+    }
   }
 
   return {
     start() {
       if (running) return;
       running = true;
+      paused = false;
       lastTime = 0;
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
       rafId = requestAnimationFrame(tick);
     },
     stop() {
       running = false;
+      paused = false;
       if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
     },
     setSpeed(n) {
       currentSpeed = n;
@@ -937,7 +970,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -946,13 +979,25 @@ function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
     .join('\n');
 
   const textEls = texts
-    .map(({ x, y, ch, size, fontFamily }) => {
+    .map(({ x, y, ch, size, fontFamily, anchor, baseline, rotation, strokeWidth }) => {
       const safeCh = String(ch).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${fontFamily || 'monospace'}" font-size="${size.toFixed(2)}" fill="black">${safeCh}</text>`;
+      const safeFont = String(fontFamily || 'monospace').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const placement = `${['start', 'middle', 'end'].includes(anchor) ? ` text-anchor="${anchor}"` : ''}${['central', 'middle', 'alphabetic', 'hanging'].includes(baseline) ? ` dominant-baseline="${baseline}"` : ''}${Number.isFinite(rotation) ? ` transform="rotate(${rotation} ${x} ${y})"` : ''}`;
+      const stroke = Number.isFinite(strokeWidth) && strokeWidth > 0 ? ` stroke="black" stroke-width="${strokeWidth}"` : '';
+      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${safeFont}" font-size="${size.toFixed(2)}" fill="black"${placement}${stroke}>${safeCh}</text>`;
     })
     .join('\n');
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}${polylines && textEls ? '\n' : ''}${textEls}\n</svg>`;
+  // Filled-mark pieces supply already-transformed corners; existing path
+  // and text callers retain their exact serialization when this is empty.
+  const polygonEls = polygons.map(({ points, fill = 'black', opacity = 1 }) => {
+    const pointsAttr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
 }

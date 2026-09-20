@@ -33,17 +33,11 @@
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createResizeBatcher } from '../../shared/resize.js';
 
   const PIECE_ID = 'flow-field';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
-
-  function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-  window.addEventListener('resize', resize);
-  resize();
 
   // Base count is deliberately modest so the default reads as a background;
   // the Density slider is what makes it loud (up to 2x).
@@ -87,10 +81,16 @@
   });
   const currentValues = baked || panel.values;
 
-  seedParticles(Math.round(BASE_COUNT * currentValues.density));
-  window.addEventListener('resize', () =>
-    seedParticles(Math.round(BASE_COUNT * currentValues.density))
-  );
+  function applyResize({ width, height }) {
+    canvas.width = width;
+    canvas.height = height;
+    seedParticles(Math.round(BASE_COUNT * currentValues.density));
+  }
+  // dpr fixed at 1: flow-field draws in CSS-pixel space (canvas.width ===
+  // window.innerWidth), and particle coords / exportPng's multiplier both
+  // assume that — a real devicePixelRatio backing store would break both.
+  const resizeBatcher = createResizeBatcher(document.body, applyResize, 1);
+  resizeBatcher.evaluate(); // sizes the canvas + seeds particles before the first frame
 
   function fieldAngle(x, y, elapsed, values) {
     const noiseScale = 0.002 * (0.2 + values.scale);
@@ -185,6 +185,7 @@
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
+      resizeBatcher.evaluate();
       drawFrame(dt, elapsed, currentValues);
     },
   });
