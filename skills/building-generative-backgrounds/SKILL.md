@@ -14,6 +14,9 @@ paper. Only looking at the output proves it works.
 Evidence throughout comes from linefield, a twelve-piece canvas library
 where each of these was shipped, found, and fixed.
 
+Generic cursor vocabularies force unrelated renderers into weak
+interpretations; prefer a composable overlay or a piece-native interaction.
+
 ## Constants that render wrong
 
 The maths is right and the picture is not. Check these by construction

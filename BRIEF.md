@@ -22,7 +22,7 @@ Filament.
 
 ## Acceptance Criteria
 - [x] shared/ modules implemented (noise, color, anim, project, controls, export)
-- [x] pieces/_template runs standalone with all 13 shared controls (incl. density) + exports
+- [x] pieces/_template runs standalone with shared visual controls + exports
 - [x] pieces/flow-field runs at target frame rate, both line/particle modes work
 - [x] Baked HTML export opens standalone with panel removed: `bakeHtml()` inlines
       every shared module into one `<script>`, so the downloaded file has zero

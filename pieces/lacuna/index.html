@@ -6,7 +6,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>linefield — orbital-veil</title>
+<title>linefield — lacuna</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -33,7 +33,7 @@
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
 
-  const PIECE_ID = 'orbital-veil';
+  const PIECE_ID = 'lacuna';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -44,17 +44,16 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // Ring count is derived per frame from density — no persistent array.
-  const BASE_RINGS = 34;
-  const SEG = 72;
+  const BASE_FRONTS = 18;
+  const SEG = 88;
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.3, stroke: 1.1, density: 0.55, saturation: 0.06, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.6, density: 0.7, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 1.2, saturation: 0.95, glow: 1.1 },
-    drift:   { opacity: 0.45, stroke: 0.8, density: 0.6, speed: 0.25, motion: 1.6 },
-    dense:   { opacity: 0.6, stroke: 0.6, density: 2, speed: 0.85, saturation: 0.5, glow: 0 },
+    whisper: { opacity: 0.18, stroke: 0.45, density: 0.55, saturation: 0.05, glow: 0 },
+    ink:     { opacity: 0.88, stroke: 1.25, density: 0.72, saturation: 0, angle: 18 },
+    neon:    { opacity: 0.72, stroke: 0.72, density: 1.12, saturation: 0.68, glow: 1.05 },
+    drift:   { opacity: 0.34, stroke: 0.55, density: 0.68, speed: 0.28, motion: 1.55, phase: 0.7 },
+    dense:   { opacity: 0.58, stroke: 0.48, density: 1.65, speed: 0.62, angle: 338 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -62,10 +61,7 @@
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    extraControls: [
-      { name: 'sweep', label: 'Sweep', type: 'range', min: 0.05, max: 1, step: 0.01, default: 0.62, category: 'form' },
-    ],
-    defaults: { hue: 265, hueB: 330, saturation: 0.55, colorMode: 'gradient', colorA: '#6a00ff', colorB: '#ff0080' },
+    defaults: { hue: 198, hueB: 224, saturation: 0.24, colorMode: 'gradient', colorA: '#7aa8b8', colorB: '#b7d4d7' },
   });
   const currentValues = baked || panel.values;
 
@@ -74,52 +70,61 @@
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     paths = [];
-    const rings = Math.max(3, Math.round(BASE_RINGS * values.density));
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const maxR = Math.min(canvas.width, canvas.height) * 0.44 * (0.35 + values.scale * 0.65);
-    const t = elapsed * values.speed;
-    // Tilt squashes the rings vertically, giving the orb its 3D read.
-    const tilt = 0.35 + 0.65 * Math.abs(Math.cos((values.angle * Math.PI) / 180));
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W * 0.62;
+    const cy = H * 0.48;
+    const theta = values.angle * Math.PI / 180;
+    const fronts = Math.max(4, Math.round(BASE_FRONTS * values.density));
+    const light = values.invert ? 0.35 : 0.62;
+    const baseWidth = 0.35 + values.stroke * 0.9;
 
-    const lineWidth = 0.4 + values.stroke * 1.2;
-    ctx.lineWidth = lineWidth;
-
-    const light = values.invert ? 0.35 : 0.6;
-
-    for (let i = 0; i < rings; i++) {
-      const f = i / (rings - 1 || 1);
-      // Pulse each ring's radius, offset per ring so the orb breathes unevenly.
-      const pulse = 1 + Math.sin(t * 0.8 + f * 6 + values.phase * Math.PI) * 0.05;
-      const radius = maxR * (0.12 + f * 0.88) * pulse;
-      // Differential rotation: outer rings lag inner ones.
-      const rot = t * (0.9 - f * 0.65) * values.motion + f * 0.6;
-      const sweep = Math.PI * 2 * values.sweep;
-      const start = rot;
-
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-
-      const pts = [];
-      ctx.beginPath();
+    for (let front = 0; front < fronts; front++) {
+      const segments = [];
+      let current = [];
+      const phase = front * 0.71;
       for (let s = 0; s <= SEG; s++) {
-        const a = start + (s / SEG) * sweep;
-        let x = cx + Math.cos(a) * radius;
-        let y = cy + Math.sin(a) * radius * tilt;
-        if (s === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-        pts.push([x, y]);
+        const u = s / SEG;
+        const a = (-0.9 + u * 1.8) * Math.PI;
+        const drift = elapsed * values.motion * 0.08;
+        const wave = Math.sin(a * 3 + phase - elapsed * values.speed * 0.9 + values.phase * Math.PI * 2);
+        const radius = (70 + front * 15) * values.scale + wave * (5 + front * 0.12);
+        const keep = Math.sin(a * 2.3 + front * 0.8 + drift) > -0.18;
+        if (!keep) {
+          if (current.length > 1) segments.push(current);
+          current = [];
+          continue;
+        }
+        const ex = Math.cos(a) * radius;
+        const ey = Math.sin(a) * radius * 0.58;
+        const x = cx + ex * Math.cos(theta) - ey * Math.sin(theta);
+        const y = cy + ex * Math.sin(theta) + ey * Math.cos(theta);
+        current.push([x, y]);
       }
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
-        ctx.globalAlpha = values.glow * 0.25;
+      if (current.length > 1) segments.push(current);
+
+      const stop = paletteHsl(values, fronts === 1 ? 0.5 : front / (fronts - 1));
+      const [r, g, b] = hslToRgb(stop.h, stop.s, light);
+      const frontAlpha = values.opacity * (0.42 + 0.58 * (front / fronts));
+      for (const segment of segments) {
+        const meanX = segment.reduce((sum, point) => sum + point[0], 0) / segment.length;
+        const quiet = Math.max(0.16, Math.min(1, (meanX / W + 0.08) / 0.92));
+        const alpha = frontAlpha * quiet;
+        ctx.beginPath();
+        ctx.moveTo(segment[0][0], segment[0][1]);
+        for (let i = 1; i < segment.length; i++) ctx.lineTo(segment[i][0], segment[i][1]);
+        ctx.lineCap = 'round';
+        ctx.lineWidth = baseWidth;
+        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+        if (values.glow > 0 && alpha > values.opacity * 0.46) {
+          ctx.globalAlpha = values.glow * 0.18;
+          ctx.lineWidth = baseWidth + values.glow * 2.4;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
         ctx.stroke();
-        ctx.lineWidth = lineWidth;
-        ctx.globalAlpha = 1;
+        paths.push(segment);
       }
-      ctx.stroke();
-      paths.push(pts);
     }
 
   }

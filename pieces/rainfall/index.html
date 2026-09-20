@@ -33,8 +33,6 @@
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { createPointer } from '../../shared/pointer.js';
-  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
 
   const PIECE_ID = 'rainfall';
   const canvas = document.getElementById('canvas');
@@ -53,17 +51,6 @@
   // Fraction of canvas height a streak crosses per second at speedMult=1,
   // values.speed=1 — slow enough that a single drop takes ~14s to fall.
   const BASE_FALL = 0.07;
-  // Grow/Shrink/Attract/Vortex fall off per-drop, unlike tether/meridian's
-  // single continuous path, but the same sparsity problem applies: only 28
-  // drops scattered across the canvas, each at its own independent point in
-  // the fall cycle, so a narrow radius catches at most two or three at any
-  // cursor position and the effect reads as nothing at normal viewing scale
-  // even though it passes the live-pixel gate. Widened well past
-  // contour-grid's 300/meridian's 320 for the same reason tether went to
-  // 340 — the sparsest pieces need the widest catchment — with no amplitude
-  // coupling to worry about here, since Grow/Shrink scale per-drop
-  // lineWidth, not radius-times-amplitude like the single-path pieces.
-  const DEFLECT_RADIUS = 480;
   let drops = [];
   let paths = [];
 
@@ -110,8 +97,6 @@
     defaults: { hue: 205, hueB: 195, saturation: 0.18, colorMode: 'gradient', colorA: '#0095ff', colorB: '#00bfff' },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
-  const overlay = createCursorOverlay();
 
   seedDrops(Math.max(4, Math.round(BASE_COUNT * currentValues.density)));
 
@@ -130,14 +115,7 @@
     // Gentle wind sway, independent of fall speed — subtle by design so the
     // piece stays calm rather than turning into a gust.
     const swayAmount = W * 0.006 * values.motion;
-    // The only gate: off at pointer 0, off when cursorInteraction is 'None',
-    // eased by influence.
-    const k = modeFactor(values, pointer);
     const theta = (values.angle * Math.PI) / 180;
-    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
-    const plx = W / 2 + pdx * cosT - pdy * sinT;
-    const ply = H / 2 + pdx * sinT + pdy * cosT;
 
     ctx.save();
     ctx.translate(W / 2, H / 2);
@@ -155,25 +133,6 @@
       const n = simplex2(d.sway, elapsed * 0.15 * values.motion);
       let x = d.x * W + n * swayAmount;
       let lw = lineWidth;
-      if (k) {
-        const ddx = x - plx, ddy = headY - ply;
-        const dist = Math.hypot(ddx, ddy) || 1;
-        const f = Math.max(0, 1 - dist / DEFLECT_RADIUS);
-        if (f) {
-          if (values.cursorInteraction === 'Attract') {
-            x += -(ddx / dist) * f * k * 70;
-          } else if (values.cursorInteraction === 'Vortex') {
-            // Tangential: perpendicular to (drop - pointer); only the
-            // horizontal component is expressible since a drop's fall (y)
-            // is time-driven, but the sideways sweep still reads as orbit.
-            x += -(ddy / dist) * f * k * 70;
-          } else if (values.cursorInteraction === 'Grow') {
-            lw = lineWidth * (1 + f * k * 1.6);
-          } else if (values.cursorInteraction === 'Shrink') {
-            lw = Math.max(lineWidth * 0.15, lineWidth / (1 + f * k * 1.6));
-          }
-        }
-      }
 
       const lightBase = values.invert ? 0.3 : 0.68;
       const headLight = Math.min(0.95, lightBase + 0.22);
@@ -222,18 +181,10 @@
 
     ctx.restore();
 
-    // Drawn after ctx.restore(), so overlay marks track the pointer's actual
-    // screen position rather than the piece's rotated coordinate space.
-    const stopB2 = paletteHsl(values, 1);
-    const [ovR, ovG, ovB] = hslToRgb(stopB2.h, stopB2.s, values.invert ? 0.3 : 0.68);
-    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

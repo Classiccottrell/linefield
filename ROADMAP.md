@@ -1,21 +1,251 @@
 # Roadmap
 
-What is deliberately not built yet, and why. Everything here was considered
-and deferred — none of it is an oversight.
+Active delivery roadmap, followed by previously recorded limitations and
+deferred ideas. Updated 2026-09-19.
 
-Ordered roughly by how much it would add.
+**This file is the canonical, version-controlled roadmap.** The Google Doc
+("Linefield - product" tab) that previously governed this queue is
+deprecated as of 2026-09-19 — its content as of that date was folded in
+below, but it is no longer updated and should not be treated as current.
+Read this file (and its git history, `git log -p ROADMAP.md`, for how the
+queue has changed) before starting a chunk, and update it in the same
+commit as the work at handoff. A markdown file in the repo is diffable,
+blame-able, and travels with the branch that implements it — a Google Doc
+is none of those things to an agent working from the checked-out tree.
 
 ---
 
-## Next up
+## Current position
 
-No scheduled work. `puddle`, `globe`, `matrix code`, `chain haze` and
-`stock market` — the five commissioned pieces (see INSPIRATION.md) — have
-all shipped, `stock market` last (seventeenth piece), closing out that
-outstanding work. Pointer interaction, full 3D orientation, drag-to-orbit,
-and exact Source export shipped in 1.3.0. Seven cursor-interaction modes
-across all twelve pieces the library then held shipped in 1.4.0. The
-sectioned control panel, colour picker and mobile sheet shipped alongside.
+Work is tracked as **PR #5** (`codex/collection-redesign-wake` → `main`,
+draft — not ready to merge). The five replacement pages, gallery cards,
+thumbnails, and baked downloads exist and are committed on that branch.
+Pleat, Driftwork, and Cipher Bloom are implemented and ready for visual
+review; Parallax is in progress (Speed is now wired independently of
+Motion, see `tools/test-parallax.mjs`; depth/occlusion tuning remains);
+Lacuna remains a draft. Their generated assets and targeted checks passed;
+the collection-wide release pass remains deferred.
+Cursor separation and Wake are already in the branch's committed history.
+
+The agreed direction remains
+[Collection Redesign and Wake](docs/superpowers/specs/2026-09-12-collection-redesign-and-wake-design.md).
+This roadmap replaces the open-ended execution queue with seven bounded
+deliverables. Existing detailed implementation plans are reference material;
+their task order must not cause a finished chunk to expand into the next.
+
+Source inspection shows why more work remains:
+
+- Pleat now uses filled rectangular folds. Driftwork now uses alternating
+  tangent-aligned ellipses following two crossing currents.
+- All fourteen Pleat controls passed targeted checks. Cipher Bloom's formerly
+  dead Stroke control is now live; Parallax's renderer still does not use
+  Speed.
+- Lacuna rotates its arcs around a fixed centre; the design calls for Angle
+  to move the calm zone around the frame.
+- Wake needs the outstanding stationary-pointer fade concern resolved.
+- Documentation and collection measurements still describe removed pieces.
+
+Only focused Pleat implementation checks were run for the first chunk.
+The user's request to skip the extra QA round remains in effect; a passing
+build or control check is not user visual acceptance.
+
+## Delivery rules
+
+- Work on one named chunk at a time. Each ends with its own preview, a short
+  change summary, and an explicit list of anything still unresolved.
+- Preserve the current drafts in a local checkpoint before further renderer
+  edits. Stage only this redesign's files; do not discard the dirty worktree.
+- Reuse the existing controls, color helpers, animation loop, and export
+  paths. Keep seventeen artworks and a separate optional Wake mechanism.
+- Each artwork chunk owns its source, five presets, manifest/README copy,
+  and generated thumbnail/download. Rebuild generated assets for handoff;
+  do not edit baked HTML manually.
+- Limit implementation checks to the changed behavior. Reserve collection
+  QA for the final delivery chunk; do not repeat a full audit after each edit.
+- A chunk is finished only when its stated outcome is met. If it is still a
+  draft, say so. Do not move to another artwork to compensate for it.
+- Freeze accepted chunks unless a concrete defect or user feedback reopens
+  them. No additional canvases, cursor modes, dependencies, or gallery
+  redesign are part of this queue.
+
+## Chunk 1 — Pleat: implemented — ready for review
+
+Implemented filled coral-and-ivory bands, five presets, and transformed
+filled-polygon SVG export. Pleat-only asset generation, all fourteen controls,
+SVG serialization/compatibility, manifest verification, and standalone baked
+rendering passed. The default thumbnail was inspected. User visual acceptance
+and collection release QA remain pending.
+
+Default preview: http://127.0.0.1:4173/downloads/pleat.html . Interactive
+controls: http://127.0.0.1:4173/pieces/pleat/ . Pre-edit checkpoint:
+`/private/tmp/linefield-pleat-checkpoint.DbF6HC/before-pleat.tar.gz`.
+
+**Outcome:** Two material-like folded bands made from filled marks, separated
+by deliberate cuts of empty space. Recognizable without its label and
+visibly different from Driftwork and the existing line fields.
+
+**Scope:** `pieces/pleat/index.html`, its entry in `pieces.json`, README piece
+copy, and generated `thumbs/pleat.png`, `downloads/pleat.html`, `index.html`.
+If filled SVG geometry requires a small additive change in
+`shared/export.js`, include it here while preserving existing callers.
+
+- [x] Replace the current sinusoidal polylines with coherent filled marks
+  following two folds. Use the approved restrained coral/ivory direction.
+- [x] Make Motion control fold depth, Speed advance the field, and Phase
+  offset the bands. Keep Angle geometry consistent between canvas and SVG.
+- [x] Tune the five presets so they differ in composition or sampling as
+  well as brightness. Preserve an identifiable quiet region for text.
+- [x] Refresh the preview and generated assets. Check the changed controls
+  and filled SVG geometry without starting a collection-wide QA cycle.
+- [x] Hand off Pleat alone and stop. Do not start Driftwork in this task.
+
+**Finish line:** One convincing Pleat, working controls for its new form,
+matching export geometry, and a reviewable checkpoint.
+
+## Chunk 2 — Driftwork: implemented — ready for review
+
+Implemented two crossing S-shaped currents from tangent-aligned violet-grey
+ellipse links. Driftwork-only asset generation, all fourteen controls, five
+presets, rotated SVG geometry, standalone baked rendering, manifest
+verification, and whitespace checks passed. User visual acceptance and
+collection release QA remain pending.
+
+Interactive preview: http://127.0.0.1:4173/pieces/driftwork/?preview=1 .
+Pre-edit checkpoint:
+`/private/tmp/linefield-driftwork-checkpoint.Dj9gKV/before-driftwork.tar.gz`.
+SVG geometry is exact; its styling retains the library's existing black 1px
+line-art treatment rather than the canvas color and glow.
+
+**Outcome:** Small alternating ellipses following two crossing S-shaped
+currents, with depth carried by size, spacing, and fading.
+
+**Scope:** `pieces/driftwork/index.html` and its manifest, README, thumbnail,
+download, and gallery output.
+
+- [x] Replace continuous strands with ellipse marks oriented along each
+  current's tangent. Dissolve the marks toward the frame edges.
+- [x] Separate link travel (Speed) from evolving currents (Motion), tune the
+  five presets, and retain the approved cool violet-grey starting palette.
+- [x] Refresh assets and hand off this piece in isolation.
+
+**Finish line:** Its linked texture and crossing silhouette remain distinct
+from Pleat even in monochrome. No changes to accepted Pleat geometry.
+
+## Chunk 3 — Cipher Bloom: implemented — ready for review
+
+Implemented a compressed, oblique band of rotated glyph fragments with a
+bright core and quiet upper-left. Stroke now adds glyph weight; Scale changes
+both type size and band breadth; Speed and Motion use independent travel and
+identity clocks. Cipher Bloom-only assets, presets, standalone baking, SVG
+geometry, XML-safe quoted font serialization, manifest verification, and
+focused export tests passed. Collection-wide QA remains deferred.
+
+Interactive preview: http://127.0.0.1:4173/pieces/cipher-bloom/?preview=1 .
+Pre-edit checkpoint:
+`/private/tmp/linefield-cipher-checkpoint.uBXH3f/before-cipher-bloom.tar.gz`.
+
+**Outcome:** A drifting band of irregular glyph fragments, with a bright core
+and dissolving edges; roughly half the composition remains quiet.
+
+**Scope:** `pieces/cipher-bloom/index.html`, its generated assets and copy;
+`shared/export.js` only for a necessary, backward-compatible text export fix.
+
+- [x] Make Stroke visibly affect glyph weight and make Scale control glyph
+  size/band breadth consistently. Refine the irregular grid and presets.
+- [x] Preserve deterministic glyph changes and separate band travel from
+  identity churn.
+- [x] Align SVG text anchoring with canvas text and safely serialize the
+  font family, including quoted names. Refresh assets and hand off.
+
+**Finish line:** A complete typographic artwork with functioning controls
+and usable SVG text output, not just a newly named page.
+
+## Chunk 4 — Parallax: in progress
+
+**Outcome:** A diagonal fan divides around an implied volume, with visible
+near/far depth and a quiet centre.
+
+**Scope:** `pieces/parallax/index.html` and its generated assets/copy.
+
+- [x] Make Speed move the field through the lens; keep Motion responsible
+  for lens drift/depth. `travel` (Speed) and `lensTime` (Motion) are now
+  independent clocks; `tools/test-parallax.mjs` asserts Speed is non-dead
+  without a browser. Near/far width and brightness differences still need
+  strengthening.
+- [ ] Keep occluded path segments separate and transformed SVG geometry
+  consistent with the canvas. Tune the presets and refresh assets.
+
+**Finish line:** Depth is legible at card size, Speed works, and occlusion
+does not produce connecting lines across the intended empty volume.
+
+## Chunk 5 — Lacuna: close the calm-zone composition
+
+**Outcome:** Broken, locally coherent caustic arcs surround an off-centre calm
+zone, gathering on one side and opening on the other.
+
+**Scope:** `pieces/lacuna/index.html` and its generated assets/copy.
+
+- [ ] Bring Angle's calm-zone placement and wave interference into line
+  with the agreed direction; keep arc reach, drift, and phase distinct.
+- [ ] Tune the quiet region and five presets at the actual gallery capture
+  viewport. Refresh assets and hand off.
+
+**Finish line:** The composition reads clearly at card size and its controls
+describe the intended form. Keep changes bounded to Lacuna.
+
+## Chunk 6 — Wake: an independent delivery
+
+**Outcome:** A standalone optional cursor mechanism with a finite, clean fade.
+This chunk can be completed independently of chunks 1–5.
+
+**Scope:** `interactions/wake.js`, `interactions/wake/index.html`, the existing
+`tools/test-interactions.mjs`, and Wake integration documentation.
+
+- [ ] Resolve the stationary-pointer behavior: expired history must not
+  continually seed a fresh dot while the pointer remains still.
+- [ ] Preserve default-off/reduced-motion behavior, zero strength, overlay
+  isolation, resize handling, and full teardown.
+- [ ] Extend the existing interaction check only for the specific fade
+  regression when implementing the fix. Hand off the standalone demo.
+
+**Finish line:** Move, stop, and leave the pointer: the marks disappear and
+stay gone until movement resumes. Artwork exports remain independent.
+
+**Separate PR boundary:** Cursor removal + Wake + its gallery section/docs
+can ship without the five replacement renderers. Preserve the uncommitted
+artwork work before preparing that branch; never mix draft renderer files
+into the Wake-only diff.
+
+## Chunk 7 — Collection handoff and PR
+
+**Depends on:** The five artwork chunks accepted; include Wake only if its
+chunk is closed or has already shipped independently.
+
+- [ ] Update README, CHANGELOG, BRIEF, INSPIRATION, and this roadmap where
+  they still describe removed artworks as current. Preserve historical
+  design decisions as history, not active promises.
+- [ ] Rebuild once after final content changes and refresh the collection
+  measurements. Retire the obsolete measurements below as current guidance.
+- [ ] Perform one bounded release pass: existing control/preset checks for
+  replacements, source/baked/export checks, Wake's existing test, and a
+  collection comparison at the shipping viewport. Fix failures in the
+  owning chunk; do not use this pass to launch another redesign.
+- [ ] Package the branch and PR with concrete previews and an accurate
+  statement of what passed and what remains deferred. If the user continues
+  to defer release QA, label the PR as a draft with verification outstanding.
+
+**Finish line:** A reviewable PR with current generated assets, truthful
+documentation, and no unnamed follow-up work. Publishing/merging is a
+separate action from preparing that handoff.
+
+## Next task prompt
+
+> Finish roadmap chunk 4: Parallax only. Make Speed move the field through the
+> lens, retain Motion for lens drift and depth, strengthen near/far contrast,
+> keep transformed SVG segments separate across the implied volume, update its
+> presets and generated assets, then stop. Keep Pleat, Driftwork, and Cipher
+> Bloom unchanged unless user feedback or a concrete defect reopens them. Keep
+> Lacuna and Wake unchanged. Collection-wide QA remains deferred.
 
 ---
 
@@ -62,74 +292,21 @@ exists; a full build reads defaults and presets off the running page via
 section, so a future limitations bullet leading with a backticked slug would
 be misread as a piece claim. Both fail loudly, neither fails silently.
 
-**Shrink cannot read on marks that are already near sub-pixel width.**
-`grain-field` and `synapse` draw their finest strokes close to the width
-floor a browser can render distinctly, and Shrink narrows from there.
-Widening the falloff radius was tried on both and did not help — it
-enlarges the affected area without deepening the effect, so the marks
-inside it dim rather than visibly narrow. Left as a limitation rather than
-a bug: the mode is wired correctly and reads on the other pieces.
-
-**`rainfall`'s Vortex reads as lateral wind, not rotation.** A drop's
-vertical position is time-driven rather than angle-driven, so only the
-horizontal component of the tangential motion a true vortex would apply is
-expressible in the draw model — the construction underneath is a genuine
-rotation, but nothing vertical can carry it. Fixing this means giving
-`rainfall` a second, angle-driven vertical term specifically for Vortex,
-which no other mode on this piece needs.
-
-**`flow-field`'s Grow/Shrink are invisible at Speed 0.** Both modes act
-only on `lineWidth`; flow-field draws each particle as a segment from `p.x`
-to `p.x + cos(angle) * 260 * values.speed * dt`, so at Speed 0 that segment
-has zero length, and a zero-length butt-capped stroke draws no pixels at
-any width. `tools/test-interactions.mjs`'s widened Speed-0 loop (added
-2026-09-11) measured this at 0.000% and excludes it explicitly via
-`SPEED0_KNOWN_DEAD`, with the same measurement recorded in that file's own
-comment — every OTHER piece clears the 0.05% floor under identical
-conditions (Grow 0.249-24.274%, Shrink 0.206-3.602%), so this is
-flow-field's draw model specifically, not a gate set too high. In the
-letter of CONTRIBUTING's contract this IS cursor response
-gated on `speed` — not through `modeFactor`, which is unaffected, but
-through the absence of any geometry for a wider line to apply to. Fixing it
-means giving flow-field a minimum segment length (or a dot fallback) when
-`values.speed` is 0, which changes rendered output and needs its own
-`npm run build` and visual review — deferred, not fixed in this pass.
-
 **`pieces/_template/` has no automated coverage at all.** It is excluded
 from `pieces.json`, and every gate that derives its piece list from that
-manifest — `tools/test-cursor-modes.mjs`, `tools/test-bake-fresh.mjs`,
-`tools/test-presets.mjs`'s check 8 sweep, and the build's capture paths —
+manifest — `tools/test-bake-fresh.mjs`, `tools/test-presets.mjs`'s check 8
+sweep, and the build's capture paths —
 therefore never touches it. A regression in the scaffold that every new
 piece is forked from ships uncaught; only `CONTRIBUTING.md`'s manual
 "verify visually in a browser" step would catch it, and only if someone
 happens to open the template itself rather than a piece copied from it.
 
-**`accretion`'s Particle Trail reads boldest of the per-element pieces.**
-Judged against the five that existed when this was written; the three
-per-element pieces added since (`matrix-code`, `chain-haze`,
-`stock-market`) have not been compared against it. Its partial-clear fade
-compounds the overlay across frames — each frame's marks blend with what the
-previous frame already drew, rather than starting from a clean slate the way
-a full-clear piece does. Cosmetic, unresolved.
-
-**The Pointer-as-number assertion (`tools/test-interactions.mjs`) runs at a
-thin margin on most pieces** — measured 2026-09-11 at 0.087-0.126% against a
-0.05% floor on ten of the twelve pieces that existed at that date, before
-the five commissioned pieces landed (the exceptions are the two accumulator
-pieces: `flow-field` 15.309%, `accretion` 6.338%; the five newer pieces have
-not been re-measured, though the gate itself runs on them) — because it is
-pinned to the deliberately faint Particle Trail overlay, chosen so a
-regression in a per-piece mode cannot masquerade as a Pointer failure (see
-that assertion's own comment). A future retune of the overlay's tuning
-(particle count, size, alpha) could flip many pieces' margins at once and
-read as a Pointer regression across the board rather than what it actually
-is. The widened Speed-0 loop added alongside this measurement inherits the
-same fragility for its own Particle-Trail-at-Speed-0 case: 0.079-0.123% on
-the same ten pieces, same floor, same overlay, same risk.
-
 ---
 
 ## Collection constraints for an eighteenth piece
+
+Historical baseline: the table below measures the removed artworks. Do not
+use it to judge the replacement set until chunk 7 refreshes these numbers.
 
 Measured across all seventeen shipped pieces, from their generated
 thumbnails: mean rendered hue (weighted by colourfulness), mean saturation,
@@ -204,6 +381,10 @@ library cannot currently do, and each would yield more than one piece.
 - Framework wrappers (React / Vue / Svelte components)
 - Framer and Webflow embed instructions
 - Live parameter sharing via URL hash — a tuned piece becomes a link
+- 3D shape layer/compositing — allow a piece to incorporate an authored 3D
+  form while preserving the self-contained export model. Explore after the
+  replacement collection ships; choose projected geometry, a reusable shape
+  input, or optional WebGL only when the visual need is clear.
 - WebGL versions of the heavier pieces
 - A community piece submission flow
 
@@ -264,29 +445,3 @@ blank-canvas check, which hid the problem instead of fixing it.
 pieces that were each individually correct and collectively looked like one
 thing five times, because every review judged a piece against its own intent
 and never against the others.
-
-**A diff percentage is not visibility.** `event-horizon`'s Shrink changed
-10.67% of sampled pixels and was invisible to a human, because the change
-sat entirely within the disc's own silhouette. Conversely `rainfall`'s
-Shrink measured twice the gate threshold and was invisible because only
-about three of thirty drops fell inside the falloff radius. Every
-threshold-based gate in this repo inherits this limit: it proves something
-changed, never that anyone can see it.
-
-**A review instrument must answer the question you are asking.** The first
-collection sheets showed the twelve pieces of the day under one mode,
-full-frame. That
-compares pieces to each other but never to their own baseline, and a
-1280-wide frame squeezed into a grid column loses any local effect.
-Rebuilt as paired 1:1 crops — None beside the mode, same seed and frame
-count, cropped to the cursor. The earlier instrument produced a confident
-"inconclusive" that the better one overturned in both directions. This
-sharpens two entries above: "Judge at the viewport that ships" and "Judge
-the collection, not just the piece" both assume the instrument shows what
-it claims to; this is what happens when it doesn't.
-
-**A named mode means one thing; the mechanism may differ.** Grow is
-literal on eight pieces and amplification on nine, because canvas cannot
-vary stroke width within a single path. What keeps that honest is looking
-at all seventeen under each mode and asking whether they read as the same
-intent — which no automated gate can answer.

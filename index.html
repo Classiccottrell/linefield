@@ -71,6 +71,17 @@
     border:1px solid var(--line);padding:4px 8px;border-radius:2px;
   }
 
+  .mechanisms{margin:48px 0 0;padding-top:24px;border-top:1px solid var(--line)}
+  .mechanism{display:block;color:inherit;text-decoration:none}
+  .mechanism:hover .mechanism-title{color:#9fd0dd}
+  .mechanism:focus-visible{outline:2px solid #6fb4c9;outline-offset:4px}
+  .mechanism-label{
+    color:var(--muted);font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+    letter-spacing:.06em;text-transform:uppercase;
+  }
+  .mechanism-title{margin:8px 0 4px;font-size:20px;font-weight:600;letter-spacing:-.01em}
+  .mechanism-copy{color:var(--muted);font-size:15px;margin:0}
+
 
   .actions{display:flex;flex-wrap:wrap;gap:8px}
   .btn{
@@ -364,102 +375,110 @@
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
-  <article class="card" data-tags="optical organic" style="--accent:hsl(112 42% 60%)">
-    <a class="frame" href="pieces/puddle/" data-src="pieces/puddle/" aria-label="Open Puddle">
-      <img src="thumbs/puddle.png" alt="Puddle preview" loading="lazy" width="240" height="150" />
+  <article class="card" data-tags="optical organic sparse" style="--accent:hsl(198 24% 60%)">
+    <a class="frame" href="pieces/lacuna/" data-src="pieces/lacuna/" aria-label="Open Lacuna">
+      <img src="thumbs/lacuna.png" alt="Lacuna preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(112 42% 60%),hsl(138 42% 60%))"></span>
-        Puddle
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(198 24% 60%),hsl(224 24% 60%))"></span>
+        Lacuna
       </h2>
-      <p class="blurb">Bounded, organic interference rippling across a puddle's surface.</p>
-      <div class="tags"><span class="tag">optical</span><span class="tag">organic</span></div>
+      <p class="blurb">Broken caustic arcs gather around an off-centre calm zone.</p>
+      <div class="tags"><span class="tag">optical</span><span class="tag">organic</span><span class="tag">sparse</span></div>
       <div class="actions">
-        <a class="btn" href="pieces/puddle/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/puddle/">Copy embed</button>
-        <a class="btn" href="downloads/puddle.html" download>Download</a>
+        <a class="btn" href="pieces/lacuna/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/lacuna/">Copy embed</button>
+        <a class="btn" href="downloads/lacuna.html" download>Download</a>
       </div>
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
-  <article class="card" data-tags="3d geometric" style="--accent:hsl(340 40% 60%)">
-    <a class="frame" href="pieces/globe/" data-src="pieces/globe/" aria-label="Open Globe">
-      <img src="thumbs/globe.png" alt="Globe preview" loading="lazy" width="240" height="150" />
+  <article class="card" data-tags="depth optical sparse" style="--accent:hsl(344 30% 60%)">
+    <a class="frame" href="pieces/parallax/" data-src="pieces/parallax/" aria-label="Open Parallax">
+      <img src="thumbs/parallax.png" alt="Parallax preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(340 40% 60%),hsl(355 40% 60%))"></span>
-        Globe
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(344 30% 60%),hsl(24 30% 60%))"></span>
+        Parallax
       </h2>
-      <p class="blurb">A latitude/longitude wire mesh bending into a spinning sphere.</p>
-      <div class="tags"><span class="tag">3d</span><span class="tag">geometric</span></div>
+      <p class="blurb">A rose-to-amber fan parts around an unseen volume, with near strands slipping past finer distant lines.</p>
+      <div class="tags"><span class="tag">depth</span><span class="tag">optical</span><span class="tag">sparse</span></div>
       <div class="actions">
-        <a class="btn" href="pieces/globe/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/globe/">Copy embed</button>
-        <a class="btn" href="downloads/globe.html" download>Download</a>
+        <a class="btn" href="pieces/parallax/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/parallax/">Copy embed</button>
+        <a class="btn" href="downloads/parallax.html" download>Download</a>
       </div>
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
-  <article class="card" data-tags="glyph grid" style="--accent:hsl(132 55% 60%)">
-    <a class="frame" href="pieces/matrix-code/" data-src="pieces/matrix-code/" aria-label="Open Matrix Code">
-      <img src="thumbs/matrix-code.png" alt="Matrix Code preview" loading="lazy" width="240" height="150" />
+  <article class="card" data-tags="glyph organic sparse" style="--accent:hsl(42 22% 60%)">
+    <a class="frame" href="pieces/cipher-bloom/" data-src="pieces/cipher-bloom/" aria-label="Open Cipher Bloom">
+      <img src="thumbs/cipher-bloom.png" alt="Cipher Bloom preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(132 55% 60%),hsl(145 55% 60%))"></span>
-        Matrix Code
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(42 22% 60%),hsl(76 22% 60%))"></span>
+        Cipher Bloom
       </h2>
-      <p class="blurb">Quantized columns of glyphs that churn identity independently of their falling head.</p>
-      <div class="tags"><span class="tag">glyph</span><span class="tag">grid</span></div>
+      <p class="blurb">Irregular glyphs gather into a bright oblique core, then dissolve into warm chalk and shadow.</p>
+      <div class="tags"><span class="tag">glyph</span><span class="tag">organic</span><span class="tag">sparse</span></div>
       <div class="actions">
-        <a class="btn" href="pieces/matrix-code/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/matrix-code/">Copy embed</button>
-        <a class="btn" href="downloads/matrix-code.html" download>Download</a>
+        <a class="btn" href="pieces/cipher-bloom/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/cipher-bloom/">Copy embed</button>
+        <a class="btn" href="downloads/cipher-bloom.html" download>Download</a>
       </div>
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
-  <article class="card" data-tags="depth geometric" style="--accent:hsl(96 22% 60%)">
-    <a class="frame" href="pieces/chain-haze/" data-src="pieces/chain-haze/" aria-label="Open Chain Haze">
-      <img src="thumbs/chain-haze.png" alt="Chain Haze preview" loading="lazy" width="240" height="150" />
+  <article class="card" data-tags="organic depth kinetic" style="--accent:hsl(250 16% 60%)">
+    <a class="frame" href="pieces/driftwork/" data-src="pieces/driftwork/" aria-label="Open Driftwork">
+      <img src="thumbs/driftwork.png" alt="Driftwork preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(96 22% 60%),hsl(108 22% 60%))"></span>
-        Chain Haze
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(250 16% 60%),hsl(278 16% 60%))"></span>
+        Driftwork
       </h2>
-      <p class="blurb">Lines of chains receding into the distance, discrete linked ovals fading with depth.</p>
-      <div class="tags"><span class="tag">depth</span><span class="tag">geometric</span></div>
+      <p class="blurb">Violet-grey ellipse marks drift through two crossing currents, gathering and dissolving like woven air.</p>
+      <div class="tags"><span class="tag">organic</span><span class="tag">depth</span><span class="tag">kinetic</span></div>
       <div class="actions">
-        <a class="btn" href="pieces/chain-haze/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/chain-haze/">Copy embed</button>
-        <a class="btn" href="downloads/chain-haze.html" download>Download</a>
+        <a class="btn" href="pieces/driftwork/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/driftwork/">Copy embed</button>
+        <a class="btn" href="downloads/driftwork.html" download>Download</a>
       </div>
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
-  <article class="card" data-tags="geometric grid" style="--accent:hsl(78 50% 60%)">
-    <a class="frame" href="pieces/stock-market/" data-src="pieces/stock-market/" aria-label="Open Stock Market">
-      <img src="thumbs/stock-market.png" alt="Stock Market preview" loading="lazy" width="240" height="150" />
+  <article class="card" data-tags="geometric organic editorial" style="--accent:hsl(12 30% 60%)">
+    <a class="frame" href="pieces/pleat/" data-src="pieces/pleat/" aria-label="Open Pleat">
+      <img src="thumbs/pleat.png" alt="Pleat preview" loading="lazy" width="240" height="150" />
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(78 50% 60%),hsl(92 50% 60%))"></span>
-        Stock Market
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(12 30% 60%),hsl(38 30% 60%))"></span>
+        Pleat
       </h2>
-      <p class="blurb">Tracks of rising and falling bars marching across the field, buy and sell rendered as filled rectangles.</p>
-      <div class="tags"><span class="tag">geometric</span><span class="tag">grid</span></div>
+      <p class="blurb">Coral and ivory marks gather into two folded surfaces, divided by a clean cut of space.</p>
+      <div class="tags"><span class="tag">geometric</span><span class="tag">organic</span><span class="tag">editorial</span></div>
       <div class="actions">
-        <a class="btn" href="pieces/stock-market/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/stock-market/">Copy embed</button>
-        <a class="btn" href="downloads/stock-market.html" download>Download</a>
+        <a class="btn" href="pieces/pleat/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/pleat/">Copy embed</button>
+        <a class="btn" href="downloads/pleat.html" download>Download</a>
       </div>
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
 </div>
+
+<section class="mechanisms" aria-label="Interaction mechanisms">
+  <a class="mechanism" href="interactions/wake/">
+    <span class="mechanism-label">Interaction mechanism</span>
+    <h2 class="mechanism-title">Wake</h2>
+    <p class="mechanism-copy">A separate cursor current for any canvas.</p>
+  </a>
+</section>
 
 <section class="skill">
   <h2>The skill that built this</h2>
@@ -706,16 +725,17 @@ const PIECES = [
     ]
   },
   {
-    "slug": "puddle",
-    "title": "Puddle",
-    "blurb": "Bounded, organic interference rippling across a puddle's surface.",
+    "slug": "lacuna",
+    "title": "Lacuna",
+    "blurb": "Broken caustic arcs gather around an off-centre calm zone.",
     "tags": [
       "optical",
-      "organic"
+      "organic",
+      "sparse"
     ],
-    "hue": 112,
-    "hueB": 138,
-    "saturation": 0.42,
+    "hue": 198,
+    "hueB": 224,
+    "saturation": 0.24,
     "presets": [
       "whisper",
       "ink",
@@ -725,53 +745,36 @@ const PIECES = [
     ]
   },
   {
-    "slug": "globe",
-    "title": "Globe",
-    "blurb": "A latitude/longitude wire mesh bending into a spinning sphere.",
-    "tags": [
-      "3d",
-      "geometric"
-    ],
-    "hue": 340,
-    "hueB": 355,
-    "saturation": 0.4,
-    "presets": [
-      "whisper",
-      "ink",
-      "neon",
-      "drift",
-      "dense"
-    ]
-  },
-  {
-    "slug": "matrix-code",
-    "title": "Matrix Code",
-    "blurb": "Quantized columns of glyphs that churn identity independently of their falling head.",
-    "tags": [
-      "glyph",
-      "grid"
-    ],
-    "hue": 132,
-    "hueB": 145,
-    "saturation": 0.55,
-    "presets": [
-      "whisper",
-      "ink",
-      "neon",
-      "drift",
-      "dense"
-    ]
-  },
-  {
-    "slug": "chain-haze",
-    "title": "Chain Haze",
-    "blurb": "Lines of chains receding into the distance, discrete linked ovals fading with depth.",
+    "slug": "parallax",
+    "title": "Parallax",
+    "blurb": "A rose-to-amber fan parts around an unseen volume, with near strands slipping past finer distant lines.",
     "tags": [
       "depth",
-      "geometric"
+      "optical",
+      "sparse"
     ],
-    "hue": 96,
-    "hueB": 108,
+    "hue": 344,
+    "hueB": 24,
+    "saturation": 0.3,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
+  },
+  {
+    "slug": "cipher-bloom",
+    "title": "Cipher Bloom",
+    "blurb": "Irregular glyphs gather into a bright oblique core, then dissolve into warm chalk and shadow.",
+    "tags": [
+      "glyph",
+      "organic",
+      "sparse"
+    ],
+    "hue": 42,
+    "hueB": 76,
     "saturation": 0.22,
     "presets": [
       "whisper",
@@ -782,16 +785,37 @@ const PIECES = [
     ]
   },
   {
-    "slug": "stock-market",
-    "title": "Stock Market",
-    "blurb": "Tracks of rising and falling bars marching across the field, buy and sell rendered as filled rectangles.",
+    "slug": "driftwork",
+    "title": "Driftwork",
+    "blurb": "Violet-grey ellipse marks drift through two crossing currents, gathering and dissolving like woven air.",
+    "tags": [
+      "organic",
+      "depth",
+      "kinetic"
+    ],
+    "hue": 250,
+    "hueB": 278,
+    "saturation": 0.16,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
+  },
+  {
+    "slug": "pleat",
+    "title": "Pleat",
+    "blurb": "Coral and ivory marks gather into two folded surfaces, divided by a clean cut of space.",
     "tags": [
       "geometric",
-      "grid"
+      "organic",
+      "editorial"
     ],
-    "hue": 78,
-    "hueB": 92,
-    "saturation": 0.5,
+    "hue": 12,
+    "hueB": 38,
+    "saturation": 0.3,
     "presets": [
       "whisper",
       "ink",

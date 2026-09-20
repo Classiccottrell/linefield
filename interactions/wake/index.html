@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wake</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; overflow: hidden; background: #101218; color: #cbd1d9; font: 14px/1.4 system-ui, sans-serif; }
+  #wake-stage { display: block; width: 100vw; height: 100vh; }
+  form { position: fixed; top: 18px; left: 18px; display: grid; gap: 10px; padding: 12px; background: #101218cc; border: 1px solid #2b3039; }
+  label { display: flex; gap: 8px; align-items: center; }
+</style>
+<canvas id="wake-stage" aria-label="Wake interaction stage"></canvas>
+<form>
+  <label><input id="wake-enabled" type="checkbox"> Enable Wake</label>
+  <label>Strength <input id="wake-strength" type="range" min="0" max="1.5" step=".01" value=".65"></label>
+</form>
+<script type="module">
+  import { createWake } from '../wake.js';
+
+  const stage = document.querySelector('#wake-stage');
+  const enabled = document.querySelector('#wake-enabled');
+  const strength = document.querySelector('#wake-strength');
+  const drawStage = () => {
+    const ratio = devicePixelRatio || 1;
+    stage.width = innerWidth * ratio;
+    stage.height = innerHeight * ratio;
+    const context = stage.getContext('2d');
+    context.scale(ratio, ratio);
+    context.strokeStyle = '#252a34';
+    context.lineWidth = 1;
+    for (let x = 0; x < innerWidth; x += 40) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x, innerHeight); context.stroke(); }
+    for (let y = 0; y < innerHeight; y += 40) { context.beginPath(); context.moveTo(0, y); context.lineTo(innerWidth, y); context.stroke(); }
+    context.fillStyle = '#7f8999';
+    context.font = '16px system-ui';
+    context.fillText('move slowly / move quickly', 18, innerHeight - 24);
+  };
+  drawStage();
+  addEventListener('resize', drawStage);
+  const wake = createWake({ target: stage, strength: 0.65, enabled: false });
+  window.__LF_WAKE__ = wake;
+  enabled.addEventListener('input', () => wake.setEnabled(enabled.checked));
+  strength.addEventListener('input', () => wake.setStrength(strength.value));
+</script>

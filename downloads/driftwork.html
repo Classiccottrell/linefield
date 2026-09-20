@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — chain haze</title>
+<title>linefield — driftwork</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.22,"colorMode":"gradient","colorA":"#8fae9e","colorB":"#7fa0c2","hue":96,"hueB":108,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"linkAspect":0.55};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":0.55,"stroke":0.9,"opacity":0.88,"saturation":0.16,"colorMode":"gradient","colorA":"#a6a1b8","colorB":"#beb3c6","hue":250,"hueB":278,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -208,149 +208,14 @@ function paletteHsl(values, f) {
 }
 
 
-// --- inlined: ../../shared/cursor-modes.js ---
-// shared/cursor-modes.js
-// A leaf module: no imports, matching every other shared module, so the bake
-// inliner picks it up from a piece's own import line.
-
-const CURSOR_MODES = [
-  'None', 'Grow', 'Shrink', 'Particle Trail', 'Ripples', 'Attract', 'Vortex',
-];
-
-// Trail and Ripples are cursor effects, not piece effects, so they live here
-// once rather than twelve times. They keep their OWN aged memory and redraw
-// every surviving mark from scratch each frame: ten pieces clear the canvas
-// fully each frame (marks would vanish) and two repaint translucent to
-// accumulate trails (marks would smear at the piece's fade rate, untunable).
-//
-// CONTRACT, binding on every piece that wires this in (see CONTRIBUTING.md,
-// "Cursor interaction"): call `.draw()` AFTER the piece has cleared the
-// canvas and drawn its own frame for this tick — as the very last thing in
-// the frame, not before it. `.step()` has no such constraint; call it
-// whenever convenient in onFrame, typically right after `pointer.step()`.
-// A piece that draws BEFORE its own clear renders nothing: a full-clear
-// piece's fillRect/clearRect wipes the overlay's marks along with
-// everything else drawn that frame. Ten of the twelve pieces in this
-// library do a full clear every frame, so this is the common case, not an
-// edge case.
-function createCursorOverlay() {
-  let marks = [];
-  let lastX = null, lastY = null;
-
-  return {
-    // Called once per frame from the piece's onFrame, before drawing.
-    step(mode, k, pointer) {
-      if (!k || (mode !== 'Particle Trail' && mode !== 'Ripples')) {
-        if (marks.length) marks = [];
-        return;
-      }
-      const now = performance.now();
-      if (mode === 'Particle Trail' && pointer.active) {
-        const moved = lastX === null || Math.hypot(pointer.x - lastX, pointer.y - lastY) > 6;
-        // A movement-only trigger leaves nothing to sample once the cursor
-        // stops (or, under the deterministic harness's single pointermove,
-        // once the last particle's life has elapsed against a run that
-        // steps thousands of ms) — that read as inert on every full-clear
-        // piece, which repaints from nothing each frame and so has no
-        // accumulated trace once the emission expires. Throttled re-emission
-        // while the pointer is present, mirroring Ripples below, keeps the
-        // trail alive regardless of whether the cursor is moving.
-        const lastDot = marks.length ? marks[marks.length - 1] : null;
-        const stale = !lastDot || now - lastDot.born > 45;
-        if (moved || stale) {
-          // Dust, not beads: a scattered cluster of small, faint, varied-
-          // size particles around the cursor (not centred on a single
-          // point), each drifting apart as it ages. Density (particle
-          // count) carries the effect's visibility, not size or opacity —
-          // those stay small/low so the overlay doesn't outweigh a piece's
-          // own marks (grain-field's fine specks are the tuning floor).
-          const n = 22;
-          for (let i = 0; i < n; i++) {
-            const ang = Math.random() * Math.PI * 2;
-            const rad = Math.random() * 11;
-            marks.push({
-              kind: 'dot',
-              x: pointer.x + Math.cos(ang) * rad,
-              y: pointer.y + Math.sin(ang) * rad,
-              born: now, life: 650 + Math.random() * 450,
-              r: 0.5 + Math.random() * 1.6,
-              alphaMul: 0.3 + Math.random() * 0.35,
-              dx: (Math.random() - 0.5) * 50,
-              dy: (Math.random() - 0.5) * 50,
-            });
-          }
-          lastX = pointer.x; lastY = pointer.y;
-        }
-      }
-      if (mode === 'Ripples' && pointer.active) {
-        const last = marks[marks.length - 1];
-        if (!last || now - last.born > 260) {
-          marks.push({ kind: 'ring', x: pointer.x, y: pointer.y, born: now, life: 1400 });
-        }
-      }
-      marks = marks.filter((m) => now - m.born < m.life);
-      if (marks.length > 400) marks = marks.slice(-400);
-    },
-
-    // Called after the piece has drawn its own frame.
-    draw(ctx, colour, k) {
-      if (!marks.length || !k) return;
-      const now = performance.now();
-      ctx.save();
-      for (const m of marks) {
-        const age = (now - m.born) / m.life;
-        if (age >= 1) continue;
-        const alpha = (1 - age) * k;
-        if (m.kind === 'dot') {
-          ctx.globalAlpha = Math.min(alpha * (m.alphaMul ?? 1), 1);
-          ctx.fillStyle = colour;
-          ctx.beginPath();
-          ctx.arc(m.x + m.dx * age, m.y + m.dy * age, m.r, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          ctx.globalAlpha = Math.min(alpha * 0.7, 1);
-          ctx.strokeStyle = colour;
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(m.x, m.y, 12 + age * 190, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-    },
-
-    reset() { marks = []; lastX = null; lastY = null; },
-  };
-}
-
-// The strength every per-piece mode multiplies by. `pointer` is the intensity
-// control, `influence` eases the cursor entering and leaving. Nothing else —
-// in particular never `values.speed`, which a user can set to zero.
-function modeFactor(values, pointer) {
-  if (values.cursorInteraction === 'None') return 0;
-  return values.pointer * pointer.influence;
-}
-
-
 // --- inlined: ../../shared/controls.js ---
 // shared/controls.js
-
 
 // `category` routes a control to one of the panel's tiers — 'interaction',
 // 'color', or the default 'visual' — and is presentation-only: it changes
 // which DOM section a row renders in, never __LF_SPECS__'s declaration
 // order, which every gate that isn't the panel itself still reads flat.
 const SHARED_CONTROLS = [
-  // The seven cursor-interaction modes (Grow, Shrink, Particle Trail,
-  // Ripples, Attract, Vortex, None). The behaviours are wired per-piece
-  // (see shared/cursor-modes.js); this declares the shared vocabulary so
-  // it is never duplicated per piece. Until a piece reads it, this control
-  // and `pointer` audit DEAD there (tools/audit-controls.mjs's PREREQS pins
-  // the other one on when probing either in isolation, but a piece with no
-  // wiring at all still shows no effect) — expected on every piece not yet
-  // wired, not a bug.
-  { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: CURSOR_MODES, default: 'None', category: 'interaction' },
-  { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0, category: 'interaction' },
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
@@ -546,18 +411,9 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   }
 
   const values = { ...defaults, ...saved.values };
-  // A saved localStorage blob is a plain object spread above, not a
-  // setValue() call, so it never reaches clampValue's enum-membership check
-  // (see below) — a stale blob holding a mode string that was since removed
-  // or renamed (e.g. a future rename of one of the seven cursor-interaction
-  // modes) would land in `values` unvalidated: the <select> falls back to
-  // whatever its first <option> happens to be while `values` keeps the
-  // stale string, the exact divergence that check exists to prevent. Not
-  // reachable today (every currently-saved value was written by setValue,
-  // which already validates), but reachable the moment a spec's `options`
-  // changes under an existing save. Re-validate every enum field on load,
-  // same fallback rule as clampValue: an out-of-vocabulary value reverts to
-  // that control's own default, not just "whatever was previously in scope".
+  // Saved values bypass setValue(), so validate enum membership on load.
+  // An option removed or renamed since the save falls back to the control's
+  // resolved default, keeping the rendered select and values in sync.
   for (const spec of allSpecs) {
     if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
       values[spec.name] = defaults[spec.name];
@@ -611,8 +467,8 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   body.className = 'lf-body';
   panel.appendChild(body);
 
-  // Two tiers, per the brief: Interactions (cursor response, kept separate
-  // from background configuration on purpose) divided from Color+Visual.
+  // The panel configures artwork visuals: camera angles in Interactions,
+  // palette in Color, and the remaining rendering parameters in Visual.
   // Each section is a toggle-button header plus a body a category routes
   // rows into — `sectionOf` below is the single place that mapping lives.
   // Collapsing hides `.lf-section-body` via CSS only: rows stay in the DOM
@@ -1011,33 +867,66 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
 // --- inlined: ../../shared/anim.js ---
 // shared/anim.js
 
+// Max per-frame dt (seconds) after a tab-switch/GC stall, so a single huge
+// frame doesn't fling particles across the canvas. Ported from
+// cc-webgl/src/core/FrameScheduler.ts's DT_CLAMP_SECONDS.
+const ANIM_DT_CLAMP_SECONDS = 0.1;
+
 function createLoop({ onFrame, speed = 1 }) {
   let running = false;
+  let paused = false;
   let lastTime = 0;
   let elapsed = 0;
   let rafId = null;
   let currentSpeed = speed;
 
   function tick(now) {
-    if (!running) return;
-    const dt = lastTime ? (now - lastTime) / 1000 : 0;
+    if (!running || paused) return;
+    const rawDt = lastTime ? (now - lastTime) / 1000 : 0;
+    const clampedDt = Math.min(Math.max(rawDt, 0), ANIM_DT_CLAMP_SECONDS);
     lastTime = now;
-    const scaledDt = dt * currentSpeed;
+    const scaledDt = clampedDt * currentSpeed;
     elapsed += scaledDt;
     onFrame(scaledDt, elapsed);
     rafId = requestAnimationFrame(tick);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined') return;
+    if (document.hidden) {
+      paused = true;
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    } else if (running && paused) {
+      paused = false;
+      // Reset the sentinel instead of computing a real dt, so resume doesn't
+      // produce a giant catch-up frame — same reasoning as start()'s reset.
+      lastTime = 0;
+      rafId = requestAnimationFrame(tick);
+    }
   }
 
   return {
     start() {
       if (running) return;
       running = true;
+      paused = false;
       lastTime = 0;
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
       rafId = requestAnimationFrame(tick);
     },
     stop() {
       running = false;
+      paused = false;
       if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
     },
     setSpeed(n) {
       currentSpeed = n;
@@ -1081,7 +970,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -1090,13 +979,25 @@ function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
     .join('\n');
 
   const textEls = texts
-    .map(({ x, y, ch, size, fontFamily }) => {
+    .map(({ x, y, ch, size, fontFamily, anchor, baseline, rotation, strokeWidth }) => {
       const safeCh = String(ch).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${fontFamily || 'monospace'}" font-size="${size.toFixed(2)}" fill="black">${safeCh}</text>`;
+      const safeFont = String(fontFamily || 'monospace').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const placement = `${['start', 'middle', 'end'].includes(anchor) ? ` text-anchor="${anchor}"` : ''}${['central', 'middle', 'alphabetic', 'hanging'].includes(baseline) ? ` dominant-baseline="${baseline}"` : ''}${Number.isFinite(rotation) ? ` transform="rotate(${rotation} ${x} ${y})"` : ''}`;
+      const stroke = Number.isFinite(strokeWidth) && strokeWidth > 0 ? ` stroke="black" stroke-width="${strokeWidth}"` : '';
+      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${safeFont}" font-size="${size.toFixed(2)}" fill="black"${placement}${stroke}>${safeCh}</text>`;
     })
     .join('\n');
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}${polylines && textEls ? '\n' : ''}${textEls}\n</svg>`;
+  // Filled-mark pieces supply already-transformed corners; existing path
+  // and text callers retain their exact serialization when this is empty.
+  const polygonEls = polygons.map(({ points, fill = 'black', opacity = 1 }) => {
+    const pointsAttr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
 }
@@ -1145,12 +1046,8 @@ function stripInnerImports(src) {
 // inside a function body called later. controls.js is always a piece's
 // first import, so BFS always placed it first in the concatenated output —
 // fine for `hexToHue` (from color.js), which is only called inside
-// `setValue`, deferred to call time; broken for `CURSOR_MODES` (from
-// cursor-modes.js), which controls.js's top-level `const SHARED_CONTROLS =
-// [...]` reads immediately. cursor-modes.js, discovered as controls.js's own
-// import, was concatenated AFTER controls.js under BFS — a real
-// ReferenceError: Cannot access 'CURSOR_MODES' before initialization, in
-// every downloaded file, that loaded without error and rendered blank.
+// `setValue`, deferred to call time. A shared module that reads an imported
+// binding at top level instead must have that dependency emitted first.
 //
 // A post-order DFS guarantees every module's dependencies appear before it
 // in the emitted output, independent of whether the consumer reads the
@@ -1231,216 +1128,12 @@ function describeForAI({ pieceName, values }) {
 }
 
 
-// --- inlined: ../../shared/pointer.js ---
-// shared/pointer.js
-// Tracks the cursor relative to one canvas. A leaf module: no imports, no
-// state beyond its own listeners.
-
-function createPointer({ canvas, enabled = true }) {
-  const p = {
-    x: 0, y: 0, nx: 0, ny: 0, vx: 0, vy: 0,
-    active: false, influence: 0,
-  };
-
-  let lastX = 0, lastY = 0, lastT = 0;
-
-  function onMove(e) {
-    const r = canvas.getBoundingClientRect();
-    const x = (e.clientX - r.left) * (canvas.width / r.width);
-    const y = (e.clientY - r.top) * (canvas.height / r.height);
-    const t = performance.now();
-    const dt = lastT ? Math.max((t - lastT) / 1000, 1 / 240) : 0;
-    if (dt) { p.vx = (x - lastX) / dt; p.vy = (y - lastY) / dt; }
-    p.x = x; p.y = y;
-    p.nx = (x / canvas.width) * 2 - 1;
-    p.ny = (y / canvas.height) * 2 - 1;
-    p.active = true;
-    lastX = x; lastY = y; lastT = t;
-  }
-  function onEnter() { p.active = true; }
-  function onLeave() { p.active = false; }
-
-  if (enabled) {
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerenter', onEnter);
-    canvas.addEventListener('pointerleave', onLeave);
-  }
-
-  // Called once per frame by the piece. `influence` rises while the pointer
-  // is over the canvas and eases back to 0 when it leaves, so a piece never
-  // snaps as the cursor exits.
-  //
-  // It takes NO dt argument and keeps its own clock, deliberately. Influence
-  // is a UI-response quantity — how present the cursor is right now — not
-  // an animation quantity, so it should not track animation timing at all.
-  // Accepting a piece's dt would couple the two regardless of how that
-  // piece happens to apply values.speed downstream; keeping its own clock
-  // keeps cursor response independent of any piece's animation rate,
-  // including at Speed 0.
-  //
-  // performance.now() is safe under the deterministic harness: it is not
-  // frozen, it is a controlled clock that stepFrames advances 16ms per frame,
-  // so influence rises normally during an audit and two runs stay identical.
-  let stepT = 0;
-  p.step = () => {
-    const now = performance.now();
-    const dt = stepT ? Math.min((now - stepT) / 1000, 0.1) : 0;
-    stepT = now;
-    if (!dt) return;
-    const target = p.active ? 1 : 0;
-    const rate = p.active ? 6 : 2.5;
-    p.influence += (target - p.influence) * Math.min(rate * dt, 1);
-    const decay = Math.exp(-4 * dt);
-    p.vx *= decay; p.vy *= decay;
-  };
-
-  // 0..1 proximity of a canvas point to the pointer, for pieces that
-  // modulate locally rather than globally.
-  p.falloff = (x, y, radius) => {
-    if (!radius) return 0;
-    const d = Math.hypot(x - p.x, y - p.y);
-    return Math.max(0, 1 - d / radius);
-  };
-
-  p.destroy = () => {
-    canvas.removeEventListener('pointermove', onMove);
-    canvas.removeEventListener('pointerenter', onEnter);
-    canvas.removeEventListener('pointerleave', onLeave);
-  };
-
-  return p;
-}
-
-// Stateless delta emitter: holds no pitch/yaw of its own. Each drag move
-// calls onOrbit(dPitchRad, dYawRad) with the frame's delta only; the caller
-// (a piece, via panel.setValue) owns where that delta lands, so the panel's
-// Pitch/Yaw sliders and the rendered camera can never read two different
-// numbers. onSettle fires once on pointerup, for the caller to persist the
-// drag's final position without writing to localStorage on every move.
-function createOrbit({
-  canvas,
-  enabled = new URLSearchParams(location.search).get('preview') !== '1',
-  sensitivity = 0.008,
-  onOrbit = () => {},
-  onSettle = () => {},
-} = {}) {
-  let dragging = false;
-  let lastX = 0, lastY = 0;
-
-  function onDown(e) {
-    if (e.button !== 0) return;
-    dragging = true;
-    lastX = e.clientX; lastY = e.clientY;
-    canvas.setPointerCapture?.(e.pointerId);
-  }
-  function onMove(e) {
-    if (!dragging) return;
-    const dYaw = (e.clientX - lastX) * sensitivity;
-    const dPitch = (e.clientY - lastY) * sensitivity;
-    lastX = e.clientX; lastY = e.clientY;
-    onOrbit(dPitch, dYaw);
-  }
-  function onUp(e) {
-    dragging = false;
-    canvas.releasePointerCapture?.(e.pointerId);
-    onSettle();
-  }
-
-  if (enabled) {
-    canvas.addEventListener('pointerdown', onDown);
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerup', onUp);
-    canvas.addEventListener('pointercancel', onUp);
-  }
-
-  return {
-    destroy() {
-      canvas.removeEventListener('pointerdown', onDown);
-      canvas.removeEventListener('pointermove', onMove);
-      canvas.removeEventListener('pointerup', onUp);
-      canvas.removeEventListener('pointercancel', onUp);
-    },
-  };
-}
-
-
-// --- inlined: ../../shared/project.js ---
-// shared/project.js
-// 3D -> 2D projection for pieces that want perspective geometry.
-//
-// Shaped as an extension point: behaviour is configured through an options
-// bag on a camera object, so future capability (roll, camera position, an
-// orthographic mode) arrives as a new option that existing callers ignore,
-// rather than a changed signature at every call site.
-//
-// Deliberately absent, by choice rather than oversight: depth sorting and
-// occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
-
-// Rotate a point: yaw about Y, pitch about X, then roll about Z.
-function rotatePoint(x, y, z, { tilt = 0, yaw = 0, roll = 0 } = {}) {
-  const cyaw = Math.cos(yaw);
-  const syaw = Math.sin(yaw);
-  const rx = x * cyaw - z * syaw;
-  let rz = x * syaw + z * cyaw;
-
-  const ct = Math.cos(tilt);
-  const st = Math.sin(tilt);
-  const ry = y * ct - rz * st;
-  rz = y * st + rz * ct;
-
-  const cr = Math.cos(roll);
-  const sr = Math.sin(roll);
-  return { x: rx * cr - ry * sr, y: rx * sr + ry * cr, z: rz };
-}
-
-function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 } = {}) {
-  const opt = { tilt, yaw, roll, fov, cx, cy };
-
-  function project(x, y, z) {
-    const r = rotatePoint(x, y, z, opt);
-    const denom = opt.fov + r.z;
-    // Near plane sits at 20% of the fov ahead of the lens (not at the lens
-    // itself), capping scale at 1/0.2 = 5x. Without this, points just past
-    // the lens (denom -> 0) blow up toward arbitrary magnification, which
-    // canvas draw calls and exported paths share the same coordinates for —
-    // canvas just clips silently at the screen edge, export doesn't. A
-    // blown-up point lands off the visible frame whenever the near-plane
-    // crossing is off the camera's optical axis, which any meaningful tilt
-    // guarantees; a tilt at or near zero (camera roughly in the plane of
-    // the geometry) is the degenerate exception where a dropped point can
-    // still be near-frame, and dropping it can visibly change the render.
-    // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
-    // steps) at which event-horizon's SVG export at Scale 2, an angle
-    // exposing the near plane, has no coordinate over magnitude 5000. At
-    // or beyond the near plane there is no meaningful projection; scale 0
-    // is the caller's signal to skip this point.
-    const nearPlane = opt.fov * 0.2;
-    if (denom <= nearPlane) return { x: 0, y: 0, scale: 0 };
-    const scale = opt.fov / denom;
-    return { x: opt.cx + r.x * scale, y: opt.cy + r.y * scale, scale };
-  }
-
-  return {
-    project,
-    projectPath(points) {
-      return points.map((p) => project(p[0], p[1], p[2]));
-    },
-    set(partial) {
-      Object.assign(opt, partial);
-    },
-  };
-}
-
-
 // --- piece script ---
 
 
 
 
-
-
-
-  const PIECE_ID = 'chain-haze';
+  const PIECE_ID = 'driftwork';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1451,33 +1144,16 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
   window.addEventListener('resize', resize);
   resize();
 
-  // Element-based, not a path piece: each chain is a sequence of discrete
-  // linked marks (stroked ovals) walking a straight line toward a per-chain
-  // vanishing point, not one continuous stroke — the structural difference
-  // from `tether`. No Math.random() anywhere and no persistent array —
-  // every link's position is a pure function of (chain index, link index,
-  // elapsed) recomputed each frame, same discipline as `matrix-code`, so
-  // there is no density re-seed trap and thumbnail capture stays
-  // byte-identical against a pinned clock.
-  const BASE_CHAINS = 7;
-  const BASE_LINKS = 24;
-  const FOV = 520; // perspective divisor strength — see persp() below
-  const MARCH_RATE = 90; // world-depth units/sec a chain advances at speed=1
-  const MIN_SCALE = 0.38; // hard floor: below this an oval reads as a dot,
-                            // which is exactly the "dashed line pretending
-                            // to be chain" failure this piece exists to avoid
   let paths = [];
+  let travel = 0;
+  let evolution = 0;
 
-  // Sparse, heavy-stroked territory (`meridian`/`tether`) is already the
-  // library's weakest pair per ROADMAP.md's collection-constraints table.
-  // Many links per chain across several chains pushes ink coverage into the
-  // empty 0.11-0.19 band rather than adding to that cluster.
   const PRESETS = {
-    whisper: { opacity: 0.28, stroke: 0.4, density: 0.6, saturation: 0.08, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.7, density: 0.9, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.92, stroke: 1, density: 1.2, saturation: 0.9, glow: 1.2 },
-    drift:   { opacity: 0.55, stroke: 0.8, density: 0.85, speed: 0.35, motion: 1.7 },
-    dense:   { opacity: 0.7, stroke: 0.6, density: 1.8, speed: 1.1 },
+    whisper: { opacity: 0.32, stroke: 0.55, density: 0.52, scale: 0.7, motion: 0.5, saturation: 0.06 },
+    ink:     { opacity: 0.9, stroke: 1.3, density: 0.7, scale: 1.2, saturation: 0, angle: 350, phase: 0.3 },
+    neon:    { opacity: 0.82, stroke: 0.8, density: 1.1, scale: 0.85, saturation: 0.55, glow: 0.8, phase: 0.65 },
+    drift:   { opacity: 0.65, stroke: 0.75, density: 0.72, scale: 1.3, speed: 0.22, motion: 1.6, phase: 1.1 },
+    dense:   { opacity: 0.76, stroke: 0.8, density: 1.65, scale: 0.85, speed: 0.5, angle: 346, phase: 0.45 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1485,46 +1161,9 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    extraControls: [
-      { name: 'linkAspect', label: 'Link aspect', type: 'range', min: 0.3, max: 0.9, step: 0.01, default: 0.55, category: 'form' },
-    ],
-    // 96/108: the last open slice below `puddle` (112/138) and
-    // `matrix-code` (132/145) in the 95-135 band ROADMAP.md flags as the
-    // only open one — picked deliberately, not measured, same caveat those
-    // two record. Low saturation reads as cold, oxidised steel, which also
-    // happens to suit chain links thematically.
-    defaults: { hue: 96, hueB: 108, saturation: 0.22, colorMode: 'gradient', colorA: '#8fae9e', colorB: '#7fa0c2' },
+    defaults: { hue: 250, hueB: 278, saturation: 0.16, colorMode: 'gradient', colorA: '#a6a1b8', colorB: '#beb3c6', opacity: 0.88, stroke: 0.9, speed: 0.55 },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
-  const overlay = createCursorOverlay();
-
-  // Perspective divisor (see CONTRIBUTING.md "3D pieces" for the shared
-  // camera — deliberately NOT used here: a straight receding line needs
-  // only a scalar divisor, not full pitch/yaw/orbit, and pulling in
-  // createCamera/createOrbit would drag rotX/rotY persistence and
-  // test-interactions coverage this piece doesn't need). Saturates toward 0
-  // as z grows, which both shrinks and bunches distant links together —
-  // the correct perspective read for evenly-spaced world depth.
-  function persp(z) {
-    return FOV / (FOV + Math.max(0, z));
-  }
-
-  // Samples an ellipse (rotated, centred) into a polyline so SVG export has
-  // real geometry — `exportSvg` only understands point arrays, and unlike
-  // `matrix-code`'s glyph marks (which have a `texts` escape hatch) an oval
-  // mark has no equivalent; it must be sampled.
-  const ELLIPSE_SEG = 14;
-  function sampleEllipse(cx, cy, rx, ry, rot) {
-    const cosR = Math.cos(rot), sinR = Math.sin(rot);
-    const pts = [];
-    for (let k = 0; k <= ELLIPSE_SEG; k++) {
-      const a = (k / ELLIPSE_SEG) * Math.PI * 2;
-      const ex = rx * Math.cos(a), ey = ry * Math.sin(a);
-      pts.push([cx + ex * cosR - ey * sinR, cy + ex * sinR + ey * cosR]);
-    }
-    return pts;
-  }
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
@@ -1533,132 +1172,72 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     paths = [];
     const W = canvas.width;
     const H = canvas.height;
-    const light = values.invert ? 0.32 : 0.66;
+    const cx = W * 0.6;
+    const cy = H * 0.57;
+    const theta = values.angle * Math.PI / 180;
+    const ct = Math.cos(theta), st = Math.sin(theta);
+    const lanes = Math.max(3, Math.round(12 * Math.sqrt(values.density)));
+    const links = Math.max(16, Math.round(72 * Math.sqrt(values.density)));
+    const unit = Math.min(W / 1280, H / 800);
+    const separation = H * (0.1 + values.scale * 0.105);
+    travel += dt * values.speed * 0.038;
+    evolution += dt * values.motion * 0.12;
 
-    const chains = Math.max(2, Math.round(BASE_CHAINS * values.density));
-    const linksPerChain = Math.max(6, Math.round(BASE_LINKS * values.density));
-
-    const aspect = values.linkAspect;
-    const linkLen = 30 * values.scale; // world-space link length (pre-perspective)
-    const step = linkLen * 1.5; // ~30% overlap between consecutive links — abutting
-                                  // links read as beads on a string, not chain
-    const zSpan = step * linksPerChain;
-
-    const k = modeFactor(values, pointer);
-    const theta = (values.angle * Math.PI) / 180;
-    const cosT = Math.cos(-theta), sinT = Math.sin(-theta);
-    const pdx = pointer.x - W / 2, pdy = pointer.y - H / 2;
-    const plx = W / 2 + pdx * cosT - pdy * sinT;
-    const ply = H / 2 + pdx * sinT + pdy * cosT;
-
-    ctx.save();
-    ctx.translate(W / 2, H / 2);
-    ctx.rotate(theta);
-    ctx.translate(-W / 2, -H / 2);
-
-    // `phase` offsets the whole link sequence along the path (a static
-    // shift, independent of the marching driven by `speed`); `speed`
-    // marches links toward the vanishing point over time; `motion` drives
-    // an independent lateral sway distinct from both — none gates the
-    // others out at zero.
-    const marchOffset = elapsed * values.speed * MARCH_RATE + values.phase * zSpan * 0.5;
-
-    for (let c = 0; c < chains; c++) {
-      const cf = chains === 1 ? 0.5 : c / (chains - 1);
-      const anchorX = W * (0.06 + 0.88 * cf);
-      const anchorY = H * (0.94 + 0.02 * Math.sin(c * 2.1));
-      // Each chain's own vanishing point drifts slightly so the whole
-      // library of lines doesn't converge on one identical pixel.
-      const vanishX = W * (0.46 + 0.08 * Math.sin(c * 1.7 + 0.6));
-      const vanishY = H * (0.08 + 0.05 * Math.cos(c * 1.3));
-      const tangent = Math.atan2(vanishY - anchorY, vanishX - anchorX);
-      const perpX = -Math.sin(tangent), perpY = Math.cos(tangent);
-
-      const chainSeed = c * 12.9898;
-      const chainPhase = ((c / chains) * zSpan) % zSpan;
-
-      const { h, s } = paletteHsl(values, cf);
-
-      for (let i = 0; i < linksPerChain; i++) {
-        let z = ((i * step - marchOffset + chainPhase) % zSpan + zSpan) % zSpan;
-        const p = persp(z);
-
-        let cx = vanishX + (anchorX - vanishX) * p;
-        let cy = vanishY + (anchorY - vanishY) * p;
-
-        // Lateral sway, perpendicular to the chain's own path direction —
-        // `motion` scales it, `speed`/`density` play no part, so it
-        // survives Speed 0 (a frozen-but-non-degenerate chain, same
-        // precedent as `globe`'s wobble).
-        const sway = Math.sin(elapsed * 0.9 + chainSeed + i * 0.35) * 6 * values.motion * p;
-        cx += perpX * sway;
-        cy += perpY * sway;
-
-        let linkScale = Math.max(MIN_SCALE, p);
-        const depthAlpha = Math.max(0.22, Math.min(1, p * 0.95));
-
-        if (k) {
-          const mode = values.cursorInteraction;
-          const f = pointer.falloff(cx, cy, 260);
-          if (f) {
-            if (mode === 'Grow') {
-              linkScale *= 1 + f * k * 1.4;
-            } else if (mode === 'Shrink') {
-              linkScale = Math.max(0.12, linkScale / (1 + f * k * 1.4));
-            } else if (mode === 'Attract') {
-              const ease = Math.min(f * k, 1);
-              cx += (plx - cx) * ease;
-              cy += (ply - cy) * ease;
-            } else if (mode === 'Vortex') {
-              const r = rotatePoint(cx - plx, cy - ply, 0, { roll: f * k * 1.1 });
-              cx = plx + r.x;
-              cy = ply + r.y;
-            }
+    for (let stream = 0; stream < 2; stream++) {
+      const side = stream === 0 ? -1 : 1;
+      const offset = stream * 0.7 + side * values.phase * 0.55;
+      for (let lane = 0; lane < lanes; lane++) {
+        const across = (lane + 0.5) / lanes - 0.5;
+        for (let link = 0; link < links; link++) {
+          const u = ((link + lane * 0.37) / links + travel * side + 10) % 1;
+          const a = u * Math.PI * 1.8 + offset - 0.6;
+          const sway = Math.sin(evolution + u * 4) * H * 0.035 * values.motion;
+          const x0 = W * (0.03 + u * 0.99);
+          const y0 = H * (0.62 - u * 0.08) + side * Math.sin(a) * separation + sway;
+          const dy = -H * 0.08 + side * Math.cos(a) * Math.PI * 1.8 * separation
+            + Math.cos(evolution + u * 4) * H * 0.14 * values.motion;
+          const tangent = Math.atan2(dy, W * 0.99);
+          const ca = Math.cos(tangent), sa = Math.sin(tangent);
+          const depth = 0.5 + 0.5 * Math.sin(a + stream * 1.4);
+          const spread = H * (0.085 + values.scale * 0.06) * (0.65 + depth * 0.35);
+          const px = x0 - sa * across * spread;
+          const py = y0 + ca * across * spread;
+          const size = unit * (3.5 + values.scale * 5.5) * (0.65 + depth * 0.5);
+          const rx = size * (link % 2 === 0 ? 1.1 : 0.85);
+          const ry = size * (link % 2 === 0 ? 0.42 : 0.18);
+          const points = [];
+          // Closed, tangent-aligned ellipses use the same mathematical
+          // corners on canvas and in the existing SVG polyline exporter.
+          for (let point = 0; point < 16; point++) {
+            const t = point / 16 * Math.PI * 2;
+            const lx = Math.cos(t) * rx, ly = Math.sin(t) * ry;
+            const x = px + lx * ca - ly * sa - cx;
+            const y = py + lx * sa + ly * ca - cy;
+            points.push([cx + x * ct - y * st, cy + x * st + y * ct]);
           }
-        }
-
-        const rx = (linkLen / 2) * linkScale;
-        // Alternating orientation: even links read face-on (full width),
-        // odd links read edge-on (squashed to ~35% width) — the same
-        // ellipse major axis (rx, along the chain's tangent), alternating
-        // minor axis, is what reads as interlocking links rather than a
-        // dotted/dashed line pretending to be chain.
-        const ryFull = (linkLen / 2) * aspect * linkScale;
-        const ry = i % 2 === 0 ? ryFull : ryFull * 0.35;
-
-        const [r, g, b] = hslToRgb(h, s, light);
-        const alpha = values.opacity * depthAlpha;
-
-        ctx.lineWidth = 1 + values.stroke * 3;
-        if (values.glow > 0) {
-          ctx.strokeStyle = `rgba(${r},${g},${b},${values.glow * 0.3 * depthAlpha})`;
-          ctx.lineWidth = (1 + values.stroke * 3) + values.glow * 3;
+          points.push(points[0]);
+          const fade = Math.pow(Math.sin(u * Math.PI), 1.2);
+          const quiet = Math.min(1, Math.max(0, (px / W - 0.04) / 0.23));
+          const alpha = values.opacity * fade * quiet * (0.32 + depth * 0.68) * (1 - Math.abs(across) * 0.8);
+          const stop = paletteHsl(values, (stream + depth) / 2);
+          const [r, g, b] = hslToRgb(stop.h, stop.s, values.invert ? 0.25 + depth * 0.12 : 0.55 + depth * 0.25);
           ctx.beginPath();
-          ctx.ellipse(cx, cy, rx, ry, tangent, 0, Math.PI * 2);
+          ctx.moveTo(...points[0]);
+          for (let i = 1; i < points.length; i++) ctx.lineTo(...points[i]);
+          ctx.lineWidth = unit * (0.3 + values.stroke * 0.95) * (0.65 + depth * 0.55);
+          ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+          ctx.shadowColor = `rgb(${r},${g},${b})`;
+          ctx.shadowBlur = values.glow * 5 * unit;
           ctx.stroke();
-          ctx.lineWidth = 1 + values.stroke * 3;
+          paths.push(points);
         }
-        ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx, ry, tangent, 0, Math.PI * 2);
-        ctx.stroke();
-
-        paths.push(sampleEllipse(cx, cy, rx, ry, tangent));
       }
     }
-
-    ctx.restore();
-
-    const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, values.invert ? 0.32 : 0.66);
-    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
+    ctx.shadowBlur = 0;
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });
@@ -1668,8 +1247,7 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
   document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
   document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
-    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
-      .catch((err) => console.error('bakeHtml failed', err));
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
   });
   document.getElementById('btn-source')?.addEventListener('click', () => {
     exportSource().catch((err) => console.error('exportSource failed', err));

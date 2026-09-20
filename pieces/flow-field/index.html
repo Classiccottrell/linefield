@@ -33,8 +33,6 @@
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
-  import { createPointer } from '../../shared/pointer.js';
-  import { createCursorOverlay, modeFactor } from '../../shared/cursor-modes.js';
   import { createResizeBatcher } from '../../shared/resize.js';
 
   const PIECE_ID = 'flow-field';
@@ -82,8 +80,6 @@
     defaults: { hue: 200, hueB: 280, saturation: 0.6, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
-  const overlay = createCursorOverlay();
 
   function applyResize({ width, height }) {
     canvas.width = width;
@@ -118,51 +114,14 @@
 
     paths = [];
     const lineWidth = 0.3 + values.stroke * 1.2;
-    // modeFactor is off at pointer 0, off when cursorInteraction is 'None'
-    // regardless of pointer, and eased rather than snapped when the cursor
-    // leaves. Nothing else.
-    const k = modeFactor(values, pointer);
-
     for (const p of particles) {
       let angle = fieldAngle(p.x, p.y, elapsed, values);
-
-      let pushX = 0, pushY = 0;
-      let lw = lineWidth;
-      if (k) {
-        const f = pointer.falloff(p.x, p.y, 260);
-        if (f) {
-          if (values.cursorInteraction === 'Attract') {
-            const toward = Math.atan2(pointer.y - p.y, pointer.x - p.x);
-            angle += (toward - angle) * f * k * 0.6;
-            // Direct positional nudge, deliberately NOT routed through
-            // `values.speed`/the speed-scaled `speed` below: that term is
-            // exactly zero at Speed 0, which would silence the pointer's
-            // entire effect at that setting. This term uses only dt (real
-            // frame time, for frame-rate independence) so pointer response
-            // survives Speed 0.
-            const push = f * k * 90 * (dt || 0.016);
-            pushX = Math.cos(toward) * push;
-            pushY = Math.sin(toward) * push;
-          } else if (values.cursorInteraction === 'Vortex') {
-            const away = Math.atan2(p.y - pointer.y, p.x - pointer.x);
-            const tangent = away + Math.PI / 2;
-            angle += (tangent - angle) * f * k * 0.6;
-            const push = f * k * 90 * (dt || 0.016);
-            pushX = Math.cos(tangent) * push;
-            pushY = Math.sin(tangent) * push;
-          } else if (values.cursorInteraction === 'Grow') {
-            lw = lineWidth * (1 + f * k * 1.6);
-          } else if (values.cursorInteraction === 'Shrink') {
-            lw = Math.max(lineWidth * 0.15, lineWidth / (1 + f * k * 1.6));
-          }
-        }
-      }
 
       // Base px/sec must stay well above lineWidth, or each frame's segment is
       // shorter than the stroke is wide and renders as a dot, not a line.
       const speed = 260 * values.speed * (dt || 0.016);
-      const nx = p.x + Math.cos(angle) * speed + pushX;
-      const ny = p.y + Math.sin(angle) * speed + pushY;
+      const nx = p.x + Math.cos(angle) * speed;
+      const ny = p.y + Math.sin(angle) * speed;
 
       const mix = (Math.sin(elapsed * 0.1 + p.x * 0.001) + 1) / 2;
       const cr = r + (rB - r) * mix;
@@ -171,7 +130,7 @@
       const [fr, fg, fb] = values.invert ? [255 - cr, 255 - cg, 255 - cb] : [cr, cg, cb];
 
       ctx.strokeStyle = `rgba(${fr | 0},${fg | 0},${fb | 0},${values.opacity})`;
-      ctx.lineWidth = lw;
+      ctx.lineWidth = lineWidth;
 
       if (values.mode) {
         ctx.beginPath();
@@ -180,10 +139,10 @@
         if (values.glow > 0) {
           // Underlay pass: wider, dimmer stroke approximates bloom cheaply
           // (canvas shadowBlur costs 5-10x per draw call at this element count).
-          ctx.lineWidth = lw + values.glow * 3;
+          ctx.lineWidth = lineWidth + values.glow * 3;
           ctx.globalAlpha = values.glow * 0.25;
           ctx.stroke();
-          ctx.lineWidth = lw;
+          ctx.lineWidth = lineWidth;
           ctx.globalAlpha = 1;
         }
         ctx.stroke();
@@ -210,10 +169,10 @@
             ctx.lineTo(p.trail[i][0], p.trail[i][1]);
           }
           if (values.glow > 0) {
-            ctx.lineWidth = lw + values.glow * 3;
+            ctx.lineWidth = lineWidth + values.glow * 3;
             ctx.globalAlpha = values.glow * 0.25;
             ctx.stroke();
-            ctx.lineWidth = lw;
+            ctx.lineWidth = lineWidth;
             ctx.globalAlpha = 1;
           }
           ctx.stroke();
@@ -222,15 +181,11 @@
       }
     }
 
-    overlay.draw(ctx, `rgb(${r},${g},${b})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
       resizeBatcher.evaluate();
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });

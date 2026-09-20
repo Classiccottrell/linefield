@@ -84,38 +84,38 @@
     "hue": 205, "hueB": 195, "saturation": 0.18
   },
   {
-    "slug": "puddle",
-    "title": "Puddle",
-    "blurb": "Bounded, organic interference rippling across a puddle's surface.",
-    "tags": ["optical", "organic"],
-    "hue": 112, "hueB": 138, "saturation": 0.42
+    "slug": "lacuna",
+    "title": "Lacuna",
+    "blurb": "Broken caustic arcs gather around an off-centre calm zone.",
+    "tags": ["optical", "organic", "sparse"],
+    "hue": 198, "hueB": 224, "saturation": 0.24
   },
   {
-    "slug": "globe",
-    "title": "Globe",
-    "blurb": "A latitude/longitude wire mesh bending into a spinning sphere.",
-    "tags": ["3d", "geometric"],
-    "hue": 340, "hueB": 355, "saturation": 0.4
+    "slug": "parallax",
+    "title": "Parallax",
+    "blurb": "A rose-to-amber fan parts around an unseen volume, with near strands slipping past finer distant lines.",
+    "tags": ["depth", "optical", "sparse"],
+    "hue": 344, "hueB": 24, "saturation": 0.3
   },
   {
-    "slug": "matrix-code",
-    "title": "Matrix Code",
-    "blurb": "Quantized columns of glyphs that churn identity independently of their falling head.",
-    "tags": ["glyph", "grid"],
-    "hue": 132, "hueB": 145, "saturation": 0.55
+    "slug": "cipher-bloom",
+    "title": "Cipher Bloom",
+    "blurb": "Irregular glyphs gather into a bright oblique core, then dissolve into warm chalk and shadow.",
+    "tags": ["glyph", "organic", "sparse"],
+    "hue": 42, "hueB": 76, "saturation": 0.22
   },
   {
-    "slug": "chain-haze",
-    "title": "Chain Haze",
-    "blurb": "Lines of chains receding into the distance, discrete linked ovals fading with depth.",
-    "tags": ["depth", "geometric"],
-    "hue": 96, "hueB": 108, "saturation": 0.22
+    "slug": "driftwork",
+    "title": "Driftwork",
+    "blurb": "Violet-grey ellipse marks drift through two crossing currents, gathering and dissolving like woven air.",
+    "tags": ["organic", "depth", "kinetic"],
+    "hue": 250, "hueB": 278, "saturation": 0.16
   },
   {
-    "slug": "stock-market",
-    "title": "Stock Market",
-    "blurb": "Tracks of rising and falling bars marching across the field, buy and sell rendered as filled rectangles.",
-    "tags": ["geometric", "grid"],
-    "hue": 78, "hueB": 92, "saturation": 0.5
+    "slug": "pleat",
+    "title": "Pleat",
+    "blurb": "Coral and ivory marks gather into two folded surfaces, divided by a clean cut of space.",
+    "tags": ["geometric", "organic", "editorial"],
+    "hue": 12, "hueB": 38, "saturation": 0.3
   }
 ]

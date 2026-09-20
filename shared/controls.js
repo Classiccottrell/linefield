@@ -1,23 +1,12 @@
 // shared/controls.js
 
 import { hexToHue } from './color.js';
-import { CURSOR_MODES } from './cursor-modes.js';
 
 // `category` routes a control to one of the panel's tiers — 'interaction',
 // 'color', or the default 'visual' — and is presentation-only: it changes
 // which DOM section a row renders in, never __LF_SPECS__'s declaration
 // order, which every gate that isn't the panel itself still reads flat.
 const SHARED_CONTROLS = [
-  // The seven cursor-interaction modes (Grow, Shrink, Particle Trail,
-  // Ripples, Attract, Vortex, None). The behaviours are wired per-piece
-  // (see shared/cursor-modes.js); this declares the shared vocabulary so
-  // it is never duplicated per piece. Until a piece reads it, this control
-  // and `pointer` audit DEAD there (tools/audit-controls.mjs's PREREQS pins
-  // the other one on when probing either in isolation, but a piece with no
-  // wiring at all still shows no effect) — expected on every piece not yet
-  // wired, not a bug.
-  { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: CURSOR_MODES, default: 'None', category: 'interaction' },
-  { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0, category: 'interaction' },
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
@@ -213,18 +202,9 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   }
 
   const values = { ...defaults, ...saved.values };
-  // A saved localStorage blob is a plain object spread above, not a
-  // setValue() call, so it never reaches clampValue's enum-membership check
-  // (see below) — a stale blob holding a mode string that was since removed
-  // or renamed (e.g. a future rename of one of the seven cursor-interaction
-  // modes) would land in `values` unvalidated: the <select> falls back to
-  // whatever its first <option> happens to be while `values` keeps the
-  // stale string, the exact divergence that check exists to prevent. Not
-  // reachable today (every currently-saved value was written by setValue,
-  // which already validates), but reachable the moment a spec's `options`
-  // changes under an existing save. Re-validate every enum field on load,
-  // same fallback rule as clampValue: an out-of-vocabulary value reverts to
-  // that control's own default, not just "whatever was previously in scope".
+  // Saved values bypass setValue(), so validate enum membership on load.
+  // An option removed or renamed since the save falls back to the control's
+  // resolved default, keeping the rendered select and values in sync.
   for (const spec of allSpecs) {
     if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
       values[spec.name] = defaults[spec.name];
@@ -278,8 +258,8 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   body.className = 'lf-body';
   panel.appendChild(body);
 
-  // Two tiers, per the brief: Interactions (cursor response, kept separate
-  // from background configuration on purpose) divided from Color+Visual.
+  // The panel configures artwork visuals: camera angles in Interactions,
+  // palette in Color, and the remaining rendering parameters in Visual.
   // Each section is a toggle-button header plus a body a category routes
   // rows into — `sectionOf` below is the single place that mapping lives.
   // Collapsing hides `.lf-section-body` via CSS only: rows stay in the DOM

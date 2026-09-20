@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"cursorInteraction":"None","pointer":0,"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.35,"colorMode":"gradient","colorA":"#00d4ff","colorB":"#0095ff","hue":190,"hueB":205,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":32,"rotY":0};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.35,"colorMode":"gradient","colorA":"#00d4ff","colorB":"#0095ff","hue":190,"hueB":205,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":32,"rotY":0};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -208,149 +208,14 @@ function paletteHsl(values, f) {
 }
 
 
-// --- inlined: ../../shared/cursor-modes.js ---
-// shared/cursor-modes.js
-// A leaf module: no imports, matching every other shared module, so the bake
-// inliner picks it up from a piece's own import line.
-
-const CURSOR_MODES = [
-  'None', 'Grow', 'Shrink', 'Particle Trail', 'Ripples', 'Attract', 'Vortex',
-];
-
-// Trail and Ripples are cursor effects, not piece effects, so they live here
-// once rather than twelve times. They keep their OWN aged memory and redraw
-// every surviving mark from scratch each frame: ten pieces clear the canvas
-// fully each frame (marks would vanish) and two repaint translucent to
-// accumulate trails (marks would smear at the piece's fade rate, untunable).
-//
-// CONTRACT, binding on every piece that wires this in (see CONTRIBUTING.md,
-// "Cursor interaction"): call `.draw()` AFTER the piece has cleared the
-// canvas and drawn its own frame for this tick — as the very last thing in
-// the frame, not before it. `.step()` has no such constraint; call it
-// whenever convenient in onFrame, typically right after `pointer.step()`.
-// A piece that draws BEFORE its own clear renders nothing: a full-clear
-// piece's fillRect/clearRect wipes the overlay's marks along with
-// everything else drawn that frame. Ten of the twelve pieces in this
-// library do a full clear every frame, so this is the common case, not an
-// edge case.
-function createCursorOverlay() {
-  let marks = [];
-  let lastX = null, lastY = null;
-
-  return {
-    // Called once per frame from the piece's onFrame, before drawing.
-    step(mode, k, pointer) {
-      if (!k || (mode !== 'Particle Trail' && mode !== 'Ripples')) {
-        if (marks.length) marks = [];
-        return;
-      }
-      const now = performance.now();
-      if (mode === 'Particle Trail' && pointer.active) {
-        const moved = lastX === null || Math.hypot(pointer.x - lastX, pointer.y - lastY) > 6;
-        // A movement-only trigger leaves nothing to sample once the cursor
-        // stops (or, under the deterministic harness's single pointermove,
-        // once the last particle's life has elapsed against a run that
-        // steps thousands of ms) — that read as inert on every full-clear
-        // piece, which repaints from nothing each frame and so has no
-        // accumulated trace once the emission expires. Throttled re-emission
-        // while the pointer is present, mirroring Ripples below, keeps the
-        // trail alive regardless of whether the cursor is moving.
-        const lastDot = marks.length ? marks[marks.length - 1] : null;
-        const stale = !lastDot || now - lastDot.born > 45;
-        if (moved || stale) {
-          // Dust, not beads: a scattered cluster of small, faint, varied-
-          // size particles around the cursor (not centred on a single
-          // point), each drifting apart as it ages. Density (particle
-          // count) carries the effect's visibility, not size or opacity —
-          // those stay small/low so the overlay doesn't outweigh a piece's
-          // own marks (grain-field's fine specks are the tuning floor).
-          const n = 22;
-          for (let i = 0; i < n; i++) {
-            const ang = Math.random() * Math.PI * 2;
-            const rad = Math.random() * 11;
-            marks.push({
-              kind: 'dot',
-              x: pointer.x + Math.cos(ang) * rad,
-              y: pointer.y + Math.sin(ang) * rad,
-              born: now, life: 650 + Math.random() * 450,
-              r: 0.5 + Math.random() * 1.6,
-              alphaMul: 0.3 + Math.random() * 0.35,
-              dx: (Math.random() - 0.5) * 50,
-              dy: (Math.random() - 0.5) * 50,
-            });
-          }
-          lastX = pointer.x; lastY = pointer.y;
-        }
-      }
-      if (mode === 'Ripples' && pointer.active) {
-        const last = marks[marks.length - 1];
-        if (!last || now - last.born > 260) {
-          marks.push({ kind: 'ring', x: pointer.x, y: pointer.y, born: now, life: 1400 });
-        }
-      }
-      marks = marks.filter((m) => now - m.born < m.life);
-      if (marks.length > 400) marks = marks.slice(-400);
-    },
-
-    // Called after the piece has drawn its own frame.
-    draw(ctx, colour, k) {
-      if (!marks.length || !k) return;
-      const now = performance.now();
-      ctx.save();
-      for (const m of marks) {
-        const age = (now - m.born) / m.life;
-        if (age >= 1) continue;
-        const alpha = (1 - age) * k;
-        if (m.kind === 'dot') {
-          ctx.globalAlpha = Math.min(alpha * (m.alphaMul ?? 1), 1);
-          ctx.fillStyle = colour;
-          ctx.beginPath();
-          ctx.arc(m.x + m.dx * age, m.y + m.dy * age, m.r, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          ctx.globalAlpha = Math.min(alpha * 0.7, 1);
-          ctx.strokeStyle = colour;
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(m.x, m.y, 12 + age * 190, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-    },
-
-    reset() { marks = []; lastX = null; lastY = null; },
-  };
-}
-
-// The strength every per-piece mode multiplies by. `pointer` is the intensity
-// control, `influence` eases the cursor entering and leaving. Nothing else —
-// in particular never `values.speed`, which a user can set to zero.
-function modeFactor(values, pointer) {
-  if (values.cursorInteraction === 'None') return 0;
-  return values.pointer * pointer.influence;
-}
-
-
 // --- inlined: ../../shared/controls.js ---
 // shared/controls.js
-
 
 // `category` routes a control to one of the panel's tiers — 'interaction',
 // 'color', or the default 'visual' — and is presentation-only: it changes
 // which DOM section a row renders in, never __LF_SPECS__'s declaration
 // order, which every gate that isn't the panel itself still reads flat.
 const SHARED_CONTROLS = [
-  // The seven cursor-interaction modes (Grow, Shrink, Particle Trail,
-  // Ripples, Attract, Vortex, None). The behaviours are wired per-piece
-  // (see shared/cursor-modes.js); this declares the shared vocabulary so
-  // it is never duplicated per piece. Until a piece reads it, this control
-  // and `pointer` audit DEAD there (tools/audit-controls.mjs's PREREQS pins
-  // the other one on when probing either in isolation, but a piece with no
-  // wiring at all still shows no effect) — expected on every piece not yet
-  // wired, not a bug.
-  { name: 'cursorInteraction', label: 'Cursor Interaction', type: 'select', options: CURSOR_MODES, default: 'None', category: 'interaction' },
-  { name: 'pointer', label: 'Pointer', type: 'range', min: 0, max: 2, step: 0.01, default: 0, category: 'interaction' },
   { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
@@ -546,18 +411,9 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   }
 
   const values = { ...defaults, ...saved.values };
-  // A saved localStorage blob is a plain object spread above, not a
-  // setValue() call, so it never reaches clampValue's enum-membership check
-  // (see below) — a stale blob holding a mode string that was since removed
-  // or renamed (e.g. a future rename of one of the seven cursor-interaction
-  // modes) would land in `values` unvalidated: the <select> falls back to
-  // whatever its first <option> happens to be while `values` keeps the
-  // stale string, the exact divergence that check exists to prevent. Not
-  // reachable today (every currently-saved value was written by setValue,
-  // which already validates), but reachable the moment a spec's `options`
-  // changes under an existing save. Re-validate every enum field on load,
-  // same fallback rule as clampValue: an out-of-vocabulary value reverts to
-  // that control's own default, not just "whatever was previously in scope".
+  // Saved values bypass setValue(), so validate enum membership on load.
+  // An option removed or renamed since the save falls back to the control's
+  // resolved default, keeping the rendered select and values in sync.
   for (const spec of allSpecs) {
     if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
       values[spec.name] = defaults[spec.name];
@@ -611,8 +467,8 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   body.className = 'lf-body';
   panel.appendChild(body);
 
-  // Two tiers, per the brief: Interactions (cursor response, kept separate
-  // from background configuration on purpose) divided from Color+Visual.
+  // The panel configures artwork visuals: camera angles in Interactions,
+  // palette in Color, and the remaining rendering parameters in Visual.
   // Each section is a toggle-button header plus a body a category routes
   // rows into — `sectionOf` below is the single place that mapping lives.
   // Collapsing hides `.lf-section-body` via CSS only: rows stay in the DOM
@@ -1011,33 +867,66 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
 // --- inlined: ../../shared/anim.js ---
 // shared/anim.js
 
+// Max per-frame dt (seconds) after a tab-switch/GC stall, so a single huge
+// frame doesn't fling particles across the canvas. Ported from
+// cc-webgl/src/core/FrameScheduler.ts's DT_CLAMP_SECONDS.
+const ANIM_DT_CLAMP_SECONDS = 0.1;
+
 function createLoop({ onFrame, speed = 1 }) {
   let running = false;
+  let paused = false;
   let lastTime = 0;
   let elapsed = 0;
   let rafId = null;
   let currentSpeed = speed;
 
   function tick(now) {
-    if (!running) return;
-    const dt = lastTime ? (now - lastTime) / 1000 : 0;
+    if (!running || paused) return;
+    const rawDt = lastTime ? (now - lastTime) / 1000 : 0;
+    const clampedDt = Math.min(Math.max(rawDt, 0), ANIM_DT_CLAMP_SECONDS);
     lastTime = now;
-    const scaledDt = dt * currentSpeed;
+    const scaledDt = clampedDt * currentSpeed;
     elapsed += scaledDt;
     onFrame(scaledDt, elapsed);
     rafId = requestAnimationFrame(tick);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined') return;
+    if (document.hidden) {
+      paused = true;
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    } else if (running && paused) {
+      paused = false;
+      // Reset the sentinel instead of computing a real dt, so resume doesn't
+      // produce a giant catch-up frame — same reasoning as start()'s reset.
+      lastTime = 0;
+      rafId = requestAnimationFrame(tick);
+    }
   }
 
   return {
     start() {
       if (running) return;
       running = true;
+      paused = false;
       lastTime = 0;
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
       rafId = requestAnimationFrame(tick);
     },
     stop() {
       running = false;
+      paused = false;
       if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
     },
     setSpeed(n) {
       currentSpeed = n;
@@ -1225,7 +1114,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -1234,13 +1123,25 @@ function exportSvg(paths, { width = 800, height = 600, texts = [] } = {}) {
     .join('\n');
 
   const textEls = texts
-    .map(({ x, y, ch, size, fontFamily }) => {
+    .map(({ x, y, ch, size, fontFamily, anchor, baseline, rotation, strokeWidth }) => {
       const safeCh = String(ch).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${fontFamily || 'monospace'}" font-size="${size.toFixed(2)}" fill="black">${safeCh}</text>`;
+      const safeFont = String(fontFamily || 'monospace').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const placement = `${['start', 'middle', 'end'].includes(anchor) ? ` text-anchor="${anchor}"` : ''}${['central', 'middle', 'alphabetic', 'hanging'].includes(baseline) ? ` dominant-baseline="${baseline}"` : ''}${Number.isFinite(rotation) ? ` transform="rotate(${rotation} ${x} ${y})"` : ''}`;
+      const stroke = Number.isFinite(strokeWidth) && strokeWidth > 0 ? ` stroke="black" stroke-width="${strokeWidth}"` : '';
+      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${safeFont}" font-size="${size.toFixed(2)}" fill="black"${placement}${stroke}>${safeCh}</text>`;
     })
     .join('\n');
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${polylines}${polylines && textEls ? '\n' : ''}${textEls}\n</svg>`;
+  // Filled-mark pieces supply already-transformed corners; existing path
+  // and text callers retain their exact serialization when this is empty.
+  const polygonEls = polygons.map(({ points, fill = 'black', opacity = 1 }) => {
+    const pointsAttr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
 }
@@ -1289,12 +1190,8 @@ function stripInnerImports(src) {
 // inside a function body called later. controls.js is always a piece's
 // first import, so BFS always placed it first in the concatenated output —
 // fine for `hexToHue` (from color.js), which is only called inside
-// `setValue`, deferred to call time; broken for `CURSOR_MODES` (from
-// cursor-modes.js), which controls.js's top-level `const SHARED_CONTROLS =
-// [...]` reads immediately. cursor-modes.js, discovered as controls.js's own
-// import, was concatenated AFTER controls.js under BFS — a real
-// ReferenceError: Cannot access 'CURSOR_MODES' before initialization, in
-// every downloaded file, that loaded without error and rendered blank.
+// `setValue`, deferred to call time. A shared module that reads an imported
+// binding at top level instead must have that dependency emitted first.
 //
 // A post-order DFS guarantees every module's dependencies appear before it
 // in the emitted output, independent of whether the consumer reads the
@@ -1516,7 +1413,6 @@ function createOrbit({
 
 
 
-
   const PIECE_ID = 'wireframe-lattice';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -1553,7 +1449,6 @@ function createOrbit({
     defaults: { hue: 190, hueB: 205, saturation: 0.35, colorMode: 'gradient', colorA: '#00d4ff', colorB: '#0095ff' },
   });
   const currentValues = baked || panel.values;
-  const pointer = createPointer({ canvas });
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
   // In panel mode the drag writes straight into rotX/rotY through setValue —
   // the only write path — so the Pitch/Yaw sliders and the rendered camera
@@ -1581,36 +1476,6 @@ function createOrbit({
   });
 
   const camera = createCamera({ fov: 620 });
-  const overlay = createCursorOverlay();
-  const WARP_RADIUS = 220;
-
-  // Attract/Vortex operate on the already-projected screen-space points
-  // (mirroring event-horizon's projectWithLens), since "toward the cursor"
-  // and "rotate about the cursor" are screen-space ideas for a tilted sheet;
-  // Grow/Shrink stay world-space Z, scaling the sheet's existing lift.
-  // Receives kAmp (pre-capped at the caller, see drawFrame), not raw k.
-  function warpProjected(pts, mode, kAmp) {
-    if (!kAmp || (mode !== 'Attract' && mode !== 'Vortex')) return pts;
-    for (const p of pts) {
-      if (p.scale <= 0) continue;
-      const f = pointer.falloff(p.x, p.y, WARP_RADIUS);
-      if (!f) continue;
-      if (mode === 'Attract') {
-        // Clamp the EASE FRACTION too, not just kAmp: f*kAmp can still
-        // exceed 1 near the pointer, and a lerp factor above 1 overshoots
-        // the pointer and reflects the point past it.
-        const ease = Math.min(f * kAmp, 1);
-        p.x += (pointer.x - p.x) * ease;
-        p.y += (pointer.y - p.y) * ease;
-      } else {
-        const r = rotatePoint(p.x - pointer.x, p.y - pointer.y, 0, { roll: f * kAmp * 1.1 });
-        p.x = pointer.x + r.x;
-        p.y = pointer.y + r.y;
-      }
-    }
-    return pts;
-  }
-
   function strokePath(pts, values, lineWidth, rgb) {
     // pts: array of {x, y, scale}. Walk in order and break the run at any
     // point behind the camera (scale <= 0) instead of filtering — a skipped
@@ -1665,34 +1530,8 @@ function createOrbit({
       cy: canvas.height / 2,
     });
 
-    // Gate: off at pointer 0, off when cursorInteraction is 'None', eased
-    // by influence, local via falloff.
-    const k = modeFactor(values, pointer);
-    const mode = values.cursorInteraction;
-
-    // Cap the amplitude/radius/rotation input at k=1: uncapped, k=2
-    // (Pointer's max) quadruples Grow's lift magnitude AND falloff
-    // radius together, and widens Vortex's rotation the same way, which
-    // can destroy the sheet's identity rather than swelling/swirling it.
-    // This holds Pointer 1..2 flat at the Pointer=1 strength (gate numbers
-    // unchanged) instead of compounding further.
-    const kAmp = Math.min(k, 1);
-
-    // World-space height of the sheet at (x, z). Grow/Shrink only: the lift
-    // term projects the (unlifted) point to screen space first to find its
-    // distance from the pointer, then adds a falloff-weighted Z, scaled and
-    // radius-widened by the same amp — no term routed through values.speed,
-    // so it survives Speed 0. Attract/Vortex act on screen space instead —
-    // see warpProjected.
     const heightAt = (x, z) => {
-      const base = simplex2(x * noiseScale + values.phase, z * noiseScale + t) * amp;
-      if (!k || (mode !== 'Grow' && mode !== 'Shrink')) return base;
-      const grow = mode === 'Grow';
-      const lAmp = grow ? 1 + kAmp * 1.5 : 1 / (1 + kAmp * 1.5);
-      const approx = camera.project(x, 0, z);
-      if (approx.scale <= 0) return base;
-      const f = pointer.falloff(approx.x, approx.y, WARP_RADIUS * lAmp);
-      return base - f * 70 * lAmp;
+      return simplex2(x * noiseScale + values.phase, z * noiseScale + t) * amp;
     };
 
     const half = SPAN / 2;
@@ -1713,20 +1552,14 @@ function createOrbit({
         rowPts.push([c, heightAt(c, a), a]);
         colPts.push([a, heightAt(a, c), c]);
       }
-      strokePath(warpProjected(camera.projectPath(rowPts), mode, kAmp), values, baseWidth, [r, g, b]);
-      strokePath(warpProjected(camera.projectPath(colPts), mode, kAmp), values, baseWidth, [r, g, b]);
+      strokePath(camera.projectPath(rowPts), values, baseWidth, [r, g, b]);
+      strokePath(camera.projectPath(colPts), values, baseWidth, [r, g, b]);
     }
 
-    const stopA = paletteHsl(values, 0);
-    const [ovR, ovG, ovB] = hslToRgb(stopA.h, stopA.s, light);
-    overlay.draw(ctx, `rgb(${ovR},${ovG},${ovB})`, k);
   }
 
   const loop = createLoop({
     onFrame(dt, elapsed) {
-      pointer.step();
-      const k = modeFactor(currentValues, pointer);
-      overlay.step(currentValues.cursorInteraction, k, pointer);
       drawFrame(dt, elapsed, currentValues);
     },
   });
