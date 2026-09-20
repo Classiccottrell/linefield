@@ -117,5 +117,12 @@
     "blurb": "Coral and ivory marks gather into two folded surfaces, divided by a clean cut of space.",
     "tags": ["geometric", "organic", "editorial"],
     "hue": 12, "hueB": 38, "saturation": 0.3
+  },
+  {
+    "slug": "globe",
+    "title": "Globe",
+    "blurb": "A lat/long wire sphere spinning in true perspective, tilt and yaw draggable.",
+    "tags": ["3d", "geometric"],
+    "hue": 105, "hueB": 130, "saturation": 0.4
   }
 ]

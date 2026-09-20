@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — wireframe-lattice</title>
+<title>linefield — globe</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -127,7 +127,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.35,"colorMode":"gradient","colorA":"#00d4ff","colorB":"#0095ff","hue":190,"hueB":205,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":32,"rotY":0};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.4,"colorMode":"gradient","colorA":"#3fd166","colorB":"#4bd18f","hue":105,"hueB":130,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":18,"rotY":0};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -938,82 +938,6 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
-// --- inlined: ../../shared/noise.js ---
-// shared/noise.js
-// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
-// reference algorithm (Stefan Gustavson).
-
-const GRAD = [
-  [1, 1], [-1, 1], [1, -1], [-1, -1],
-  [1, 0], [-1, 0], [1, 0], [-1, 0],
-  [0, 1], [0, -1], [0, 1], [0, -1],
-];
-
-function buildPermutation(seed = 1337) {
-  const p = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) p[i] = i;
-  let s = seed;
-  const rand = () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-  for (let i = 255; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [p[i], p[j]] = [p[j], p[i]];
-  }
-  const perm = new Uint8Array(512);
-  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-  return perm;
-}
-
-const perm = buildPermutation();
-
-function dot(g, x, y) {
-  return g[0] * x + g[1] * y;
-}
-
-const F2 = 0.5 * (Math.sqrt(3) - 1);
-const G2 = (3 - Math.sqrt(3)) / 6;
-
-function simplex2(xin, yin) {
-  const s = (xin + yin) * F2;
-  const i = Math.floor(xin + s);
-  const j = Math.floor(yin + s);
-  const t = (i + j) * G2;
-  const X0 = i - t;
-  const Y0 = j - t;
-  const x0 = xin - X0;
-  const y0 = yin - Y0;
-
-  let i1, j1;
-  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
-
-  const x1 = x0 - i1 + G2;
-  const y1 = y0 - j1 + G2;
-  const x2 = x0 - 1 + 2 * G2;
-  const y2 = y0 - 1 + 2 * G2;
-
-  const ii = i & 255;
-  const jj = j & 255;
-  const gi0 = perm[ii + perm[jj]] % 12;
-  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
-  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
-
-  let n0 = 0, n1 = 0, n2 = 0;
-
-  let t0 = 0.5 - x0 * x0 - y0 * y0;
-  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
-
-  let t1 = 0.5 - x1 * x1 - y1 * y1;
-  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
-
-  let t2 = 0.5 - x2 * x2 - y2 * y2;
-  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
-
-  return 70 * (n0 + n1 + n2);
-}
-
-
 // --- inlined: ../../shared/project.js ---
 // shared/project.js
 // 3D -> 2D projection for pieces that want perspective geometry.
@@ -1412,8 +1336,7 @@ function createOrbit({
 
 
 
-
-  const PIECE_ID = 'wireframe-lattice';
+  const PIECE_ID = 'globe';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1424,17 +1347,30 @@ function createOrbit({
   window.addEventListener('resize', resize);
   resize();
 
-  // Grid resolution is derived per frame from density — no persistent array.
-  const BASE_STEPS = 24;
-  const SPAN = 900; // world-space width/depth of the sheet
+  // Ring/meridian counts derive per frame from density — no persistent
+  // array. SEG_* are per-curve segment resolution, for SVG export fidelity
+  // and smooth circles at rest.
+  const BASE_LATS = 10;  // latitude rings, excluding the two poles
+  const BASE_LONS = 16;  // longitude meridians, pole to pole
+  const SEG_LAT = 64;
+  const SEG_LON = 48;
+  const MAX_LAT_DEG = 82; // stops short of the poles so a ring never degenerates to a point
+  const FOV = 650;
   let paths = [];
 
+  // Distinct from the three orb pieces (orbital-veil, accretion,
+  // event-horizon), which are all flat screen-space discs squashed by a
+  // tilt factor, and from parallax, which is a flat diagonal fan/lens with
+  // no real depth axis. globe is a real 3D sphere — latitude small-circles
+  // at radius R*cos(lat) plus longitude great-circles converging at the
+  // poles, both walked through shared/project.js's perspective camera,
+  // same as wireframe-lattice. Structure, not colour, is the differentiator.
   const PRESETS = {
-    whisper: { opacity: 0.3, stroke: 1.1, density: 0.6, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.7, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.95, glow: 1.1 },
-    drift:   { opacity: 0.5, stroke: 0.8, density: 0.7, speed: 0.35, motion: 1.8 },
-    dense:   { opacity: 0.6, stroke: 0.6, density: 1.8, speed: 0.8, glow: 0 },
+    whisper: { opacity: 0.28, stroke: 1, density: 0.55, saturation: 0.08, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.6, density: 0.75, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 0.85, density: 1.1, saturation: 0.95, glow: 1.1 },
+    drift:   { opacity: 0.5, stroke: 0.8, density: 0.65, speed: 0.3, motion: 1.7 },
+    dense:   { opacity: 0.62, stroke: 0.6, density: 1.8, speed: 0.7, glow: 0 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1443,10 +1379,20 @@ function createOrbit({
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32, category: 'interaction' },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 18, category: 'interaction' },
       { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
     ],
-    defaults: { hue: 190, hueB: 205, saturation: 0.35, colorMode: 'gradient', colorA: '#00d4ff', colorB: '#0095ff' },
+    // Hue 105/130: the old globe (pre-redesign) sat at 340/355, which
+    // parallax's own 344/24 now occupies (parallax replaced globe, so it
+    // inherited territory near its hue). Checked against every piece's
+    // full hue->hueB ramp, not just start hues — 285->344 (the gap a
+    // start-hue-only scan suggests) is a false gap: it's crossed by
+    // orbital-veil's 265->330 ramp. The actual open arc is cipher-bloom's
+    // 76 to meridian's 150, ~74 degrees untouched by any ramp on either
+    // end. Centred inside it (green, unrelated to any orb-family hue) so
+    // globe's colour doesn't reinforce the orb-family read even
+    // incidentally — the real differentiator is the geometry below.
+    defaults: { hue: 105, hueB: 130, saturation: 0.4, colorMode: 'gradient', colorA: '#3fd166', colorB: '#4bd18f' },
   });
   const currentValues = baked || panel.values;
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -1475,40 +1421,54 @@ function createOrbit({
     },
   });
 
-  const camera = createCamera({ fov: 620 });
-  function strokePath(pts, values, lineWidth, rgb) {
-    // pts: array of {x, y, scale}. Walk in order and break the run at any
-    // point behind the camera (scale <= 0) instead of filtering — a skipped
-    // interior point must start a new subpath, not get bridged over.
-    let anyRun = false;
-    ctx.beginPath();
-    let run = [];
-    const flushRun = () => {
-      if (run.length >= 2) {
-        anyRun = true;
-        ctx.moveTo(run[0].x, run[0].y);
-        for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
-        paths.push(run.map((p) => [p.x, p.y]));
-      }
-      run = [];
-    };
+  const camera = createCamera({ fov: FOV });
+
+  // Draws one already-projected polyline. Walks in order and breaks the
+  // run at any point behind the camera (scale <= 0) instead of filtering —
+  // a skipped interior point must start a new subpath, not get bridged
+  // over. Each segment is stroked individually so its own average `scale`
+  // (the projection's perspective divisor — larger is nearer) can drive a
+  // per-segment alpha: the far hemisphere recedes instead of reading flat,
+  // which is the depth cue a lat/long wire mesh needs to read as a surface
+  // rather than a mandala.
+  function strokeRun(pts, values, lineWidth, rgb) {
+    const run = pts.filter((p) => p.scale > 0);
+    // Still record broken sub-runs for SVG fidelity.
+    let cur = [];
     for (const p of pts) {
-      if (p.scale > 0) run.push(p);
-      else flushRun();
+      if (p.scale > 0) cur.push([p.x, p.y]);
+      else if (cur.length >= 2) { paths.push(cur); cur = []; }
+      else cur = [];
     }
-    flushRun();
-    if (!anyRun) return;
+    if (cur.length >= 2) paths.push(cur);
+    if (run.length < 2) return;
 
     const [r, g, b] = rgb;
-    ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-    if (values.glow > 0) {
-      ctx.lineWidth = lineWidth + values.glow * 3;
-      ctx.globalAlpha = values.glow * 0.25;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
     ctx.lineWidth = lineWidth;
-    ctx.stroke();
+    for (let i = 0; i < run.length - 1; i++) {
+      // A point right at the run's seam (scale <= 0 neighbour skipped) can
+      // still be drawn against the next in-front point — fine, since both
+      // endpoints here are already filtered to scale > 0.
+      const a = run[i], b2 = run[i + 1];
+      const avgScale = (a.scale + b2.scale) / 2;
+      const depthAlpha = Math.max(0.22, Math.min(1, avgScale * 0.72));
+      const alpha = values.opacity * depthAlpha;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+      if (values.glow > 0) {
+        ctx.lineWidth = lineWidth + values.glow * 3;
+        ctx.globalAlpha = values.glow * 0.25 * depthAlpha;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b2.x, b2.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = lineWidth;
+      }
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b2.x, b2.y);
+      ctx.stroke();
+    }
   }
 
   function drawFrame(dt, elapsed, values) {
@@ -1516,46 +1476,81 @@ function createOrbit({
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     paths = [];
-    const steps = Math.max(4, Math.round(BASE_STEPS * values.density));
-    const t = elapsed * values.speed * 0.5;
-    const noiseScale = 0.0035 * (0.3 + values.scale);
-    const amp = 45 * values.motion;
+    // R stays under 0.8*FOV even at Scale's max (2), so the near-plane cap
+    // in shared/project.js (20% of fov ahead of the lens) never silently
+    // swallows the sphere's front cap: 0.35*2 = 0.7 < 0.8.
+    const R = FOV * 0.35 * values.scale;
+    const lats = Math.max(3, Math.round(BASE_LATS * values.density));
+    const lons = Math.max(4, Math.round(BASE_LONS * values.density));
     const light = values.invert ? 0.35 : 0.62;
+    const baseWidth = 0.3 + values.stroke * 1.0;
+
+    // Speed drives the continuous spin — the piece's headline motion, so a
+    // spinning globe survives Speed 0 as a still frame rather than going
+    // inert (the read is just frozen, not gone). Motion drives an
+    // independent axial wobble (precession), a small oscillation on tilt
+    // distinct from the yaw spin — Motion 0 flattens it to a fixed tilt,
+    // Speed 0 leaves it oscillating; neither is a proxy for the other.
+    const spin = elapsed * values.speed * 0.35;
+    const wobble = Math.sin(elapsed * values.motion * 0.22) * 6 * (Math.PI / 180);
 
     camera.set({
-      tilt: (values.rotX * Math.PI) / 180,
-      yaw: (values.rotY * Math.PI) / 180,
+      tilt: (values.rotX * Math.PI) / 180 + wobble,
+      yaw: (values.rotY * Math.PI) / 180 + spin,
       roll: (values.angle * Math.PI) / 180,
       cx: canvas.width / 2,
       cy: canvas.height / 2,
     });
 
-    const heightAt = (x, z) => {
-      return simplex2(x * noiseScale + values.phase, z * noiseScale + t) * amp;
-    };
+    // Phase RESTRUCTURES the latitude spacing rather than translating the
+    // whole mesh (translation on a rotationally symmetric, already-spinning
+    // figure is imperceptible — see event-horizon's own note on why it
+    // warps radius instead of yaw). warpLat is the identity at Phase 0 and
+    // stays monotonic in v across [-1, 1], so rings never cross; increasing
+    // Phase bunches rings toward the equator.
+    const warpLat = (v) => Math.sign(v) * Math.pow(Math.abs(v), 1 + values.phase * 1.5);
 
-    const half = SPAN / 2;
-    const step = SPAN / steps;
-    const baseWidth = 0.3 + values.stroke * 1.0;
+    // --- Latitude rings (small circles at fixed y, radius R*cos(lat)) ---
+    for (let i = 0; i < lats; i++) {
+      const u = lats === 1 ? 0.5 : i / (lats - 1);
+      const v = warpLat(u * 2 - 1); // -1..1
+      const latDeg = v * MAX_LAT_DEG;
+      const lat = (latDeg * Math.PI) / 180;
+      const ringR = Math.cos(lat);
+      const y = Math.sin(lat);
 
-    // Rows (constant z), then columns (constant x).
-    for (let i = 0; i <= steps; i++) {
-      const f = i / steps;
+      const f = (i + 0.5) / lats;
       const { h, s } = paletteHsl(values, f);
       const [r, g, b] = hslToRgb(h, s, light);
 
-      const rowPts = [];
-      const colPts = [];
-      const a = -half + i * step;
-      for (let j = 0; j <= steps; j++) {
-        const c = -half + j * step;
-        rowPts.push([c, heightAt(c, a), a]);
-        colPts.push([a, heightAt(a, c), c]);
+      const pts = [];
+      for (let s = 0; s <= SEG_LAT; s++) {
+        const a = (s / SEG_LAT) * Math.PI * 2;
+        const dx = Math.cos(a) * ringR;
+        const dz = Math.sin(a) * ringR;
+        pts.push([dx * R, y * R, dz * R]);
       }
-      strokePath(camera.projectPath(rowPts), values, baseWidth, [r, g, b]);
-      strokePath(camera.projectPath(colPts), values, baseWidth, [r, g, b]);
+      strokeRun(camera.projectPath(pts), values, baseWidth, [r, g, b]);
     }
 
+    // --- Longitude meridians (great circles through both poles) ---
+    for (let j = 0; j < lons; j++) {
+      const lon = (j / lons) * Math.PI * 2;
+      const f = j / lons;
+      const { h, s } = paletteHsl(values, f);
+      const [r, g, b] = hslToRgb(h, s, light);
+
+      const pts = [];
+      for (let s = 0; s <= SEG_LON; s++) {
+        const lat = (s / SEG_LON) * Math.PI - Math.PI / 2; // -90..90 (pole to pole)
+        const cLat = Math.cos(lat);
+        const dx = Math.cos(lon) * cLat;
+        const dy = Math.sin(lat);
+        const dz = Math.sin(lon) * cLat;
+        pts.push([dx * R, dy * R, dz * R]);
+      }
+      strokeRun(camera.projectPath(pts), values, baseWidth * 0.85, [r, g, b]);
+    }
   }
 
   const loop = createLoop({

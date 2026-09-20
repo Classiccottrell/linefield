@@ -293,16 +293,27 @@ that reads less like the existing orb family." Re-run it through the
 current (post-redesign) contract: Wake instead of cursor modes, current
 shared control set.
 
-- [ ] Decide and document how `globe` and `parallax` coexist without
+- [x] Decide and document how `globe` and `parallax` coexist without
   reading as the same piece twice — this is the actual design work, not
-  the restoration.
-- [ ] Restore/rebuild the piece against current `shared/`, add its
+  the restoration. Decision: `globe` is a real 3D sphere (lat/long rings
+  and meridians through `shared/project.js`'s perspective camera, silhouette
+  a circle that reads as a solid, occludable body) where `parallax` is a
+  flat diagonal fan/lens with no depth axis at all — same distinction
+  already used to separate it from the orb family (`orbital-veil`,
+  `accretion`, `event-horizon`), which are flat screen-space discs.
+  Confirmed visually, not just asserted: generated thumbnails
+  (`thumbs/globe.png` vs. `thumbs/parallax.png`, `thumbs/orbital-veil.png`,
+  `thumbs/event-horizon.png`, `thumbs/accretion.png`) show distinct
+  silhouettes at gallery-card size. Palette also moved off the old
+  340/355 hue (now occupied by `parallax`'s own 344/24) into the 59–166
+  gap — see collection-constraints below.
+- [x] Restore/rebuild the piece against current `shared/`, add its
   `pieces.json` entry, README bullet, thumbnail, download.
-- [ ] Re-run collection-metrics; note globe's hue placement against the
+- [x] Re-run collection-metrics; note globe's hue placement against the
   now-full wheel (see the collection-constraints table below).
 
 **Finish line:** Eighteen pieces, `globe` and `parallax` both read as
-distinct compositions at gallery-card size.
+distinct compositions at gallery-card size. Met.
 
 ### Chunk 10 — Palette: retire purple, adopt ClassicCottrell green
 
@@ -466,58 +477,46 @@ happens to open the template itself rather than a piece copied from it.
 
 ## Collection constraints for an eighteenth piece
 
-Historical baseline: the table below measures the removed artworks. Do not
-use it to judge the replacement set until chunk 7 refreshes these numbers.
-
-Measured across all seventeen shipped pieces, from their generated
-thumbnails: mean rendered hue (weighted by colourfulness), mean saturation,
-and ink coverage — the fraction of pixels the piece actually marks.
+Refreshed by chunk 9 (`globe` restored). Measured across all eighteen
+shipped pieces, from their generated thumbnails: mean rendered hue (weighted
+by colourfulness), mean saturation, and ink coverage — the fraction of
+pixels the piece actually marks.
 
 Every row below is **generated**, not hand-recorded: run
-`npm run collection-metrics` and paste its output here. That tool
-(`tools/collection-metrics.mjs`) was written after the five commissioned
-pieces shipped without rows: with no tool, each addition either invented
-numbers or declined to, and declining left the table describing a library
-that no longer existed. It reproduces the twelve values published before it
-existed on 34 of 36 numbers; `wireframe-lattice`'s ink reads 0.108 against a
-published 0.107, and that single digit is the only change to a pre-existing
-row. Rebuild thumbnails (`npm run build`) before trusting a
-regenerated table — it measures the committed PNGs, not the live piece.
+`npm run collection-metrics` and paste its output here. Rebuild thumbnails
+(`npm run build`) before trusting a regenerated table — it measures the
+committed PNGs, not the live piece.
 
 | Hue | Sat | Ink | Piece |
 |---:|---:|---:|---|
+| 7 | 0.20 | 0.122 | `parallax` |
+| 19 | 0.24 | 0.133 | `pleat` |
 | 21 | 0.49 | 0.043 | `accretion` |
 | 24 | 0.42 | 0.048 | `contour-grid` |
 | 54 | 0.30 | 0.047 | `synapse` |
-| 87 | 0.52 | 0.205 | `stock-market` |
-| 106 | 0.16 | 0.030 | `chain-haze` |
-| 133 | 0.38 | 0.064 | `puddle` |
-| 146 | 0.51 | 0.042 | `matrix-code` |
+| 59 | 0.11 | 0.043 | `cipher-bloom` |
+| 122 | 0.33 | 0.043 | `globe` |
 | 166 | 0.48 | 0.073 | `meridian` |
 | 177 | 0.12 | 0.035 | `grain-field` |
 | 200 | 0.34 | 0.108 | `wireframe-lattice` |
 | 213 | 0.12 | 0.011 | `rainfall` |
+| 220 | 0.25 | 0.028 | `lacuna` |
 | 235 | 0.24 | 0.066 | `tether` |
 | 247 | 0.51 | 0.195 | `event-horizon` |
+| 253 | 0.17 | 0.120 | `driftwork` |
 | 254 | 0.58 | 0.318 | `interference` |
 | 261 | 0.90 | 0.341 | `flow-field` |
 | 305 | 0.48 | 0.096 | `orbital-veil` |
-| 342 | 0.34 | 0.044 | `globe` |
 
-**The hue wheel is full.** The 95–135 band the five commissioned pieces were
-aimed at is now occupied by `chain-haze` (106) and `puddle` (133), and
-`globe` (342) closed the last wide gap. What remains are four gaps of
-roughly 35–45°: 261–305, 305–342, 342–21 across the wrap, and 54–87. None
-is the free colour the early library had. A new piece should differentiate on
-**form or density**, not expect a free hue. `rainfall` is the worked example:
-it landed at hue 213, in the most crowded band in the table, and still reads
-as distinct because at saturation 0.12 the hue barely registers and its ink
-coverage is a third of the next-sparsest piece.
-
-**Ink coverage is the axis with the most room left.** Ten of the seventeen
-sit between 0.04 and 0.11. `rainfall` at 0.011 and `flow-field` at 0.341 are
-the poles, and the middle-high range between 0.11 and 0.19 is still empty —
-five pieces later, nothing landed in it.
+**`globe` landed at hue 122** (authored 105/130 gradient), squarely in the
+59–166 gap between `cipher-bloom` and `meridian` — the widest untouched arc
+on the wheel, confirmed against every piece's full hue→hueB ramp, not just
+start hues (a start-hue-only scan wrongly suggested 285→344, which
+`orbital-veil`'s 265→330 ramp actually crosses). No adjacent-hue collision.
+Ink coverage (0.043) sits with the sparse cluster (`accretion`,
+`contour-grid`, `synapse`, `cipher-bloom`) rather than crowding any single
+piece — a wireframe sphere's rendered mark density is inherently sparse, no
+special tuning needed to land there.
 
 **`meridian` and `tether` remain the weakest pair.** Found twice, by different
 methods — once by comparing rendered frames pixel-by-pixel, once by looking at

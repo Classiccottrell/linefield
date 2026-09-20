@@ -470,6 +470,25 @@
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
+  <article class="card" data-tags="3d geometric" style="--accent:hsl(105 40% 60%)">
+    <a class="frame" href="pieces/globe/" data-src="pieces/globe/" aria-label="Open Globe">
+      <img src="thumbs/globe.png" alt="Globe preview" loading="lazy" width="240" height="150" />
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(105 40% 60%),hsl(130 40% 60%))"></span>
+        Globe
+      </h2>
+      <p class="blurb">A lat/long wire sphere spinning in true perspective, tilt and yaw draggable.</p>
+      <div class="tags"><span class="tag">3d</span><span class="tag">geometric</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/globe/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/globe/">Copy embed</button>
+        <a class="btn" href="downloads/globe.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
 </div>
 
 <section class="mechanisms" aria-label="Interaction mechanisms">
@@ -816,6 +835,25 @@ const PIECES = [
     "hue": 12,
     "hueB": 38,
     "saturation": 0.3,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
+  },
+  {
+    "slug": "globe",
+    "title": "Globe",
+    "blurb": "A lat/long wire sphere spinning in true perspective, tilt and yaw draggable.",
+    "tags": [
+      "3d",
+      "geometric"
+    ],
+    "hue": 105,
+    "hueB": 130,
+    "saturation": 0.4,
     "presets": [
       "whisper",
       "ink",

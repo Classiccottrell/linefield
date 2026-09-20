@@ -128,12 +128,12 @@ persists like any manual tuning, and "Reset to defaults" still returns to the
 piece's own defaults.
 
 Presets live in each piece's own control panel. The gallery does not surface
-them — a homepage of seventeen cards each carrying five swatches was more
+them — a homepage of eighteen cards each carrying five swatches was more
 inventory than invitation.
 
 ## Gallery
 
-`index.html` at the repo root shows all seventeen pieces with live previews,
+`index.html` at the repo root shows all eighteen pieces with live previews,
 filtering, and per-piece downloads. Serve the repo and open `/`:
 
 ```bash
@@ -162,6 +162,7 @@ tooling" below and CONTRIBUTING.md.
 - `cipher-bloom` — irregular glyph fragments gathering around a bright oblique core and dissolving into warm chalk and shadow
 - `driftwork` — alternating violet-grey ellipse marks following two crossing currents, with depth and dissolving edges
 - `pleat` — coral and ivory rectangular marks gathering into two folded surfaces with a clean cut between them
+- `globe` — a lat/long wire sphere spinning in true perspective, tilt and yaw draggable
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,
@@ -169,7 +170,7 @@ invert, density) plus its own piece-specific control. Color
 mode switches between a single hue (Solid) and a two-stop blend (Gradient,
 the default — every piece's own look); Color A/B are hex pickers, B shown
 only in Gradient mode. `density` multiplies the piece's base element count.
-`wireframe-lattice` and `event-horizon` also provide Pitch and Yaw
+`wireframe-lattice`, `event-horizon`, and `globe` also provide Pitch and Yaw
 controls; Angle is roll, and
 dragging the canvas orbits the camera on direct piece pages. Gallery
 previews disable drag-to-orbit.
@@ -242,7 +243,7 @@ npm run collection-metrics           # NOT run in CI — hue/sat/ink per piece, 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
 canvas, captured at 1280×800) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
-never reimplemented) for all seventeen pieces, then renders `index.html` at
+never reimplemented) for all eighteen pieces, then renders `index.html` at
 the repo root from `tools/templates/gallery.html` and the manifest — the
 gallery page itself, with live hover/keyboard previews, tag filtering, and
 per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
