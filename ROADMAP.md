@@ -238,6 +238,167 @@ chunk is closed or has already shipped independently.
 documentation, and no unnamed follow-up work. Publishing/merging is a
 separate action from preparing that handoff.
 
+---
+
+## Intake — 2026-09-19
+
+New work from a single review session, broken into named chunks the same
+way as 1–7. None of these are scoped to start automatically — each begins
+only when named, per the delivery rules above. Two items below are cross-
+project notes, not buildable chunks yet.
+
+### Chunk 8 — Marketing home page
+
+**Outcome:** A real landing page for linefield as a product, distinct from
+the plain piece gallery `index.html` already is. Uses an actual piece as
+its own hero background (dogfooding, not a screenshot), shows a sample of
+what a visitor finds in the full gallery, and documents — in plain
+language, not API reference — how a designer would drop a piece into their
+own design-system project.
+
+**Scope:** New file(s) under a `home/` or `site/` directory (does not
+replace `index.html`, the gallery). No new dependency; same
+no-build-step-for-pieces discipline does not apply here since this is a
+site page, not a piece, but keep it framework-free consistent with the
+rest of the repo.
+
+- [ ] Build two visual directions. Both must use a real linefield piece
+  live as the hero background (pick pieces that read well behind text —
+  see CONTRIBUTING's "text-safe zone" guidance from the redesign spec).
+- [ ] Both directions include a gallery-sample section (a curated handful
+  of pieces, not all seventeen) and a "how to use this in your project"
+  section: pasting a piece, the shared-controls contract, baked vs. source
+  export, MIT license.
+- [ ] Present both for a choice; the chosen direction gets a further polish
+  pass — this is the one explicitly called out to be "super sexy," not the
+  rejected direction.
+- [ ] Add basic, real controls on the page (not decorative) — enough to
+  demonstrate the shared-control contract a visitor would actually use.
+
+**Finish line:** One shipped landing page, one archived alternate, both
+functional (not mockups) since the whole point is showing the product
+working live.
+
+### Chunk 9 — Bring globe back
+
+**Outcome:** `globe` returns to the collection as an eighteenth piece,
+alongside `parallax` rather than instead of it — the redesign removed it
+as a replacement-for, but it's wanted back as an addition.
+
+**Scope:** Restore `pieces/globe/index.html` (available in git history at
+`ecde851` on `main`, pre-redesign) as a piece distinct from `parallax`
+despite both being depth/projection pieces — needs a real differentiation
+pass since `parallax`'s whole existence was "replace globe with something
+that reads less like the existing orb family." Re-run it through the
+current (post-redesign) contract: Wake instead of cursor modes, current
+shared control set.
+
+- [ ] Decide and document how `globe` and `parallax` coexist without
+  reading as the same piece twice — this is the actual design work, not
+  the restoration.
+- [ ] Restore/rebuild the piece against current `shared/`, add its
+  `pieces.json` entry, README bullet, thumbnail, download.
+- [ ] Re-run collection-metrics; note globe's hue placement against the
+  now-full wheel (see the collection-constraints table below).
+
+**Finish line:** Eighteen pieces, `globe` and `parallax` both read as
+distinct compositions at gallery-card size.
+
+### Chunk 10 — Palette: retire purple, adopt ClassicCottrell green
+
+**Outcome:** Purple is removed from the shared UI (control panel, page
+chrome — not individual pieces' own hue defaults, which are each piece's
+authored identity) and replaced with ClassicCottrell green `#437057`.
+
+**Scope:** `shared/controls.js`'s panel CSS and any other shared-UI
+surface using a purple accent. Does not touch per-piece `hue`/`hueB`
+defaults in `pieces.json` — that's the art, not the UI chrome.
+
+- [ ] Audit every purple hardcoded in shared UI CSS (grep for common purple
+  hex ranges, don't rely on memory of what looked purple).
+- [ ] Swap to `#437057` and its needed tints/shades for hover/active/focus
+  states, checked in both the light default and any dark-mode variant.
+
+**Finish line:** No purple left in the control panel or page chrome;
+`#437057` reads correctly at every interactive state.
+
+### Chunk 11 — Refresh Tether, Rainfall, Flow Field
+
+**Outcome:** These three pre-redesign pieces get a quality pass so they
+don't read as a visibly older generation next to Pleat/Driftwork/Cipher
+Bloom/Parallax/Lacuna. This is a visual/compositional refresh, not a
+rewrite — keep each piece's identity (per ROADMAP's own "meridian and
+tether remain the weakest pair" note below, `tether` already has a known
+weakness worth addressing here rather than opening a separate item for
+it).
+
+**Scope:** `pieces/tether/index.html`, `pieces/rainfall/index.html`,
+`pieces/flow-field/index.html` and their generated assets. `flow-field`
+already got a technical hardening pass (resize batcher, dt-clamp) in the
+merge that closed PR #5's conflict — this chunk is about its visual
+quality, a separate concern from that.
+
+- [ ] One named piece at a time, per the delivery rules — do not let a
+  finished piece expand into the next.
+- [ ] Judge each against the current collection's bar (silhouette read at
+  card size, negative space, a mark vocabulary not already carried more
+  strongly by another piece) rather than against its own prior version.
+- [ ] Refresh presets, thumbnail, download for each on completion.
+
+**Finish line:** All three read as belonging to the same collection as the
+five newest pieces, judged side by side, not each against its own history.
+
+### Chunk 12 — Wake: promote and expand
+
+**Outcome:** Wake moves from wherever it currently sits to the top of its
+section/page, gets a fuller description (what it is, why it's separate
+from per-piece cursor decoration), and gains real configuration — knobs
+and switches enabling different behaviors, not just on/off.
+
+**Scope:** `interactions/wake.js`, `interactions/wake/index.html`, its
+docs. Depends on Chunk 6 (Wake's stationary-pointer fade bug) closing
+first — do not layer new configuration surface onto a mechanism with a
+known-broken fade.
+
+- [ ] Close Chunk 6's fade bug first if not already closed.
+- [ ] Reorder Wake's section to the top wherever it's presented (gallery,
+  docs, and the new home page from Chunk 8 if that lands first).
+- [ ] Write a fuller description: what Wake is, why it exists outside the
+  per-piece control contract, what it does versus what removed cursor
+  modes did.
+- [ ] Design and add real configuration — specific knobs/switches remain
+  open; scope them against what Wake's current single-mechanism design can
+  actually support before adding surface area for its own sake.
+
+**Finish line:** Wake is presented first, its description explains itself
+without external context, and its configuration is real (state that
+changes behavior), not decorative.
+
+### Exploratory — ASCII art brought to life
+
+Not yet a chunk: a named idea, not a scoped deliverable. The glyph-mark
+capability already exists (built for `matrix-code`, carried into
+`cipher-bloom`); this would be a new piece or technique using arbitrary
+ASCII-art source rather than a fixed character set. Needs a design pass —
+what makes it distinct from `cipher-bloom` — before it becomes a chunk
+with an outcome and a scope. Tied to the Linefield+Forma idea below; may
+belong to whichever product turns out to own "bring static art to life"
+as a shared pattern.
+
+### Cross-project note — Forma alignment
+
+Not a linefield chunk: linefield and `Projects/Forma` (a separate 3D
+shape-playground product, React + three.js, MIT) currently share UI only
+partially, and the goal is eventual shared design patterns/design system
+between them. Real existing link, not aspirational: linefield's own
+`shared/anim.js`/`resize.js`/`quality.js` hardening (merged into this
+branch resolving PR #5's conflict) explicitly ports logic from
+`cc-webgl`, an engine Forma's own BRIEF.md also references
+(`cc-webgl`'s `ResourceRegistry`). That shared substrate is the honest
+starting point for alignment — not a rewrite of either product's UI.
+Needs its own scoping pass in Forma's own repo/roadmap before it becomes
+buildable work here; recorded so it isn't lost, not started.
+
 ## Next task prompt
 
 > Finish roadmap chunk 4: Parallax only. Make Speed move the field through the
