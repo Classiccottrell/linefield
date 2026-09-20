@@ -25,6 +25,14 @@ export function createWake({
   let pulse = null;
   let pulsed = false;
   let lastMove = 0;
+  // Tracks the pointer's own last-seeded position, independent of the
+  // `points` history array's lifecycle. `points` empties out as marks fully
+  // decay; falling back to it for "did the pointer move" (via `points.at(-1)`
+  // being undefined) reads a stationary pointer as an infinite jump the
+  // instant history clears, re-seeding a fresh mark every ~900ms with zero
+  // motion. `lastSeed` persists across that emptying so a still pointer
+  // never seeds again until it actually moves.
+  let lastSeed = null;
 
   overlay.dataset.lfWake = '';
   Object.assign(overlay.style, {
@@ -40,6 +48,7 @@ export function createWake({
     points.length = 0;
     pulse = null;
     pulsed = false;
+    lastSeed = null;
     clear();
   }
 
@@ -98,11 +107,14 @@ export function createWake({
     drawStrand(1, 1, now);
     if (points.length === 1) {
       const point = points[0];
-      context.beginPath();
-      context.arc(point.x, point.y, 8 * amount, 0, Math.PI * 2);
-      context.globalAlpha = 0.35;
-      context.fillStyle = color;
-      context.fill();
+      const age = Math.max(0, 1 - (now - point.t) / 900);
+      if (age > 0) {
+        context.beginPath();
+        context.arc(point.x, point.y, 8 * amount, 0, Math.PI * 2);
+        context.globalAlpha = age * 0.35;
+        context.fillStyle = color;
+        context.fill();
+      }
     }
     if (pulse) {
       const age = now - pulse.t;
@@ -126,13 +138,14 @@ export function createWake({
       const x = pointer.x * overlay.width / Math.max(target.width, 1);
       const y = pointer.y * overlay.height / Math.max(target.height, 1);
       const previous = points.at(-1);
-      const distance = previous ? Math.hypot(x - previous.x, y - previous.y) : Infinity;
+      const distance = lastSeed ? Math.hypot(x - lastSeed.x, y - lastSeed.y) : Infinity;
       if (distance >= 3 * (devicePixelRatio || 1)) {
         const dx = x - (previous?.x ?? x);
         const dy = y - (previous?.y ?? y);
         const length = Math.hypot(dx, dy) || 1;
         points.push({ x, y, nx: -dy / length, ny: dx / length, t: now });
         if (points.length > 32) points.shift();
+        lastSeed = { x, y };
         lastMove = now;
         pulse = null;
         pulsed = false;

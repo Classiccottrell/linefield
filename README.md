@@ -154,7 +154,7 @@ tooling" below and CONTRIBUTING.md.
 - `meridian` — seven long ribbons sweeping the full width
 - `synapse` — drifting nodes wired to their neighbours, pulsing
 - `accretion` — matter spiralling inward to a bright core
-- `tether` — a few heavy cables strung taut and swaying
+- `tether` — heavy cables mooring to a single converging point
 - `event-horizon` — a polar grid bent inward by a gravity well
 - `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
 - `lacuna` — broken caustic arcs gathering around an off-centre calm zone

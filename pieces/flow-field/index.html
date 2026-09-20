@@ -45,20 +45,52 @@
   let particles = [];
   let paths = [];
 
+  // Composition: earlier versions seeded particles edge-to-edge, so the
+  // piece read as a uniform wallpaper with no negative space next to the
+  // newer collection pieces. A soft off-center mask concentrates the mark
+  // toward one focal region and lets the rest of the canvas go quiet.
+  const FOCUS = { x: 0.58, y: 0.42 };
+  const MASK_INNER = 0.3; // fully opaque within this normalized radius
+  const MASK_OUTER = 0.62; // true zero at/beyond this radius, not just faint
+
+  function maskValue(x, y, width, height) {
+    const r = Math.min(width, height);
+    const dx = (x - width * FOCUS.x) / r;
+    const dy = (y - height * FOCUS.y) / r;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d <= MASK_INNER) return 1;
+    if (d >= MASK_OUTER) return 0;
+    const t = (d - MASK_INNER) / (MASK_OUTER - MASK_INNER);
+    return 1 - t * t * (3 - 2 * t);
+  }
+
+  function sampleFocusPoint(width, height) {
+    const r = Math.min(width, height);
+    for (let i = 0; i < 8; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.sqrt(Math.random()) * MASK_OUTER * r;
+      const x = width * FOCUS.x + Math.cos(ang) * rad;
+      const y = height * FOCUS.y + Math.sin(ang) * rad;
+      if (x >= 0 && x <= width && y >= 0 && y <= height && maskValue(x, y, width, height) > 0) {
+        return { x, y };
+      }
+    }
+    return { x: width * FOCUS.x, y: height * FOCUS.y };
+  }
+
   function seedParticles(count) {
-    particles = Array.from({ length: count }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      trail: [],
-    }));
+    particles = Array.from({ length: count }, () => {
+      const spot = sampleFocusPoint(canvas.width, canvas.height);
+      return { x: spot.x, y: spot.y, trail: [] };
+    });
   }
 
   const PRESETS = {
-    whisper: { opacity: 0.16, stroke: 0.5, density: 0.4, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.9, density: 0.7, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 0.75, saturation: 0.95, glow: 1.4 },
-    drift:   { opacity: 0.45, stroke: 0.8, density: 0.6, speed: 0.3, motion: 1.7 },
-    dense:   { opacity: 0.55, stroke: 0.7, density: 2, speed: 0.9, saturation: 0.2, glow: 0 },
+    whisper: { opacity: 0.16, stroke: 0.5, density: 0.35, saturation: 0.05, glow: 0, mode: false },
+    ink:     { opacity: 1, stroke: 1.6, density: 0.55, saturation: 0, glow: 0, mode: true },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 0.7, saturation: 0.95, glow: 1.4, mode: false },
+    drift:   { opacity: 0.45, stroke: 0.8, density: 0.5, speed: 0.3, motion: 1.7, mode: false },
+    dense:   { opacity: 0.55, stroke: 0.7, density: 1.4, speed: 0.9, saturation: 0.2, glow: 0, mode: true },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -115,6 +147,9 @@
     paths = [];
     const lineWidth = 0.3 + values.stroke * 1.2;
     for (const p of particles) {
+      // Mask read at the pre-move position: this frame's stroke belongs to
+      // where the particle currently is, not where it's about to land.
+      const m = maskValue(p.x, p.y, canvas.width, canvas.height);
       let angle = fieldAngle(p.x, p.y, elapsed, values);
 
       // Base px/sec must stay well above lineWidth, or each frame's segment is
@@ -123,42 +158,49 @@
       const nx = p.x + Math.cos(angle) * speed;
       const ny = p.y + Math.sin(angle) * speed;
 
-      const mix = (Math.sin(elapsed * 0.1 + p.x * 0.001) + 1) / 2;
-      const cr = r + (rB - r) * mix;
-      const cg = g + (gB - g) * mix;
-      const cb = b + (bB - b) * mix;
-      const [fr, fg, fb] = values.invert ? [255 - cr, 255 - cg, 255 - cb] : [cr, cg, cb];
+      if (m > 0) {
+        const mix = (Math.sin(elapsed * 0.1 + p.x * 0.001) + 1) / 2;
+        const cr = r + (rB - r) * mix;
+        const cg = g + (gB - g) * mix;
+        const cb = b + (bB - b) * mix;
+        const [fr, fg, fb] = values.invert ? [255 - cr, 255 - cg, 255 - cb] : [cr, cg, cb];
 
-      ctx.strokeStyle = `rgba(${fr | 0},${fg | 0},${fb | 0},${values.opacity})`;
-      ctx.lineWidth = lineWidth;
+        ctx.strokeStyle = `rgba(${fr | 0},${fg | 0},${fb | 0},${values.opacity * m})`;
+        ctx.lineWidth = lineWidth;
 
-      if (values.mode) {
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(nx, ny);
-        if (values.glow > 0) {
-          // Underlay pass: wider, dimmer stroke approximates bloom cheaply
-          // (canvas shadowBlur costs 5-10x per draw call at this element count).
-          ctx.lineWidth = lineWidth + values.glow * 3;
-          ctx.globalAlpha = values.glow * 0.25;
+        if (values.mode) {
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(nx, ny);
+          if (values.glow > 0) {
+            // Underlay pass: wider, dimmer stroke approximates bloom cheaply
+            // (canvas shadowBlur costs 5-10x per draw call at this element count).
+            ctx.lineWidth = lineWidth + values.glow * 3;
+            ctx.globalAlpha = values.glow * 0.25 * m;
+            ctx.stroke();
+            ctx.lineWidth = lineWidth;
+            ctx.globalAlpha = 1;
+          }
           ctx.stroke();
-          ctx.lineWidth = lineWidth;
-          ctx.globalAlpha = 1;
+          paths.push([[p.x, p.y], [nx, ny]]);
         }
-        ctx.stroke();
-        paths.push([[p.x, p.y], [nx, ny]]);
       }
 
       p.x = nx;
       p.y = ny;
 
-      if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
-        p.x = Math.random() * canvas.width;
-        p.y = Math.random() * canvas.height;
+      // Respawn on leaving the canvas OR the mask (not the canvas alone) —
+      // otherwise the noise field advects particles back out to uniform
+      // coverage within a few seconds and the negative space collapses.
+      const outOfMask = maskValue(p.x, p.y, canvas.width, canvas.height) <= 0;
+      if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height || outOfMask) {
+        const spot = sampleFocusPoint(canvas.width, canvas.height);
+        p.x = spot.x;
+        p.y = spot.y;
         p.trail = [];
       }
 
-      if (!values.mode) {
+      if (!values.mode && m > 0) {
         p.trail.push([p.x, p.y]);
         if (p.trail.length > 40) p.trail.shift();
 
@@ -170,7 +212,7 @@
           }
           if (values.glow > 0) {
             ctx.lineWidth = lineWidth + values.glow * 3;
-            ctx.globalAlpha = values.glow * 0.25;
+            ctx.globalAlpha = values.glow * 0.25 * m;
             ctx.stroke();
             ctx.lineWidth = lineWidth;
             ctx.globalAlpha = 1;

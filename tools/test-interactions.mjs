@@ -265,6 +265,42 @@ try {
     return data.reduce((sum, value, index) => sum + (index % 4 === 3 ? value : 0), 0);
   });
   assert.equal(settledPulseInk, 0, 'Wake repeated a settled pulse');
+
+  // Regression: once the history array fully emptied, the "did the pointer
+  // move" check fell back to `points.at(-1)` being undefined and read that
+  // as an infinite jump, re-seeding a fresh mark at the pointer's unchanged
+  // position every ~900ms window with zero actual movement — the trail
+  // never actually stayed gone. A single move-then-stop must fade to
+  // nothing once and then stay at nothing across several more 900ms
+  // windows of continued stillness. Alpha (not RGB) carries the fade: a
+  // semi-transparent fill on a transparent canvas un-premultiplies back to
+  // the same opaque-looking RGB in getImageData regardless of alpha, so
+  // overlayVariance() can't see a fade in progress — sum the alpha channel
+  // instead, the way settledPulseInk above already does.
+  const overlayInk = () => page.locator('[data-lf-wake]').evaluate((canvas) => {
+    const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    let sum = 0;
+    for (let i = 3; i < data.length; i += 4 * 37) sum += data[i];
+    return sum;
+  });
+  await stepFrames(page, 60); // flush any residual history from the prior loop
+  assert.equal(await overlayVariance(), 0, 'stale Wake history before fade regression check');
+  await page.mouse.move(400, 300);
+  await stepFrames(page, 1);
+  const inkEarly = await overlayInk();
+  assert.ok(inkEarly > 0, 'stationary Wake dot did not render');
+  await stepFrames(page, 25); // ~400ms after stopping, still inside the 900ms window
+  const inkMid = await overlayInk();
+  assert.ok(inkMid > 0 && inkMid < inkEarly, 'stationary Wake dot held steady instead of fading');
+  await stepFrames(page, 40); // now past the 900ms window
+  assert.equal(await overlayVariance(), 0, 'stationary Wake dot did not fade to nothing');
+  // Keep waiting through several more decay windows with zero movement: a
+  // reseed anywhere in here is the exact bug this check exists to catch.
+  for (let i = 0; i < 4; i++) {
+    await stepFrames(page, 60); // ~960ms of continued stillness
+    assert.equal(await overlayVariance(), 0, `stationary Wake dot reappeared without movement (window ${i})`);
+  }
+
   const beforeResize = await page.locator('[data-lf-wake]').evaluate((canvas) => [canvas.width, canvas.height]);
   await page.setViewportSize({ width: 960, height: 640 });
   await page.waitForTimeout(50);

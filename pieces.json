@@ -65,7 +65,7 @@
   {
     "slug": "tether",
     "title": "Tether",
-    "blurb": "Six heavy cables strung taut and swaying.",
+    "blurb": "Heavy cables mooring to a single converging point.",
     "tags": ["sparse"],
     "hue": 220, "hueB": 250, "saturation": 0.25
   },
