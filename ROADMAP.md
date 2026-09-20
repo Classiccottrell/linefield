@@ -355,6 +355,15 @@ quality, a separate concern from that.
   card size, negative space, a mark vocabulary not already carried more
   strongly by another piece) rather than against its own prior version.
 - [ ] Refresh presets, thumbnail, download for each on completion.
+  - [x] `rainfall` done: was uniform random scatter edge to edge (no
+    gesture, just dots). Reshaped into a single spatially-fixed veil — a
+    raised-cosine brightness window over x, denser center-right, quiet at
+    both edges, with a left-side floor deliberately below the rest so it
+    stays quietest under the `home/quiet-drift` hero copy it backs. Drops
+    still fall/sway exactly as before; only per-drop brightness changed, so
+    motion reveals the veil's shape as streaks cross it rather than just
+    translating. Ink coverage 0.011 → 0.010 (measured, did not increase).
+    Presets untouched structurally, still differ on ≥2 axes each.
 
 `flow-field` done: off-center soft mask replaces edge-to-edge particle
 coverage, giving it real negative space; presets refreshed to differ on
@@ -516,7 +525,7 @@ committed PNGs, not the live piece.
 | 166 | 0.48 | 0.073 | `meridian` |
 | 177 | 0.12 | 0.035 | `grain-field` |
 | 200 | 0.34 | 0.108 | `wireframe-lattice` |
-| 213 | 0.12 | 0.011 | `rainfall` |
+| 219 | 0.13 | 0.010 | `rainfall` |
 | 220 | 0.25 | 0.028 | `lacuna` |
 | 235 | 0.24 | 0.066 | `tether` |
 | 247 | 0.51 | 0.195 | `event-horizon` |

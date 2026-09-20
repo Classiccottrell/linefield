@@ -1230,20 +1230,48 @@ function describeForAI({ pieceName, values }) {
   let drops = [];
   let paths = [];
 
+  // Rainfall used to be pure random scatter edge to edge — legible as
+  // "dots falling," not a composition. This shapes the same scatter into a
+  // single broad veil (a raised-cosine window over x) so the piece reads
+  // as one gesture — denser through the middle-right, quiet at both edges
+  // — instead of uniform noise. The floor (0.12) keeps it continuous rain
+  // rather than gapped holes. The window is centred right of the frame's
+  // middle on purpose: the home page's hero copy sits over rainfall's left
+  // third (home/quiet-drift/index.html, this piece is its background
+  // specifically for its low, even ink), so the left edge is deliberately
+  // the quietest part of the veil, on top of the page's own text gradient.
+  function envelopeAt(x0) {
+    const center = 0.62;
+    const width = 0.62;
+    const d = Math.abs(x0 - center) / width;
+    const window = d < 1 ? 0.5 + 0.5 * Math.cos(d * Math.PI) : 0;
+    const e = Math.pow(window, 0.85);
+    const floor = 0.12;
+    return floor + e * (1 - floor);
+  }
+
   function seedDrops(count) {
-    drops = Array.from({ length: count }, () => ({
+    drops = Array.from({ length: count }, () => {
       // Positions normalised so a resize doesn't need a reseed.
-      x: Math.random(),
-      // Vertical phase offset — without this every drop would fall in
-      // lockstep and read as a single sheet, not individual streaks.
-      seed: Math.random(),
-      // Per-drop speed and length variety, per the brief ("varying speeds
-      // and lengths"). Range chosen so slow/short and fast/long drops both
-      // stay legible as rain, not as outliers.
-      speedMult: 0.5 + Math.random() * 1.3,
-      lenMult: 0.5 + Math.random() * 1.5,
-      sway: Math.random() * Math.PI * 2,
-    }));
+      const x = Math.random();
+      return {
+        x,
+        // Fixed per-drop envelope weight (see envelopeAt) — spatial, not
+        // time-varying, so a drop's brightness is set by where it falls,
+        // not when. Motion carries drops through the veil rather than the
+        // veil itself moving.
+        env: envelopeAt(x),
+        // Vertical phase offset — without this every drop would fall in
+        // lockstep and read as a single sheet, not individual streaks.
+        seed: Math.random(),
+        // Per-drop speed and length variety, per the brief ("varying speeds
+        // and lengths"). Range chosen so slow/short and fast/long drops both
+        // stay legible as rain, not as outliers.
+        speedMult: 0.5 + Math.random() * 1.3,
+        lenMult: 0.5 + Math.random() * 1.5,
+        sway: Math.random() * Math.PI * 2,
+      };
+    });
   }
 
   // Sparsest piece in the library at ink coverage 0.011, so `whisper` barely
@@ -1318,14 +1346,19 @@ function describeForAI({ pieceName, values }) {
       const stopA = paletteHsl(values, 0);
       const [tr, tg, tb] = hslToRgb(stopA.h, stopA.s, tailLight);
 
+      // Envelope shapes brightness, not count or width — a drop in a thin
+      // stretch of the veil still falls at full speed, just paler, so the
+      // motion is what reveals the veil's shape as drops cross it.
+      const op = values.opacity * d.env;
+
       const grad = ctx.createLinearGradient(x, tailY, x, headY);
       grad.addColorStop(0, `rgba(${tr},${tg},${tb},0)`);
-      grad.addColorStop(1, `rgba(${hr},${hg},${hb},${values.opacity})`);
+      grad.addColorStop(1, `rgba(${hr},${hg},${hb},${op})`);
 
       ctx.strokeStyle = grad;
       if (values.glow > 0) {
         ctx.lineWidth = lw + values.glow * 4;
-        ctx.globalAlpha = values.glow * 0.22;
+        ctx.globalAlpha = values.glow * 0.22 * d.env;
         ctx.beginPath();
         ctx.moveTo(x, tailY);
         ctx.lineTo(x, headY);
@@ -1344,7 +1377,7 @@ function describeForAI({ pieceName, values }) {
         // enough relative to the canvas to stay calm rather than blobby.
         const r = lw * 3;
         const glintGrad = ctx.createRadialGradient(x, headY, 0, x, headY, r);
-        glintGrad.addColorStop(0, `rgba(${hr},${hg},${hb},${values.opacity})`);
+        glintGrad.addColorStop(0, `rgba(${hr},${hg},${hb},${op})`);
         glintGrad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
         ctx.fillStyle = glintGrad;
         ctx.beginPath();
