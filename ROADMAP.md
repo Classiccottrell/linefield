@@ -201,15 +201,25 @@ This chunk can be completed independently of chunks 1–5.
 **Scope:** `interactions/wake.js`, `interactions/wake/index.html`, the existing
 `tools/test-interactions.mjs`, and Wake integration documentation.
 
-- [ ] Resolve the stationary-pointer behavior: expired history must not
-  continually seed a fresh dot while the pointer remains still.
-- [ ] Preserve default-off/reduced-motion behavior, zero strength, overlay
-  isolation, resize handling, and full teardown.
-- [ ] Extend the existing interaction check only for the specific fade
+- [x] Resolve the stationary-pointer behavior: expired history must not
+  continually seed a fresh dot while the pointer remains still. Root cause:
+  once history fully decayed, `points.at(-1)` returned `undefined`, so the
+  moved-distance check fell back to `Infinity` — always "moved," reseeding
+  every ~900ms. Fixed by tracking the last-seeded position independently of
+  the decaying history array (commit `8684544`). Also fixed a secondary bug
+  found while diagnosing: the single-remaining-dot render branch didn't fade
+  by age like the multi-point strand did.
+- [x] Preserve default-off/reduced-motion behavior, zero strength, overlay
+  isolation, resize handling, and full teardown. Untouched code paths,
+  confirmed still passing.
+- [x] Extend the existing interaction check only for the specific fade
   regression when implementing the fix. Hand off the standalone demo.
+  Verified by reverting the fix and confirming the extended test fails
+  exactly as expected, then confirming a real Playwright session against
+  `interactions/wake/index.html` over wall-clock time.
 
 **Finish line:** Move, stop, and leave the pointer: the marks disappear and
-stay gone until movement resumes. Artwork exports remain independent.
+stay gone until movement resumes. Artwork exports remain independent. **Done.**
 
 **Separate PR boundary:** Cursor removal + Wake + its gallery section/docs
 can ship without the five replacement renderers. Preserve the uncommitted
@@ -349,12 +359,14 @@ already got a technical hardening pass (resize batcher, dt-clamp) in the
 merge that closed PR #5's conflict — this chunk is about its visual
 quality, a separate concern from that.
 
-- [ ] One named piece at a time, per the delivery rules — do not let a
-  finished piece expand into the next.
-- [ ] Judge each against the current collection's bar (silhouette read at
+- [x] One named piece at a time, per the delivery rules — do not let a
+  finished piece expand into the next. Run as three parallel agents on
+  disjoint files (each scoped to its own piece only), not as one agent
+  expanding scope across all three.
+- [x] Judge each against the current collection's bar (silhouette read at
   card size, negative space, a mark vocabulary not already carried more
   strongly by another piece) rather than against its own prior version.
-- [ ] Refresh presets, thumbnail, download for each on completion.
+- [x] Refresh presets, thumbnail, download for each on completion.
   - [x] `rainfall` done: was uniform random scatter edge to edge (no
     gesture, just dots). Reshaped into a single spatially-fixed veil — a
     raised-cosine brightness window over x, denser center-right, quiet at
@@ -384,6 +396,27 @@ Thumbnail and download regenerated via `npm run build`.
 
 **Finish line:** All three read as belonging to the same collection as the
 five newest pieces, judged side by side, not each against its own history.
+**Done.**
+
+**Tooling gap found running this chunk, not fixed here:** `tools/build.mjs`
+and `tools/audit-controls.mjs` hardcode ports 5799/5798 with no per-run
+scoping. Three coder agents running the gate suite concurrently in the same
+worktree collided on both repeatedly — `audit-controls` in particular sat
+in `EADDRINUSE` retry loops across all three agents' sessions for most of
+this chunk, and one agent's orphaned retry loop kept re-triggering after
+its own work was done and reported. Worth a random/CLI-supplied port if
+concurrent coder sessions on this repo continue.
+
+**Worktree fragility found running this chunk, not fixed here:** the
+`flow-field` agent's entire uncommitted edit was silently wiped mid-task —
+`git status` went clean with no trace while two sibling commits landed
+around the same time. Root cause unconfirmed (no reflog evidence of a hard
+reset), but the likely mechanism is three coder agents sharing one physical
+worktree directory: any one agent's `git checkout .`/`reset --hard`/bad
+`stash` can silently destroy another's uncommitted work with no error.
+Recovered by re-applying from conversation history and committing
+immediately. If running concurrent coder agents on this repo again, prefer
+one worktree per agent over sharing one.
 
 ### Chunk 12 — Wake: promote and expand
 
@@ -457,10 +490,23 @@ when Motion is 0, since all animation lives in the motion-scaled layer.
 a horizontal translate. None is dead at default settings.
 
 **SVG export ignores `angle`** for pieces that rotate via canvas transform
-(`contour-grid`, `meridian`, `tether`, `matrix-code`, `chain-haze`) — their path/text
+(`contour-grid`, `meridian`, `tether`, `rainfall`) — their path/text
 points are recorded before the rotation is applied, so an exported SVG shows
 unrotated geometry. PNG export is unaffected. Fixing it properly means every
-rotating piece baking its transform into stored points.
+rotating piece baking its transform into stored points. (`rainfall` joined
+this list in its Chunk 11 refresh; `matrix-code` and `chain-haze`, previously
+listed here, no longer exist — removed by the collection redesign.)
+
+**`rainfall`'s Color A control reads as dead in `audit-controls`, but isn't.**
+Measured at 0.047% changed-pixel diff against a detection floor other color
+controls clear at ~0.06% (`node tools/audit-controls.mjs rainfall`). Color A
+is hue-linked (`shared/controls.js`'s `linkedHue`) and does shift the render
+— the diff is real, just too subtle for the audit's threshold given
+`rainfall`'s ink coverage, the sparsest in the collection at 0.010 after its
+Chunk 11 refresh (deliberately kept low: it's the hero on
+`home/quiet-drift`, where lowering coverage further would help this
+false-positive but reads worse on the page it exists for). Same class of
+limitation as grain-field/synapse's sub-pixel Shrink, below.
 
 **`matrix-code` SVG export uses `<text>`, not `<polyline>`.** It is the
 library's first glyph-mark piece — a filled/stroked character has no line
