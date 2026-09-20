@@ -1,24 +1,30 @@
 # Roadmap
 
 Active delivery roadmap, followed by previously recorded limitations and
-deferred ideas. Updated 2026-09-14.
+deferred ideas. Updated 2026-09-19.
 
-The live roadmap now lives in the Google document's
-[Linefield - product tab](https://docs.google.com/document/d/1BaOkPd91I82allnWV7WWNxBpNKGh0r3OPUqwAUhspAg/edit?tab=t.o1m9lrkc5hen).
-Read that tab before starting a chunk and update its status at handoff.
-The detail below is the local implementation reference; Google Docs governs
-the current queue and completion status.
+**This file is the canonical, version-controlled roadmap.** The Google Doc
+("Linefield - product" tab) that previously governed this queue is
+deprecated as of 2026-09-19 — its content as of that date was folded in
+below, but it is no longer updated and should not be treated as current.
+Read this file (and its git history, `git log -p ROADMAP.md`, for how the
+queue has changed) before starting a chunk, and update it in the same
+commit as the work at handoff. A markdown file in the repo is diffable,
+blame-able, and travels with the branch that implements it — a Google Doc
+is none of those things to an agent working from the checked-out tree.
 
 ---
 
 ## Current position
 
-The five replacement pages, gallery cards, thumbnails, and baked downloads
-exist. Pleat, Driftwork, and Cipher Bloom are implemented and ready for visual
-review; Lacuna and Parallax remain drafts. Their generated assets and targeted
-checks passed;
-the collection-wide release pass remains deferred. The files remain uncommitted on
-`codex/collection-redesign-wake` in `.worktrees/collection-redesign-wake`.
+Work is tracked as **PR #5** (`codex/collection-redesign-wake` → `main`,
+draft — not ready to merge). The five replacement pages, gallery cards,
+thumbnails, and baked downloads exist and are committed on that branch.
+Pleat, Driftwork, and Cipher Bloom are implemented and ready for visual
+review; Parallax is in progress (Speed is now wired independently of
+Motion, see `tools/test-parallax.mjs`; depth/occlusion tuning remains);
+Lacuna remains a draft. Their generated assets and targeted checks passed;
+the collection-wide release pass remains deferred.
 Cursor separation and Wake are already in the branch's committed history.
 
 The agreed direction remains
@@ -161,8 +167,11 @@ near/far depth and a quiet centre.
 
 **Scope:** `pieces/parallax/index.html` and its generated assets/copy.
 
-- [ ] Make Speed move the field through the lens; keep Motion responsible
-  for lens drift/depth. Strengthen near/far width and brightness differences.
+- [x] Make Speed move the field through the lens; keep Motion responsible
+  for lens drift/depth. `travel` (Speed) and `lensTime` (Motion) are now
+  independent clocks; `tools/test-parallax.mjs` asserts Speed is non-dead
+  without a browser. Near/far width and brightness differences still need
+  strengthening.
 - [ ] Keep occluded path segments separate and transformed SVG geometry
   consistent with the canvas. Tune the presets and refresh assets.
 
