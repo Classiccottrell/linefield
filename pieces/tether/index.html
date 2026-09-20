@@ -51,13 +51,26 @@
   let cables = [];
   let paths = [];
 
+  // Every cable now shares one converging anchor — the actual "tether"
+  // point — instead of independent random pairs on each side. That's the
+  // structural change: the old version was a field of crossing lines
+  // spread edge-to-edge, which is exactly why it read as a hue-shifted
+  // twin of meridian's field of parallel ribbons. A fan converging on one
+  // point gives tether its own dominant gesture (a mooring, not a field)
+  // and opens real negative space on the side away from the knot, at any
+  // size including a gallery card.
+  // Just past the right edge so the bundle exits the frame instead of
+  // stopping short and reading as a cut stub of blunt line ends.
+  const TETHER_X = 1.04;
+  const TETHER_Y = 0.48;
+
   function seedCables(count) {
     cables = Array.from({ length: count }, (_, i) => ({
       // Anchors live in normalised space so a resize doesn't restring them.
-      ax: 0.02 + Math.random() * 0.2,
-      ay: 0.1 + Math.random() * 0.8,
-      bx: 0.78 + Math.random() * 0.2,
-      by: 0.1 + Math.random() * 0.8,
+      ax: -0.06 + Math.random() * 0.2,
+      ay: -0.08 + Math.random() * 1.16,
+      bx: TETHER_X + (Math.random() - 0.5) * 0.03,
+      by: TETHER_Y + (Math.random() - 0.5) * 0.06,
       j: (i / Math.max(1, count)) * Math.PI * 2 + Math.random(),
     }));
   }
@@ -65,12 +78,19 @@
   // Only 6 heavy cables at rest, so `whisper` has to drop stroke hard or it
   // still reads heavy. stroke's control max is 2 — `ink` is held at 1.9,
   // not the limit, so the preset isn't pinned to a ceiling.
+  // `slack` is now the composition-defining knob (the fan converges to one
+  // point; how much each cable droops on the way there is the whole
+  // silhouette), so presets vary it — not just intensity — alongside a
+  // second structural axis (`angle` tilts the whole rig, `scale` widens
+  // the shiver). `dense` in particular is checked against the knot at
+  // TETHER_X not collapsing into a blob: slack is dropped there so more
+  // cables stay taut and legible instead of piling up as droop.
   const PRESETS = {
-    whisper: { opacity: 0.22, stroke: 0.3, density: 0.5, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.9, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.95, stroke: 1.2, density: 1.2, saturation: 0.95, glow: 1.2 },
-    drift:   { opacity: 0.5, stroke: 1, density: 0.7, speed: 0.25, motion: 1.7 },
-    dense:   { opacity: 0.6, stroke: 0.7, density: 1.8, speed: 0.8 },
+    whisper: { opacity: 0.22, stroke: 0.3, density: 0.5, saturation: 0.05, glow: 0, slack: 0.4 },
+    ink:     { opacity: 1, stroke: 1.9, density: 0.8, saturation: 0, glow: 0, slack: 1.4 },
+    neon:    { opacity: 0.95, stroke: 1.2, density: 1.2, saturation: 0.95, glow: 1.2, slack: 0.9, angle: 352 },
+    drift:   { opacity: 0.5, stroke: 1, density: 0.7, speed: 0.25, motion: 1.7, slack: 1.7 },
+    dense:   { opacity: 0.6, stroke: 0.7, density: 1.8, speed: 0.8, slack: 0.35, scale: 1.3 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -92,6 +112,7 @@
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.lineCap = 'round';
 
     paths = [];
     const W = canvas.width;

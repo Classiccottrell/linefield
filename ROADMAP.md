@@ -356,6 +356,23 @@ quality, a separate concern from that.
   strongly by another piece) rather than against its own prior version.
 - [ ] Refresh presets, thumbnail, download for each on completion.
 
+`flow-field` done: off-center soft mask replaces edge-to-edge particle
+coverage, giving it real negative space; presets refreshed to differ on
+at least two visual axes each; resize-batcher/dt-clamp hardening confirmed
+intact.
+
+`tether` done: cables that used to run as independent random pairs across
+the full canvas — the same edge-to-edge field structure as meridian, hue
+aside — now converge to a single anchor point exiting the frame, giving
+tether its own dominant gesture (a mooring/fan, not a field) and real
+negative space on the side away from the knot. This resolves the
+documented "meridian and tether remain the weakest pair" weakness at the
+structural level, not just palette. Presets refreshed: `slack` (now the
+composition-defining knob) plus a second structural axis (`angle` or
+`scale`) vary alongside intensity so all five differ on at least two
+visual axes, verified with `node tools/preset-sheet.mjs tether`.
+Thumbnail and download regenerated via `npm run build`.
+
 **Finish line:** All three read as belonging to the same collection as the
 five newest pieces, judged side by side, not each against its own history.
 
