@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — backgrounds that breathe</title>
+<style>
+  :root{
+    --bg:#0a0a0d; --ink:#e9e7e1; --muted:#8b8a86; --line:#232228;
+    --accent:#437057; --accent-soft:#437057b3;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink)}
+  body{
+    font:17px/1.65 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--ink)}
+  .mono{font:12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+  /* ---- Hero -------------------------------------------------------- */
+  .hero{position:relative;min-height:100svh;display:flex;align-items:center;overflow:hidden;border-bottom:1px solid var(--line)}
+  .hero iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
+  .hero::after{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(100deg, rgba(10,10,13,.94) 0%, rgba(10,10,13,.72) 32%, rgba(10,10,13,.28) 58%, rgba(10,10,13,.08) 78%);
+    pointer-events:none;
+  }
+  .hero-content{position:relative;z-index:1;max-width:760px;padding:0 7vw}
+  .kicker{display:block;margin-bottom:22px}
+  .kicker::before{content:'';display:inline-block;width:26px;height:1px;background:var(--accent);vertical-align:middle;margin-right:10px}
+  h1{
+    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    font-weight:400;font-style:italic;
+    font-size:clamp(38px,6vw,74px);line-height:1.06;letter-spacing:-.01em;
+    margin:0 0 26px;
+  }
+  h1 em{font-style:normal;color:var(--accent-soft)}
+  .lede{font-size:19px;color:#c9c7c0;max-width:52ch;margin:0 0 40px}
+  .lede code{font:14px/1 ui-monospace,Menlo,monospace;background:#16161a;border:1px solid var(--line);padding:2px 7px;border-radius:3px;color:var(--ink)}
+  .cta-row{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:13px 22px;border-radius:2px;text-decoration:none;
+    font:500 14px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:.01em;
+    border:1px solid var(--accent);color:var(--bg);background:var(--accent);
+    transition:background .18s ease, color .18s ease;
+  }
+  .btn:hover{background:transparent;color:var(--accent)}
+  .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  .btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* ---- Live control strip on the hero -------------------------------- */
+  .knobs{position:relative;z-index:1;margin-top:48px;display:flex;gap:34px;flex-wrap:wrap;align-items:flex-end;max-width:520px}
+  .knob{display:flex;flex-direction:column;gap:8px}
+  .knob label{font:11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .knob input[type=range]{
+    -webkit-appearance:none;appearance:none;width:150px;height:1px;background:var(--line);outline:0;cursor:pointer;
+  }
+  .knob input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 0 3px rgba(67,112,87,.18);cursor:pointer;margin-top:-5px;
+  }
+  .knob input[type=range]::-moz-range-thumb{width:11px;height:11px;border:0;border-radius:50%;background:var(--accent)}
+  .knob .val{font:11px/1 ui-monospace,monospace;color:var(--accent-soft)}
+  .knob-note{align-self:flex-start;font:12px/1.5 -apple-system,sans-serif;color:var(--muted);max-width:230px;padding-top:4px}
+
+  /* ---- Sections ------------------------------------------------------ */
+  section{padding:110px 7vw}
+  .section-head{max-width:640px;margin:0 0 56px}
+  .section-head h2{font:400 italic clamp(26px,3.4vw,38px)/1.15 'Iowan Old Style','Palatino Linotype',Georgia,serif;margin:0 0 14px}
+  .section-head p{color:var(--muted);margin:0;font-size:16px;max-width:56ch}
+
+  /* ---- Gallery sample -------------------------------------------------- */
+  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+  .piece-card{position:relative;background:var(--bg);aspect-ratio:4/3;overflow:hidden;display:block;text-decoration:none;color:inherit}
+  .piece-card img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.92)}
+  .piece-card .tag{
+    position:absolute;left:14px;bottom:14px;
+    font:12px/1 ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;
+    color:#eae8e2;text-shadow:0 1px 6px rgba(0,0,0,.8);
+  }
+  .piece-card::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg, transparent 55%, rgba(0,0,0,.55) 100%);opacity:0;transition:opacity .2s ease}
+  .piece-card:hover::after{opacity:1}
+  .strip-foot{margin-top:28px}
+
+  /* ---- How-to -------------------------------------------------------- */
+  .steps{list-style:none;margin:0;padding:0;display:grid;gap:38px;max-width:680px}
+  .steps li{display:grid;grid-template-columns:44px 1fr;gap:20px}
+  .steps .n{font:400 italic 26px/1 'Iowan Old Style',Georgia,serif;color:var(--accent-soft)}
+  .steps h3{margin:0 0 8px;font:600 16px/1.3 -apple-system,sans-serif}
+  .steps p{margin:0;color:#b8b6b0;font-size:15.5px;max-width:56ch}
+  .steps a{color:var(--accent-soft);text-decoration:underline;text-underline-offset:3px}
+  .fine{margin-top:46px;padding-top:28px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px;max-width:60ch}
+
+  footer{padding:48px 7vw 80px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px}
+  footer a{color:var(--muted);text-decoration:none;font-size:13px}
+  footer a:hover{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <!-- Live piece, not a screenshot: rainfall runs same-origin, its own
+       chrome hidden from the parent page after load (same technique as the
+       gallery's own hover-preview at index.html — see goLive()). -->
+  <iframe id="hero-frame" src="../../pieces/rainfall/index.html?preview=1&preset=whisper" title="" aria-hidden="true" tabindex="-1"></iframe>
+  <div class="hero-content">
+    <span class="mono kicker">Open-source · self-hosted · MIT</span>
+    <h1>Backgrounds that <em>drift</em>,<br>not distract.</h1>
+    <p class="lede">
+      linefield is a small library of generative line-art backgrounds: one
+      HTML file each, no dependencies, no build step. This is <code>rainfall</code>,
+      running live behind this text, right now.
+    </p>
+    <div class="cta-row">
+      <a class="btn" href="../../index.html">Browse the collection</a>
+      <a class="btn ghost" href="../../pieces/rainfall/">Open rainfall</a>
+    </div>
+
+    <div class="knobs">
+      <div class="knob">
+        <label for="k-speed">Speed</label>
+        <input type="range" id="k-speed" min="0" max="2" step="0.05" value="1" />
+        <span class="val" id="k-speed-val">1.00</span>
+      </div>
+      <div class="knob">
+        <label for="k-density">Density</label>
+        <input type="range" id="k-density" min="0.2" max="2" step="0.05" value="0.75" />
+        <span class="val" id="k-density-val">0.75</span>
+      </div>
+      <div class="knob">
+        <label for="k-opacity">Opacity</label>
+        <input type="range" id="k-opacity" min="0.1" max="1" step="0.02" value="0.42" />
+        <span class="val" id="k-opacity-val">0.42</span>
+      </div>
+      <p class="knob-note">These move the actual piece behind you (three of the fourteen controls every piece ships with).</p>
+    </div>
+  </div>
+</header>
+
+<section id="gallery">
+  <div class="section-head">
+    <h2>A handful, not the whole shelf.</h2>
+    <p>Eighteen pieces span sparse to dense, cool to warm. Four of them, to get a feel for the range; the rest live in the full gallery.</p>
+  </div>
+  <div class="strip">
+    <a class="piece-card" href="../../pieces/meridian/">
+      <img src="../../thumbs/meridian.png" alt="Meridian preview" loading="lazy" />
+      <span class="tag">Meridian</span>
+    </a>
+    <a class="piece-card" href="../../pieces/tether/">
+      <img src="../../thumbs/tether.png" alt="Tether preview" loading="lazy" />
+      <span class="tag">Tether</span>
+    </a>
+    <a class="piece-card" href="../../pieces/cipher-bloom/">
+      <img src="../../thumbs/cipher-bloom.png" alt="Cipher Bloom preview" loading="lazy" />
+      <span class="tag">Cipher Bloom</span>
+    </a>
+    <a class="piece-card" href="../../pieces/flow-field/">
+      <img src="../../thumbs/flow-field.png" alt="Flow Field preview" loading="lazy" />
+      <span class="tag">Flow Field</span>
+    </a>
+  </div>
+  <p class="strip-foot"><a class="btn ghost" href="../../index.html">See all eighteen →</a></p>
+</section>
+
+<section id="how">
+  <div class="section-head">
+    <h2>How it lands in your project.</h2>
+    <p>No package to install. Everything below happens in a browser tab.</p>
+  </div>
+  <ol class="steps">
+    <li>
+      <span class="n">1</span>
+      <div>
+        <h3>Open a piece, tune it</h3>
+        <p>Every piece ships the same fourteen shared controls (speed, density, palette, and so on) plus a few of its own. Drag until it looks right for your site.</p>
+      </div>
+    </li>
+    <li>
+      <span class="n">2</span>
+      <div>
+        <h3>Export baked, or export source</h3>
+        <p><strong>Baked HTML</strong> hardcodes your settings, strips the panel, and inlines every shared module into one file, ready to paste anywhere. <strong>Source</strong> gives you the same piece unbaked, if you'd rather keep the controls and edit the logic yourself.</p>
+      </div>
+    </li>
+    <li>
+      <span class="n">3</span>
+      <div>
+        <h3>Paste it in</h3>
+        <p>One <code>&lt;script type="module"&gt;</code> tag, one canvas. No bundler, no npm install, no framework requirement: it's plain ES modules the browser runs directly. Full contract in the <a href="../../README.md">README</a> and <a href="../../CONTRIBUTING.md">CONTRIBUTING</a>.</p>
+      </div>
+    </li>
+  </ol>
+  <p class="fine">MIT licensed. Use it in commercial work, fork it, strip it for parts; no attribution required, though it's appreciated. The controls on this page talk to the live piece the same way the exported control panel does: one shared write path, <code>setValue()</code>, no separate demo-only code.</p>
+</section>
+
+<footer>
+  <span class="mono">linefield — direction: quiet drift</span>
+  <nav style="display:flex;gap:22px">
+    <a href="../../index.html">Gallery</a>
+    <a href="../specimen-grid/">Other direction</a>
+    <a href="https://github.com" rel="noopener">GitHub</a>
+  </nav>
+</footer>
+
+<script type="module">
+  const frame = document.getElementById('hero-frame');
+  let panelWindow = null;
+
+  frame.addEventListener('load', () => {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    // Suppress the piece's own control panel + export row chrome — same
+    // technique as the gallery's hover-preview (index.html goLive()).
+    const style = doc.createElement('style');
+    style.textContent = '[data-lf-panel] { visibility: hidden; }';
+    doc.head.appendChild(style);
+    panelWindow = frame.contentWindow;
+  });
+
+  function wire(id, name, fmt = (v) => Number(v).toFixed(2)) {
+    const input = document.getElementById(id);
+    const out = document.getElementById(id + '-val');
+    input.addEventListener('input', () => {
+      out.textContent = fmt(input.value);
+      // Reach into the live piece's own panel API — the same setValue()
+      // its exported control panel calls on every drag. persist:false so
+      // this page never writes to the piece's own localStorage tuning.
+      if (panelWindow && panelWindow.__LF_PANEL__) {
+        panelWindow.__LF_PANEL__.setValue(name, Number(input.value), { persist: false });
+      }
+    });
+  }
+  wire('k-speed', 'speed');
+  wire('k-density', 'density');
+  wire('k-opacity', 'opacity');
+</script>
+
+</body>
+</html>
