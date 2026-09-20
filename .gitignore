@@ -7,3 +7,6 @@ linefield-*.zip
 
 # SDD scratch (ledger, briefs, review packages)
 .superpowers/
+
+# impeccable design-review hook scratch
+.impeccable/
