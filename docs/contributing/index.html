@@ -1,0 +1,427 @@
+<!--
+  Hand-ported from CONTRIBUTING.md (repo root) as of commit 4a8512e.
+  Restructured into sections/lists for this dark-monospace page; the
+  facts and rules are CONTRIBUTING.md's, not invented here. Re-sync this
+  page's copy when that file changes.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contributing — linefield</title>
+<style>
+  :root{
+    --bg:#0a0a0d; --surface:#131319; --line:#26262f;
+    --ink:#e8e8ec; --muted:#7c7c8c;
+    --brand:#437057; --brand-dim:#2d4d3c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font:15px/1.6 ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--brand)}
+  .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .wrap{max-width:860px;margin:0 auto;padding:0 24px 96px}
+
+  .topbar{
+    position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;
+    padding:16px 28px;border-bottom:1px solid var(--line);background:rgba(10,10,13,.88);backdrop-filter:blur(6px);
+  }
+  .topbar .mark{font-weight:700;letter-spacing:.04em;font-size:15px;text-decoration:none;color:var(--ink)}
+  .topbar .mark span{color:var(--brand)}
+  .topbar nav{display:flex;gap:24px;font-size:12px}
+  .topbar nav a{text-decoration:none;color:var(--muted)}
+  .topbar nav a:hover,.topbar nav a[aria-current]{color:var(--ink)}
+
+  header.intro{padding:56px 0 28px}
+  header.intro .label{margin-bottom:16px;display:block}
+  h1{font:700 clamp(28px,4.2vw,40px)/1.18 ui-monospace,monospace;letter-spacing:-.01em;margin:0 0 14px}
+  .lede{color:#b9b9be;font-size:15px;margin:0;max-width:64ch}
+  .lede code,p code,li code{font-size:13px;background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
+
+  .toc{display:flex;flex-wrap:wrap;gap:8px;padding:24px 0 32px;border-bottom:1px solid var(--line)}
+  .toc a{
+    font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+    color:var(--muted);background:transparent;border:1px solid var(--line);
+    padding:8px 13px;text-decoration:none;text-transform:uppercase;
+  }
+  .toc a:hover{color:var(--ink);border-color:#3a3a46}
+
+  .doc-section{padding:36px 0;border-top:1px solid var(--line)}
+  .doc-section:first-of-type{border-top:none}
+  .doc-section h2{margin:0 0 14px;font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .doc-section h3{margin:20px 0 10px;font-size:15px;font-weight:700;color:var(--ink)}
+  .doc-section p{color:#c6c6d0;margin:0 0 14px;max-width:68ch}
+  .doc-section p:last-child{margin-bottom:0}
+
+  ol.steps{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:14px;counter-reset:step}
+  ol.steps li{display:grid;grid-template-columns:28px 1fr;gap:14px;counter-increment:step}
+  ol.steps li::before{content:counter(step);color:var(--brand);font-weight:700}
+  ol.steps li p,ol.steps li div{margin:0;color:#c6c6d0;font-size:14px;line-height:1.55}
+  ol.steps li strong{color:var(--ink)}
+
+  ol.gates{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:10px;counter-reset:gate}
+  ol.gates li{display:grid;grid-template-columns:22px 1fr;gap:12px;counter-increment:gate}
+  ol.gates li::before{content:counter(gate);color:var(--brand);font-weight:700;font-size:13px}
+  ol.gates li code{display:block;margin-bottom:2px}
+  ol.gates li span{color:var(--muted);font-size:13px}
+
+  ul.control-list{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0 0 16px;padding:0}
+  ul.control-list li{
+    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0;
+    border:1px solid var(--line);padding:6px 10px;background:var(--surface);
+  }
+
+  ul.plain{margin:0 0 16px;padding-left:20px;color:#c6c6d0}
+  ul.plain li{margin:0 0 8px;font-size:14px;line-height:1.55}
+  ul.plain li:last-child{margin-bottom:0}
+
+  .callout{border:1px solid var(--line);background:var(--surface);padding:18px 20px;margin:0 0 16px}
+  .callout .label{margin-bottom:8px;display:block}
+  .callout p{margin:0;color:#c6c6d0;font-size:13.5px}
+  .callout p+p{margin-top:10px}
+
+  .snip{
+    display:flex;align-items:flex-start;gap:12px;
+    background:var(--bg);border:1px solid var(--line);
+    padding:14px 14px 14px 16px;margin:0 0 16px;
+  }
+  .snip pre{margin:0;flex:1;min-width:0;overflow-x:auto;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0}
+
+  .btn{
+    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;
+    color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
+    padding:9px 12px;cursor:pointer;text-decoration:none;display:inline-block;
+  }
+  .btn::before{content:'$ ';color:var(--brand)}
+  .btn:hover{color:var(--ink);border-color:#3a3a46}
+  .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+
+  footer{padding:56px 0 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:40px}
+  footer a{color:var(--brand)}
+  footer p{margin:0 0 10px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="mark" href="../../index.html">line<span>field</span></a>
+  <nav>
+    <a href="../">Docs</a>
+    <a href="../../docs/contributing/index.html" aria-current="page">Contributing</a>
+    <a href="../../index.html">Gallery</a>
+    <a href="https://github.com/Classiccottrell/linefield">GitHub</a>
+  </nav>
+</div>
+
+<div class="wrap">
+
+<header class="intro">
+  <span class="label">Docs / Contributing — stub, ported from CONTRIBUTING.md</span>
+  <h1>Contributing to linefield.</h1>
+  <p class="lede">Before you start, read
+    <a href="https://github.com/Classiccottrell/linefield/blob/main/skills/building-generative-backgrounds/SKILL.md">skills/building-generative-backgrounds/SKILL.md</a>.
+    It carries the constants that render wrong, what counts as
+    verification, and the collection gate. Everything in it was learned by
+    shipping a piece that looked fine on paper and wrong on screen.</p>
+</header>
+
+<nav class="toc" aria-label="On this page">
+  <a href="#adding-piece">Adding a piece</a>
+  <a href="#build-boundary">Build boundary</a>
+  <a href="#gallery">Gallery entry</a>
+  <a href="#serving">Serving</a>
+  <a href="#shared-controls">Shared controls</a>
+  <a href="#extra-controls">extraControls</a>
+  <a href="#defaults">Defaults</a>
+  <a href="#presets">Presets</a>
+  <a href="#density">Density</a>
+  <a href="#wake">Interactions</a>
+  <a href="#baked-export">Baked export</a>
+  <a href="#3d">3D pieces</a>
+  <a href="#no-tests">Verifying a piece</a>
+</nav>
+
+<section class="doc-section" id="adding-piece">
+  <h2>Adding a new piece</h2>
+  <ol class="steps">
+    <li><div>Copy the whole <code>pieces/_template/</code> folder to
+      <code>pieces/&lt;your-piece-name&gt;/</code>, using kebab-case for
+      the folder name (e.g. <code>flow-field</code>,
+      <code>contour-grid</code>).</div></li>
+    <li><div>Update the <code>&lt;title&gt;</code> and <code>PIECE_ID</code>
+      in the new <code>index.html</code>.</div></li>
+    <li><div>Replace the <code>drawFrame()</code> body with your own
+      rendering logic, following the comments left in the template.</div></li>
+    <li><div>Pick a distinct default palette for your piece (see
+      "Defaults" below) so the library doesn't look uniform &mdash; check
+      the other pieces' <code>defaults</code> blocks before choosing
+      hues.</div></li>
+    <li><div>Verify visually in a browser (see "Verifying a piece"
+      below).</div></li>
+  </ol>
+  <p>A piece itself has no build step, no dependencies, no bundler &mdash;
+    see "The build boundary" below. Everything is plain ES modules loaded
+    directly by the browser, so a piece is just an <code>index.html</code>
+    that imports from <code>../../shared/*.js</code>.</p>
+</section>
+
+<section class="doc-section" id="build-boundary">
+  <h2>The build boundary</h2>
+  <p>The pieces have no dependencies and no build step. That is the
+    product: a piece is one file you can open, and a baked export is one
+    file you can paste anywhere. Nothing in <code>pieces/</code> or
+    <code>shared/</code> may import anything generated or require an
+    install step.</p>
+  <p>The <strong>microsite</strong> is different. <code>index.html</code>,
+    <code>thumbs/</code> and <code>downloads/</code> are generated by
+    <code>tools/build.mjs</code> from <code>pieces.json</code>, using
+    Playwright as a dev dependency. None of that reaches a user of a
+    piece.</p>
+</section>
+
+<section class="doc-section" id="gallery">
+  <h2>Adding a piece to the gallery</h2>
+  <ol class="steps">
+    <li><div>Build the piece as described above.</div></li>
+    <li><div>Add an entry to <code>pieces.json</code>: <code>slug</code>,
+      <code>title</code>, <code>blurb</code>, <code>tags</code>, and the
+      <code>hue</code>/<code>hueB</code>/<code>saturation</code> from the
+      piece's own <code>defaults</code> block. These three must come FIRST
+      in the <code>defaults</code> block and in that exact order &mdash;
+      the verifier's parser is a regex locked to that order.
+      <code>colorMode</code>/<code>colorA</code>/<code>colorB</code> may
+      follow after; they aren't read by the manifest.</div></li>
+    <li><div>Add a bullet to README's Pieces list.</div></li>
+    <li><div>Run <code>npm run build</code>.</div></li>
+    <li><div>Run <code>npm run collection-metrics</code> and paste its
+      output over ROADMAP's "Collection constraints" table. Do this after
+      the build, since it measures the committed thumbnails &mdash; a
+      piece with no thumbnail yet has no row.</div></li>
+  </ol>
+  <div class="callout">
+    <span class="label">The build verifies before it generates</span>
+    <p>It fails if the manifest, the pieces on disk, and the README
+      disagree, including if a piece's palette has been tuned without
+      updating the manifest. Run <code>npm run verify</code> on its own to
+      check without regenerating.</p>
+    <p>Re-run <code>npm run build</code> whenever you tune a piece:
+      thumbnails and downloads are captured from the live piece, so they
+      go stale when it changes. An unrelated <code>npm run build</code> is
+      a byte-identical no-op (thumbnail capture pins the RNG and clock) so
+      only pieces you actually touched show a diff in <code>thumbs/</code>.</p>
+  </div>
+
+  <h3>CI gates, in order (.github/workflows/checks.yml)</h3>
+  <ol class="gates">
+    <li><code>npm run verify</code><span>manifest vs. pieces vs. README agreement</span></li>
+    <li><code>node tools/test-presets.mjs synapse</code><span>preset mechanism on one piece; preset value/enum data on all pieces</span></li>
+    <li><code>npm run test-bake-fresh</code><span>bakes every piece live against today's source and validates the output</span></li>
+    <li><code>npm run test-baked</code><span>every committed <code>downloads/*.html</code> renders standalone over <code>file://</code></span></li>
+    <li><code>npm run test-source</code><span>Source buttons download exact unbaked piece files</span></li>
+    <li><code>npm run test-interactions</code><span>Wake, orbit, animation, and baked-artifact browser QA</span></li>
+    <li><code>npm run audit-controls</code><span>every control has a visible effect; run last on purpose, it's the slowest and broadest, so it can never hide a faster/narrower gate's failure behind itself</span></li>
+  </ol>
+  <p><code>node tools/preset-sheet.mjs</code>, <code>node tools/browser-matrix.mjs</code>
+    and <code>npm run collection-metrics</code> are curation tools with no
+    pass/fail gate and don't run in CI at all &mdash; read their output
+    yourself.</p>
+  <div class="callout">
+    <span class="label">Accepted gap: neither bake check catches a forgotten rebuild</span>
+    <p><code>test-bake-fresh</code> proves the bake process works against
+      current source and says nothing about what's actually committed.
+      <code>test-baked</code> proves the committed bytes still render
+      standalone and is blind to a live process regression until someone
+      next runs <code>npm run build</code>. A piece whose values were
+      tuned but never rebuilt renders fine either way, so both gates pass
+      trivially on a stale download.</p>
+    <p>CI deliberately does not run <code>npm run build</code> itself,
+      since the gallery, thumbnails and downloads are committed and
+      GitHub Pages serves them directly &mdash; rebuilding in CI would
+      rewrite those committed artifacts on every run. Re-running the build
+      after any visual change is on you.</p>
+  </div>
+</section>
+
+<section class="doc-section" id="serving">
+  <h2>Serving the project</h2>
+  <p>Serve the <strong>repo root</strong> with any static file server.
+    Pieces import shared code with paths like
+    <code>../../shared/controls.js</code>, so opening a piece's own folder
+    as the server root, or opening the file directly via
+    <code>file://</code>, will not work: ES modules are blocked over
+    <code>file://</code> and the relative import paths assume repo-root
+    serving.</p>
+  <div class="snip"><pre>npx serve .</pre></div>
+  <p>Then open <code>http://localhost:&lt;port&gt;/pieces/&lt;piece-name&gt;/</code>.</p>
+</section>
+
+<section class="doc-section" id="shared-controls">
+  <h2>The 14 shared visual controls</h2>
+  <p>Every piece gets these controls for free via
+    <code>createControlPanel()</code> (<code>shared/controls.js</code>):</p>
+  <ul class="control-list">
+    <li>scale</li><li>speed</li><li>stroke</li><li>opacity</li>
+    <li>saturation</li><li>colorMode</li><li>colorA</li><li>colorB</li>
+    <li>glow</li><li>angle</li><li>motion</li><li>phase</li>
+    <li>invert</li><li>density</li>
+  </ul>
+  <p><code>colorMode</code> (Solid/Gradient) and <code>colorA</code>/<code>colorB</code>
+    (hex colour pickers, <code>colorB</code> only shown in Gradient mode)
+    are the <em>authored</em> palette &mdash; a piece never reads them
+    directly. Call <code>paletteHsl(values, f)</code> from
+    <code>shared/color.js</code> instead: it returns <code>{ h, s }</code>
+    for a 0-1 position along the ramp (<code>f=0</code> is stop A,
+    <code>f=1</code> is stop B; Solid mode ignores <code>f</code> and
+    always returns stop A), sourcing <code>s</code> from the shared
+    <code>saturation</code> control. <code>hue</code> and
+    <code>hueB</code> still exist in <code>values</code>, hidden from the
+    panel, but they are implementation values <code>colorA</code>/<code>colorB</code>
+    drive one-way; a piece's own code should never read them.</p>
+  <p>A new piece should make <strong>each</strong> authored control
+    visibly affect its render. If a control doesn't map naturally onto
+    your piece's visuals, find a reasonable interpretation (e.g.
+    <code>angle</code> can rotate a field, <code>motion</code> can scale a
+    secondary animation speed distinct from <code>speed</code>) rather
+    than skipping it.</p>
+</section>
+
+<section class="doc-section" id="extra-controls">
+  <h2>Piece-specific controls (extraControls)</h2>
+  <p>Pass an <code>extraControls</code> array to
+    <code>createControlPanel({ ... extraControls })</code> for controls
+    unique to your piece (same spec shape as the shared controls:
+    <code>name</code>, <code>label</code>, <code>type</code>,
+    <code>min</code>/<code>max</code>/<code>step</code> or default, etc).
+    These render below the fourteen shared controls automatically. You can
+    also add one after the panel exists with
+    <code>panel.addControl({ ... })</code>.</p>
+</section>
+
+<section class="doc-section" id="defaults">
+  <h2>Defaults</h2>
+  <p>Pass a <code>defaults</code> object to
+    <code>createControlPanel({ ... defaults })</code> to set your piece's
+    own default values: <code>hue</code>/<code>hueB</code> (exact
+    degrees, most important, so each piece reads as visually distinct out
+    of the box) and <code>colorA</code>/<code>colorB</code> (the hex the
+    picker shows for those same two hues on first load). Check the
+    existing pieces' <code>defaults</code> blocks before picking colors to
+    avoid duplicating another piece's palette.</p>
+  <p>A saved <code>localStorage</code> value always outranks a piece's
+    defaults for a returning visitor. "Reset to defaults" in the panel
+    clears it.</p>
+</section>
+
+<section class="doc-section" id="presets">
+  <h2>Presets</h2>
+  <p>Pass a <code>presets</code> object to
+    <code>createControlPanel({ ... presets })</code> to add a row of chip
+    buttons above the controls. Keys are drawn from the shared five-name
+    vocabulary &mdash; <code>whisper</code>, <code>ink</code>,
+    <code>neon</code>, <code>drift</code>, <code>dense</code> &mdash; and
+    each value is a <strong>partial</strong> map of control name to value;
+    anything a preset omits falls back to the piece's own defaults.
+    Clicking a chip and loading <code>?preset=&lt;name&gt;</code> share
+    one apply path, and moving any slider clears the active chip. See
+    <code>pieces/flow-field/index.html</code> for a worked example.</p>
+  <p>A preset value that exceeds its control's declared
+    <code>min</code>/<code>max</code> still renders.
+    <code>node tools/test-presets.mjs &lt;slug&gt;</code> checks every
+    preset value against <code>window.__LF_SPECS__</code> and fails naming
+    the offending piece/preset/control/value/range, but keep values in
+    range by construction rather than relying on the gate to catch it
+    after the fact. <code>window.__LF_PANEL__.setValue(name, value, {
+    persist })</code> is the panel's write path exposed for tooling.</p>
+</section>
+
+<section class="doc-section" id="density">
+  <h2>Density convention</h2>
+  <p>If your piece renders a countable number of elements (particles,
+    lines, grid cells), derive the count from <code>density</code> rather
+    than hardcoding it:</p>
+  <div class="snip"><pre>const BASE_COUNT = 200; // pick a sane baseline for your piece
+const count = Math.round(BASE_COUNT * values.density);</pre></div>
+  <p>If your piece holds a <strong>persistent</strong> array (particles
+    that carry state frame to frame, not values recomputed from scratch
+    each frame), re-seed that array inside the panel's
+    <code>onChange</code> callback when <code>density</code> changes;
+    recomputing <code>count</code> alone won't resize an existing array.
+    See <code>pieces/flow-field/index.html</code> for a worked example.</p>
+</section>
+
+<section class="doc-section" id="wake">
+  <h2>Optional interaction mechanisms</h2>
+  <p>Wake is not baked into pieces. Add it to any canvas that needs it:</p>
+  <div class="snip"><pre>import { createWake } from './interactions/wake.js';
+
+const wake = createWake({ target: document.querySelector('canvas') });
+wake.setEnabled(true);</pre></div>
+</section>
+
+<section class="doc-section" id="baked-export">
+  <h2>Baked HTML export</h2>
+  <p><code>shared/export.js</code>'s <code>bakeHtml()</code> produces a
+    fully standalone file: it strips the control panel, inlines all of
+    <code>shared/*.js</code> into one
+    <code>&lt;script type="module"&gt;</code>, and hardcodes the current
+    control values as <code>window.__LF_BAKED_VALUES__</code>. The output
+    has zero external references and runs from anywhere, including
+    outside this repo. Shared modules are derived from the piece's
+    imports; no separate bake list is maintained.
+    <code>exportSource()</code> fetches the current route without its
+    query/hash and downloads those exact, unbaked bytes.</p>
+</section>
+
+<section class="doc-section" id="3d">
+  <h2>3D pieces</h2>
+  <p><code>shared/project.js</code> is where 3D capability lives and
+    grows. It exposes <code>createCamera({ tilt, yaw, roll, fov, cx, cy
+    })</code> returning <code>.project(x, y, z)</code>,
+    <code>.projectPath(points)</code> and <code>.set(partialOptions)</code>,
+    plus a standalone <code>rotatePoint</code>. A projected point carries
+    a <code>scale</code> (the perspective divisor) so pieces can thin or
+    fade distant geometry; <code>scale === 0</code> means the point is at
+    or beyond the camera's near plane and must be skipped.</p>
+  <p>3D pieces expose <code>rotX</code>/<code>rotY</code> as Pitch/Yaw and
+    use shared Angle as roll. <code>createOrbit()</code> in
+    <code>shared/pointer.js</code> is a stateless delta emitter; each drag
+    move calls <code>onOrbit(dPitchRad, dYawRad)</code> and the piece
+    writes that delta into <code>rotX</code>/<code>rotY</code> via
+    <code>panel.setValue(..., { persist: false })</code>, then persists
+    once from <code>onSettle()</code> on pointerup. It disables itself
+    under <code>?preview=1</code>.</p>
+  <p>Extend the camera by adding an option, not by changing call
+    signatures, so existing pieces keep working. Deliberately absent
+    today: depth sorting and occlusion, matrix stacks, lighting, mesh
+    loading, and an orthographic mode.</p>
+</section>
+
+<section class="doc-section" id="no-tests">
+  <h2>Verifying a piece</h2>
+  <p>A piece has no bundler, transpiler, or test runner of its own.
+    Canvas rendering is verified visually:</p>
+  <ul class="plain">
+    <li>Serve the repo root and open the piece in a browser.</li>
+    <li>Confirm it renders and animates as expected, with zero console
+      errors.</li>
+    <li>Click through each export button &mdash; PNG 2x, PNG 4x, SVG,
+      Baked HTML, Source, Copy AI Prompt &mdash; to confirm they work.</li>
+  </ul>
+</section>
+
+<footer>
+  <p>This page is a hand-ported stub of
+    <a href="https://github.com/Classiccottrell/linefield/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.
+    Read that file directly for the canonical, always-current version.
+    See also the <a href="../">docs landing page</a> and
+    <a href="https://github.com/Classiccottrell/linefield/blob/main/skills/building-generative-backgrounds/SKILL.md">building-generative-backgrounds skill</a>.</p>
+</footer>
+
+</div>
+</body>
+</html>
