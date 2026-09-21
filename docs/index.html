@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Docs — linefield</title>
+<style>
+  /* Same dark/monospace specimen system as the gallery (tools/templates/gallery.html)
+     and quiet-drift's footer/topbar chrome — see ROADMAP.md Chunk 15/16.
+     Pages in this repo each inline their own copy rather than sharing a
+     stylesheet (same pattern as home/quiet-drift and home/specimen-grid). */
+  :root{
+    --bg:#0a0a0d; --surface:#131319; --line:#26262f;
+    --ink:#e8e8ec; --muted:#7c7c8c;
+    --brand:#437057; --brand-dim:#2d4d3c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font:15px/1.6 ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--brand)}
+  .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .wrap{max-width:860px;margin:0 auto;padding:0 24px 96px}
+
+  .topbar{
+    position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;
+    padding:16px 28px;border-bottom:1px solid var(--line);background:rgba(10,10,13,.88);backdrop-filter:blur(6px);
+  }
+  .topbar .mark{font-weight:700;letter-spacing:.04em;font-size:15px;text-decoration:none;color:var(--ink)}
+  .topbar .mark span{color:var(--brand)}
+  .topbar nav{display:flex;gap:24px;font-size:12px}
+  .topbar nav a{text-decoration:none;color:var(--muted)}
+  .topbar nav a:hover,.topbar nav a[aria-current]{color:var(--ink)}
+
+  header.intro{padding:56px 0 28px}
+  header.intro .label{margin-bottom:16px;display:block}
+  h1{font:700 clamp(28px,4.2vw,40px)/1.18 ui-monospace,monospace;letter-spacing:-.01em;margin:0 0 14px}
+  .lede{color:#b9b9be;font-size:15px;margin:0;max-width:64ch}
+  .lede code,p code,li code{font-size:13px;background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
+
+  .toc{display:flex;flex-wrap:wrap;gap:8px;padding:24px 0 32px;border-bottom:1px solid var(--line)}
+  .toc a{
+    font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+    color:var(--muted);background:transparent;border:1px solid var(--line);
+    padding:8px 13px;text-decoration:none;text-transform:uppercase;
+  }
+  .toc a:hover{color:var(--ink);border-color:#3a3a46}
+
+  .doc-section{padding:40px 0;border-top:1px solid var(--line)}
+  .doc-section:first-of-type{border-top:none}
+  .doc-section h2{margin:0 0 14px;font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .doc-section p{color:#c6c6d0;margin:0 0 14px;max-width:68ch}
+  .doc-section p:last-child{margin-bottom:0}
+
+  ol.steps{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:14px;counter-reset:step}
+  ol.steps li{display:grid;grid-template-columns:28px 1fr;gap:14px;counter-increment:step}
+  ol.steps li::before{content:counter(step);color:var(--brand);font-weight:700}
+  ol.steps li p,ol.steps li div{margin:0;color:#c6c6d0;font-size:14px;line-height:1.55}
+  ol.steps li strong{color:var(--ink)}
+
+  ul.control-list{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0 0 16px;padding:0}
+  ul.control-list li{
+    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0;
+    border:1px solid var(--line);padding:6px 10px;background:var(--surface);
+  }
+
+  .callout{border:1px solid var(--line);background:var(--surface);padding:18px 20px;margin:0 0 16px}
+  .callout .label{margin-bottom:8px;display:block}
+  .callout p{margin:0;color:#c6c6d0;font-size:13.5px}
+  .callout p+p{margin-top:10px}
+
+  .snip{
+    display:flex;align-items:flex-start;gap:12px;
+    background:var(--bg);border:1px solid var(--line);
+    padding:14px 14px 14px 16px;margin:0 0 16px;
+  }
+  .snip pre{margin:0;flex:1;min-width:0;overflow-x:auto;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0}
+
+  .btn{
+    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;
+    color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
+    padding:9px 12px;cursor:pointer;text-decoration:none;display:inline-block;
+  }
+  .btn::before{content:'$ ';color:var(--brand)}
+  .btn:hover{color:var(--ink);border-color:#3a3a46}
+  .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+
+  footer{padding:56px 0 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:40px}
+  footer a{color:var(--brand)}
+  footer p{margin:0 0 10px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="mark" href="../index.html">line<span>field</span></a>
+  <nav>
+    <a href="./" aria-current="page">Docs</a>
+    <a href="contributing/">Contributing</a>
+    <a href="../index.html">Gallery</a>
+    <a href="https://github.com/Classiccottrell/linefield">GitHub</a>
+  </nav>
+</div>
+
+<div class="wrap">
+
+<header class="intro">
+  <span class="label">Docs / stub — scaffolded, not final copy</span>
+  <h1>How linefield fits into a project.</h1>
+  <p class="lede">Everything on this page also lives in
+    <code>README.md</code> and <code>CONTRIBUTING.md</code> at the repo
+    root. This organizes the visitor-facing parts of both as real,
+    navigable sections instead of two flat files you'd have to find on
+    GitHub.</p>
+</header>
+
+<nav class="toc" aria-label="On this page">
+  <a href="#using">Using a piece</a>
+  <a href="#configuring">Without the panel</a>
+  <a href="#presets">Presets</a>
+  <a href="#controls">Shared controls</a>
+  <a href="#adding">Adding a piece</a>
+</nav>
+
+<section class="doc-section" id="using">
+  <h2>Using a piece in your own site</h2>
+  <p>Three routes, in the order most people want them.</p>
+  <ol class="steps">
+    <li><div><strong>Bake it (recommended).</strong> Open a piece, tune it
+      with the control panel, then click <strong>Baked HTML</strong>. You
+      get one self-contained <code>.html</code> file: settings hardcoded,
+      panel removed, every shared module inlined. No dependencies, no
+      build step, nothing else to copy.</div></li>
+    <li><div><strong>Embed an iframe.</strong> If the piece is hosted
+      somewhere, point at it directly. The gallery's <strong>Copy
+      embed</strong> button produces exactly this markup. The piece stays
+      updatable and isolated from your page's CSS, but it's a frame, with
+      a frame's layout and accessibility implications.</div></li>
+    <li><div><strong>Copy the folder.</strong> Take <code>pieces/&lt;name&gt;/</code>
+      and <code>shared/</code>, keeping their relative positions, and host
+      both. Most control, most files. Useful if you intend to modify the
+      piece rather than just use it.</div></li>
+  </ol>
+  <div class="snip">
+<pre>&lt;iframe src="https://example.com/pieces/flow-field/"
+        style="border:0;width:100%;height:100%"&gt;&lt;/iframe&gt;</pre>
+  </div>
+</section>
+
+<section class="doc-section" id="configuring">
+  <h2>Configuring without the control panel</h2>
+  <p>A piece checks for <code>window.__LF_BAKED_VALUES__</code> before it
+    builds its control panel. If that global is set, the piece renders
+    with those values and no panel &mdash; exactly what a Baked HTML
+    export produces, and something you can also do by hand. The script
+    has to come first, above the piece's own
+    <code>&lt;script type="module"&gt;</code>, since the piece reads the
+    global while its module script evaluates.</p>
+  <div class="snip">
+<pre>&lt;script&gt;
+  window.__LF_BAKED_VALUES__ = {
+    scale: 1, speed: 0.6, stroke: 1, opacity: 1,
+    saturation: 0.5, colorMode: 'gradient', hue: 210, hueB: 260,
+    colorA: '#3399ff', colorB: '#aa00ff',
+    glow: 0, angle: 0, motion: 1, phase: 0,
+    invert: false, density: 0.8,
+  };
+&lt;/script&gt;</pre>
+  </div>
+  <div class="callout">
+    <span class="label">Set every control</span>
+    <p>Unlike a real Baked HTML export, a hand-written object is used
+      as-is: it is not merged with the piece's defaults. Any control you
+      omit reads as <code>undefined</code>, which breaks rendering rather
+      than falling back to a default. Copy the full list above and edit
+      values, don't trim it.</p>
+  </div>
+</section>
+
+<section class="doc-section" id="presets">
+  <h2>Presets</h2>
+  <p>Every piece ships five curated starting points, shown as a chip row
+    at the top of its control panel: <code>whisper</code>,
+    <code>ink</code>, <code>neon</code>, <code>drift</code>,
+    <code>dense</code>. The names mean the same intent on every piece; the
+    values are tuned per piece, since a saturation that flatters
+    <code>grain-field</code> is wrong for <code>flow-field</code>.</p>
+  <p>A preset is a partial set of controls composed over that piece's own
+    defaults, not a full snapshot, so switching between two presets never
+    leaves a control stranded at the previous one's value. Open a piece at
+    a preset directly with <code>?preset=&lt;name&gt;</code>, for example
+    <code>pieces/meridian/?preset=ink</code>. The gallery itself doesn't
+    surface presets &mdash; eighteen cards each carrying five swatches was
+    more inventory than invitation.</p>
+</section>
+
+<section class="doc-section" id="controls">
+  <h2>The shared control contract</h2>
+  <p>Every piece gets the same fourteen controls for free via the shared
+    control panel:</p>
+  <ul class="control-list">
+    <li>scale</li><li>speed</li><li>stroke</li><li>opacity</li>
+    <li>saturation</li><li>colorMode</li><li>colorA</li><li>colorB</li>
+    <li>glow</li><li>angle</li><li>motion</li><li>phase</li>
+    <li>invert</li><li>density</li>
+  </ul>
+  <p><code>colorMode</code> (Solid/Gradient) and <code>colorA</code>/<code>colorB</code>
+    are the authored palette shown in the panel; a piece never reads them
+    directly, it reads <code>hue</code>/<code>hueB</code> through a shared
+    helper instead. <code>density</code> multiplies the piece's base
+    element count. Three pieces (<code>wireframe-lattice</code>,
+    <code>event-horizon</code>, <code>globe</code>) also get Pitch and Yaw,
+    since they're 3D; Angle is roll on those.</p>
+  <p>Full mechanics &mdash; the exact palette helper, defaults, presets,
+    piece-specific controls, and the density convention for a piece's own
+    element count &mdash; are on the <a href="contributing/">Contributing
+    page</a>.</p>
+</section>
+
+<section class="doc-section" id="adding">
+  <h2>Adding a new piece</h2>
+  <p>Short version: copy <code>pieces/_template/</code> to
+    <code>pieces/&lt;your-piece-name&gt;/</code>, update its
+    <code>&lt;title&gt;</code> and <code>PIECE_ID</code>, replace
+    <code>drawFrame()</code> with your own rendering logic, pick a distinct
+    default hue so the library doesn't look uniform, then verify visually
+    in a browser. Adding it to the gallery is a separate step: an entry in
+    <code>pieces.json</code>, a README bullet, and a rebuild.</p>
+  <p>The full steps, the build boundary between pieces and the microsite,
+    and the CI gate order all live on the
+    <a href="contributing/">Contributing page</a> &mdash; read the skill
+    file it links first if you're building the actual rendering logic.</p>
+  <div class="actions">
+    <a class="btn" href="contributing/">read contributing</a>
+  </div>
+</section>
+
+<footer>
+  <p>Source of truth for everything above:
+    <a href="https://github.com/Classiccottrell/linefield/blob/main/README.md">README.md</a>
+    and
+    <a href="https://github.com/Classiccottrell/linefield/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>
+    at the repo root. <a href="https://github.com/Classiccottrell/linefield/blob/main/ROADMAP.md">ROADMAP.md</a>
+    tracks what's built, what's deliberately deferred, and why.</p>
+</footer>
+
+</div>
+</body>
+</html>
