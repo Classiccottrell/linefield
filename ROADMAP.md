@@ -398,14 +398,19 @@ Thumbnail and download regenerated via `npm run build`.
 five newest pieces, judged side by side, not each against its own history.
 **Done.**
 
-**Tooling gap found running this chunk, not fixed here:** `tools/build.mjs`
-and `tools/audit-controls.mjs` hardcode ports 5799/5798 with no per-run
+**Tooling gap found running this chunk, fixed since:** `tools/build.mjs`
+and `tools/audit-controls.mjs` hardcoded ports 5799/5798 with no per-run
 scoping. Three coder agents running the gate suite concurrently in the same
 worktree collided on both repeatedly — `audit-controls` in particular sat
 in `EADDRINUSE` retry loops across all three agents' sessions for most of
 this chunk, and one agent's orphaned retry loop kept re-triggering after
-its own work was done and reported. Worth a random/CLI-supplied port if
-concurrent coder sessions on this repo continue.
+its own work was done and reported. Both tools now share `tools/serve.mjs`:
+each still tries its default port first (5799/5798, preserved for muscle
+memory and stable local URLs), and on `EADDRINUSE` falls back once to an
+OS-assigned ephemeral port, logging whichever port it actually bound. Set
+`LF_BUILD_PORT`/`LF_AUDIT_PORT` to pin an explicit port instead (CI, or a
+human who wants a stable URL) — a pinned port fails loudly on collision
+rather than silently moving.
 
 **Worktree fragility found running this chunk, not fixed here:** the
 `flow-field` agent's entire uncommitted edit was silently wiped mid-task —
