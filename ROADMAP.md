@@ -608,19 +608,52 @@ rewrite.
 design system rather than a third, different visual language on the same
 microsite.
 
-- [ ] Stub a docs landing page reflecting the repo's actual `docs/`
+- [x] Stub a docs landing page reflecting the repo's actual `docs/`
   content (check what's there now — the redesign spec lives under
   `docs/superpowers/specs/`, that's implementation history, not visitor-
   facing documentation; figure out what's actually visitor-relevant before
   stubbing a page around it).
-- [ ] Stub a contribution-guide page from `CONTRIBUTING.md`'s existing
+- [x] Stub a contribution-guide page from `CONTRIBUTING.md`'s existing
   content — a real page, not a dead link to a `.md` file.
-- [ ] Link both from the gallery/home pages' nav so they're actually
+- [x] Link both from the gallery/home pages' nav so they're actually
   reachable, not orphaned pages.
+
+`docs/superpowers/` (plans and specs) confirmed as implementation history,
+not visitor-facing — nothing there fed the landing page. Visitor-relevant
+content was already in `README.md` (usage, baked/source export, presets,
+the shared control contract) and `CONTRIBUTING.md` (full contributor
+contract), matching the chunk's own framing.
+
+New pages: `docs/index.html` (landing, synthesizes README's usage-facing
+sections into real anchored sections: using a piece, configuring without
+the panel, presets, the shared control contract, adding a piece) and
+`docs/contributing/index.html` (a full section-by-section port of
+`CONTRIBUTING.md`, restructured into numbered steps, a gate-order list,
+and bordered callouts rather than transcribed verbatim — CONTRIBUTING's
+own CI-order paragraph is dense with asides and would have read as a wall
+ported as-is; a provenance HTML comment at the top names the source
+commit). Folder-plus-`index.html` naming matches `pieces/<slug>/`,
+`home/<direction>/`, and `interactions/wake/`'s existing convention.
+Nav: `tools/templates/gallery.html`'s topbar and `home/quiet-drift/`'s
+footer both gained Docs + Contributing links; quiet-drift's two inline
+dead links to `../../README.md` and `../../CONTRIBUTING.md` in its "How it
+lands" section were repointed at the new pages instead of left dangling.
+
+**Checks run:** `npm run build` (18/18 pieces; `thumbs/` and `downloads/`
+came back byte-identical, only `index.html` plus the two new pages
+changed), `node tools/build.mjs --verify-only` (18 pieces). Reachability
+verified live: a throwaway Playwright script drove `tools/serve.mjs`'s
+`serveRepo()` and clicked the real chain gallery → Docs → in-page TOC
+anchor → Contributing → Docs → wordmark → gallery, plus loaded
+`home/quiet-drift/` directly and read its repointed links — zero console
+or page errors across every hop, both `/docs/` and `/docs/index.html`
+returned 200. No e2e suite exists for the microsite pages themselves
+(CI's Playwright checks are piece/gallery-focused), so this was a
+one-off script, not a committed test.
 
 **Finish line:** Both pages exist, are linked from the site, and use the
 Chunk 15 design system — "stub" means scaffolded and navigable, not
-necessarily final copy.
+necessarily final copy. **Done.**
 
 ### Chunk 17 — Second refinement pass on Tether, Rainfall, Flow Field
 
