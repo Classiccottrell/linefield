@@ -430,19 +430,57 @@ docs. Depends on Chunk 6 (Wake's stationary-pointer fade bug) closing
 first — do not layer new configuration surface onto a mechanism with a
 known-broken fade.
 
-- [ ] Close Chunk 6's fade bug first if not already closed.
-- [ ] Reorder Wake's section to the top wherever it's presented (gallery,
-  docs, and the new home page from Chunk 8 if that lands first).
-- [ ] Write a fuller description: what Wake is, why it exists outside the
+- [x] Close Chunk 6's fade bug first if not already closed. (Already closed;
+  `lastSeed` fix confirmed present in `interactions/wake.js` before this
+  chunk started.)
+- [x] Reorder Wake's section to the top wherever it's presented (gallery,
+  docs, and the new home page from Chunk 8 if that lands first). Gallery's
+  `.mechanisms` section now renders above the piece grid (`tools/templates/gallery.html`,
+  regenerated into `index.html`); both `home/quiet-drift/` and
+  `home/specimen-grid/` gained a Wake callout directly under the hero,
+  ahead of the gallery sample and "how to use" sections.
+- [x] Write a fuller description: what Wake is, why it exists outside the
   per-piece control contract, what it does versus what removed cursor
-  modes did.
-- [ ] Design and add real configuration — specific knobs/switches remain
+  modes did. Expanded on `interactions/wake/index.html`, the gallery
+  mechanisms card, and both home directions (register-matched copy per
+  page, not identical text).
+- [x] Design and add real configuration — specific knobs/switches remain
   open; scope them against what Wake's current single-mechanism design can
-  actually support before adding surface area for its own sake.
+  actually support before adding surface area for its own sake. Added
+  `setLife`, `setStrands`, `setPulse`, `setColor` to `createWake()`'s
+  public API, wired live on the demo page; strength/enable unchanged.
 
 **Finish line:** Wake is presented first, its description explains itself
 without external context, and its configuration is real (state that
 changes behavior), not decorative.
+
+### Chunk 13 — Wake as its own product area (deferred to last, not yet scoped)
+
+**Explicitly deferred.** User direction: finish the rest of the core
+linefield roadmap first; this chunk does not start until every other
+chunk here is done, Chunk 12's PR included. Recorded now only so the
+decision isn't lost before then.
+
+**Direction, decided:** a combination of two of the three options
+originally offered — (b) genuinely different interaction categories, not
+just trail-effect variations (Wake's current knobs — life/strands/pulse/
+color — already cover that axis well, per the user), and (c) a composable
+toolkit of interaction primitives, not a fixed menu, with an eye toward
+reuse by `Projects/Forma` down the line per the earlier cross-project
+note. Not (a): more variations on the trail idea specifically was ruled
+out.
+
+**Not yet scoped, needs a real design pass before it's a buildable
+chunk:** what the actual primitives are (Wake's trail is only one — click/
+tap, scroll-driven, and hover-target were named as one example direction,
+not a decision), whether they live under `interactions/` as siblings to
+`wake.js` or need their own directory/naming convention, whether "still
+does not need to interact with the backgrounds, though that could be
+something" (user's own words) means an opt-in bridge API between a
+primitive and a specific piece, and what a Forma-facing composable API
+surface would need to look like before Forma's own repo could consume it
+(see the "Cross-project note — Forma alignment" entry above — same
+scoping dependency applies here).
 
 ### Exploratory — ASCII art brought to life
 

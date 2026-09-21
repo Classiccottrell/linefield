@@ -96,6 +96,14 @@
   footer{padding:48px 7vw 80px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px}
   footer a{color:var(--muted);text-decoration:none;font-size:13px}
   footer a:hover{color:var(--ink)}
+
+  /* ---- Wake callout ---------------------------------------------------- */
+  .wake{padding:64px 7vw 0;display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap;border-top:1px solid var(--line)}
+  .wake-copy{max-width:52ch}
+  .wake .mono{display:block;margin-bottom:14px}
+  .wake h2{font:400 italic clamp(24px,3vw,32px)/1.2 'Iowan Old Style','Palatino Linotype',Georgia,serif;margin:0 0 12px}
+  .wake p{color:var(--muted);margin:0;font-size:15.5px}
+  .wake a.btn{flex:none}
 </style>
 </head>
 <body>
@@ -138,6 +146,19 @@
     </div>
   </div>
 </header>
+
+<section class="wake">
+  <div class="wake-copy">
+    <span class="mono">Also — Wake</span>
+    <h2>A current that follows the cursor, on top of any piece.</h2>
+    <p>Every piece above stays still under a static viewport. Wake is the
+      one thing here that answers your mouse directly: a faint trail that
+      drifts and settles as you move, layered over whatever background
+      you've picked. It's separate from the pieces on purpose — attach it,
+      skip it, or hand it its own canvas.</p>
+  </div>
+  <a class="btn ghost" href="../../interactions/wake/">Try Wake →</a>
+</section>
 
 <section id="gallery">
   <div class="section-head">

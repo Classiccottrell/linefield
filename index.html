@@ -71,8 +71,12 @@
     border:1px solid var(--line);padding:4px 8px;border-radius:2px;
   }
 
-  .mechanisms{margin:48px 0 0;padding-top:24px;border-top:1px solid var(--line)}
-  .mechanism{display:block;color:inherit;text-decoration:none}
+  .mechanisms{
+    margin:8px 0 0;padding:22px 24px;border:1px solid var(--line);border-radius:4px;
+    background:var(--surface);display:flex;gap:20px;align-items:flex-start;
+    justify-content:space-between;flex-wrap:wrap;
+  }
+  .mechanism{display:block;color:inherit;text-decoration:none;max-width:66ch}
   .mechanism:hover .mechanism-title{color:#9fd0dd}
   .mechanism:focus-visible{outline:2px solid #6fb4c9;outline-offset:4px}
   .mechanism-label{
@@ -80,7 +84,9 @@
     letter-spacing:.06em;text-transform:uppercase;
   }
   .mechanism-title{margin:8px 0 4px;font-size:20px;font-weight:600;letter-spacing:-.01em}
-  .mechanism-copy{color:var(--muted);font-size:15px;margin:0}
+  .mechanism-copy{color:var(--muted);font-size:15px;margin:0 0 8px}
+  .mechanism-detail{color:var(--muted);font-size:13.5px;margin:0;max-width:60ch}
+  .mechanism .btn{flex:none;margin-top:2px}
 
 
   .actions{display:flex;flex-wrap:wrap;gap:8px}
@@ -143,6 +149,15 @@
   </div>
   <p class="lede">Twelve generative line-art backgrounds. Every piece is one self-contained file with no dependencies — tune it, then export a standalone <code>.html</code> you can paste into any site.</p>
 </header>
+
+<section class="mechanisms" aria-label="Interaction mechanisms">
+  <a class="mechanism" href="interactions/wake/">
+    <span class="mechanism-label">Interaction mechanism — not a piece</span>
+    <h2 class="mechanism-title">Wake</h2>
+    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the eighteen pieces below.</p>
+    <p class="mechanism-detail">Off by default, opt-in per canvas, never baked into an exported piece. Try it live and tune strength, trail life, strand count, and color.</p>
+  </a>
+</section>
 
 <div class="chips" id="chips" role="group" aria-label="Filter pieces by category"></div>
 
@@ -490,14 +505,6 @@
     </div>
   </article>
 </div>
-
-<section class="mechanisms" aria-label="Interaction mechanisms">
-  <a class="mechanism" href="interactions/wake/">
-    <span class="mechanism-label">Interaction mechanism</span>
-    <h2 class="mechanism-title">Wake</h2>
-    <p class="mechanism-copy">A separate cursor current for any canvas.</p>
-  </a>
-</section>
 
 <section class="skill">
   <h2>The skill that built this</h2>
