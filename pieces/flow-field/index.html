@@ -40,8 +40,13 @@
   const ctx = canvas.getContext('2d');
 
   // Base count is deliberately modest so the default reads as a background;
-  // the Density slider is what makes it loud (up to 2x).
-  const BASE_COUNT = 500;
+  // the Density slider is what makes it loud (up to 2x). Chunk 11's mask
+  // gave the piece real negative space around the mass, but 500 crossing
+  // ribbons packed into that one focal region was still enough to read as
+  // a tangled purple blob rather than legible flow lines next to
+  // Driftwork's woven mesh — this is the actual lever, not another
+  // modulation on top of the same crossing count.
+  const BASE_COUNT = 320;
   let particles = [];
   let paths = [];
 
@@ -159,14 +164,23 @@
       const ny = p.y + Math.sin(angle) * speed;
 
       if (m > 0) {
-        const mix = (Math.sin(elapsed * 0.1 + p.x * 0.001) + 1) / 2;
+        // Tied to the field's own local direction instead of an arbitrary
+        // position/time sine — the colour now IS the flow, a compass
+        // rather than decorative banding unrelated to what's moving.
+        const mix = (Math.sin(angle) + 1) / 2;
         const cr = r + (rB - r) * mix;
         const cg = g + (gB - g) * mix;
         const cb = b + (bB - b) * mix;
         const [fr, fg, fb] = values.invert ? [255 - cr, 255 - cg, 255 - cb] : [cr, cg, cb];
 
+        // Width rides the same mask value as alpha, but on a gentler curve
+        // (0.4 floor, not 0) — alpha alone fading at the mask boundary read
+        // as flat cutout edges; thinning the stroke too sells the mass
+        // dissolving into the negative space around it rather than just
+        // going transparent.
+        const strokeWidth = lineWidth * (0.4 + 0.6 * m);
         ctx.strokeStyle = `rgba(${fr | 0},${fg | 0},${fb | 0},${values.opacity * m})`;
-        ctx.lineWidth = lineWidth;
+        ctx.lineWidth = strokeWidth;
 
         if (values.mode) {
           ctx.beginPath();
@@ -175,10 +189,10 @@
           if (values.glow > 0) {
             // Underlay pass: wider, dimmer stroke approximates bloom cheaply
             // (canvas shadowBlur costs 5-10x per draw call at this element count).
-            ctx.lineWidth = lineWidth + values.glow * 3;
+            ctx.lineWidth = strokeWidth + values.glow * 3;
             ctx.globalAlpha = values.glow * 0.25 * m;
             ctx.stroke();
-            ctx.lineWidth = lineWidth;
+            ctx.lineWidth = strokeWidth;
             ctx.globalAlpha = 1;
           }
           ctx.stroke();
@@ -202,19 +216,24 @@
 
       if (!values.mode && m > 0) {
         p.trail.push([p.x, p.y]);
-        if (p.trail.length > 40) p.trail.shift();
+        // Longer than before (40 -> 56): fewer, longer-lived ribbons read
+        // as legible currents; short trails at this particle count were
+        // part of why the mass read as a tangle rather than a flow.
+        if (p.trail.length > 56) p.trail.shift();
 
         if (p.trail.length > 1) {
+          const strokeWidth = lineWidth * (0.4 + 0.6 * m);
+          ctx.lineWidth = strokeWidth;
           ctx.beginPath();
           ctx.moveTo(p.trail[0][0], p.trail[0][1]);
           for (let i = 1; i < p.trail.length; i++) {
             ctx.lineTo(p.trail[i][0], p.trail[i][1]);
           }
           if (values.glow > 0) {
-            ctx.lineWidth = lineWidth + values.glow * 3;
+            ctx.lineWidth = strokeWidth + values.glow * 3;
             ctx.globalAlpha = values.glow * 0.25 * m;
             ctx.stroke();
-            ctx.lineWidth = lineWidth;
+            ctx.lineWidth = strokeWidth;
             ctx.globalAlpha = 1;
           }
           ctx.stroke();
