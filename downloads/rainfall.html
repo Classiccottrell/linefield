@@ -1240,7 +1240,7 @@ function describeForAI({ pieceName, values }) {
   // third (home/quiet-drift/index.html, this piece is its background
   // specifically for its low, even ink), so the left edge is deliberately
   // the quietest part of the veil, on top of the page's own text gradient.
-  function envelopeAt(x0) {
+  function staticEnvelopeAt(x0) {
     const center = 0.62;
     const width = 0.62;
     const d = Math.abs(x0 - center) / width;
@@ -1250,17 +1250,36 @@ function describeForAI({ pieceName, values }) {
     return floor + e * (1 - floor);
   }
 
+  // The veil used to be a spatially-fixed shape: the same brightness
+  // curve forever, revealed only by drops falling through it. That's a
+  // static composition wearing a dynamic piece's clothes — next to
+  // Lacuna's turning rings or Parallax's depth drift, rainfall's overall
+  // silhouette never actually moved. This adds a slow weather-drift to the
+  // window's centre, one-sided: it only ever pushes right (0.62 -> 0.72),
+  // never left, and DRIFT_LEFT_GUARD's Math.min against the untouched
+  // static curve holds `env(x, t) <= env_today(x)` for the left third at
+  // every t regardless of drift phase — the home/quiet-drift hero copy
+  // sits over that third and it must never get denser than it is today.
+  const DRIFT_LEFT_GUARD = 0.35;
+  const DRIFT_AMOUNT = 0.1;
+  const DRIFT_FREQ = 0.05;
+  function envelopeAt(x0, t) {
+    const center = 0.62 + DRIFT_AMOUNT * (0.5 + 0.5 * Math.sin(t * DRIFT_FREQ));
+    const width = 0.62;
+    const d = Math.abs(x0 - center) / width;
+    const window = d < 1 ? 0.5 + 0.5 * Math.cos(d * Math.PI) : 0;
+    const e = Math.pow(window, 0.85);
+    const floor = 0.12;
+    const dynamic = floor + e * (1 - floor);
+    return x0 < DRIFT_LEFT_GUARD ? Math.min(dynamic, staticEnvelopeAt(x0)) : dynamic;
+  }
+
   function seedDrops(count) {
     drops = Array.from({ length: count }, () => {
       // Positions normalised so a resize doesn't need a reseed.
       const x = Math.random();
       return {
         x,
-        // Fixed per-drop envelope weight (see envelopeAt) — spatial, not
-        // time-varying, so a drop's brightness is set by where it falls,
-        // not when. Motion carries drops through the veil rather than the
-        // veil itself moving.
-        env: envelopeAt(x),
         // Vertical phase offset — without this every drop would fall in
         // lockstep and read as a single sheet, not individual streaks.
         seed: Math.random(),
@@ -1269,7 +1288,6 @@ function describeForAI({ pieceName, values }) {
         // stay legible as rain, not as outliers.
         speedMult: 0.5 + Math.random() * 1.3,
         lenMult: 0.5 + Math.random() * 1.5,
-        sway: Math.random() * Math.PI * 2,
       };
     });
   }
@@ -1318,8 +1336,13 @@ function describeForAI({ pieceName, values }) {
     const baseLen = H * 0.05 * (0.4 + values.scale);
     // Gentle wind sway, independent of fall speed — subtle by design so the
     // piece stays calm rather than turning into a gust.
-    const swayAmount = W * 0.006 * values.motion;
+    const swayAmount = W * 0.01 * values.motion;
     const theta = (values.angle * Math.PI) / 180;
+    // Veil breathing, independent of fall speed too, and gated by Motion
+    // (near-static at motion=0, full pace at motion=1) so the shared
+    // control has a second, composition-level effect on this piece rather
+    // than only nudging individual streaks.
+    const veilT = elapsed * (0.3 + 0.7 * values.motion);
 
     ctx.save();
     ctx.translate(W / 2, H / 2);
@@ -1334,8 +1357,16 @@ function describeForAI({ pieceName, values }) {
       const headY = fall * (H + baseLen * 2) - baseLen;
       const tailY = headY - baseLen * d.lenMult;
 
-      const n = simplex2(d.sway, elapsed * 0.15 * values.motion);
-      let x = d.x * W + n * swayAmount;
+      // Sampled by x, not by an independent per-drop random phase, so
+      // neighbouring drops lean the same way at any instant — a gust
+      // crossing the veil, not decorrelated dot-jitter (the "scattered
+      // dashes" read Chunk 11 left standing). Head and tail sample the
+      // noise at different phases, so each streak tilts rather than
+      // staying a rigid vertical translate.
+      const swayHead = simplex2(d.x * 4, veilT);
+      const swayTail = simplex2(d.x * 4, veilT + 0.4);
+      const xHead = d.x * W + swayHead * swayAmount;
+      const xTail = d.x * W + swayTail * swayAmount;
       let lw = lineWidth;
 
       const lightBase = values.invert ? 0.3 : 0.68;
@@ -1348,27 +1379,30 @@ function describeForAI({ pieceName, values }) {
 
       // Envelope shapes brightness, not count or width — a drop in a thin
       // stretch of the veil still falls at full speed, just paler, so the
-      // motion is what reveals the veil's shape as drops cross it.
-      const op = values.opacity * d.env;
+      // motion is what reveals the veil's shape as drops cross it. Read at
+      // x, t now (see envelopeAt) instead of a value fixed at seed time, so
+      // the veil itself slowly breathes rather than sitting frozen forever.
+      const env = envelopeAt(d.x, veilT);
+      const op = values.opacity * env;
 
-      const grad = ctx.createLinearGradient(x, tailY, x, headY);
+      const grad = ctx.createLinearGradient(xTail, tailY, xHead, headY);
       grad.addColorStop(0, `rgba(${tr},${tg},${tb},0)`);
       grad.addColorStop(1, `rgba(${hr},${hg},${hb},${op})`);
 
       ctx.strokeStyle = grad;
       if (values.glow > 0) {
         ctx.lineWidth = lw + values.glow * 4;
-        ctx.globalAlpha = values.glow * 0.22 * d.env;
+        ctx.globalAlpha = values.glow * 0.22 * env;
         ctx.beginPath();
-        ctx.moveTo(x, tailY);
-        ctx.lineTo(x, headY);
+        ctx.moveTo(xTail, tailY);
+        ctx.lineTo(xHead, headY);
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
       ctx.lineWidth = lw;
       ctx.beginPath();
-      ctx.moveTo(x, tailY);
-      ctx.lineTo(x, headY);
+      ctx.moveTo(xTail, tailY);
+      ctx.lineTo(xHead, headY);
       ctx.stroke();
 
       if (values.glint) {
@@ -1376,16 +1410,16 @@ function describeForAI({ pieceName, values }) {
         // so "brighter head" reads clearly even at a glance, still small
         // enough relative to the canvas to stay calm rather than blobby.
         const r = lw * 3;
-        const glintGrad = ctx.createRadialGradient(x, headY, 0, x, headY, r);
+        const glintGrad = ctx.createRadialGradient(xHead, headY, 0, xHead, headY, r);
         glintGrad.addColorStop(0, `rgba(${hr},${hg},${hb},${op})`);
         glintGrad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
         ctx.fillStyle = glintGrad;
         ctx.beginPath();
-        ctx.arc(x, headY, r, 0, Math.PI * 2);
+        ctx.arc(xHead, headY, r, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      paths.push([[x, tailY], [x, headY]]);
+      paths.push([[xTail, tailY], [xHead, headY]]);
     }
 
     ctx.restore();
