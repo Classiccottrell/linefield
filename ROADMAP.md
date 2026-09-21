@@ -564,7 +564,7 @@ the first pass as a start, not a finish.
 `pieces/flow-field/index.html` and their generated assets — same three
 files Chunk 11 touched.
 
-- [ ] Before changing anything, look at all three next to the five
+- [x] Before changing anything, look at all three next to the five
   commissioned pieces and Pleat/Driftwork/Cipher Bloom/Parallax/Lacuna
   again, now that Chunk 11's changes are live — identify specifically
   what still falls short, rather than re-doing the same diagnosis Chunk 11
@@ -574,14 +574,75 @@ files Chunk 11 touched.
     stay text-safe behind `home/quiet-drift`'s headline, and by Chunk 14
     above it may become one of two selectable hero pieces there — don't
     undo that constraint without checking Chunk 14's status first.
-- [ ] One named piece at a time, per the delivery rules.
-- [ ] Refresh presets/thumbnail/download for each on completion, same as
+- [x] One named piece at a time, per the delivery rules.
+- [x] Refresh presets/thumbnail/download for each on completion, same as
   Chunk 11.
+
+Diagnosis, past Chunk 11's structural/negative-space fix:
+
+- [x] `tether` done: the fan and its negative space were real (Chunk 11),
+  but every cable rendered at one uniform stroke weight — no hierarchy —
+  and the knot the whole fan converges toward was just where lines
+  stopped, so the void Chunk 11 opened stayed literally empty instead of
+  pointing at anything. Added a three-tier depth per cable (same
+  discrete-tier idiom as `parallax`'s `row % 4 / 3`) driving both width
+  and alpha, so the bundle reads as load-bearing lines up front and slack
+  ones behind. Added a soft radial knot-glow, drawn underneath the cables
+  inside the piece's own rotate transform so it tracks `angle` (verified
+  against the `neon` preset, which rotates 352°) — centred just inside the
+  frame (0.90W) rather than at the literal off-canvas anchor (1.04W),
+  since a glow centred past the edge only shows a sliver of its own
+  falloff. Ink 0.066 → 0.079 (up, from the added marked pixels; still the
+  second-sparsest piece). Verified with `node tools/preset-sheet.mjs
+  tether`: all five presets show visible hierarchy and a knot highlight.
+- [x] `rainfall` done: the veil Chunk 11 shaped was a fixed shape forever —
+  a static composition next to `lacuna`'s turning rings or `parallax`'s
+  depth drift — and each drop's sway was an independent random phase, so
+  neighbouring streaks jittered against each other instead of reading as
+  one gesture (the "scattered dashes" problem survived inside the veil's
+  new shape). Sway is now sampled by drop x-position instead of an
+  independent random phase, so neighbouring drops lean together — a gust
+  crossing the veil. The veil's centre now drifts slowly right (0.62 →
+  0.72), gated by Motion. **Ink-coverage constraint held explicitly:** the
+  drift is one-sided (never left of its resting centre) and `envelopeAt()`
+  additionally clamps with `Math.min` against the untouched static curve
+  for `x < 0.35` (the hero-copy zone), so `env(x, t) <= env_today(x)` holds
+  at every `t` — verified by direct computation across `t` in `[0, 5000)`,
+  not just the one captured thumbnail frame. Measured ink moved 0.010 →
+  0.008 (down, not up); opacity/density/stroke untouched. Chunk 14's
+  hero-piece-switcher status was not checked further since the change only
+  ever reduces density, never raises it.
+- [x] `flow-field` done: Chunk 11's off-center mask gave the piece real
+  negative space, but the mass inside that focal region was still 500
+  particles' worth of 40-point trails crossing each other — a tangled
+  purple blob next to `driftwork`'s woven mesh, not a flow. `BASE_COUNT`
+  500 → 320 with longer trails (40 → 56 points) is the actual lever: fewer,
+  longer-lived ribbons read as individual currents. Stroke width now rides
+  the same mask value as alpha but on a gentler curve (`0.4 + 0.6*m`, not
+  `m`), so threads thin as they dissolve into the negative space instead of
+  just fading to transparent. Color mix is now driven by the field's own
+  local angle at each particle instead of an arbitrary position/time sine —
+  the palette is a compass for the flow, not decorative banding. Ink 0.341
+  → 0.222 (down). Verified with `node tools/preset-sheet.mjs flow-field`:
+  all five presets read as legible currents.
 
 **Finish line:** All three read as fully resolved against the current
 collection's bar — the user's own judgment is the finish line here more
 than any mechanical checklist, since Chunk 11 already cleared the
-mechanical bar once.
+mechanical bar once. **Done**, pending the user's own look.
+
+**Checks run:** `node tools/build.mjs --verify-only`, `npm run
+test-bake-fresh` (18/18), `npm run test-baked` (18/18), `npm run
+test-source` (18/18), `npm run test-interactions` (all 18 renders +
+picker + orbit checks passed), `node tools/test-presets.mjs tether` (all
+preset-mechanism and cross-collection preset-value checks passed). `npm
+run audit-controls` ran clean this time (no `EADDRINUSE`) and reached all
+three touched pieces before the rest of the collection: `flow-field`,
+`tether` and `rainfall` each show every one of their controls — including
+the ones this chunk's changes ride (`stroke`/`glow`/`opacity`/`angle` on
+`tether`; `motion`/`speed`/`phase` on `rainfall`; the existing mask plus
+`stroke`/`opacity`/`density` on `flow-field`) — as `LIVE` with no piece
+introducing a new control that needed auditing.
 
 ### Exploratory — ASCII art brought to life
 
@@ -710,14 +771,29 @@ committed PNGs, not the live piece.
 | 166 | 0.48 | 0.073 | `meridian` |
 | 177 | 0.12 | 0.035 | `grain-field` |
 | 200 | 0.34 | 0.108 | `wireframe-lattice` |
-| 219 | 0.13 | 0.010 | `rainfall` |
+| 216 | 0.13 | 0.008 | `rainfall` |
 | 220 | 0.25 | 0.028 | `lacuna` |
-| 235 | 0.24 | 0.066 | `tether` |
+| 237 | 0.23 | 0.079 | `tether` |
+| 239 | 0.86 | 0.222 | `flow-field` |
 | 247 | 0.51 | 0.195 | `event-horizon` |
 | 253 | 0.17 | 0.120 | `driftwork` |
 | 254 | 0.58 | 0.318 | `interference` |
-| 261 | 0.90 | 0.341 | `flow-field` |
 | 305 | 0.48 | 0.096 | `orbital-veil` |
+
+Chunk 17 moved three rows: `rainfall` ink 0.010 → 0.008 (down — the veil-drift
+and correlated-sway rework dims some previously-bright pixels below the
+measurement threshold at the captured frame; opacity/density/stroke
+untouched, and the left-third text-safety guard is unconditional, not
+frame-dependent — see the chunk's own notes below). `tether` ink 0.066 →
+0.079 (up — per-cable width/alpha hierarchy and the knot glow both add
+marked pixels; still the second-sparsest piece in the library). `flow-field`
+ink 0.341 → 0.222 (down — BASE_COUNT 500 → 320 plus a gentler mask-edge
+width falloff mark fewer pixels even with longer trails). `flow-field`'s hue
+also shifted 261 → 239, landing close to `tether` (237); both are gradient
+pieces whose thumbnail-frame mean hue is a colourfulness-weighted snapshot,
+not a fixed authored value, so this is expected drift from the rendering
+change, not a new authored-palette collision — `tether`'s defaults
+(220/250) and `flow-field`'s (200/280) are unchanged.
 
 **`globe` landed at hue 122** (authored 105/130 gradient), squarely in the
 59–166 gap between `cipher-bloom` and `meridian` — the widest untouched arc
