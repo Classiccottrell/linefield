@@ -712,6 +712,49 @@ the ones this chunk's changes ride (`stroke`/`glow`/`opacity`/`angle` on
 `stroke`/`opacity`/`density` on `flow-field`) — as `LIVE` with no piece
 introducing a new control that needed auditing.
 
+### Chunk 18 — Codex design round on Tether, Rainfall, Flow Field
+
+**Owner: Codex, not Claude.** User's explicit decision: let Chunk 17's
+pass ship and be seen live first (it has — merged as PR #14), then bring
+in Codex for a further round with genuinely independent design judgment
+on the same three pieces, rather than another Claude iteration on the
+same diagnosis pattern.
+
+**Outcome:** A third pass on `tether`, `rainfall`, `flow-field` — not a
+repeat of Chunk 11 (structural gesture/negative space) or Chunk 17 (depth
+hierarchy, correlated motion, mass reduction). Codex should form its own
+opinion on what's still missing next to the current collection, not
+inherit Claude's diagnosis chain.
+
+**Hard constraint, non-negotiable:** `rainfall`'s ink coverage must not
+increase past its current measured value without an explicit, stated
+reason. It's the default hero background on the live home page
+(`home/quiet-drift/index.html`) and one of two selectable heroes via
+Chunk 14's dropdown (the other is `grain-field`) — raising its density
+risks breaking text legibility on a page that's already shipped. Chunk 17
+proved a real improvement is possible without raising it (ink moved
+*down*, 0.010→0.008); that's the bar, not an obstacle to route around.
+
+**Scope:** `pieces/tether/index.html`, `pieces/rainfall/index.html`,
+`pieces/flow-field/index.html` and their generated assets only. Same
+files Chunks 11 and 17 touched — no new files, no shared/ changes unless
+a real defect is found (state it explicitly if so, don't silently expand
+scope).
+
+**Process, same as every other chunk in this file:** one named piece at a
+time; commit and update this file's checkboxes in the same commit as the
+work; run this repo's own gates before calling a piece done
+(`node tools/build.mjs --verify-only`, `npm run test-bake-fresh`,
+`npm run test-baked`, `npm run test-source`, `npm run test-interactions`,
+`npm run audit-controls`); regenerate `thumbs/`/`downloads/` via
+`npm run build`, never hand-edit generated output; branch off current
+`main`, open a PR, do not merge without the user's own review — same as
+every prior chunk here.
+
+**Finish line:** All three read as a further step past Chunk 17, judged
+by the user against the live collection — not a mechanical checklist pass
+this time, genuine outside design judgment is the point of this chunk.
+
 ### Exploratory — ASCII art brought to life
 
 Not yet a chunk: a named idea, not a scoped deliverable. The glyph-mark
