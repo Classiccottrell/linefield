@@ -183,8 +183,13 @@ fits on screen at rest. Reset is a sticky footer, always visible at the
 panel's bottom edge regardless of scroll position. Below ~640px the panel
 docks as a bottom sheet, collapsed to a handle by default.
 
-Wake is a separate optional interaction mechanism for any canvas, not baked
-into pieces. Open it from the gallery's Wake link.
+Wake is a separate, opt-in pointer-trail overlay for any canvas — not a
+piece, and not baked into piece exports. It's promoted to the top of the
+gallery (`interactions/wake/`) and both home-page directions. Its public
+API (`createWake()` in `interactions/wake.js`) exposes `setEnabled`,
+`setStrength`, `setLife` (trail persistence), `setStrands` (1–5, fan
+width), `setPulse` (settle-pulse on/off), and `setColor`, all live-tunable
+on the demo page.
 
 ## Adding a new piece
 

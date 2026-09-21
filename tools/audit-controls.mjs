@@ -16,38 +16,15 @@
 //
 // Usage: node tools/audit-controls.mjs [slug ...]
 
-import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname, extname } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer } from 'node:http';
 import { chromium } from 'playwright';
 import { DETERMINISTIC_INIT, STEPS, stepFrames } from './deterministic.mjs';
+import { serveRepo } from './serve.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8'));
-
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-};
-
-function serveRepo(port) {
-  const server = createServer((req, res) => {
-    let rel = decodeURIComponent(req.url.split('?')[0]);
-    if (rel.endsWith('/')) rel += 'index.html';
-    const path = join(ROOT, rel);
-    if (!path.startsWith(ROOT) || !existsSync(path)) {
-      res.writeHead(404).end('not found');
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': MIME[extname(path)] || 'application/octet-stream' });
-    res.end(readFileSync(path));
-  });
-  return new Promise((resolve) => server.listen(port, () => resolve(server)));
-}
 
 // Reads the control specs off window.__LF_SPECS__ instead of the DOM, so an
 // addressing scheme survives whatever widget renders a control. Discriminate
@@ -197,9 +174,14 @@ async function main() {
   const only = process.argv.slice(2);
   const targets = only.length ? manifest.filter((p) => only.includes(p.slug)) : manifest;
 
-  const PORT = 5798;
-  const base = `http://localhost:${PORT}`;
-  const server = await serveRepo(PORT);
+  // LF_AUDIT_PORT pins an explicit port (CI, or a human who wants a stable
+  // URL); unset, the default 5798 is tried first and falls back to an
+  // OS-assigned ephemeral port on collision (multiple agents sharing a
+  // worktree — see ROADMAP.md).
+  const pinned = process.env.LF_AUDIT_PORT != null;
+  const requestedPort = pinned ? Number(process.env.LF_AUDIT_PORT) : 5798;
+  const { server, port, base } = await serveRepo(ROOT, requestedPort, { pinned });
+  process.stderr.write(`serving ${ROOT} on ${base}${port !== requestedPort ? ` (${requestedPort} was in use)` : ''}\n`);
   const browser = await chromium.launch();
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
