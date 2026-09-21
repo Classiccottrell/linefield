@@ -326,6 +326,7 @@ function cardHtml(p) {
   return `  <article class="card" data-tags="${escapeHtml(p.tags.join(' '))}" style="--accent:${accent}">
     <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
       <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">${Math.round(p.hue)}&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">

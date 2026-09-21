@@ -144,7 +144,7 @@ try {
 
   await page.goto(`${base}/`, { waitUntil: 'load' });
   assert.equal(await page.locator('#grid [data-interaction]').count(), 0, 'Wake rendered as a piece');
-  assert.equal(await page.locator('a[href="interactions/wake/"]').count(), 1, 'Wake gallery link missing');
+  assert.equal(await page.locator('a.mechanism[href="interactions/wake/"]').count(), 1, 'Wake gallery link missing');
 
   for (const { slug } of pieces) {
     await openPiece(page, base, slug);
