@@ -1223,9 +1223,9 @@ function describeForAI({ pieceName, values }) {
 
   // Deliberately a sparse piece — quiet rain, not a downpour. Sits between
   // tether (6, the sparsest) and meridian (7 long ribbons) in the library.
-  // Two fewer drops offsets the extra marked pixels from the correlated
-  // weather-front phase; the hero stays at or below its 0.008 ink baseline.
-  const BASE_COUNT = 26;
+  // Fewer drops leave room for longer, more coordinated streaks while the
+  // hero stays at or below its 0.008 ink baseline.
+  const BASE_COUNT = 20;
   // Fraction of canvas height a streak crosses per second at speedMult=1,
   // values.speed=1 — slow enough that a single drop takes ~14s to fall.
   const BASE_FALL = 0.07;
@@ -1287,7 +1287,7 @@ function describeForAI({ pieceName, values }) {
         // lockstep and read as a single sheet, not individual streaks.
         // Correlate most of the vertical phase with x. The same sparse marks
         // now arrive as a quiet weather front instead of unrelated dots.
-        seed: (x * 0.55 + Math.random() * 0.45) % 1,
+        seed: (x * 0.8 + Math.random() * 0.2) % 1,
         // Per-drop speed and length variety, per the brief ("varying speeds
         // and lengths"). Range chosen so slow/short and fast/long drops both
         // stay legible as rain, not as outliers.
@@ -1338,11 +1338,11 @@ function describeForAI({ pieceName, values }) {
     const H = canvas.height;
     const t = elapsed * values.speed * BASE_FALL;
     const lineWidth = 0.6 + values.stroke * 1.8;
-    const baseLen = H * 0.05 * (0.4 + values.scale);
+    const baseLen = H * 0.07 * (0.4 + values.scale);
     // Gentle wind sway, independent of fall speed — subtle by design so the
     // piece stays calm rather than turning into a gust.
     const swayAmount = W * 0.01 * values.motion;
-    const leanAmount = W * 0.035 * values.motion;
+    const leanAmount = W * 0.06 * values.motion;
     const theta = (values.angle * Math.PI) / 180;
     // Veil breathing, independent of fall speed too, and gated by Motion
     // (near-static at motion=0, full pace at motion=1) so the shared

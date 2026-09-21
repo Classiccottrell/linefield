@@ -61,7 +61,7 @@
   // size including a gallery card.
   // Just inside the right edge so the bundle terminates at a visible eye
   // instead of reading as a cut stub of blunt line ends.
-  const TETHER_X = 0.92;
+  const TETHER_X = 0.88;
   const TETHER_Y = 0.48;
 
   function seedCables(count) {
@@ -153,12 +153,16 @@
     // The highlight alone read as atmosphere, not an object the cables were
     // tied to. A small eye gives the fan a literal point of attachment at
     // card size without turning the sparse piece into a logo.
-    const eyeR = 3 + values.stroke * 1.5;
+    const eyeR = 5 + values.stroke * 2.4;
     ctx.strokeStyle = `rgba(${kr},${kg},${kb},${values.opacity * 0.9})`;
     ctx.lineWidth = Math.max(1, values.stroke * 1.2);
     ctx.beginPath();
-    ctx.arc(glowX, glowY, eyeR, 0, Math.PI * 2);
+    ctx.ellipse(glowX, glowY, eyeR * 1.35, eyeR * 0.72, -0.25, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.fillStyle = `rgba(${kr},${kg},${kb},${values.opacity * 0.65})`;
+    ctx.beginPath();
+    ctx.arc(glowX, glowY, Math.max(1.5, eyeR * 0.22), 0, Math.PI * 2);
+    ctx.fill();
 
     for (let i = 0; i < cables.length; i++) {
       const c = cables[i];
