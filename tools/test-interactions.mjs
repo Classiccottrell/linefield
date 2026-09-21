@@ -4,11 +4,16 @@ import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 import { DETERMINISTIC_INIT, stepFrames } from './deterministic.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SHOTS = '/private/tmp/linefield-qa';
+// os.tmpdir() resolves per-platform (/tmp on Linux CI runners, /var/folders/…
+// on macOS via TMPDIR) — a hardcoded '/private/tmp/...' only worked on
+// macOS and failed EACCES on GitHub Actions' ubuntu-latest runner, which has
+// no writable /private at filesystem root.
+const SHOTS = join(tmpdir(), 'linefield-qa');
 const pieces = JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8'));
 const FORBIDDEN_CURSOR_SOURCE = [
   'cursorInteraction', 'createCursorOverlay', 'modeFactor',
