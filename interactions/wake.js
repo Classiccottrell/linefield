@@ -1,6 +1,8 @@
 import { createPointer } from '../shared/pointer.js';
 
 const clampStrength = (value) => Math.max(0, Math.min(1.5, Number(value) || 0));
+const clampLife = (value) => Math.max(300, Math.min(2400, Number(value) || 0));
+const clampStrands = (value) => Math.max(1, Math.min(5, Math.round(Number(value) || 0)));
 
 export function createWake({
   target,
@@ -8,6 +10,9 @@ export function createWake({
   strength = 0.65,
   enabled = false,
   respectReducedMotion = true,
+  life = 900,
+  strands = 3,
+  pulse: pulseEnabled = true,
 } = {}) {
   if (!(target instanceof HTMLCanvasElement)) {
     throw new TypeError('Wake target must be a canvas element');
@@ -20,6 +25,9 @@ export function createWake({
   const reduced = respectReducedMotion && matchMedia('(prefers-reduced-motion: reduce)').matches;
   let active = Boolean(enabled) && !reduced;
   let amount = clampStrength(strength);
+  let lifeMs = clampLife(life);
+  let strandCount = clampStrands(strands);
+  let pulseOn = Boolean(pulseEnabled);
   let destroyed = false;
   let frame = 0;
   let pulse = null;
@@ -92,22 +100,31 @@ export function createWake({
         (previous.y + previous.ny * offset * width + y) / 2,
       );
     }
-    const age = Math.max(0, 1 - (now - first.t) / 900);
+    const age = Math.max(0, 1 - (now - first.t) / lifeMs);
     context.globalAlpha = age * (0.44 - Math.abs(index) * 0.1) * (0.4 + alphaSpeed * 0.6);
     context.strokeStyle = color;
     context.lineWidth = Math.max(1, amount * (1.5 - Math.abs(index) * 0.25));
     context.stroke();
   }
 
+  // Strand offsets fan out symmetrically from the centerline: 1 strand is
+  // just [0], 3 is [-1,0,1], 5 is [-2,-1,0,1,2]. `index` (the same value as
+  // `offset` here) also drives per-strand alpha in drawStrand, so widening
+  // the fan naturally dims the outer strands rather than needing a second knob.
+  function offsets() {
+    const half = Math.floor(strandCount / 2);
+    const list = [];
+    for (let i = -half; i <= half; i++) list.push(i);
+    return list;
+  }
+
   function draw(now) {
     clear();
     if (!active || !amount) return;
-    drawStrand(-1, -1, now);
-    drawStrand(0, 0, now);
-    drawStrand(1, 1, now);
+    for (const offset of offsets()) drawStrand(offset, offset, now);
     if (points.length === 1) {
       const point = points[0];
-      const age = Math.max(0, 1 - (now - point.t) / 900);
+      const age = Math.max(0, 1 - (now - point.t) / lifeMs);
       if (age > 0) {
         context.beginPath();
         context.arc(point.x, point.y, 8 * amount, 0, Math.PI * 2);
@@ -144,15 +161,18 @@ export function createWake({
         const dy = y - (previous?.y ?? y);
         const length = Math.hypot(dx, dy) || 1;
         points.push({ x, y, nx: -dy / length, ny: dx / length, t: now });
-        if (points.length > 32) points.shift();
+        // Cap scales with life so a longer trail isn't truncated by history
+        // length before its own age-based fade would have removed it.
+        const cap = Math.round(32 * (lifeMs / 900));
+        if (points.length > cap) points.shift();
         lastSeed = { x, y };
         lastMove = now;
         pulse = null;
         pulsed = false;
       }
     }
-    while (points[0] && now - points[0].t > 900) points.shift();
-    if (active && amount && !pulse && !pulsed && points.length >= 6 && now - lastMove >= 180) {
+    while (points[0] && now - points[0].t > lifeMs) points.shift();
+    if (pulseOn && active && amount && !pulse && !pulsed && points.length >= 6 && now - lastMove >= 180) {
       const point = points.at(-1);
       pulse = { x: point.x, y: point.y, t: now };
       pulsed = true;
@@ -178,6 +198,23 @@ export function createWake({
       if (destroyed) return;
       amount = clampStrength(value);
       if (!amount) reset();
+    },
+    setLife(value) {
+      if (destroyed) return;
+      lifeMs = clampLife(value);
+    },
+    setStrands(value) {
+      if (destroyed) return;
+      strandCount = clampStrands(value);
+    },
+    setPulse(value) {
+      if (destroyed) return;
+      pulseOn = Boolean(value);
+      if (!pulseOn) { pulse = null; pulsed = false; }
+    },
+    setColor(value) {
+      if (destroyed) return;
+      color = String(value);
     },
     destroy() {
       if (destroyed) return;

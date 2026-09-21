@@ -4,11 +4,16 @@ import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 import { DETERMINISTIC_INIT, stepFrames } from './deterministic.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SHOTS = '/private/tmp/linefield-qa';
+// os.tmpdir() resolves per-platform (/tmp on Linux CI runners, /var/folders/…
+// on macOS via TMPDIR) — a hardcoded '/private/tmp/...' only worked on
+// macOS and failed EACCES on GitHub Actions' ubuntu-latest runner, which has
+// no writable /private at filesystem root.
+const SHOTS = join(tmpdir(), 'linefield-qa');
 const pieces = JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8'));
 const FORBIDDEN_CURSOR_SOURCE = [
   'cursorInteraction', 'createCursorOverlay', 'modeFactor',
@@ -139,7 +144,7 @@ try {
 
   await page.goto(`${base}/`, { waitUntil: 'load' });
   assert.equal(await page.locator('#grid [data-interaction]').count(), 0, 'Wake rendered as a piece');
-  assert.equal(await page.locator('a[href="interactions/wake/"]').count(), 1, 'Wake gallery link missing');
+  assert.equal(await page.locator('a.mechanism[href="interactions/wake/"]').count(), 1, 'Wake gallery link missing');
 
   for (const { slug } of pieces) {
     await openPiece(page, base, slug);

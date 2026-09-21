@@ -2,25 +2,56 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wake</title>
+<title>Wake — linefield</title>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; overflow: hidden; background: #101218; color: #cbd1d9; font: 14px/1.4 system-ui, sans-serif; }
   #wake-stage { display: block; width: 100vw; height: 100vh; }
-  form { position: fixed; top: 18px; left: 18px; display: grid; gap: 10px; padding: 12px; background: #101218cc; border: 1px solid #2b3039; }
-  label { display: flex; gap: 8px; align-items: center; }
+  .panel {
+    position: fixed; top: 18px; left: 18px; width: 260px;
+    display: grid; gap: 14px; padding: 16px; background: #101218e6;
+    border: 1px solid #2b3039; border-radius: 4px;
+  }
+  .panel h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; color: #eef1f5; }
+  .panel p { margin: 0; color: #8b92a0; font-size: 12.5px; line-height: 1.5; }
+  form { display: grid; gap: 10px; }
+  label { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  label span:first-child { flex: none; }
+  label input[type="range"] { flex: 1; }
+  label .val { flex: none; width: 34px; text-align: right; font: 12px/1 ui-monospace, Menlo, monospace; color: #6fb4c9; }
+  a.back { color: #6fb4c9; text-decoration: none; font-size: 12.5px; }
+  a.back:hover { text-decoration: underline; }
 </style>
 <canvas id="wake-stage" aria-label="Wake interaction stage"></canvas>
-<form>
-  <label><input id="wake-enabled" type="checkbox"> Enable Wake</label>
-  <label>Strength <input id="wake-strength" type="range" min="0" max="1.5" step=".01" value=".65"></label>
-</form>
+<div class="panel">
+  <a class="back" href="../../index.html">&larr; linefield</a>
+  <h1>Wake</h1>
+  <p>
+    A pointer-trail overlay, not a piece control. It draws on its own
+    transparent canvas above whatever you attach it to, so it can sit on
+    any of the eighteen pieces — or a plain shape like this one — without
+    touching that piece's own rendering or its exported HTML. Off by
+    default; opt in per canvas.
+  </p>
+  <form>
+    <label><span>Enable</span><input id="wake-enabled" type="checkbox"></label>
+    <label><span>Strength</span><input id="wake-strength" type="range" min="0" max="1.5" step=".01" value=".65"><span class="val" id="wake-strength-val">.65</span></label>
+    <label><span>Trail life</span><input id="wake-life" type="range" min="300" max="2400" step="50" value="900"><span class="val" id="wake-life-val">900</span></label>
+    <label><span>Strands</span><input id="wake-strands" type="range" min="1" max="5" step="2" value="3"><span class="val" id="wake-strands-val">3</span></label>
+    <label><span>Settle pulse</span><input id="wake-pulse" type="checkbox" checked></label>
+    <label><span>Color</span><input id="wake-color" type="color" value="#ffffff"></label>
+  </form>
+</div>
 <script type="module">
   import { createWake } from '../wake.js';
 
   const stage = document.querySelector('#wake-stage');
   const enabled = document.querySelector('#wake-enabled');
   const strength = document.querySelector('#wake-strength');
+  const life = document.querySelector('#wake-life');
+  const strands = document.querySelector('#wake-strands');
+  const pulse = document.querySelector('#wake-pulse');
+  const color = document.querySelector('#wake-color');
   const drawStage = () => {
     const ratio = devicePixelRatio || 1;
     stage.width = innerWidth * ratio;
@@ -39,6 +70,21 @@
   addEventListener('resize', drawStage);
   const wake = createWake({ target: stage, strength: 0.65, enabled: false });
   window.__LF_WAKE__ = wake;
+
   enabled.addEventListener('input', () => wake.setEnabled(enabled.checked));
-  strength.addEventListener('input', () => wake.setStrength(strength.value));
+  strength.addEventListener('input', () => {
+    document.querySelector('#wake-strength-val').textContent = Number(strength.value).toFixed(2);
+    wake.setStrength(strength.value);
+  });
+  life.addEventListener('input', () => {
+    document.querySelector('#wake-life-val').textContent = life.value;
+    wake.setLife(life.value);
+  });
+  strands.addEventListener('input', () => {
+    document.querySelector('#wake-strands-val').textContent = strands.value;
+    wake.setStrands(strands.value);
+  });
+  pulse.addEventListener('input', () => wake.setPulse(pulse.checked));
+  color.addEventListener('input', () => wake.setColor(color.value));
 </script>
+</html>
