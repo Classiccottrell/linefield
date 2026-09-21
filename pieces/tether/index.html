@@ -59,9 +59,9 @@
   // point gives tether its own dominant gesture (a mooring, not a field)
   // and opens real negative space on the side away from the knot, at any
   // size including a gallery card.
-  // Just past the right edge so the bundle exits the frame instead of
-  // stopping short and reading as a cut stub of blunt line ends.
-  const TETHER_X = 1.04;
+  // Just inside the right edge so the bundle terminates at a visible eye
+  // instead of reading as a cut stub of blunt line ends.
+  const TETHER_X = 0.92;
   const TETHER_Y = 0.48;
 
   function seedCables(count) {
@@ -131,14 +131,12 @@
     // Knot glow: the convergence point was, until now, just where lines
     // stopped — the negative space Chunk 11 opened around it stayed
     // literally empty. A soft highlight gives that void something to point
-    // at, like a lit mooring point the fan pulls toward. Placed just inside
-    // the frame (0.90W), not at the literal off-canvas TETHER_X (1.04W) —
-    // a glow centred past the edge only shows a sliver of its own falloff
-    // and reads as nothing. Cables still exit the frame exactly as before;
-    // only the highlight's anchor moved. Drawn underneath the cables
+    // at, like a lit mooring point the fan pulls toward. Centred on the
+    // actual in-frame anchor so it reads as the thing being pulled toward.
+    // Drawn underneath the cables
     // (before the loop) and inside the same rotate transform so it tracks
     // the bundle under `angle`, e.g. the `neon` preset.
-    const glowX = W * 0.90;
+    const glowX = TETHER_X * W;
     const glowY = TETHER_Y * H;
     const knotPulse = 0.7 + 0.3 * Math.sin(t * 1.3);
     const knotR = (55 + values.glow * 70) * knotPulse;
@@ -151,6 +149,16 @@
     ctx.beginPath();
     ctx.arc(glowX, glowY, knotR, 0, Math.PI * 2);
     ctx.fill();
+
+    // The highlight alone read as atmosphere, not an object the cables were
+    // tied to. A small eye gives the fan a literal point of attachment at
+    // card size without turning the sparse piece into a logo.
+    const eyeR = 3 + values.stroke * 1.5;
+    ctx.strokeStyle = `rgba(${kr},${kg},${kb},${values.opacity * 0.9})`;
+    ctx.lineWidth = Math.max(1, values.stroke * 1.2);
+    ctx.beginPath();
+    ctx.arc(glowX, glowY, eyeR, 0, Math.PI * 2);
+    ctx.stroke();
 
     for (let i = 0; i < cables.length; i++) {
       const c = cables[i];

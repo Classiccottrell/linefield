@@ -741,6 +741,10 @@ files Chunks 11 and 17 touched — no new files, no shared/ changes unless
 a real defect is found (state it explicitly if so, don't silently expand
 scope).
 
+- [x] `tether`: make the mooring point read as an object at card size.
+- [ ] `rainfall`: refine the rain gesture without increasing ink coverage.
+- [ ] `flow-field`: refine its dominant flow read against the collection.
+
 **Process, same as every other chunk in this file:** one named piece at a
 time; commit and update this file's checkboxes in the same commit as the
 work; run this repo's own gates before calling a piece done
