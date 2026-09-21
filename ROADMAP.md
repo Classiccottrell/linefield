@@ -743,7 +743,7 @@ scope).
 
 - [x] `tether`: make the mooring point read as an object at card size.
 - [x] `rainfall`: refine the rain gesture without increasing ink coverage.
-- [ ] `flow-field`: refine its dominant flow read against the collection.
+- [x] `flow-field`: refine its dominant flow read against the collection.
 
 **Process, same as every other chunk in this file:** one named piece at a
 time; commit and update this file's checkboxes in the same commit as the
