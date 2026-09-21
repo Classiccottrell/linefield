@@ -454,6 +454,34 @@ known-broken fade.
 without external context, and its configuration is real (state that
 changes behavior), not decorative.
 
+### Chunk 13 — Wake as its own product area (deferred to last, not yet scoped)
+
+**Explicitly deferred.** User direction: finish the rest of the core
+linefield roadmap first; this chunk does not start until every other
+chunk here is done, Chunk 12's PR included. Recorded now only so the
+decision isn't lost before then.
+
+**Direction, decided:** a combination of two of the three options
+originally offered — (b) genuinely different interaction categories, not
+just trail-effect variations (Wake's current knobs — life/strands/pulse/
+color — already cover that axis well, per the user), and (c) a composable
+toolkit of interaction primitives, not a fixed menu, with an eye toward
+reuse by `Projects/Forma` down the line per the earlier cross-project
+note. Not (a): more variations on the trail idea specifically was ruled
+out.
+
+**Not yet scoped, needs a real design pass before it's a buildable
+chunk:** what the actual primitives are (Wake's trail is only one — click/
+tap, scroll-driven, and hover-target were named as one example direction,
+not a decision), whether they live under `interactions/` as siblings to
+`wake.js` or need their own directory/naming convention, whether "still
+does not need to interact with the backgrounds, though that could be
+something" (user's own words) means an opt-in bridge API between a
+primitive and a specific piece, and what a Forma-facing composable API
+surface would need to look like before Forma's own repo could consume it
+(see the "Cross-project note — Forma alignment" entry above — same
+scoping dependency applies here).
+
 ### Exploratory — ASCII art brought to life
 
 Not yet a chunk: a named idea, not a scoped deliverable. The glyph-mark
