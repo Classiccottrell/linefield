@@ -47,7 +47,9 @@
 
   // Deliberately a sparse piece — quiet rain, not a downpour. Sits between
   // tether (6, the sparsest) and meridian (7 long ribbons) in the library.
-  const BASE_COUNT = 28;
+  // Two fewer drops offsets the extra marked pixels from the correlated
+  // weather-front phase; the hero stays at or below its 0.008 ink baseline.
+  const BASE_COUNT = 26;
   // Fraction of canvas height a streak crosses per second at speedMult=1,
   // values.speed=1 — slow enough that a single drop takes ~14s to fall.
   const BASE_FALL = 0.07;
@@ -70,7 +72,8 @@
     const d = Math.abs(x0 - center) / width;
     const window = d < 1 ? 0.5 + 0.5 * Math.cos(d * Math.PI) : 0;
     const e = Math.pow(window, 0.85);
-    const floor = 0.12;
+    // Keep the correlated front below the shipped hero's measured ink floor.
+    const floor = 0.10;
     return floor + e * (1 - floor);
   }
 
@@ -93,7 +96,7 @@
     const d = Math.abs(x0 - center) / width;
     const window = d < 1 ? 0.5 + 0.5 * Math.cos(d * Math.PI) : 0;
     const e = Math.pow(window, 0.85);
-    const floor = 0.12;
+    const floor = 0.10;
     const dynamic = floor + e * (1 - floor);
     return x0 < DRIFT_LEFT_GUARD ? Math.min(dynamic, staticEnvelopeAt(x0)) : dynamic;
   }
@@ -106,7 +109,9 @@
         x,
         // Vertical phase offset — without this every drop would fall in
         // lockstep and read as a single sheet, not individual streaks.
-        seed: Math.random(),
+        // Correlate most of the vertical phase with x. The same sparse marks
+        // now arrive as a quiet weather front instead of unrelated dots.
+        seed: (x * 0.55 + Math.random() * 0.45) % 1,
         // Per-drop speed and length variety, per the brief ("varying speeds
         // and lengths"). Range chosen so slow/short and fast/long drops both
         // stay legible as rain, not as outliers.
@@ -161,6 +166,7 @@
     // Gentle wind sway, independent of fall speed — subtle by design so the
     // piece stays calm rather than turning into a gust.
     const swayAmount = W * 0.01 * values.motion;
+    const leanAmount = W * 0.035 * values.motion;
     const theta = (values.angle * Math.PI) / 180;
     // Veil breathing, independent of fall speed too, and gated by Motion
     // (near-static at motion=0, full pace at motion=1) so the shared
@@ -189,8 +195,10 @@
       // staying a rigid vertical translate.
       const swayHead = simplex2(d.x * 4, veilT);
       const swayTail = simplex2(d.x * 4, veilT + 0.4);
-      const xHead = d.x * W + swayHead * swayAmount;
-      const xTail = d.x * W + swayTail * swayAmount;
+      // One shared diagonal lean turns the veil into weather, while the
+      // smaller noise term preserves individual streak character.
+      const xHead = d.x * W + swayHead * swayAmount + leanAmount * (headY / H - 0.5);
+      const xTail = d.x * W + swayTail * swayAmount + leanAmount * (tailY / H - 0.5);
       let lw = lineWidth;
 
       const lightBase = values.invert ? 0.3 : 0.68;

@@ -742,7 +742,7 @@ a real defect is found (state it explicitly if so, don't silently expand
 scope).
 
 - [x] `tether`: make the mooring point read as an object at card size.
-- [ ] `rainfall`: refine the rain gesture without increasing ink coverage.
+- [x] `rainfall`: refine the rain gesture without increasing ink coverage.
 - [ ] `flow-field`: refine its dominant flow read against the collection.
 
 **Process, same as every other chunk in this file:** one named piece at a
