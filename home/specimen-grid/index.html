@@ -99,6 +99,14 @@
   footer a{color:var(--muted);text-decoration:none}
   footer a:hover{color:var(--ink)}
 
+  /* ---- Wake callout ---------------------------------------------------- */
+  .wake{border-bottom:1px solid var(--line);padding:26px 28px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;background:#0d0d10}
+  .wake .id{color:var(--accent);font-size:12px}
+  .wake .id::before{content:'●';margin-right:7px;font-size:8px;vertical-align:1px}
+  .wake h2{margin:6px 0 4px;font-size:16px;font-weight:700;letter-spacing:-.01em}
+  .wake p{margin:0;color:#adadb2;font-size:12.5px;max-width:60ch}
+  .wake-copy{max-width:640px}
+
   @media (max-width:820px){
     .lab{grid-template-columns:1fr}
     .lab-copy{border-right:0;border-bottom:1px solid var(--line);padding-right:0}
@@ -116,6 +124,18 @@
     <a href="../../CONTRIBUTING.md">Docs</a>
   </nav>
 </div>
+
+<section class="wake">
+  <div class="wake-copy">
+    <span class="id">addon.wake / cursor-trail / opt-in</span>
+    <h2>Wake: a pointer-trail rig, independent of every piece.</h2>
+    <p>Not one of the eighteen specimens: a standalone module you attach to
+      any canvas. It draws a fading trail keyed to pointer speed, has its
+      own config surface, and ships as source only — never inlined into a
+      baked export.</p>
+  </div>
+  <a class="btn ghost" href="../../interactions/wake/">$ open rig →</a>
+</section>
 
 <header class="lab">
   <div class="lab-copy">
