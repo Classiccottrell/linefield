@@ -5,48 +5,74 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — generative line-art backgrounds</title>
 <style>
+  /* Specimen system ported from home/specimen-grid/ (Chunk 15): dark
+     monospace/technical register, sharp corners (zero radius), a fixed
+     --brand accent for page chrome, and a per-card --accent (hue-tinted)
+     that overrides --brand locally so each card's swatch/focus ring reads
+     as that piece's own measured hue, not a shared UI color. */
   :root{
-    --ground:#0a0a0d;
-    --surface:#131319;
-    --line:#26262f;
-    --text:#e8e8ec;
-    --muted:#7c7c8c;
+    --bg:#0a0a0d; --surface:#131319; --line:#26262f;
+    --ink:#e8e8ec; --muted:#7c7c8c;
+    --brand:#437057; --brand-dim:#2d4d3c;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
-    background:var(--ground);color:var(--text);
-    font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
-    -webkit-font-smoothing:antialiased;padding:0 24px 96px;
+    background:var(--bg);color:var(--ink);
+    font:15px/1.6 ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;
+    -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1180px;margin:0 auto}
+  a{color:var(--brand)}
+  .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px 96px}
 
-  header{padding:80px 0 40px}
-  h1{font-size:clamp(32px,5vw,46px);font-weight:600;letter-spacing:-.02em;margin:0 0 14px}
-  .lede{color:var(--muted);font-size:18px;margin:0;max-width:60ch}
-  .lede code{font-size:15px;background:var(--surface);padding:2px 6px;border-radius:3px}
+  /* ---- Sticky topbar, ported from specimen-grid's .topbar ------------- */
+  .topbar{
+    position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;
+    padding:16px 28px;border-bottom:1px solid var(--line);background:rgba(10,10,13,.88);backdrop-filter:blur(6px);
+  }
+  .topbar .mark{font-weight:700;letter-spacing:.04em;font-size:15px}
+  .topbar .mark span{color:var(--brand)}
+  .topbar nav{display:flex;gap:24px;font-size:12px}
+  .topbar nav a{text-decoration:none;color:var(--muted)}
+  .topbar nav a:hover{color:var(--ink)}
+
+  header.intro{padding:56px 0 32px}
+  header.intro .label{margin-bottom:16px;display:block}
+  h1{font:700 clamp(30px,4.4vw,44px)/1.18 ui-monospace,monospace;letter-spacing:-.01em;margin:0 0 14px}
+  h1 .op{color:var(--brand)}
+  .lede{color:#b9b9be;font-size:15px;margin:0;max-width:62ch}
+  .lede code{font-size:13px;background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
 
   .chips{display:flex;flex-wrap:wrap;gap:8px;padding:24px 0 32px;border-bottom:1px solid var(--line)}
   .chip{
     font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
     color:var(--muted);background:transparent;border:1px solid var(--line);
-    padding:8px 13px;border-radius:2px;cursor:pointer;text-transform:uppercase;
+    padding:8px 13px;cursor:pointer;text-transform:uppercase;
   }
-  .chip:hover{color:var(--text);border-color:#3a3a46}
-  .chip[aria-pressed="true"]{color:var(--ground);background:var(--text);border-color:var(--text)}
-  .chip:focus-visible{outline:2px solid #6fb4c9;outline-offset:2px}
+  .chip:hover{color:var(--ink);border-color:#3a3a46}
+  .chip[aria-pressed="true"]{color:var(--bg);background:var(--ink);border-color:var(--ink)}
+  .chip:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 
+  /* ---- Gallery grid: specimen-grid's own many-sample answer -----------
+     specimen-grid's page carries two different treatments: the one-hero
+     `.specimen` (boxed, crosshair-guided) and the `.grid`/`.cell` sample
+     mosaic (hairline gutters via gap+background, bottom-gradient meta,
+     hue-degree tag, no crosshair) it uses for its OWN four-piece sample.
+     Eighteen cards is a many-sample case, so this ports the mosaic system,
+     not the crosshair — a literal crosshair on eighteen boxes at once is
+     the visual noise the brief warned about; the hairline grid is the part
+     that actually scales. */
   .grid{
-    display:grid;gap:28px;padding:36px 0 0;
-    grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+    display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+    margin:36px 0 0;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
   }
-  .card{display:flex;flex-direction:column;gap:0}
+  .card{display:flex;flex-direction:column;background:var(--bg)}
   .card[hidden]{display:none}
 
   .frame{
-    position:relative;aspect-ratio:16/10;overflow:hidden;border-radius:3px;
-    background:var(--ground);border:1px solid var(--line);display:block;
-    text-decoration:none;
+    position:relative;aspect-ratio:16/10;overflow:hidden;
+    background:#000;display:block;text-decoration:none;
   }
   .frame img,.frame iframe{
     position:absolute;inset:0;width:100%;height:100%;border:0;display:block;
@@ -55,75 +81,84 @@
   /* The iframe sits topmost in the anchor; without this, every click is
      consumed by the iframe and never reaches the enclosing <a>. */
   .frame iframe{pointer-events:none}
-  .frame:focus-visible{outline:2px solid var(--accent,#6fb4c9);outline-offset:3px}
-
-  .meta{padding:14px 2px 0}
-  .name{
-    display:flex;align-items:baseline;gap:10px;margin:0 0 4px;
-    font-size:17px;font-weight:600;letter-spacing:-.01em;
+  .frame:focus-visible{outline:2px solid var(--accent,var(--brand));outline-offset:2px}
+  /* Hue-degree spec tag, ported from specimen-grid's .cell .meta .tag-hue.
+     Colored via --accent so it reads as this card's own measured value,
+     not a shared UI accent. */
+  .frame-label{
+    position:absolute;top:10px;right:12px;z-index:2;
+    font-size:11px;letter-spacing:.04em;color:var(--accent,var(--brand));
+    text-shadow:0 1px 3px rgba(0,0,0,.85);
   }
-  .swatch{width:22px;height:3px;border-radius:2px;flex:none}
-  .blurb{color:var(--muted);font-size:14.5px;margin:0 0 12px}
+
+  .meta{padding:16px 16px 18px;border-top:1px solid var(--line)}
+  .name{
+    display:flex;align-items:baseline;gap:10px;margin:0 0 6px;
+    font-size:16px;font-weight:700;letter-spacing:-.01em;
+  }
+  .swatch{width:20px;height:3px;flex:none}
+  .blurb{color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 12px}
 
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
   .tag{
-    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9a9aa8;
-    border:1px solid var(--line);padding:4px 8px;border-radius:2px;
+    font:11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9a9aa8;
+    border:1px solid var(--line);padding:4px 8px;text-transform:uppercase;letter-spacing:.04em;
   }
 
   .mechanisms{margin:48px 0 0;padding-top:24px;border-top:1px solid var(--line)}
   .mechanism{display:block;color:inherit;text-decoration:none}
-  .mechanism:hover .mechanism-title{color:#9fd0dd}
-  .mechanism:focus-visible{outline:2px solid #6fb4c9;outline-offset:4px}
+  .mechanism:hover .mechanism-title{color:var(--brand)}
+  .mechanism:focus-visible{outline:2px solid var(--brand);outline-offset:4px}
   .mechanism-label{
-    color:var(--muted);font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
-    letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
   }
-  .mechanism-title{margin:8px 0 4px;font-size:20px;font-weight:600;letter-spacing:-.01em}
-  .mechanism-copy{color:var(--muted);font-size:15px;margin:0}
+  .mechanism-title{margin:8px 0 4px;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .mechanism-copy{color:var(--muted);font-size:13px;margin:0}
 
-
+  /* $-prefixed action buttons, ported from specimen-grid's `$ tune` /
+     `$ export` / `$ ship` command-style labels. CSS-only (::before) so the
+     copy-to-clipboard handlers below, which do `btn.textContent = 'Copied'`
+     and restore it after, never lose the glyph to a wiped child node. */
   .actions{display:flex;flex-wrap:wrap;gap:8px}
   .btn{
-    font:500 12.5px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;
     color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
-    padding:8px 12px;border-radius:3px;cursor:pointer;text-decoration:none;
+    padding:9px 12px;cursor:pointer;text-decoration:none;display:inline-block;
   }
-  .btn:hover{color:var(--text);border-color:#3a3a46}
-  .btn:focus-visible{outline:2px solid #6fb4c9;outline-offset:2px}
+  .btn::before{content:'$ ';color:var(--brand)}
+  .btn:hover{color:var(--ink);border-color:#3a3a46}
+  .btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 
-  .note{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+  .note{color:var(--muted);font-size:12px;margin:10px 0 0}
 
-  .titlebar{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
   .gh{
-    display:inline-flex;align-items:center;gap:8px;flex:none;margin-top:6px;
-    font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    display:inline-flex;align-items:center;gap:8px;flex:none;
+    font:500 13px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
     color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
-    padding:9px 13px;border-radius:3px;text-decoration:none;
+    padding:9px 13px;text-decoration:none;
   }
-  .gh:hover{color:var(--text);border-color:#3a3a46}
-  .gh:focus-visible{outline:2px solid #6fb4c9;outline-offset:2px}
+  .gh:hover{color:var(--ink);border-color:#3a3a46}
+  .gh:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
   .gh svg{width:16px;height:16px;fill:currentColor;flex:none}
 
   .skill{
-    margin:64px 0 0;padding:28px;border:1px solid var(--line);
-    border-radius:4px;background:var(--surface);
+    margin:64px 0 0;padding:28px;border:1px solid var(--line);background:var(--surface);
   }
-  .skill h2{margin:0 0 10px;font-size:20px;font-weight:600;letter-spacing:-.01em}
-  .skill p{color:var(--muted);font-size:15px;margin:0 0 18px;max-width:68ch}
+  .skill h2{margin:0 0 10px;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .skill p{color:var(--muted);font-size:13px;margin:0 0 18px;max-width:68ch}
   .skill .snip{
     display:flex;align-items:flex-start;gap:12px;
-    background:var(--ground);border:1px solid var(--line);border-radius:3px;
+    background:var(--bg);border:1px solid var(--line);
     padding:14px 14px 14px 16px;
   }
   .skill pre{
     margin:0;flex:1;min-width:0;overflow-x:auto;
-    font:12.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0;
+    font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0;
   }
   .skill .actions{margin-top:16px}
 
-  footer{padding:72px 0 0;color:var(--muted);font-size:14px;border-top:1px solid var(--line);margin-top:72px}
-  footer a{color:#9fd0dd}
+  footer{padding:72px 0 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:72px}
+  footer a{color:var(--brand)}
 
   @media (prefers-reduced-motion: reduce){
     *{animation:none!important;transition:none!important}
@@ -131,17 +166,22 @@
 </style>
 </head>
 <body>
+
+<div class="topbar">
+  <div class="mark">line<span>field</span></div>
+  <nav>
+    <a href="interactions/wake/">Wake</a>
+    <a href="#skill">Skill</a>
+    <a href="https://github.com/Classiccottrell/linefield">GitHub</a>
+  </nav>
+</div>
+
 <div class="wrap">
 
-<header>
-  <div class="titlebar">
-    <h1>linefield</h1>
-    <a class="gh" href="https://github.com/Classiccottrell/linefield">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-      GitHub
-    </a>
-  </div>
-  <p class="lede">Twelve generative line-art backgrounds. Every piece is one self-contained file with no dependencies — tune it, then export a standalone <code>.html</code> you can paste into any site.</p>
+<header class="intro">
+  <span class="label">Collection / 18 pieces / live</span>
+  <h1>Generative backgrounds, <span class="op">shipped as one file.</span></h1>
+  <p class="lede">Eighteen self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
 </header>
 
 <div class="chips" id="chips" role="group" aria-label="Filter pieces by category"></div>
@@ -150,6 +190,7 @@
   <article class="card" data-tags="flow" style="--accent:hsl(200 60% 60%)">
     <a class="frame" href="pieces/flow-field/" data-src="pieces/flow-field/" aria-label="Open Flow Field">
       <img src="thumbs/flow-field.png" alt="Flow Field preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">200&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -169,6 +210,7 @@
   <article class="card" data-tags="geometric" style="--accent:hsl(35 50% 60%)">
     <a class="frame" href="pieces/contour-grid/" data-src="pieces/contour-grid/" aria-label="Open Contour Grid">
       <img src="thumbs/contour-grid.png" alt="Contour Grid preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">35&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -188,6 +230,7 @@
   <article class="card" data-tags="optical" style="--accent:hsl(185 75% 60%)">
     <a class="frame" href="pieces/interference/" data-src="pieces/interference/" aria-label="Open Interference">
       <img src="thumbs/interference.png" alt="Interference preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">185&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -207,6 +250,7 @@
   <article class="card" data-tags="orb" style="--accent:hsl(265 55% 60%)">
     <a class="frame" href="pieces/orbital-veil/" data-src="pieces/orbital-veil/" aria-label="Open Orbital Veil">
       <img src="thumbs/orbital-veil.png" alt="Orbital Veil preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">265&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -226,6 +270,7 @@
   <article class="card" data-tags="grain" style="--accent:hsl(30 12% 60%)">
     <a class="frame" href="pieces/grain-field/" data-src="pieces/grain-field/" aria-label="Open Grain Field">
       <img src="thumbs/grain-field.png" alt="Grain Field preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">30&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -245,6 +290,7 @@
   <article class="card" data-tags="geometric 3d" style="--accent:hsl(190 35% 60%)">
     <a class="frame" href="pieces/wireframe-lattice/" data-src="pieces/wireframe-lattice/" aria-label="Open Wireframe Lattice">
       <img src="thumbs/wireframe-lattice.png" alt="Wireframe Lattice preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">190&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -264,6 +310,7 @@
   <article class="card" data-tags="flow sparse" style="--accent:hsl(150 50% 60%)">
     <a class="frame" href="pieces/meridian/" data-src="pieces/meridian/" aria-label="Open Meridian">
       <img src="thumbs/meridian.png" alt="Meridian preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">150&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -283,6 +330,7 @@
   <article class="card" data-tags="network dense" style="--accent:hsl(75 70% 60%)">
     <a class="frame" href="pieces/synapse/" data-src="pieces/synapse/" aria-label="Open Synapse">
       <img src="thumbs/synapse.png" alt="Synapse preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">75&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -302,6 +350,7 @@
   <article class="card" data-tags="orb dense" style="--accent:hsl(10 80% 60%)">
     <a class="frame" href="pieces/accretion/" data-src="pieces/accretion/" aria-label="Open Accretion">
       <img src="thumbs/accretion.png" alt="Accretion preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">10&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -321,6 +370,7 @@
   <article class="card" data-tags="sparse" style="--accent:hsl(220 25% 60%)">
     <a class="frame" href="pieces/tether/" data-src="pieces/tether/" aria-label="Open Tether">
       <img src="thumbs/tether.png" alt="Tether preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">220&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -340,6 +390,7 @@
   <article class="card" data-tags="3d orb" style="--accent:hsl(285 60% 60%)">
     <a class="frame" href="pieces/event-horizon/" data-src="pieces/event-horizon/" aria-label="Open Event Horizon">
       <img src="thumbs/event-horizon.png" alt="Event Horizon preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">285&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -359,6 +410,7 @@
   <article class="card" data-tags="sparse" style="--accent:hsl(205 18% 60%)">
     <a class="frame" href="pieces/rainfall/" data-src="pieces/rainfall/" aria-label="Open Rainfall">
       <img src="thumbs/rainfall.png" alt="Rainfall preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">205&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -378,6 +430,7 @@
   <article class="card" data-tags="optical organic sparse" style="--accent:hsl(198 24% 60%)">
     <a class="frame" href="pieces/lacuna/" data-src="pieces/lacuna/" aria-label="Open Lacuna">
       <img src="thumbs/lacuna.png" alt="Lacuna preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">198&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -397,6 +450,7 @@
   <article class="card" data-tags="depth optical sparse" style="--accent:hsl(344 30% 60%)">
     <a class="frame" href="pieces/parallax/" data-src="pieces/parallax/" aria-label="Open Parallax">
       <img src="thumbs/parallax.png" alt="Parallax preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">344&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -416,6 +470,7 @@
   <article class="card" data-tags="glyph organic sparse" style="--accent:hsl(42 22% 60%)">
     <a class="frame" href="pieces/cipher-bloom/" data-src="pieces/cipher-bloom/" aria-label="Open Cipher Bloom">
       <img src="thumbs/cipher-bloom.png" alt="Cipher Bloom preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">42&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -435,6 +490,7 @@
   <article class="card" data-tags="organic depth kinetic" style="--accent:hsl(250 16% 60%)">
     <a class="frame" href="pieces/driftwork/" data-src="pieces/driftwork/" aria-label="Open Driftwork">
       <img src="thumbs/driftwork.png" alt="Driftwork preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">250&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -454,6 +510,7 @@
   <article class="card" data-tags="geometric organic editorial" style="--accent:hsl(12 30% 60%)">
     <a class="frame" href="pieces/pleat/" data-src="pieces/pleat/" aria-label="Open Pleat">
       <img src="thumbs/pleat.png" alt="Pleat preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">12&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -473,6 +530,7 @@
   <article class="card" data-tags="3d geometric" style="--accent:hsl(105 40% 60%)">
     <a class="frame" href="pieces/globe/" data-src="pieces/globe/" aria-label="Open Globe">
       <img src="thumbs/globe.png" alt="Globe preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">105&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
@@ -499,7 +557,7 @@
   </a>
 </section>
 
-<section class="skill">
+<section class="skill" id="skill">
   <h2>The skill that built this</h2>
   <p>Every constant that renders wrong, what counts as verifying a piece rather than reasoning about it, and the gate for judging a collection instead of one piece at a time. All of it learned by shipping work that looked right on paper and wrong on screen. Drop it into Claude Code and it loads when you build generative canvas work, here or anywhere else.</p>
   <div class="snip">

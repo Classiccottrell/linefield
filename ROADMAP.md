@@ -510,14 +510,40 @@ layout lives in the real gallery, or kept as the home-page-direction
 record — decide once the port is done and it's clear whether duplicating
 the layout in two places is worth it or just drift risk.
 
-- [ ] Port specimen-grid's layout system (framed viewport, crosshair
+- [x] Port specimen-grid's layout system (framed viewport, crosshair
   guides, sticky topbar, `$ command` label style) into the gallery
   template, applied across all eighteen piece cards, not just a hero.
-- [ ] Confirm the existing gallery behaviors survive the port: live
+  specimen-grid's own page actually ships two different treatments: the
+  one-hero `.specimen` (boxed, crosshair-guided) and the `.grid`/`.cell`
+  many-sample mosaic it uses for its own four-piece sample (hairline
+  gutters via `gap:1px` + `background:var(--line)`, bottom-of-thumbnail
+  hue-degree tag, no crosshair). Ported the latter for the eighteen cards —
+  it's specimen-grid's own answer to the one-to-many scaling question, and
+  a literal crosshair repeated eighteen times is exactly the noise the
+  brief flagged as a risk. Sticky topbar, monospace type, sharp
+  (zero-radius) corners, and `$`-prefixed action labels (CSS
+  `::before`, so the copy-to-clipboard "Copied" swap never eats the glyph)
+  carried over directly.
+- [x] Confirm the existing gallery behaviors survive the port: live
   previews, thumbnail fallback, links into each piece's own page, Wake's
-  Chunk 12 promoted section staying at the top.
-- [ ] Rebuild (`npm run build`) and confirm `node tools/build.mjs
-  --verify-only` still reports all eighteen pieces.
+  Chunk 12 promoted section staying at the top. First three verified live
+  (Playwright screenshot + hover test). Wake's promotion (PR #8,
+  `wake-promote-and-expand`) is not in this branch's history — confirmed
+  via `git merge-base --is-ancestor`, not an assumption — so Wake still
+  renders as the pre-Chunk-12 bottom "Interaction mechanism" section here;
+  restyled in place, left unpromoted and out of scope for this chunk.
+- [x] Rebuild (`npm run build`) and confirm `node tools/build.mjs
+  --verify-only` still reports all eighteen pieces. `index.html` is the
+  only generated artifact that changed; `thumbs/` and `downloads/` came
+  back byte-identical, confirming no piece drift from this template-only
+  change.
+
+`home/specimen-grid/` kept as-is: `home/COMPARISON.md` documents it
+side-by-side with `home/quiet-drift/` as Chunk 8's two directions, and
+deleting the page would leave that record pointing at nothing. The two
+pages share no code (each inlines its own CSS), so the layout now living
+in two places is not a maintenance hazard the way a shared component
+would be.
 
 **Finish line:** The gallery reads as specimen-grid's layout applied to
 the full collection, not the old gallery template with a coat of paint.
