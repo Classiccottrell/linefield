@@ -63,6 +63,12 @@
   }
   .knob input[type=range]::-moz-range-thumb{width:11px;height:11px;border:0;border-radius:50%;background:var(--accent)}
   .knob .val{font:11px/1 ui-monospace,monospace;color:var(--accent-soft)}
+  .knob select{
+    font:11px/1 ui-monospace,Menlo,monospace;letter-spacing:.04em;
+    background:var(--bg);color:var(--ink);border:1px solid var(--line);
+    padding:6px 8px;border-radius:2px;cursor:pointer;outline:0;
+  }
+  .knob select:hover{border-color:var(--accent)}
   .knob-note{align-self:flex-start;font:12px/1.5 -apple-system,sans-serif;color:var(--muted);max-width:230px;padding-top:4px}
 
   /* ---- Sections ------------------------------------------------------ */
@@ -101,24 +107,35 @@
 <body>
 
 <header class="hero">
-  <!-- Live piece, not a screenshot: rainfall runs same-origin, its own
+  <!-- Live piece, not a screenshot: hero-frame runs same-origin, its own
        chrome hidden from the parent page after load (same technique as the
-       gallery's own hover-preview at index.html — see goLive()). -->
+       gallery's own hover-preview at index.html — see goLive()). The
+       hero-piece select below swaps this iframe's src between the two
+       hero-eligible pieces in HERO_PIECES; both options are re-checked
+       against ../../pieces.json on load so a renamed/removed slug degrades
+       instead of silently orphaning. -->
   <iframe id="hero-frame" src="../../pieces/rainfall/index.html?preview=1&preset=whisper" title="" aria-hidden="true" tabindex="-1"></iframe>
   <div class="hero-content">
     <span class="mono kicker">Open-source · self-hosted · MIT</span>
     <h1>Backgrounds that <em>drift</em>,<br>not distract.</h1>
     <p class="lede">
       linefield is a small library of generative line-art backgrounds: one
-      HTML file each, no dependencies, no build step. This is <code>rainfall</code>,
+      HTML file each, no dependencies, no build step. This is <code id="hero-piece-name">rainfall</code>,
       running live behind this text, right now.
     </p>
     <div class="cta-row">
       <a class="btn" href="../../index.html">Browse the collection</a>
-      <a class="btn ghost" href="../../pieces/rainfall/">Open rainfall</a>
+      <a class="btn ghost" id="hero-piece-link" href="../../pieces/rainfall/">Open rainfall</a>
     </div>
 
     <div class="knobs">
+      <div class="knob">
+        <label for="k-hero">Hero piece</label>
+        <select id="k-hero">
+          <option value="rainfall">Rainfall</option>
+          <option value="grain-field">Grain Field</option>
+        </select>
+      </div>
       <div class="knob">
         <label for="k-speed">Speed</label>
         <input type="range" id="k-speed" min="0" max="2" step="0.05" value="1" />
@@ -206,8 +223,37 @@
 </footer>
 
 <script type="module">
+  // Hero-eligible pieces, both confirmed low ink coverage / text-safe per
+  // ROADMAP.md's collection-metrics table (rainfall 0.010, grain-field
+  // 0.035 — the two sparsest pieces still unclaimed by the sibling
+  // home/specimen-grid page, which already runs lacuna as its own hero).
+  // Both ship a `whisper` preset (see CONTRIBUTING.md's Presets section).
+  const HERO_PIECES = {
+    rainfall: { title: 'Rainfall' },
+    'grain-field': { title: 'Grain Field' },
+  };
+
   const frame = document.getElementById('hero-frame');
+  const select = document.getElementById('k-hero');
+  const nameEl = document.getElementById('hero-piece-name');
+  const linkEl = document.getElementById('hero-piece-link');
   let panelWindow = null;
+
+  function currentKnobs() {
+    return {
+      speed: Number(document.getElementById('k-speed').value),
+      density: Number(document.getElementById('k-density').value),
+      opacity: Number(document.getElementById('k-opacity').value),
+    };
+  }
+
+  function applyKnobs() {
+    if (!panelWindow || !panelWindow.__LF_PANEL__) return;
+    const values = currentKnobs();
+    for (const name of Object.keys(values)) {
+      panelWindow.__LF_PANEL__.setValue(name, values[name], { persist: false });
+    }
+  }
 
   frame.addEventListener('load', () => {
     const doc = frame.contentDocument;
@@ -218,7 +264,24 @@
     style.textContent = '[data-lf-panel] { visibility: hidden; }';
     doc.head.appendChild(style);
     panelWindow = frame.contentWindow;
+    // Re-assert the live knobs' current values against whichever piece
+    // just loaded, so a swap never leaves the sliders showing numbers the
+    // new piece isn't actually running.
+    applyKnobs();
   });
+
+  function loadHero(slug) {
+    // panelWindow belongs to the outgoing document — drop it immediately so
+    // no stray setValue() call lands on a piece we've already navigated
+    // away from; frame's own 'load' listener re-wires the new one.
+    panelWindow = null;
+    frame.src = `../../pieces/${slug}/index.html?preview=1&preset=whisper`;
+    nameEl.textContent = slug;
+    linkEl.href = `../../pieces/${slug}/`;
+    linkEl.textContent = `Open ${slug}`;
+  }
+
+  select.addEventListener('change', () => loadHero(select.value));
 
   function wire(id, name, fmt = (v) => Number(v).toFixed(2)) {
     const input = document.getElementById(id);
@@ -236,6 +299,25 @@
   wire('k-speed', 'speed');
   wire('k-density', 'density');
   wire('k-opacity', 'opacity');
+
+  // Staleness guardrail (see ROADMAP.md Chunk 14 note): re-check both
+  // option slugs against the real manifest rather than trusting the
+  // hardcoded <option> markup forever. A slug that's been renamed or
+  // removed from pieces.json gets disabled here instead of silently
+  // linking to a 404 iframe.
+  fetch('../../pieces.json')
+    .then((res) => res.json())
+    .then((pieces) => {
+      const known = new Set(pieces.map((p) => p.slug));
+      for (const option of select.options) {
+        if (!known.has(option.value)) {
+          option.disabled = true;
+          option.textContent += ' (missing)';
+          console.warn(`quiet-drift hero switcher: "${option.value}" is no longer in pieces.json`);
+        }
+      }
+    })
+    .catch(() => {}); // best-effort — the dropdown still works off its own markup if this fails
 </script>
 
 </body>
