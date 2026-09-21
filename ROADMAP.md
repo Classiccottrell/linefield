@@ -444,6 +444,145 @@ known-broken fade.
 without external context, and its configuration is real (state that
 changes behavior), not decorative.
 
+---
+
+## Intake — 2026-09-20 (post home-page review)
+
+User picked `home/quiet-drift/` as the actual home page and asked for it
+to grow a real feature; picked `home/specimen-grid/`'s layout specifically
+to become the *main gallery's* visual system, not just live on as an
+alternate home; and added two new microsite pages plus a second pass on
+Chunk 11's three pieces. Four new chunks, numbered onward from 13 (Wake's
+own chunk 13, "Wake as its own product area," stays where it is on the
+`wake-promote-and-expand` branch/PR #8 — not renumbered here to avoid a
+collision once that PR merges).
+
+### Chunk 14 — quiet-drift becomes the home page, gains a hero-effect switcher
+
+**Outcome:** `home/quiet-drift/` is the linefield home page. It gains a
+dropdown that swaps which live piece runs as the hero background, without
+reloading the page — starting with two options, not all eighteen.
+
+**Scope:** `home/quiet-drift/index.html` only. Does not touch
+`home/specimen-grid/` (that direction's fate is Chunk 15, below) or
+`pieces.json`.
+
+- [ ] Add a hero-piece dropdown. Two options to start: `rainfall` (current
+  hero, already confirmed text-safe) and one more pick — choose a second
+  piece with similarly low ink coverage per `ROADMAP.md`'s collection
+  table (do not pick a dense piece that would break the headline's
+  legibility; that's the whole reason rainfall was chosen originally).
+- [ ] Swapping the dropdown swaps the live iframe's piece in place — reuse
+  the existing live-preview mechanism (`goLive()`-style same-origin
+  iframe, `?preview=1`) the page already uses for its hero, don't invent a
+  second embedding method.
+- [ ] The existing speed/density/opacity live knobs continue to act on
+  whichever piece is currently selected.
+- [ ] Note for whoever picks this up: the user's own words were "I want to
+  make sure that when we... let me rethink this one, because I think
+  that's on the roadmap that these get updated as well" — an unfinished
+  thought about the hero-piece list staying in sync as pieces get
+  refreshed or renamed (this exact class of staleness bit the "SVG ignores
+  angle" limitation's piece list earlier this session). Whatever the
+  dropdown's option list looks like, don't hardcode it somewhere a future
+  piece rename/removal can silently orphan it without a build-time check
+  catching it — ask the user to confirm intent here if it's not obvious
+  once you're implementing, don't guess further than this note already
+  does.
+
+**Finish line:** The home page is quiet-drift, its hero is switchable
+between at least two real pieces live, with working knobs on whichever is
+selected.
+
+### Chunk 15 — Rebuild the main gallery using specimen-grid's layout
+
+**Outcome:** The main piece gallery (`index.html` at the repo root,
+generated from `tools/templates/gallery.html`) adopts `specimen-grid`'s
+visual system — boxed/framed viewport treatment, monospace/technical
+register, crosshair-guide framing — as the collection's actual browsing
+experience, not just a marketing-page alternate.
+
+**Scope:** `tools/templates/gallery.html` (the source template — `index.html`
+is generated from it via `npm run build`, never hand-edit the generated
+file directly, per the Chunk 12 agent's own note on this exact mistake to
+avoid). `home/specimen-grid/index.html` may be deprecated/removed once its
+layout lives in the real gallery, or kept as the home-page-direction
+record — decide once the port is done and it's clear whether duplicating
+the layout in two places is worth it or just drift risk.
+
+- [ ] Port specimen-grid's layout system (framed viewport, crosshair
+  guides, sticky topbar, `$ command` label style) into the gallery
+  template, applied across all eighteen piece cards, not just a hero.
+- [ ] Confirm the existing gallery behaviors survive the port: live
+  previews, thumbnail fallback, links into each piece's own page, Wake's
+  Chunk 12 promoted section staying at the top.
+- [ ] Rebuild (`npm run build`) and confirm `node tools/build.mjs
+  --verify-only` still reports all eighteen pieces.
+
+**Finish line:** The gallery reads as specimen-grid's layout applied to
+the full collection, not the old gallery template with a coat of paint.
+
+### Chunk 16 — Stub docs and CONTRIBUTING pages as microsite pages
+
+**Outcome:** `docs/` and contribution guidance exist as real pages on the
+microsite (styled consistently with whatever the gallery/home now look
+like post-Chunk 15), not only as root-level `.md` files a visitor has to
+find on GitHub.
+
+**Scope:** New page(s), likely `docs/index.html` or similar and a
+contribution-guide page — exact routing/naming is this chunk's own
+decision, not pre-specified here. Source content from the existing
+`CONTRIBUTING.md` and whatever's already under `docs/` rather than
+rewriting it from scratch; this is a stub/scaffold pass, not a full docs
+rewrite.
+
+**Depends on:** Chunk 15 landing first, so these pages inherit the same
+design system rather than a third, different visual language on the same
+microsite.
+
+- [ ] Stub a docs landing page reflecting the repo's actual `docs/`
+  content (check what's there now — the redesign spec lives under
+  `docs/superpowers/specs/`, that's implementation history, not visitor-
+  facing documentation; figure out what's actually visitor-relevant before
+  stubbing a page around it).
+- [ ] Stub a contribution-guide page from `CONTRIBUTING.md`'s existing
+  content — a real page, not a dead link to a `.md` file.
+- [ ] Link both from the gallery/home pages' nav so they're actually
+  reachable, not orphaned pages.
+
+**Finish line:** Both pages exist, are linked from the site, and use the
+Chunk 15 design system — "stub" means scaffolded and navigable, not
+necessarily final copy.
+
+### Chunk 17 — Second refinement pass on Tether, Rainfall, Flow Field
+
+**Outcome:** A deeper iteration on the three pieces Chunk 11 already
+refreshed — the user asked to focus refinement effort here again, treating
+the first pass as a start, not a finish.
+
+**Scope:** `pieces/tether/index.html`, `pieces/rainfall/index.html`,
+`pieces/flow-field/index.html` and their generated assets — same three
+files Chunk 11 touched.
+
+- [ ] Before changing anything, look at all three next to the five
+  commissioned pieces and Pleat/Driftwork/Cipher Bloom/Parallax/Lacuna
+  again, now that Chunk 11's changes are live — identify specifically
+  what still falls short, rather than re-doing the same diagnosis Chunk 11
+  already made (structural gesture, negative space — that part is done;
+  find the next gap).
+  - Note: `rainfall`'s ink coverage is deliberately kept low (0.010) to
+    stay text-safe behind `home/quiet-drift`'s headline, and by Chunk 14
+    above it may become one of two selectable hero pieces there — don't
+    undo that constraint without checking Chunk 14's status first.
+- [ ] One named piece at a time, per the delivery rules.
+- [ ] Refresh presets/thumbnail/download for each on completion, same as
+  Chunk 11.
+
+**Finish line:** All three read as fully resolved against the current
+collection's bar — the user's own judgment is the finish line here more
+than any mechanical checklist, since Chunk 11 already cleared the
+mechanical bar once.
+
 ### Exploratory — ASCII art brought to life
 
 Not yet a chunk: a named idea, not a scoped deliverable. The glyph-mark
