@@ -180,7 +180,7 @@
       // Head = leading (lower) end of the streak, wrapping endlessly top to
       // bottom. + values.phase gives a global stagger control; % 1 keeps it
       // periodic so the loop never runs out of range.
-      const depthScale = 0.55 + d.depth * 0.9;
+      const depthScale = 0.55 + d.depth * (0.9 + values.motion * 0.12);
       const fall = ((t * d.speedMult * (0.7 + d.depth * 0.55) + d.seed + values.phase * 0.5) % 1 + 1) % 1;
       const headY = fall * (H + baseLen * 2) - baseLen;
       const tailY = headY - baseLen * d.lenMult * depthScale;
@@ -194,11 +194,13 @@
 
       const lightBase = values.invert ? 0.3 : 0.68;
       const headLight = Math.min(0.95, lightBase + 0.22);
-      const tailLight = Math.max(0.04, lightBase - 0.4);
+      const tailLight = Math.max(0.10, lightBase - 0.3);
       const stopB = paletteHsl(values, 1);
       const [hr, hg, hb] = hslToRgb(stopB.h, stopB.s, headLight);
       const stopA = paletteHsl(values, 0);
       const [tr, tg, tb] = hslToRgb(stopA.h, stopA.s, tailLight);
+      const mid = paletteHsl(values, 0.65);
+      const [mr, mg, mb] = hslToRgb(mid.h, mid.s, (tailLight + headLight) * 0.5);
 
       // Envelope shapes brightness, not count or width — a drop in a thin
       // stretch of the veil still falls at full speed, just paler, so the
@@ -209,7 +211,10 @@
       const op = values.opacity * env * (0.35 + d.depth * 0.65);
 
       const grad = ctx.createLinearGradient(xTail, tailY, xHead, headY);
-      grad.addColorStop(0, `rgba(${tr},${tg},${tb},0)`);
+      // Keep a faint tail so Color A and Solid/Gradient remain visible even
+      // on this deliberately sparse piece; the head still carries the read.
+      grad.addColorStop(0, `rgba(${tr},${tg},${tb},${op * 0.18 * (0.4 + d.depth * 0.6)})`);
+      grad.addColorStop(0.55, `rgba(${mr},${mg},${mb},${op * 0.45})`);
       grad.addColorStop(1, `rgba(${hr},${hg},${hb},${op})`);
 
       ctx.strokeStyle = grad;
