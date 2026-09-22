@@ -47,7 +47,7 @@
 
   // Deliberately the sparsest piece in the library.
   const BASE_COUNT = 6;
-  const SAMPLES = 48; // points along each cable
+  const SAMPLES = 36; // points along each cable
   let cables = [];
   let paths = [];
 
@@ -181,9 +181,9 @@
       const bx = (c.bx + simplex2(i * 2.9 + t * 0.3, 7.5) * wobble) * W;
       const by = (c.by + simplex2(i * 2.9 + t * 0.3, 9.5) * wobble * 3) * H;
 
-      // Sag: a parabola along the chord, swaying with a slow oscillation.
+      // Small sag keeps the bolts tethered without making them read as rope.
       const sway = Math.sin(t + c.j + values.phase * Math.PI);
-      const sag = H * 0.16 * values.slack * (0.55 + 0.45 * sway);
+      const sag = H * 0.05 * values.slack * (0.55 + 0.45 * sway);
 
       // Width and alpha both ride the same depth tier so the hierarchy
       // reads at a glance, not just up close.
@@ -202,11 +202,15 @@
         const y = ay + (by - ay) * u;
         // 4*u*(1-u) peaks at 1 in the middle and is 0 at both anchors.
         const droop = 4 * u * (1 - u) * sag;
-        // A little high-frequency shiver, like a plucked string.
-        const shiver =
-          simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
-        let py = y + droop + shiver;
-        let px = x;
+        // Stepped noise creates angular electrical bends instead of smooth
+        // cable wobble. The envelope keeps the ends anchored and the middle
+        // alive without turning the whole piece into visual static.
+        const boltSegment = Math.floor(u * 9);
+        const boltEnvelope = 4 * u * (1 - u);
+        const bolt = simplex2(boltSegment * noiseScale + c.j, t * 0.45) * 28 * values.motion * boltEnvelope;
+        const lateral = simplex2(boltSegment * noiseScale + c.j + 4, t * 0.45) * 12 * values.motion * boltEnvelope;
+        const py = y + droop + bolt;
+        const px = x + lateral;
           if (s === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
         pts.push([px, py]);

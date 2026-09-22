@@ -1285,14 +1285,15 @@ function describeForAI({ pieceName, values }) {
         x,
         // Vertical phase offset — without this every drop would fall in
         // lockstep and read as a single sheet, not individual streaks.
-        // Correlate most of the vertical phase with x. The same sparse marks
-        // now arrive as a quiet weather front instead of unrelated dots.
-        seed: (x * 0.8 + Math.random() * 0.2) % 1,
+        // Keep the fall phase varied so the sparse field never forms a
+        // synchronized sheet.
+        seed: Math.random(),
         // Per-drop speed and length variety, per the brief ("varying speeds
         // and lengths"). Range chosen so slow/short and fast/long drops both
         // stay legible as rain, not as outliers.
         speedMult: 0.5 + Math.random() * 1.3,
         lenMult: 0.5 + Math.random() * 1.5,
+        depth: Math.random(),
       };
     });
   }
@@ -1339,10 +1340,6 @@ function describeForAI({ pieceName, values }) {
     const t = elapsed * values.speed * BASE_FALL;
     const lineWidth = 0.6 + values.stroke * 1.8;
     const baseLen = H * 0.07 * (0.4 + values.scale);
-    // Gentle wind sway, independent of fall speed — subtle by design so the
-    // piece stays calm rather than turning into a gust.
-    const swayAmount = W * 0.01 * values.motion;
-    const leanAmount = W * 0.06 * values.motion;
     const theta = (values.angle * Math.PI) / 180;
     // Veil breathing, independent of fall speed too, and gated by Motion
     // (near-static at motion=0, full pace at motion=1) so the shared
@@ -1359,23 +1356,17 @@ function describeForAI({ pieceName, values }) {
       // Head = leading (lower) end of the streak, wrapping endlessly top to
       // bottom. + values.phase gives a global stagger control; % 1 keeps it
       // periodic so the loop never runs out of range.
-      const fall = ((t * d.speedMult + d.seed + values.phase * 0.5) % 1 + 1) % 1;
+      const depthScale = 0.55 + d.depth * 0.9;
+      const fall = ((t * d.speedMult * (0.7 + d.depth * 0.55) + d.seed + values.phase * 0.5) % 1 + 1) % 1;
       const headY = fall * (H + baseLen * 2) - baseLen;
-      const tailY = headY - baseLen * d.lenMult;
+      const tailY = headY - baseLen * d.lenMult * depthScale;
 
-      // Sampled by x, not by an independent per-drop random phase, so
-      // neighbouring drops lean the same way at any instant — a gust
-      // crossing the veil, not decorrelated dot-jitter (the "scattered
-      // dashes" read Chunk 11 left standing). Head and tail sample the
-      // noise at different phases, so each streak tilts rather than
-      // staying a rigid vertical translate.
-      const swayHead = simplex2(d.x * 4, veilT);
-      const swayTail = simplex2(d.x * 4, veilT + 0.4);
-      // One shared diagonal lean turns the veil into weather, while the
-      // smaller noise term preserves individual streak character.
-      const xHead = d.x * W + swayHead * swayAmount + leanAmount * (headY / H - 0.5);
-      const xTail = d.x * W + swayTail * swayAmount + leanAmount * (tailY / H - 0.5);
-      let lw = lineWidth;
+      // Straight fall is intentional. Depth does the visual work: distant
+      // drops are shorter, thinner, dimmer and slower; near drops carry the
+      // occasional quiet head glint.
+      const xHead = d.x * W;
+      const xTail = xHead;
+      const lw = lineWidth * (0.55 + d.depth * 0.75);
 
       const lightBase = values.invert ? 0.3 : 0.68;
       const headLight = Math.min(0.95, lightBase + 0.22);
@@ -1391,7 +1382,7 @@ function describeForAI({ pieceName, values }) {
       // x, t now (see envelopeAt) instead of a value fixed at seed time, so
       // the veil itself slowly breathes rather than sitting frozen forever.
       const env = envelopeAt(d.x, veilT);
-      const op = values.opacity * env;
+      const op = values.opacity * env * (0.35 + d.depth * 0.65);
 
       const grad = ctx.createLinearGradient(xTail, tailY, xHead, headY);
       grad.addColorStop(0, `rgba(${tr},${tg},${tb},0)`);
@@ -1413,11 +1404,11 @@ function describeForAI({ pieceName, values }) {
       ctx.lineTo(xHead, headY);
       ctx.stroke();
 
-      if (values.glint) {
+      if (values.glint && d.depth > 0.68) {
         // Soft radial highlight at the head — bigger than the stroke itself
         // so "brighter head" reads clearly even at a glance, still small
         // enough relative to the canvas to stay calm rather than blobby.
-        const r = lw * 3;
+        const r = lw * 2.2;
         const glintGrad = ctx.createRadialGradient(xHead, headY, 0, xHead, headY, r);
         glintGrad.addColorStop(0, `rgba(${hr},${hg},${hb},${op})`);
         glintGrad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
