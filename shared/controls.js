@@ -54,7 +54,9 @@ const PANEL_CSS = `
 .lf-panel.collapsed .lf-body, .lf-panel.collapsed .lf-reset { display: none; }
 .lf-panel h3 { margin: 0; padding: 14px 18px 12px; font: 700 11px/1 ui-monospace,Menlo,monospace;
   text-transform: uppercase; letter-spacing: .12em; color: #5fa07c; flex: none;
-  display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  display: flex; align-items: center; justify-content: space-between; cursor: grab;
+  user-select: none; touch-action: none; }
+.lf-panel h3:active { cursor: grabbing; }
 .lf-panel h3 .lf-status { display: flex; align-items: center; gap: 5px; font: 500 10px/1 ui-monospace,Menlo,monospace;
   letter-spacing: .05em; color: #8a8a9a; text-transform: none; }
 .lf-panel h3 .lf-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
@@ -211,6 +213,9 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
     }
   }
   let collapsed = saved.collapsed || false;
+  let panelPosition = saved.position && Number.isFinite(saved.position.left) && Number.isFinite(saved.position.top)
+    ? saved.position
+    : null;
   // Mobile-sheet collapse is a separate, unpersisted flag: it starts
   // collapsed every load (handle-only, per the brief) and is scoped to the
   // <=640px media query in CSS, so toggling it can never affect (or be
@@ -247,7 +252,45 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
   status.className = 'lf-status';
   status.innerHTML = '<span class="lf-dot"></span>live';
   heading.append(headingLabel, status);
+  heading.title = 'Drag to move · click to collapse';
+  let dragState = null;
+  let suppressHeadingClick = false;
+  heading.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || window.innerWidth <= 640) return;
+    const rect = panel.getBoundingClientRect();
+    dragState = { id: event.pointerId, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, moved: false };
+    heading.setPointerCapture(event.pointerId);
+  });
+  heading.addEventListener('pointermove', (event) => {
+    if (!dragState || event.pointerId !== dragState.id) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    if (!dragState.moved && Math.hypot(dx, dy) < 4) return;
+    dragState.moved = true;
+    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+    panel.style.left = `${Math.min(maxLeft, Math.max(0, dragState.left + dx))}px`;
+    panel.style.top = `${Math.min(maxTop, Math.max(0, dragState.top + dy))}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  });
+  function finishPanelDrag(event) {
+    if (!dragState || event.pointerId !== dragState.id) return;
+    if (heading.hasPointerCapture(event.pointerId)) heading.releasePointerCapture(event.pointerId);
+    if (dragState.moved) {
+      panelPosition = { left: parseFloat(panel.style.left), top: parseFloat(panel.style.top) };
+      suppressHeadingClick = true;
+      persist();
+    }
+    dragState = null;
+  }
+  heading.addEventListener('pointerup', finishPanelDrag);
+  heading.addEventListener('pointercancel', finishPanelDrag);
   heading.addEventListener('click', () => {
+    if (suppressHeadingClick) {
+      suppressHeadingClick = false;
+      return;
+    }
     collapsed = !collapsed;
     panel.classList.toggle('collapsed', collapsed);
     persist();
@@ -601,9 +644,29 @@ export function createControlPanel({ pieceId, onChange, extraControls = [], defa
 
   document.body.appendChild(panel);
 
+  function applyPanelPosition() {
+    if (window.innerWidth <= 640 || !panelPosition) {
+      panel.style.removeProperty('left');
+      panel.style.removeProperty('top');
+      panel.style.removeProperty('right');
+      panel.style.removeProperty('bottom');
+      return;
+    }
+    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+    panelPosition.left = Math.min(maxLeft, Math.max(0, panelPosition.left));
+    panelPosition.top = Math.min(maxTop, Math.max(0, panelPosition.top));
+    panel.style.left = `${panelPosition.left}px`;
+    panel.style.top = `${panelPosition.top}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+  applyPanelPosition();
+  window.addEventListener('resize', applyPanelPosition);
+
   function persist() {
     if (isPreview) return;
-    localStorage.setItem(storageKey, JSON.stringify({ collapsed, values, sections: sectionOpen }));
+    localStorage.setItem(storageKey, JSON.stringify({ collapsed, values, sections: sectionOpen, position: panelPosition }));
   }
 
   // Declared, uncomposed. tools/build.mjs reads this off the loaded page
