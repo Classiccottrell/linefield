@@ -47,7 +47,7 @@
 
   // Deliberately the sparsest piece in the library.
   const BASE_COUNT = 6;
-  const SAMPLES = 48; // points along each cable
+  const SAMPLES = 36; // points along each cable
   let cables = [];
   let paths = [];
 
@@ -59,9 +59,9 @@
   // point gives tether its own dominant gesture (a mooring, not a field)
   // and opens real negative space on the side away from the knot, at any
   // size including a gallery card.
-  // Just past the right edge so the bundle exits the frame instead of
-  // stopping short and reading as a cut stub of blunt line ends.
-  const TETHER_X = 1.04;
+  // Just inside the right edge so the bundle terminates at a visible eye
+  // instead of reading as a cut stub of blunt line ends.
+  const TETHER_X = 0.88;
   const TETHER_Y = 0.48;
 
   function seedCables(count) {
@@ -131,14 +131,12 @@
     // Knot glow: the convergence point was, until now, just where lines
     // stopped — the negative space Chunk 11 opened around it stayed
     // literally empty. A soft highlight gives that void something to point
-    // at, like a lit mooring point the fan pulls toward. Placed just inside
-    // the frame (0.90W), not at the literal off-canvas TETHER_X (1.04W) —
-    // a glow centred past the edge only shows a sliver of its own falloff
-    // and reads as nothing. Cables still exit the frame exactly as before;
-    // only the highlight's anchor moved. Drawn underneath the cables
+    // at, like a lit mooring point the fan pulls toward. Centred on the
+    // actual in-frame anchor so it reads as the thing being pulled toward.
+    // Drawn underneath the cables
     // (before the loop) and inside the same rotate transform so it tracks
     // the bundle under `angle`, e.g. the `neon` preset.
-    const glowX = W * 0.90;
+    const glowX = TETHER_X * W;
     const glowY = TETHER_Y * H;
     const knotPulse = 0.7 + 0.3 * Math.sin(t * 1.3);
     const knotR = (55 + values.glow * 70) * knotPulse;
@@ -150,6 +148,20 @@
     ctx.fillStyle = knotGrad;
     ctx.beginPath();
     ctx.arc(glowX, glowY, knotR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // The highlight alone read as atmosphere, not an object the cables were
+    // tied to. A small eye gives the fan a literal point of attachment at
+    // card size without turning the sparse piece into a logo.
+    const eyeR = 5 + values.stroke * 2.4;
+    ctx.strokeStyle = `rgba(${kr},${kg},${kb},${values.opacity * 0.9})`;
+    ctx.lineWidth = Math.max(1, values.stroke * 1.2);
+    ctx.beginPath();
+    ctx.ellipse(glowX, glowY, eyeR * 1.35, eyeR * 0.72, -0.25, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(${kr},${kg},${kb},${values.opacity * 0.65})`;
+    ctx.beginPath();
+    ctx.arc(glowX, glowY, Math.max(1.5, eyeR * 0.22), 0, Math.PI * 2);
     ctx.fill();
 
     for (let i = 0; i < cables.length; i++) {
@@ -169,9 +181,9 @@
       const bx = (c.bx + simplex2(i * 2.9 + t * 0.3, 7.5) * wobble) * W;
       const by = (c.by + simplex2(i * 2.9 + t * 0.3, 9.5) * wobble * 3) * H;
 
-      // Sag: a parabola along the chord, swaying with a slow oscillation.
+      // Small sag keeps the bolts tethered without making them read as rope.
       const sway = Math.sin(t + c.j + values.phase * Math.PI);
-      const sag = H * 0.16 * values.slack * (0.55 + 0.45 * sway);
+      const sag = H * 0.05 * values.slack * (0.55 + 0.45 * sway);
 
       // Width and alpha both ride the same depth tier so the hierarchy
       // reads at a glance, not just up close.
@@ -190,11 +202,15 @@
         const y = ay + (by - ay) * u;
         // 4*u*(1-u) peaks at 1 in the middle and is 0 at both anchors.
         const droop = 4 * u * (1 - u) * sag;
-        // A little high-frequency shiver, like a plucked string.
-        const shiver =
-          simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
-        let py = y + droop + shiver;
-        let px = x;
+        // Stepped noise creates angular electrical bends instead of smooth
+        // cable wobble. The envelope keeps the ends anchored and the middle
+        // alive without turning the whole piece into visual static.
+        const boltSegment = Math.floor(u * 9);
+        const boltEnvelope = 4 * u * (1 - u);
+        const bolt = simplex2(boltSegment * noiseScale + c.j, t * 0.45) * 28 * values.motion * boltEnvelope;
+        const lateral = simplex2(boltSegment * noiseScale + c.j + 4, t * 0.45) * 12 * values.motion * boltEnvelope;
+        const py = y + droop + bolt;
+        const px = x + lateral;
           if (s === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
         pts.push([px, py]);

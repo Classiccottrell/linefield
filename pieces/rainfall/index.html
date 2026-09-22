@@ -47,7 +47,9 @@
 
   // Deliberately a sparse piece — quiet rain, not a downpour. Sits between
   // tether (6, the sparsest) and meridian (7 long ribbons) in the library.
-  const BASE_COUNT = 28;
+  // Fewer drops leave room for longer, more coordinated streaks while the
+  // hero stays at or below its 0.008 ink baseline.
+  const BASE_COUNT = 20;
   // Fraction of canvas height a streak crosses per second at speedMult=1,
   // values.speed=1 — slow enough that a single drop takes ~14s to fall.
   const BASE_FALL = 0.07;
@@ -70,7 +72,8 @@
     const d = Math.abs(x0 - center) / width;
     const window = d < 1 ? 0.5 + 0.5 * Math.cos(d * Math.PI) : 0;
     const e = Math.pow(window, 0.85);
-    const floor = 0.12;
+    // Keep the correlated front below the shipped hero's measured ink floor.
+    const floor = 0.10;
     return floor + e * (1 - floor);
   }
 
@@ -93,7 +96,7 @@
     const d = Math.abs(x0 - center) / width;
     const window = d < 1 ? 0.5 + 0.5 * Math.cos(d * Math.PI) : 0;
     const e = Math.pow(window, 0.85);
-    const floor = 0.12;
+    const floor = 0.10;
     const dynamic = floor + e * (1 - floor);
     return x0 < DRIFT_LEFT_GUARD ? Math.min(dynamic, staticEnvelopeAt(x0)) : dynamic;
   }
@@ -106,12 +109,15 @@
         x,
         // Vertical phase offset — without this every drop would fall in
         // lockstep and read as a single sheet, not individual streaks.
+        // Keep the fall phase varied so the sparse field never forms a
+        // synchronized sheet.
         seed: Math.random(),
         // Per-drop speed and length variety, per the brief ("varying speeds
         // and lengths"). Range chosen so slow/short and fast/long drops both
         // stay legible as rain, not as outliers.
         speedMult: 0.5 + Math.random() * 1.3,
         lenMult: 0.5 + Math.random() * 1.5,
+        depth: Math.random(),
       };
     });
   }
@@ -157,10 +163,7 @@
     const H = canvas.height;
     const t = elapsed * values.speed * BASE_FALL;
     const lineWidth = 0.6 + values.stroke * 1.8;
-    const baseLen = H * 0.05 * (0.4 + values.scale);
-    // Gentle wind sway, independent of fall speed — subtle by design so the
-    // piece stays calm rather than turning into a gust.
-    const swayAmount = W * 0.01 * values.motion;
+    const baseLen = H * 0.07 * (0.4 + values.scale);
     const theta = (values.angle * Math.PI) / 180;
     // Veil breathing, independent of fall speed too, and gated by Motion
     // (near-static at motion=0, full pace at motion=1) so the shared
@@ -177,29 +180,27 @@
       // Head = leading (lower) end of the streak, wrapping endlessly top to
       // bottom. + values.phase gives a global stagger control; % 1 keeps it
       // periodic so the loop never runs out of range.
-      const fall = ((t * d.speedMult + d.seed + values.phase * 0.5) % 1 + 1) % 1;
+      const depthScale = 0.55 + d.depth * (0.9 + values.motion * 0.12);
+      const fall = ((t * d.speedMult * (0.7 + d.depth * 0.55) + d.seed + values.phase * 0.5) % 1 + 1) % 1;
       const headY = fall * (H + baseLen * 2) - baseLen;
-      const tailY = headY - baseLen * d.lenMult;
+      const tailY = headY - baseLen * d.lenMult * depthScale;
 
-      // Sampled by x, not by an independent per-drop random phase, so
-      // neighbouring drops lean the same way at any instant — a gust
-      // crossing the veil, not decorrelated dot-jitter (the "scattered
-      // dashes" read Chunk 11 left standing). Head and tail sample the
-      // noise at different phases, so each streak tilts rather than
-      // staying a rigid vertical translate.
-      const swayHead = simplex2(d.x * 4, veilT);
-      const swayTail = simplex2(d.x * 4, veilT + 0.4);
-      const xHead = d.x * W + swayHead * swayAmount;
-      const xTail = d.x * W + swayTail * swayAmount;
-      let lw = lineWidth;
+      // Straight fall is intentional. Depth does the visual work: distant
+      // drops are shorter, thinner, dimmer and slower; near drops carry the
+      // occasional quiet head glint.
+      const xHead = d.x * W;
+      const xTail = xHead;
+      const lw = lineWidth * (0.55 + d.depth * 0.75);
 
       const lightBase = values.invert ? 0.3 : 0.68;
       const headLight = Math.min(0.95, lightBase + 0.22);
-      const tailLight = Math.max(0.04, lightBase - 0.4);
+      const tailLight = Math.max(0.10, lightBase - 0.3);
       const stopB = paletteHsl(values, 1);
       const [hr, hg, hb] = hslToRgb(stopB.h, stopB.s, headLight);
       const stopA = paletteHsl(values, 0);
       const [tr, tg, tb] = hslToRgb(stopA.h, stopA.s, tailLight);
+      const mid = paletteHsl(values, 0.65);
+      const [mr, mg, mb] = hslToRgb(mid.h, mid.s, (tailLight + headLight) * 0.5);
 
       // Envelope shapes brightness, not count or width — a drop in a thin
       // stretch of the veil still falls at full speed, just paler, so the
@@ -207,10 +208,13 @@
       // x, t now (see envelopeAt) instead of a value fixed at seed time, so
       // the veil itself slowly breathes rather than sitting frozen forever.
       const env = envelopeAt(d.x, veilT);
-      const op = values.opacity * env;
+      const op = values.opacity * env * (0.35 + d.depth * 0.65);
 
       const grad = ctx.createLinearGradient(xTail, tailY, xHead, headY);
-      grad.addColorStop(0, `rgba(${tr},${tg},${tb},0)`);
+      // Keep a faint tail so Color A and Solid/Gradient remain visible even
+      // on this deliberately sparse piece; the head still carries the read.
+      grad.addColorStop(0, `rgba(${tr},${tg},${tb},${op * 0.18 * (0.4 + d.depth * 0.6)})`);
+      grad.addColorStop(0.55, `rgba(${mr},${mg},${mb},${op * 0.45})`);
       grad.addColorStop(1, `rgba(${hr},${hg},${hb},${op})`);
 
       ctx.strokeStyle = grad;
@@ -229,11 +233,11 @@
       ctx.lineTo(xHead, headY);
       ctx.stroke();
 
-      if (values.glint) {
+      if (values.glint && d.depth > 0.68) {
         // Soft radial highlight at the head — bigger than the stroke itself
         // so "brighter head" reads clearly even at a glance, still small
         // enough relative to the canvas to stay calm rather than blobby.
-        const r = lw * 3;
+        const r = lw * 2.2;
         const glintGrad = ctx.createRadialGradient(xHead, headY, 0, xHead, headY, r);
         glintGrad.addColorStop(0, `rgba(${hr},${hg},${hb},${op})`);
         glintGrad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);

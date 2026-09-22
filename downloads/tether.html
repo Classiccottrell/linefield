@@ -25,7 +25,9 @@
 .lf-panel.collapsed .lf-body, .lf-panel.collapsed .lf-reset { display: none; }
 .lf-panel h3 { margin: 0; padding: 14px 18px 12px; font: 700 11px/1 ui-monospace,Menlo,monospace;
   text-transform: uppercase; letter-spacing: .12em; color: #5fa07c; flex: none;
-  display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  display: flex; align-items: center; justify-content: space-between; cursor: grab;
+  user-select: none; touch-action: none; }
+.lf-panel h3:active { cursor: grabbing; }
 .lf-panel h3 .lf-status { display: flex; align-items: center; gap: 5px; font: 500 10px/1 ui-monospace,Menlo,monospace;
   letter-spacing: .05em; color: #8a8a9a; text-transform: none; }
 .lf-panel h3 .lf-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
@@ -263,7 +265,9 @@ const PANEL_CSS = `
 .lf-panel.collapsed .lf-body, .lf-panel.collapsed .lf-reset { display: none; }
 .lf-panel h3 { margin: 0; padding: 14px 18px 12px; font: 700 11px/1 ui-monospace,Menlo,monospace;
   text-transform: uppercase; letter-spacing: .12em; color: #5fa07c; flex: none;
-  display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  display: flex; align-items: center; justify-content: space-between; cursor: grab;
+  user-select: none; touch-action: none; }
+.lf-panel h3:active { cursor: grabbing; }
 .lf-panel h3 .lf-status { display: flex; align-items: center; gap: 5px; font: 500 10px/1 ui-monospace,Menlo,monospace;
   letter-spacing: .05em; color: #8a8a9a; text-transform: none; }
 .lf-panel h3 .lf-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
@@ -420,6 +424,9 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
     }
   }
   let collapsed = saved.collapsed || false;
+  let panelPosition = saved.position && Number.isFinite(saved.position.left) && Number.isFinite(saved.position.top)
+    ? saved.position
+    : null;
   // Mobile-sheet collapse is a separate, unpersisted flag: it starts
   // collapsed every load (handle-only, per the brief) and is scoped to the
   // <=640px media query in CSS, so toggling it can never affect (or be
@@ -456,7 +463,45 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
   status.className = 'lf-status';
   status.innerHTML = '<span class="lf-dot"></span>live';
   heading.append(headingLabel, status);
+  heading.title = 'Drag to move · click to collapse';
+  let dragState = null;
+  let suppressHeadingClick = false;
+  heading.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || window.innerWidth <= 640) return;
+    const rect = panel.getBoundingClientRect();
+    dragState = { id: event.pointerId, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, moved: false };
+    heading.setPointerCapture(event.pointerId);
+  });
+  heading.addEventListener('pointermove', (event) => {
+    if (!dragState || event.pointerId !== dragState.id) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    if (!dragState.moved && Math.hypot(dx, dy) < 4) return;
+    dragState.moved = true;
+    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+    panel.style.left = `${Math.min(maxLeft, Math.max(0, dragState.left + dx))}px`;
+    panel.style.top = `${Math.min(maxTop, Math.max(0, dragState.top + dy))}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  });
+  function finishPanelDrag(event) {
+    if (!dragState || event.pointerId !== dragState.id) return;
+    if (heading.hasPointerCapture(event.pointerId)) heading.releasePointerCapture(event.pointerId);
+    if (dragState.moved) {
+      panelPosition = { left: parseFloat(panel.style.left), top: parseFloat(panel.style.top) };
+      suppressHeadingClick = true;
+      persist();
+    }
+    dragState = null;
+  }
+  heading.addEventListener('pointerup', finishPanelDrag);
+  heading.addEventListener('pointercancel', finishPanelDrag);
   heading.addEventListener('click', () => {
+    if (suppressHeadingClick) {
+      suppressHeadingClick = false;
+      return;
+    }
     collapsed = !collapsed;
     panel.classList.toggle('collapsed', collapsed);
     persist();
@@ -810,9 +855,29 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
 
   document.body.appendChild(panel);
 
+  function applyPanelPosition() {
+    if (window.innerWidth <= 640 || !panelPosition) {
+      panel.style.removeProperty('left');
+      panel.style.removeProperty('top');
+      panel.style.removeProperty('right');
+      panel.style.removeProperty('bottom');
+      return;
+    }
+    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+    panelPosition.left = Math.min(maxLeft, Math.max(0, panelPosition.left));
+    panelPosition.top = Math.min(maxTop, Math.max(0, panelPosition.top));
+    panel.style.left = `${panelPosition.left}px`;
+    panel.style.top = `${panelPosition.top}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+  applyPanelPosition();
+  window.addEventListener('resize', applyPanelPosition);
+
   function persist() {
     if (isPreview) return;
-    localStorage.setItem(storageKey, JSON.stringify({ collapsed, values, sections: sectionOpen }));
+    localStorage.setItem(storageKey, JSON.stringify({ collapsed, values, sections: sectionOpen, position: panelPosition }));
   }
 
   // Declared, uncomposed. tools/build.mjs reads this off the loaded page
@@ -1223,7 +1288,7 @@ function describeForAI({ pieceName, values }) {
 
   // Deliberately the sparsest piece in the library.
   const BASE_COUNT = 6;
-  const SAMPLES = 48; // points along each cable
+  const SAMPLES = 36; // points along each cable
   let cables = [];
   let paths = [];
 
@@ -1235,9 +1300,9 @@ function describeForAI({ pieceName, values }) {
   // point gives tether its own dominant gesture (a mooring, not a field)
   // and opens real negative space on the side away from the knot, at any
   // size including a gallery card.
-  // Just past the right edge so the bundle exits the frame instead of
-  // stopping short and reading as a cut stub of blunt line ends.
-  const TETHER_X = 1.04;
+  // Just inside the right edge so the bundle terminates at a visible eye
+  // instead of reading as a cut stub of blunt line ends.
+  const TETHER_X = 0.88;
   const TETHER_Y = 0.48;
 
   function seedCables(count) {
@@ -1307,14 +1372,12 @@ function describeForAI({ pieceName, values }) {
     // Knot glow: the convergence point was, until now, just where lines
     // stopped — the negative space Chunk 11 opened around it stayed
     // literally empty. A soft highlight gives that void something to point
-    // at, like a lit mooring point the fan pulls toward. Placed just inside
-    // the frame (0.90W), not at the literal off-canvas TETHER_X (1.04W) —
-    // a glow centred past the edge only shows a sliver of its own falloff
-    // and reads as nothing. Cables still exit the frame exactly as before;
-    // only the highlight's anchor moved. Drawn underneath the cables
+    // at, like a lit mooring point the fan pulls toward. Centred on the
+    // actual in-frame anchor so it reads as the thing being pulled toward.
+    // Drawn underneath the cables
     // (before the loop) and inside the same rotate transform so it tracks
     // the bundle under `angle`, e.g. the `neon` preset.
-    const glowX = W * 0.90;
+    const glowX = TETHER_X * W;
     const glowY = TETHER_Y * H;
     const knotPulse = 0.7 + 0.3 * Math.sin(t * 1.3);
     const knotR = (55 + values.glow * 70) * knotPulse;
@@ -1326,6 +1389,20 @@ function describeForAI({ pieceName, values }) {
     ctx.fillStyle = knotGrad;
     ctx.beginPath();
     ctx.arc(glowX, glowY, knotR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // The highlight alone read as atmosphere, not an object the cables were
+    // tied to. A small eye gives the fan a literal point of attachment at
+    // card size without turning the sparse piece into a logo.
+    const eyeR = 5 + values.stroke * 2.4;
+    ctx.strokeStyle = `rgba(${kr},${kg},${kb},${values.opacity * 0.9})`;
+    ctx.lineWidth = Math.max(1, values.stroke * 1.2);
+    ctx.beginPath();
+    ctx.ellipse(glowX, glowY, eyeR * 1.35, eyeR * 0.72, -0.25, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(${kr},${kg},${kb},${values.opacity * 0.65})`;
+    ctx.beginPath();
+    ctx.arc(glowX, glowY, Math.max(1.5, eyeR * 0.22), 0, Math.PI * 2);
     ctx.fill();
 
     for (let i = 0; i < cables.length; i++) {
@@ -1345,9 +1422,9 @@ function describeForAI({ pieceName, values }) {
       const bx = (c.bx + simplex2(i * 2.9 + t * 0.3, 7.5) * wobble) * W;
       const by = (c.by + simplex2(i * 2.9 + t * 0.3, 9.5) * wobble * 3) * H;
 
-      // Sag: a parabola along the chord, swaying with a slow oscillation.
+      // Small sag keeps the bolts tethered without making them read as rope.
       const sway = Math.sin(t + c.j + values.phase * Math.PI);
-      const sag = H * 0.16 * values.slack * (0.55 + 0.45 * sway);
+      const sag = H * 0.05 * values.slack * (0.55 + 0.45 * sway);
 
       // Width and alpha both ride the same depth tier so the hierarchy
       // reads at a glance, not just up close.
@@ -1366,11 +1443,15 @@ function describeForAI({ pieceName, values }) {
         const y = ay + (by - ay) * u;
         // 4*u*(1-u) peaks at 1 in the middle and is 0 at both anchors.
         const droop = 4 * u * (1 - u) * sag;
-        // A little high-frequency shiver, like a plucked string.
-        const shiver =
-          simplex2(u * 3 * noiseScale + c.j, t * 1.6) * 32 * values.motion * (4 * u * (1 - u));
-        let py = y + droop + shiver;
-        let px = x;
+        // Stepped noise creates angular electrical bends instead of smooth
+        // cable wobble. The envelope keeps the ends anchored and the middle
+        // alive without turning the whole piece into visual static.
+        const boltSegment = Math.floor(u * 9);
+        const boltEnvelope = 4 * u * (1 - u);
+        const bolt = simplex2(boltSegment * noiseScale + c.j, t * 0.45) * 28 * values.motion * boltEnvelope;
+        const lateral = simplex2(boltSegment * noiseScale + c.j + 4, t * 0.45) * 12 * values.motion * boltEnvelope;
+        const py = y + droop + bolt;
+        const px = x + lateral;
           if (s === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
         pts.push([px, py]);

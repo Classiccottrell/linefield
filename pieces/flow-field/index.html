@@ -46,7 +46,7 @@
   // a tangled purple blob rather than legible flow lines next to
   // Driftwork's woven mesh — this is the actual lever, not another
   // modulation on top of the same crossing count.
-  const BASE_COUNT = 320;
+  const BASE_COUNT = 280;
   let particles = [];
   let paths = [];
 
@@ -135,7 +135,16 @@
       x * noiseScale + elapsed * 0.05 * values.motion,
       y * noiseScale + values.phase
     );
-    return n * Math.PI * 2 + (values.angle * Math.PI) / 180;
+    // Give the noise a shared travelling current. Without it the field's
+    // local directions close into a vortex, which overlaps event-horizon's
+    // orbital read; this keeps the ribbons moving through the frame.
+    const wave = Math.sin(
+      (y / canvas.height) * Math.PI * 2.2 +
+      (x / canvas.width) * 1.4 +
+      elapsed * 0.05 * values.motion
+    );
+    const current = 0.45 + wave * 0.55;
+    return current + n * 0.9 + (values.angle * Math.PI) / 180;
   }
 
   function drawFrame(dt, elapsed, values) {
