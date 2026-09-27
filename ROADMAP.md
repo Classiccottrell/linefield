@@ -33,8 +33,10 @@ It does **not** set out to reproduce its **catalogue**. Concretely:
 **Known overlap.** Six linefield pieces shared a name with a reference
 piece, a seventh contained one, and an INSPIRATION stub used the
 reference's product name. Chunk 1.1 renamed all eight (see its table).
-INSPIRATION's `corridor` stub is still an exact reference name and needs a
-new one. Several concepts are close as well (see Phase 1).
+An audit of INSPIRATION then found five stubs, `corridor` among them, that
+describe reference pieces outright. Those were retired rather than renamed
+(see INSPIRATION's originality audit). Several live concepts are close as
+well (see Phase 1).
 
 Reference piece names seen on its product page on 2026-09-27, as a partial
 avoid-list. Sixteen come from its published stills, each with a named file
@@ -157,10 +159,14 @@ names.
 piece. Every internal link, test and doc uses the new slugs. The CHANGELOG
 records the broken URLs.
 
-**Status (2026-09-27):** the seven renames are done, and the
-`filament-ring` stub is now `void-ring`. Still open: INSPIRATION's
-`corridor` stub is an exact reference name (Corridor), so the finish line
-doesn't hold until the owner names it.
+**Status (2026-09-27): done.** The seven renames are merged into `v2`. The
+`filament-ring` stub became `void-ring`, but an audit of INSPIRATION showed
+that renaming stubs misses the point. `corridor`, `void-ring`,
+`vortex-polygon`, `halftone-torus` and `node-sphere` each describe a
+reference piece's *concept*, not just its name, and `halftone-sphere` and
+`drape` sit too close. All seven are retired as struck-through record
+entries. No live piece or live stub now shares a name with a reference
+piece.
 
 ### Chunk 1.2 — Re-differentiate the close concepts
 
@@ -235,11 +241,16 @@ sheet reads as one collection.
 
 ## Phase 4 — Materials and range
 
-- **4.1 Grain / lit-volume technique.** This is a new capability: soft,
-  film-grain shaded forms rendered in Canvas 2D with no dependencies.
-  Decide its SVG export story up front, because it is raster by nature.
-- **4.2 Halftone, 4.3 Masking, 4.4 Radial fibre.** These are the three
-  families INSPIRATION already stubs, and each yields more than one piece.
+- **4.1 Grain / lit-volume technique**, in progress as **`dune`**: a
+  wind-shaped ridge of film grain under a low raking light. This is a new
+  capability: soft, film-grain shaded forms rendered in Canvas 2D with no
+  dependencies. Its SVG export story is decided up front, because it is
+  raster by nature.
+- **4.2 Halftone**, in progress as **`swell`**: one ocean swell drawn in dots
+  whose size carries the light. Deliberately not a sphere or a ring.
+- **4.3 Masking** (`grain-mask`, with a shape of our own) comes next.
+- **"Radial fibre" is dropped.** Every stub it held matched a reference
+  piece (see INSPIRATION's audit).
 - **Growth is by quality, not a count.** There is no 128 target. Every new
   piece clears the originality line and the collection constraints.
 
