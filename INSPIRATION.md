@@ -19,7 +19,7 @@ ambiguous labels are kept uncertain rather than treated as specifications.
 Five pieces requested directly. Unlike everything below, these were not
 candidates to weigh — they were outstanding work, and all five have now
 shipped: `puddle`, `globe`, `matrix code`, `chain haze` and `stock market`
-(see below). ROADMAP's Next up has no scheduled work as a result.
+(see below). Their delivery history is in `docs/roadmap-history.md`.
 
 **`globe`** — shipped. A real 3D lat/long wire sphere via
 `shared/project.js`'s camera: latitude small-circles at radius `R·cos(lat)`

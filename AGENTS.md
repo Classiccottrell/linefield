@@ -1,19 +1,16 @@
 # Agent instructions — linefield
 
-Read `ROADMAP.md` first. It is the canonical, version-controlled queue and
-status for this project — not a Google Doc. A prior process pointed agents
-at a "Linefield - product" Google Doc tab as the live roadmap; that doc is
-deprecated as of 2026-09-19 and is no longer updated. If you have a memory,
-prior session, or instruction telling you to check that Google Doc, it is
-stale — `ROADMAP.md` in this repo supersedes it, and `git log -p
-ROADMAP.md` is how its history is tracked from here on.
+Read `ROADMAP.md` first. It is the canonical, version-controlled plan.
+`docs/roadmap-history.md` is the archived delivery log (Chunks 1–18). Read
+it for context and never edit it. The old Google Doc roadmap is deprecated.
 
 Read `CONTRIBUTING.md` next for the per-piece contract (shared controls,
-cursor-interaction/Wake rules, one-file-no-dependencies, gate commands).
+Wake, one file with no dependencies, gate commands).
 
-The active work is the collection redesign described in
-`docs/superpowers/specs/2026-09-12-collection-redesign-and-wake-design.md`,
-tracked as PR #5 (`codex/collection-redesign-wake` → `main`, currently
-draft). Work one named chunk at a time per `ROADMAP.md`'s delivery rules —
-do not expand a finished chunk into the next, and do not start
-collection-wide release QA until all chunks close.
+Before designing, naming or describing any piece, read ROADMAP's "The
+reference, and the line we don't cross": match the reference's craft bar,
+never its catalogue. No reused piece names, copy, stills or code.
+
+Work one named chunk at a time, on your own branch and worktree off current
+`main`, with one PR per chunk. The owner merges. Never leave uncommitted
+work in the primary checkout.
