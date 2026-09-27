@@ -30,11 +30,11 @@ It does **not** set out to reproduce its **catalogue**. Concretely:
 - Generic concepts are fine. Line art, wireframes, a hue slider, and a
   baked-HTML export are a genre, not a product. Naming and copy are ours.
 
-**Known overlap today.** Six linefield pieces share a name with a reference
-piece: `meridian`, `interference`, `accretion`, `event-horizon`, `tether`
-and `synapse`. `orbital-veil` contains one ("Veil"), and INSPIRATION's
-`filament-ring` stub uses the reference's product name. Several concepts are
-close as well (see Phase 1).
+**Known overlap.** Six linefield pieces shared a name with a reference
+piece, a seventh contained one, and an INSPIRATION stub used the
+reference's product name. Chunk 1.1 renamed all eight (see its table).
+INSPIRATION's `corridor` stub is still an exact reference name and needs a
+new one. Several concepts are close as well (see Phase 1).
 
 Reference piece names seen on its product page on 2026-09-27, as a partial
 avoid-list. Sixteen come from its published stills, each with a named file
@@ -56,9 +56,9 @@ answers did not load, so nothing here is inferred from them.
 
 | | Reference | linefield today |
 |---|---|---|
-| **Palette** | Monochrome white on near-black. One bright focal point per piece. Colour is available but is never the identity. | Every piece has an authored, saturated hue. 9 of 18 have mean saturation ≥ 0.30 (`flow-field` 0.80, `interference` 0.58, `event-horizon` 0.51). |
-| **Composition** | One legible object, centred in a square frame, surrounded by a lot of empty space. | Many edge-to-edge fields: `contour-grid`, `meridian`, `synapse`, `rainfall`, `grain-field`, `interference`. |
-| **Line craft** | Hundreds of hairlines. Form emerges where they accumulate brightness. | Several pieces draw a few heavier strokes (`meridian`: seven ribbons; `tether`: a handful of cables). |
+| **Palette** | Monochrome white on near-black. One bright focal point per piece. Colour is available but is never the identity. | Every piece has an authored, saturated hue. 9 of 18 have mean saturation ≥ 0.30 (`flow-field` 0.80, `moire` 0.58, `funnel` 0.51). |
+| **Composition** | One legible object, centred in a square frame, surrounded by a lot of empty space. | Many edge-to-edge fields: `contour-grid`, `longwave`, `relay`, `rainfall`, `grain-field`, `moire`. |
+| **Line craft** | Hundreds of hairlines. Form emerges where they accumulate brightness. | Several pieces draw a few heavier strokes (`longwave`: seven ribbons; `mooring`: a handful of cables). |
 | **Materials** | A second family of soft, film-grain lit volumes alongside the linework. | Line, dot, glyph, ellipse and rectangle marks only. No lit-volume technique. `grain-field` is sparse specks. |
 | **Scale** | 128 pieces in ten named collections. | 18 pieces and a flat list of 15 tags. |
 | **Packaging** | Six exports, including ready-made stills of every piece, plus a `catalogue.md` describing every piece for AI tools. | Five exports (Source, AI prompt, Baked HTML, PNG 2x/4x, SVG). Gallery thumbnails, but no stills pack and no collection-level catalogue. |
@@ -101,8 +101,8 @@ having.
 - [x] `main` is clean at `6be3d9c`, and all 18 pieces are verified.
 - [x] Codex's uncommitted Sep-24 continuation is preserved on
   `codex-uncommitted-work-sep24` and opened as draft **PR #18** for review.
-  It is not merged: its `tether` rework converges on the reference's own
-  Tether, and it rewrites closed history.
+  It is not merged: its `tether` (now `mooring`) rework converges on the
+  reference's own Tether, and it rewrites closed history.
 - [x] The draggable control panel (PR #17, `53dcfe9`) is documented in
   README and CHANGELOG.
 - [x] Chunk history is archived to `docs/roadmap-history.md`, and this
@@ -157,6 +157,11 @@ names.
 piece. Every internal link, test and doc uses the new slugs. The CHANGELOG
 records the broken URLs.
 
+**Status (2026-09-27):** the seven renames are done, and the
+`filament-ring` stub is now `void-ring`. Still open: INSPIRATION's
+`corridor` stub is an exact reference name (Corridor), so the finish line
+doesn't hold until the owner names it.
+
 ### Chunk 1.2 — Re-differentiate the close concepts
 
 Renaming alone doesn't fix a piece that describes itself in the same
@@ -166,13 +171,13 @@ then change the dominant gesture wherever it still reads as the same idea.
 
 Close today:
 
-- `tether`: slack cables between anchors.
-- `synapse` and `globe`: wire spheres with nodes, and a lat/long sphere.
+- `mooring`: slack cables between anchors.
+- `relay` and `globe`: wire spheres with nodes, and a lat/long sphere.
   The reference's *Meridian* is itself a longitude globe.
-- `accretion`: a concentric disc around a dark eye.
-- `event-horizon`: a grid pulled into a well. That's nearer the reference's
+- `infall`: a concentric disc around a dark eye.
+- `funnel`: a grid pulled into a well. That's nearer the reference's
   *Basin* ("grid draped into a … bowl") than its Event Horizon.
-- `interference`: two ripple families.
+- `moire`: two ripple families.
 
 Compare against the reference's descriptions to spot overlap, never to
 borrow wording.
@@ -202,8 +207,8 @@ needed.
 
 ### Chunks 2.3 onward — Convert the collection, ~3 pieces per chunk
 
-Start with the weakest: the renamed `meridian` and `tether`, then `synapse`,
-`grain-field`, `contour-grid`, `flow-field` and `interference`. Each gets a
+Start with the weakest: the renamed `longwave` and `mooring`, then `relay`,
+`grain-field`, `contour-grid`, `flow-field` and `moire`. Each gets a
 monochrome default, one object in the frame with real negative space, and
 hairline density.
 
@@ -274,28 +279,30 @@ sheet reads as one collection.
 
 Every row is **generated**, not hand-recorded. Run `npm run collection-metrics`
 and paste its output here. Rebuild thumbnails (`npm run build`) first, because
-it measures the committed PNGs. Refreshed 2026-09-27 on `main` at `6be3d9c`.
+it measures the committed PNGs. Refreshed 2026-09-27 on `main` at `6be3d9c`,
+then re-run after Chunk 1.1's renames: the values are identical and only the
+slugs changed.
 
 | Hue | Sat | Ink | Piece |
 |---:|---:|---:|---|
 | 7 | 0.20 | 0.122 | `parallax` |
 | 19 | 0.24 | 0.133 | `pleat` |
-| 21 | 0.49 | 0.043 | `accretion` |
+| 21 | 0.49 | 0.043 | `infall` |
 | 24 | 0.42 | 0.048 | `contour-grid` |
-| 54 | 0.30 | 0.047 | `synapse` |
+| 54 | 0.30 | 0.047 | `relay` |
 | 59 | 0.11 | 0.043 | `cipher-bloom` |
 | 122 | 0.33 | 0.043 | `globe` |
-| 166 | 0.48 | 0.073 | `meridian` |
+| 166 | 0.48 | 0.073 | `longwave` |
 | 177 | 0.12 | 0.035 | `grain-field` |
 | 200 | 0.34 | 0.108 | `wireframe-lattice` |
 | 219 | 0.19 | 0.007 | `rainfall` |
 | 220 | 0.25 | 0.028 | `lacuna` |
-| 237 | 0.23 | 0.067 | `tether` |
-| 247 | 0.51 | 0.195 | `event-horizon` |
+| 237 | 0.23 | 0.067 | `mooring` |
+| 247 | 0.51 | 0.195 | `funnel` |
 | 253 | 0.80 | 0.270 | `flow-field` |
 | 253 | 0.17 | 0.120 | `driftwork` |
-| 254 | 0.58 | 0.318 | `interference` |
-| 305 | 0.48 | 0.096 | `orbital-veil` |
+| 254 | 0.58 | 0.318 | `moire` |
+| 305 | 0.48 | 0.096 | `orbitals` |
 
 **Phase 2 changes what this table is for.** Up to now, a new piece had to
 find a free hue on a nearly full wheel. Once defaults are monochrome, hue
@@ -303,7 +310,7 @@ stops being a piece's identity, and saturation and ink become the columns
 that matter. Differentiate on **form and density**, which was already the
 advice, since `rainfall` proved it at saturation 0.12.
 
-**`meridian` and `tether` remain the weakest pair.** This was found twice,
+**`longwave` and `mooring` remain the weakest pair.** This was found twice,
 by different methods. They're separated only by hue and by crossing-versus-
 parallel structure. Both are also Phase 1 renames and Phase 2 conversions.
 
@@ -315,11 +322,11 @@ These are real, understood, and judged not worth the fix today.
 
 **Three residual control couplings.** `contour-grid`'s Speed does nothing
 when Motion is 0, since all its animation lives in the motion-scaled layer.
-`meridian`'s Phase weakens at Sweep 0. `contour-grid`'s Phase is effectively
+`longwave`'s Phase weakens at Sweep 0. `contour-grid`'s Phase is effectively
 a horizontal translate. None of these is dead at default settings.
 
 **SVG export ignores `angle`** for pieces that rotate via a canvas transform
-(`contour-grid`, `meridian`, `tether`, `rainfall`). Their path points are
+(`contour-grid`, `longwave`, `mooring`, `rainfall`). Their path points are
 recorded before the rotation is applied, so an exported SVG shows unrotated
 geometry. PNG export is unaffected.
 
@@ -361,8 +368,8 @@ Its pieces, names and words are not. If a piece reads as "their X", it isn't
 finished.
 
 **Every shared control must visibly affect every piece.** A control that
-reads a value and changes nothing has shipped twice here (`tether`'s Scale
-and `synapse`'s Scale), both passing review because the arithmetic looked
+reads a value and changes nothing has shipped twice here (`mooring`'s Scale
+and `relay`'s Scale), both passing review because the arithmetic looked
 fine. `npm run audit-controls` drives every piece × control combination and
 diffs pixels. Run it after touching any piece.
 

@@ -39,7 +39,7 @@ export function readPieceDefaults(slug) {
 }
 
 // Slugs the README's Pieces list claims, from lines like:
-//   - `synapse` — drifting nodes ...
+//   - `relay` — drifting nodes ...
 export function readReadmeSlugs() {
   const src = readFileSync(join(ROOT, 'README.md'), 'utf8');
   return [...src.matchAll(/^- `([a-z0-9-]+)`/gm)].map((m) => m[1]);
@@ -116,7 +116,7 @@ export function verifyManifest() {
   return manifest;
 }
 
-// Several pieces build their look over many frames — accretion's spiral arms
+// Several pieces build their look over many frames — infall's spiral arms
 // and flow-field's ribbons are trail-accumulated — so a first-frame capture
 // misrepresents them. Wait long enough for the image to establish.
 const SETTLE_MS = 4000;

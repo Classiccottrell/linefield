@@ -6,7 +6,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>linefield — synapse</title>
+<title>linefield — relay</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -34,7 +34,7 @@
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
 
-  const PIECE_ID = 'synapse';
+  const PIECE_ID = 'relay';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 

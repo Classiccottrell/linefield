@@ -6,7 +6,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>linefield — tether</title>
+<title>linefield — mooring</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -34,7 +34,7 @@
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
 
-  const PIECE_ID = 'tether';
+  const PIECE_ID = 'mooring';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -51,12 +51,12 @@
   let cables = [];
   let paths = [];
 
-  // Every cable now shares one converging anchor — the actual "tether"
+  // Every cable now shares one converging anchor — the actual "mooring"
   // point — instead of independent random pairs on each side. That's the
   // structural change: the old version was a field of crossing lines
   // spread edge-to-edge, which is exactly why it read as a hue-shifted
-  // twin of meridian's field of parallel ribbons. A fan converging on one
-  // point gives tether its own dominant gesture (a mooring, not a field)
+  // twin of longwave's field of parallel ribbons. A fan converging on one
+  // point gives mooring its own dominant gesture (a mooring, not a field)
   // and opens real negative space on the side away from the knot, at any
   // size including a gallery card.
   // Just inside the right edge so the bundle terminates at a visible eye
@@ -119,7 +119,7 @@
     const H = canvas.height;
     const t = elapsed * values.speed * 0.35;
     const light = values.invert ? 0.35 : 0.65;
-    const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than meridian
+    const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than longwave
     const noiseScale = 0.9 * (0.3 + values.scale);
     const theta = (values.angle * Math.PI) / 180;
 

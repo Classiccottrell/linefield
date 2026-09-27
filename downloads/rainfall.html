@@ -1287,7 +1287,7 @@ function describeForAI({ pieceName, values }) {
   resize();
 
   // Deliberately a sparse piece — quiet rain, not a downpour. Sits between
-  // tether (6, the sparsest) and meridian (7 long ribbons) in the library.
+  // mooring (6, the sparsest) and longwave (7 long ribbons) in the library.
   // Fewer drops leave room for longer, more coordinated streaks while the
   // hero stays at or below its 0.008 ink baseline.
   const BASE_COUNT = 20;
@@ -1386,7 +1386,7 @@ function describeForAI({ pieceName, values }) {
       { name: 'glint', label: 'Head glint', type: 'checkbox', default: true, category: 'ink' },
     ],
     // Cool, desaturated blue-grey — reads as overcast/rain, distinct from
-    // tether's indigo (220/250) and wireframe-lattice's cyan (190/205).
+    // mooring's indigo (220/250) and wireframe-lattice's cyan (190/205).
     defaults: { hue: 205, hueB: 195, saturation: 0.18, colorMode: 'gradient', colorA: '#0095ff', colorB: '#00bfff' },
   });
   const currentValues = baked || panel.values;

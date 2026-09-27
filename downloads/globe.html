@@ -1049,7 +1049,7 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     // the geometry) is the degenerate exception where a dropped point can
     // still be near-frame, and dropping it can visibly change the render.
     // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
-    // steps) at which event-horizon's SVG export at Scale 2, an angle
+    // steps) at which funnel's SVG export at Scale 2, an angle
     // exposing the near plane, has no coordinate over magnitude 5000. At
     // or beyond the near plane there is no meaningful projection; scale 0
     // is the caller's signal to skip this point.
@@ -1423,8 +1423,8 @@ function createOrbit({
   const FOV = 650;
   let paths = [];
 
-  // Distinct from the three orb pieces (orbital-veil, accretion,
-  // event-horizon), which are all flat screen-space discs squashed by a
+  // Distinct from the three orb pieces (orbitals, infall,
+  // funnel), which are all flat screen-space discs squashed by a
   // tilt factor, and from parallax, which is a flat diagonal fan/lens with
   // no real depth axis. globe is a real 3D sphere — latitude small-circles
   // at radius R*cos(lat) plus longitude great-circles converging at the
@@ -1452,8 +1452,8 @@ function createOrbit({
     // inherited territory near its hue). Checked against every piece's
     // full hue->hueB ramp, not just start hues — 285->344 (the gap a
     // start-hue-only scan suggests) is a false gap: it's crossed by
-    // orbital-veil's 265->330 ramp. The actual open arc is cipher-bloom's
-    // 76 to meridian's 150, ~74 degrees untouched by any ramp on either
+    // orbitals's 265->330 ramp. The actual open arc is cipher-bloom's
+    // 76 to longwave's 150, ~74 degrees untouched by any ramp on either
     // end. Centred inside it (green, unrelated to any orb-family hue) so
     // globe's colour doesn't reinforce the orb-family read even
     // incidentally — the real differentiator is the geometry below.
@@ -1569,7 +1569,7 @@ function createOrbit({
 
     // Phase RESTRUCTURES the latitude spacing rather than translating the
     // whole mesh (translation on a rotationally symmetric, already-spinning
-    // figure is imperceptible — see event-horizon's own note on why it
+    // figure is imperceptible — see funnel's own note on why it
     // warps radius instead of yaw). warpLat is the identity at Phase 0 and
     // stays monotonic in v across [-1, 1], so rings never cross; increasing
     // Phase bunches rings toward the equator.

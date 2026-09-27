@@ -25,7 +25,7 @@ for (const { slug } of pieces) {
     assert.equal(source.includes(token), false, `${slug}: still contains ${token}`);
   }
 }
-const ORBIT_PIECES = ['event-horizon', 'wireframe-lattice'];
+const ORBIT_PIECES = ['funnel', 'wireframe-lattice'];
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',

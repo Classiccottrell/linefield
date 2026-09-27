@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — tether</title>
+<title>linefield — infall</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -129,7 +129,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.25,"colorMode":"gradient","colorA":"#0055ff","colorB":"#2a00ff","hue":220,"hueB":250,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"slack":1};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.8,"colorMode":"gradient","colorA":"#ff2b00","colorB":"#ffaa00","hue":10,"hueB":40,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"spin":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1003,82 +1003,6 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
-// --- inlined: ../../shared/noise.js ---
-// shared/noise.js
-// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
-// reference algorithm (Stefan Gustavson).
-
-const GRAD = [
-  [1, 1], [-1, 1], [1, -1], [-1, -1],
-  [1, 0], [-1, 0], [1, 0], [-1, 0],
-  [0, 1], [0, -1], [0, 1], [0, -1],
-];
-
-function buildPermutation(seed = 1337) {
-  const p = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) p[i] = i;
-  let s = seed;
-  const rand = () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-  for (let i = 255; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [p[i], p[j]] = [p[j], p[i]];
-  }
-  const perm = new Uint8Array(512);
-  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-  return perm;
-}
-
-const perm = buildPermutation();
-
-function dot(g, x, y) {
-  return g[0] * x + g[1] * y;
-}
-
-const F2 = 0.5 * (Math.sqrt(3) - 1);
-const G2 = (3 - Math.sqrt(3)) / 6;
-
-function simplex2(xin, yin) {
-  const s = (xin + yin) * F2;
-  const i = Math.floor(xin + s);
-  const j = Math.floor(yin + s);
-  const t = (i + j) * G2;
-  const X0 = i - t;
-  const Y0 = j - t;
-  const x0 = xin - X0;
-  const y0 = yin - Y0;
-
-  let i1, j1;
-  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
-
-  const x1 = x0 - i1 + G2;
-  const y1 = y0 - j1 + G2;
-  const x2 = x0 - 1 + 2 * G2;
-  const y2 = y0 - 1 + 2 * G2;
-
-  const ii = i & 255;
-  const jj = j & 255;
-  const gi0 = perm[ii + perm[jj]] % 12;
-  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
-  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
-
-  let n0 = 0, n1 = 0, n2 = 0;
-
-  let t0 = 0.5 - x0 * x0 - y0 * y0;
-  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
-
-  let t1 = 0.5 - x1 * x1 - y1 * y1;
-  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
-
-  let t2 = 0.5 - x2 * x2 - y2 * y2;
-  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
-
-  return 70 * (n0 + n1 + n2);
-}
-
-
 // --- inlined: ../../shared/export.js ---
 // shared/export.js
 
@@ -1274,8 +1198,7 @@ function describeForAI({ pieceName, values }) {
 
 
 
-
-  const PIECE_ID = 'tether';
+  const PIECE_ID = 'infall';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1286,52 +1209,34 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // Deliberately the sparsest piece in the library.
-  const BASE_COUNT = 6;
-  const SAMPLES = 36; // points along each cable
-  let cables = [];
+  // Persistent particle array — must re-seed when density changes.
+  const BASE_COUNT = 900;
+  const CORE = 18; // world radius of the core; particles respawn on reaching it
+  let motes = [];
   let paths = [];
 
-  // Every cable now shares one converging anchor — the actual "tether"
-  // point — instead of independent random pairs on each side. That's the
-  // structural change: the old version was a field of crossing lines
-  // spread edge-to-edge, which is exactly why it read as a hue-shifted
-  // twin of meridian's field of parallel ribbons. A fan converging on one
-  // point gives tether its own dominant gesture (a mooring, not a field)
-  // and opens real negative space on the side away from the knot, at any
-  // size including a gallery card.
-  // Just inside the right edge so the bundle terminates at a visible eye
-  // instead of reading as a cut stub of blunt line ends.
-  const TETHER_X = 0.88;
-  const TETHER_Y = 0.48;
+  function maxRadius() {
+    return Math.min(canvas.width, canvas.height) * 0.46;
+  }
 
-  function seedCables(count) {
-    cables = Array.from({ length: count }, (_, i) => ({
-      // Anchors live in normalised space so a resize doesn't restring them.
-      ax: -0.06 + Math.random() * 0.2,
-      ay: -0.08 + Math.random() * 1.16,
-      bx: TETHER_X + (Math.random() - 0.5) * 0.03,
-      by: TETHER_Y + (Math.random() - 0.5) * 0.06,
-      j: (i / Math.max(1, count)) * Math.PI * 2 + Math.random(),
+  function seedMotes(count) {
+    const rim = maxRadius();
+    motes = Array.from({ length: count }, () => ({
+      a: Math.random() * Math.PI * 2,
+      r: CORE + Math.random() * (rim - CORE),
+      j: Math.random(), // per-mote colour/rate jitter
     }));
   }
 
-  // Only 6 heavy cables at rest, so `whisper` has to drop stroke hard or it
-  // still reads heavy. stroke's control max is 2 — `ink` is held at 1.9,
-  // not the limit, so the preset isn't pinned to a ceiling.
-  // `slack` is now the composition-defining knob (the fan converges to one
-  // point; how much each cable droops on the way there is the whole
-  // silhouette), so presets vary it — not just intensity — alongside a
-  // second structural axis (`angle` tilts the whole rig, `scale` widens
-  // the shiver). `dense` in particular is checked against the knot at
-  // TETHER_X not collapsing into a blob: slack is dropped there so more
-  // cables stay taut and legible instead of piling up as droop.
+  // Short partial-clear trails make low-opacity presets read bolder in a
+  // stepped capture than the number alone suggests — judge these on the
+  // rendered sheet, not by arithmetic.
   const PRESETS = {
-    whisper: { opacity: 0.22, stroke: 0.3, density: 0.5, saturation: 0.05, glow: 0, slack: 0.4 },
-    ink:     { opacity: 1, stroke: 1.9, density: 0.8, saturation: 0, glow: 0, slack: 1.4 },
-    neon:    { opacity: 0.95, stroke: 1.2, density: 1.2, saturation: 0.95, glow: 1.2, slack: 0.9, angle: 352 },
-    drift:   { opacity: 0.5, stroke: 1, density: 0.7, speed: 0.25, motion: 1.7, slack: 1.7 },
-    dense:   { opacity: 0.6, stroke: 0.7, density: 1.8, speed: 0.8, slack: 0.35, scale: 1.3 },
+    whisper: { opacity: 0.35, stroke: 1.2, density: 0.55, saturation: 0.06, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.6, density: 0.7, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 0.9, density: 1.2, saturation: 1, glow: 1.2 },
+    drift:   { opacity: 0.55, stroke: 1.3, density: 0.8, speed: 0.25, motion: 1.6 },
+    dense:   { opacity: 0.6, stroke: 0.6, density: 1.8, speed: 0.85 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1339,137 +1244,96 @@ function describeForAI({ pieceName, values }) {
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: (name, value, values) => {
-      if (name === 'density') seedCables(Math.max(2, Math.round(BASE_COUNT * values.density)));
+      if (name === 'density') seedMotes(Math.max(20, Math.round(BASE_COUNT * values.density)));
     },
     extraControls: [
-      { name: 'slack', label: 'Slack', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'spin', label: 'Spin', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'motion' },
     ],
-    defaults: { hue: 220, hueB: 250, saturation: 0.25, colorMode: 'gradient', colorA: '#0055ff', colorB: '#2a00ff' },
+    defaults: { hue: 10, hueB: 40, saturation: 0.8, colorMode: 'gradient', colorA: '#ff2b00', colorB: '#ffaa00' },
   });
   const currentValues = baked || panel.values;
 
-  seedCables(Math.max(2, Math.round(BASE_COUNT * currentValues.density)));
+  seedMotes(Math.max(20, Math.round(BASE_COUNT * currentValues.density)));
+  window.addEventListener('resize', () =>
+    seedMotes(Math.max(20, Math.round(BASE_COUNT * currentValues.density)))
+  );
 
   function drawFrame(dt, elapsed, values) {
-    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    // Partial clear leaves short motion trails behind each mote.
+    ctx.fillStyle = values.invert ? 'rgba(242,242,244,0.14)' : 'rgba(10,10,13,0.14)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.lineCap = 'round';
 
     paths = [];
-    const W = canvas.width;
-    const H = canvas.height;
-    const t = elapsed * values.speed * 0.35;
-    const light = values.invert ? 0.35 : 0.65;
-    const lineWidth = 2.8 + values.stroke * 6.0; // heaviest strokes in the library — clearly heavier than meridian
-    const noiseScale = 0.9 * (0.3 + values.scale);
-    const theta = (values.angle * Math.PI) / 180;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const rim = maxRadius() * (0.4 + values.scale * 0.6);
+    const step = dt || 0.016;
+    const light = values.invert ? 0.4 : 0.6;
+    const lineWidth = 0.4 + values.stroke * 1.4;
+    const baseAngle = (values.angle * Math.PI) / 180;
+    // Phase bunches the (otherwise angularly uniform) mote ensemble into
+    // spiral arms and warps their pitch by radius, instead of rotating the
+    // whole disc like angle does — it restructures the disc rather than
+    // turning it. The sin() term reads the mote's own angle, so it survives
+    // rotation by `angle` as a rigid pattern rather than washing out.
+    const twist = values.phase * 2.2;
+    const ARMS = 3;
+    const bunch = values.phase * 0.28;
+    const rNorm = (r) => 1 - Math.min(1, Math.max(0, (r - CORE) / Math.max(1, rim - CORE)));
+    const drawAngle = (a, r) => a + baseAngle + twist * rNorm(r) + bunch * Math.sin(ARMS * a);
 
-    ctx.save();
-    ctx.translate(W / 2, H / 2);
-    ctx.rotate(theta);
-    ctx.translate(-W / 2, -H / 2);
+    const stopA = paletteHsl(values, 0);
+    const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
+    const stopB = paletteHsl(values, 1);
+    const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
+    for (const m of motes) {
+      const prevA = m.a;
+      const prevR = m.r;
 
-    // Knot glow: the convergence point was, until now, just where lines
-    // stopped — the negative space Chunk 11 opened around it stayed
-    // literally empty. A soft highlight gives that void something to point
-    // at, like a lit mooring point the fan pulls toward. Centred on the
-    // actual in-frame anchor so it reads as the thing being pulled toward.
-    // Drawn underneath the cables
-    // (before the loop) and inside the same rotate transform so it tracks
-    // the bundle under `angle`, e.g. the `neon` preset.
-    const glowX = TETHER_X * W;
-    const glowY = TETHER_Y * H;
-    const knotPulse = 0.7 + 0.3 * Math.sin(t * 1.3);
-    const knotR = (55 + values.glow * 70) * knotPulse;
-    const { h: kh, s: ks } = paletteHsl(values, 1);
-    const [kr, kg, kb] = hslToRgb(kh, ks, Math.min(0.92, light + 0.3));
-    const knotGrad = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, knotR);
-    knotGrad.addColorStop(0, `rgba(${kr},${kg},${kb},${0.4 * values.opacity})`);
-    knotGrad.addColorStop(1, `rgba(${kr},${kg},${kb},0)`);
-    ctx.fillStyle = knotGrad;
-    ctx.beginPath();
-    ctx.arc(glowX, glowY, knotR, 0, Math.PI * 2);
-    ctx.fill();
+      // Angular velocity rises as radius falls — the spiral tightens inward.
+      const omega = (900 / (m.r + 40)) * 0.05 * values.speed * (0.4 + values.spin * 1.2);
+      m.a += omega * step * (0.75 + m.j * 0.5);
+      // Inward drift.
+      m.r -= (14 + 40 / (m.r / 60 + 1)) * values.motion * step;
 
-    // The highlight alone read as atmosphere, not an object the cables were
-    // tied to. A small eye gives the fan a literal point of attachment at
-    // card size without turning the sparse piece into a logo.
-    const eyeR = 5 + values.stroke * 2.4;
-    ctx.strokeStyle = `rgba(${kr},${kg},${kb},${values.opacity * 0.9})`;
-    ctx.lineWidth = Math.max(1, values.stroke * 1.2);
-    ctx.beginPath();
-    ctx.ellipse(glowX, glowY, eyeR * 1.35, eyeR * 0.72, -0.25, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = `rgba(${kr},${kg},${kb},${values.opacity * 0.65})`;
-    ctx.beginPath();
-    ctx.arc(glowX, glowY, Math.max(1.5, eyeR * 0.22), 0, Math.PI * 2);
-    ctx.fill();
-
-    for (let i = 0; i < cables.length; i++) {
-      const c = cables[i];
-      const f = cables.length === 1 ? 0.5 : i / (cables.length - 1);
-      // Three-tier depth hierarchy (same discrete-tier idiom as
-      // parallax's `row % 4 / 3`) so cables read as a bundle with load-
-      // bearing lines up front and slack ones behind, instead of six
-      // identical-weight strands. Chunk 11 gave the fan real negative
-      // space; this is what still read flat inside the fan itself.
-      const depth = (i % 3) / 2;
-
-      // Anchors drift slowly so the rig never looks static.
-      const wobble = 0.012 * values.motion;
-      const ax = (c.ax + simplex2(i * 1.7 + t * 0.3, 0.5) * wobble) * W;
-      const ay = (c.ay + simplex2(i * 1.7 + t * 0.3, 3.5) * wobble * 3) * H;
-      const bx = (c.bx + simplex2(i * 2.9 + t * 0.3, 7.5) * wobble) * W;
-      const by = (c.by + simplex2(i * 2.9 + t * 0.3, 9.5) * wobble * 3) * H;
-
-      // Small sag keeps the bolts tethered without making them read as rope.
-      const sway = Math.sin(t + c.j + values.phase * Math.PI);
-      const sag = H * 0.05 * values.slack * (0.55 + 0.45 * sway);
-
-      // Width and alpha both ride the same depth tier so the hierarchy
-      // reads at a glance, not just up close.
-      const cableWidth = lineWidth * (0.62 + depth * 0.72);
-      const cableAlpha = values.opacity * (0.7 + depth * 0.3);
-
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${cableAlpha})`;
-
-      const pts = [];
-      ctx.beginPath();
-      for (let s = 0; s <= SAMPLES; s++) {
-        const u = s / SAMPLES;
-        const x = ax + (bx - ax) * u;
-        const y = ay + (by - ay) * u;
-        // 4*u*(1-u) peaks at 1 in the middle and is 0 at both anchors.
-        const droop = 4 * u * (1 - u) * sag;
-        // Stepped noise creates angular electrical bends instead of smooth
-        // cable wobble. The envelope keeps the ends anchored and the middle
-        // alive without turning the whole piece into visual static.
-        const boltSegment = Math.floor(u * 9);
-        const boltEnvelope = 4 * u * (1 - u);
-        const bolt = simplex2(boltSegment * noiseScale + c.j, t * 0.45) * 28 * values.motion * boltEnvelope;
-        const lateral = simplex2(boltSegment * noiseScale + c.j + 4, t * 0.45) * 12 * values.motion * boltEnvelope;
-        const py = y + droop + bolt;
-        const px = x + lateral;
-          if (s === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-        pts.push([px, py]);
+      let respawned = false;
+      if (m.r <= CORE) {
+        m.a = Math.random() * Math.PI * 2;
+        m.r = rim;
+        m.j = Math.random();
+        respawned = true;
       }
 
+      // On respawn, don't connect the old near-core point to the new rim point —
+      // that would draw a long spoke across the whole disc every respawn.
+      const startA = respawned ? m.a : prevA;
+      const startR = respawned ? m.r : prevR;
+      const x0 = cx + Math.cos(drawAngle(startA, startR)) * startR;
+      const y0 = cy + Math.sin(drawAngle(startA, startR)) * startR;
+      const x1 = cx + Math.cos(drawAngle(m.a, m.r)) * m.r;
+      const y1 = cy + Math.sin(drawAngle(m.a, m.r)) * m.r;
+
+      // Hot near the core, cooler at the rim.
+      const heat = 1 - Math.min(1, (m.r - CORE) / Math.max(1, rim - CORE));
+      const cr = r0 + (r1 - r0) * (1 - heat);
+      const cg = g0 + (g1 - g0) * (1 - heat);
+      const cb = b0 + (b1 - b0) * (1 - heat);
+
+      const lw = lineWidth;
+      ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${values.opacity})`;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
       if (values.glow > 0) {
-        ctx.lineWidth = cableWidth + values.glow * 5;
+        ctx.lineWidth = lw + values.glow * 3;
         ctx.globalAlpha = values.glow * 0.25;
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      ctx.lineWidth = cableWidth;
+      ctx.lineWidth = lw;
       ctx.stroke();
-      paths.push(pts);
+      paths.push([[x0, y0], [x1, y1]]);
     }
-
-    ctx.restore();
-
   }
 
   const loop = createLoop({

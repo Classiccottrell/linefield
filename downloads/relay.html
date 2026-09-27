@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — interference</title>
+<title>linefield — relay</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -129,7 +129,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.75,"colorMode":"gradient","colorA":"#00eaff","colorB":"#ff00aa","hue":185,"hueB":320,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"split":1};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.7,"colorMode":"gradient","colorA":"#bfff00","colorB":"#ffbf00","hue":75,"hueB":45,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"reach":90};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1003,6 +1003,82 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
+// --- inlined: ../../shared/noise.js ---
+// shared/noise.js
+// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
+// reference algorithm (Stefan Gustavson).
+
+const GRAD = [
+  [1, 1], [-1, 1], [1, -1], [-1, -1],
+  [1, 0], [-1, 0], [1, 0], [-1, 0],
+  [0, 1], [0, -1], [0, 1], [0, -1],
+];
+
+function buildPermutation(seed = 1337) {
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  let s = seed;
+  const rand = () => {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  const perm = new Uint8Array(512);
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  return perm;
+}
+
+const perm = buildPermutation();
+
+function dot(g, x, y) {
+  return g[0] * x + g[1] * y;
+}
+
+const F2 = 0.5 * (Math.sqrt(3) - 1);
+const G2 = (3 - Math.sqrt(3)) / 6;
+
+function simplex2(xin, yin) {
+  const s = (xin + yin) * F2;
+  const i = Math.floor(xin + s);
+  const j = Math.floor(yin + s);
+  const t = (i + j) * G2;
+  const X0 = i - t;
+  const Y0 = j - t;
+  const x0 = xin - X0;
+  const y0 = yin - Y0;
+
+  let i1, j1;
+  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
+
+  const x1 = x0 - i1 + G2;
+  const y1 = y0 - j1 + G2;
+  const x2 = x0 - 1 + 2 * G2;
+  const y2 = y0 - 1 + 2 * G2;
+
+  const ii = i & 255;
+  const jj = j & 255;
+  const gi0 = perm[ii + perm[jj]] % 12;
+  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
+  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
+
+  let n0 = 0, n1 = 0, n2 = 0;
+
+  let t0 = 0.5 - x0 * x0 - y0 * y0;
+  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
+
+  let t1 = 0.5 - x1 * x1 - y1 * y1;
+  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
+
+  let t2 = 0.5 - x2 * x2 - y2 * y2;
+  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
+
+  return 70 * (n0 + n1 + n2);
+}
+
+
 // --- inlined: ../../shared/export.js ---
 // shared/export.js
 
@@ -1198,7 +1274,8 @@ function describeForAI({ pieceName, values }) {
 
 
 
-  const PIECE_ID = 'interference';
+
+  const PIECE_ID = 'relay';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1209,88 +1286,171 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // Ring count is derived per frame from density — no persistent array.
-  const BASE_RINGS = 60;
-  const SEG = 64; // polygon segments per ring, for SVG export fidelity
+  // Persistent node array — must re-seed when density changes.
+  const BASE_COUNT = 220;
+  let nodes = [];
   let paths = [];
 
+  function seedNodes(count) {
+    nodes = Array.from({ length: count }, () => {
+      const x = Math.random() * canvas.width;
+      const y = Math.random() * canvas.height;
+      return {
+        x, y,
+        homeX: x, homeY: y, // anchor: noise-field drift wanders around this,
+        // it never travels far from it, so the field can't collapse into thin
+        // filaments over time the way pure unbounded advection does.
+        j: Math.random() * Math.PI * 2, // per-node phase, so pulses aren't in lockstep
+      };
+    });
+  }
+
+  // connection-based: cost scales with node count x reach, so `dense` is
+  // held at 1.8, not the control max of 2, to protect frame rate.
   const PRESETS = {
-    whisper: { opacity: 0.16, stroke: 0.6, density: 0.35, saturation: 0.08, glow: 0 },
-    ink:     { opacity: 0.9, stroke: 1.2, density: 0.5, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.85, stroke: 0.7, density: 1, saturation: 1, glow: 1.2 },
-    drift:   { opacity: 0.28, stroke: 0.5, density: 0.4, speed: 0.25, motion: 1.7, saturation: 0.25 },
-    dense:   { opacity: 0.8, stroke: 0.6, density: 1.8, speed: 0.7, saturation: 0.6, glow: 0 },
+    whisper: { opacity: 0.5, stroke: 1.6, density: 0.7, saturation: 0.05, glow: 0, reach: 130 },
+    ink:     { opacity: 1, stroke: 1.7, density: 1.3, saturation: 0, glow: 0, reach: 150 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.95, glow: 1.1 },
+    drift:   { opacity: 0.55, stroke: 0.9, density: 0.85, speed: 0.3, motion: 1.7, reach: 140 },
+    dense:   { opacity: 0.62, stroke: 0.65, density: 1.8, speed: 0.8, reach: 105 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
     presets: PRESETS,
-    onChange: () => {},
+    onChange: (name, value, values) => {
+      if (name === 'density') seedNodes(Math.max(8, Math.round(BASE_COUNT * values.density)));
+    },
     extraControls: [
-      { name: 'split', label: 'Split', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 90, category: 'visual' },
     ],
-    defaults: { hue: 185, hueB: 320, saturation: 0.75, colorMode: 'gradient', colorA: '#00eaff', colorB: '#ff00aa' },
+    defaults: { hue: 75, hueB: 45, saturation: 0.7, colorMode: 'gradient', colorA: '#bfff00', colorB: '#ffbf00' },
   });
   const currentValues = baked || panel.values;
 
-  // One family of concentric rings, centred at (cx, cy).
-  function drawFamily(cx, cy, rings, spacing, rgb, values) {
-    const [r, g, b] = rgb;
-    ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-    const lineWidth = ctx.lineWidth;
-    for (let i = 1; i <= rings; i++) {
-      const radius = i * spacing;
-      const pts = [];
-      ctx.beginPath();
-      for (let s = 0; s <= SEG; s++) {
-        const a = (s / SEG) * Math.PI * 2;
-        let x = cx + Math.cos(a) * radius;
-        let y = cy + Math.sin(a) * radius;
-        if (s === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-        pts.push([x, y]);
-      }
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
-        ctx.globalAlpha = values.glow * 0.25;
-        ctx.stroke();
-        ctx.lineWidth = lineWidth;
-        ctx.globalAlpha = 1;
-      }
-      ctx.stroke();
-      paths.push(pts);
-    }
-  }
+  seedNodes(Math.max(8, Math.round(BASE_COUNT * currentValues.density)));
+  window.addEventListener('resize', () =>
+    seedNodes(Math.max(8, Math.round(BASE_COUNT * currentValues.density)))
+  );
 
   function drawFrame(dt, elapsed, values) {
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     paths = [];
-    const rings = Math.max(4, Math.round(BASE_RINGS * values.density));
-    // Tight spacing is what makes the moiré appear; scale tunes it.
-    const spacing = 6 + 14 * values.scale;
-    const t = elapsed * values.speed * 0.4 * values.motion;
+    const reach = values.reach;
+    const noiseScale = 0.0016 * (0.3 + values.scale);
+    const t = elapsed * 0.2 * values.motion;
+    const stepDt = dt || 0.016;
+    const drift = 18 * values.speed * stepDt;
+    // Scale sets how far a node can wander from its seeded home before the
+    // spring pulls it back — 0 pins nodes to a crisp, evenly-spread lattice;
+    // 2 lets them roam far enough for the noise field's spatial frequency
+    // (see noiseScale above) to actually show up as clumps/filaments/voids.
+    // pull is derived from it, not hardcoded, so the equilibrium radius
+    // stays ~wanderRadius regardless of speed (speed only affects how fast
+    // nodes approach that radius, not how far they get).
+    const wanderRadius = 4 + values.scale * 80;
+    const pull = (18 * values.speed) / wanderRadius; // per-second return-to-home rate
+    const light = values.invert ? 0.35 : 0.62;
+    const lineWidth = 0.25 + values.stroke * 0.8;
+    ctx.lineWidth = lineWidth;
 
-    ctx.lineWidth = 0.4 + values.stroke * 0.9;
+    // Drift the nodes on a noise field, wrapping at the edges.
+    for (const n of nodes) {
+      const a =
+        simplex2(n.x * noiseScale + values.phase, n.y * noiseScale + t) * Math.PI * 2 +
+        (values.angle * Math.PI) / 180;
+      n.x += Math.cos(a) * drift - (n.x - n.homeX) * pull * stepDt;
+      n.y += Math.sin(a) * drift - (n.y - n.homeY) * pull * stepDt;
 
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    // The two centres drift apart and back; their separation drives the moiré.
-    const sep = (60 + Math.sin(t + values.phase * Math.PI) * 55) * values.split;
-    const dir = (values.angle * Math.PI) / 180;
-    const dx = Math.cos(dir) * sep;
-    const dy = Math.sin(dir) * sep;
 
-    const light = values.invert ? 0.35 : 0.6;
+      if (n.x < 0) n.x += canvas.width;
+      if (n.x > canvas.width) n.x -= canvas.width;
+      if (n.y < 0) n.y += canvas.height;
+      if (n.y > canvas.height) n.y -= canvas.height;
+    }
+
+    // Uniform spatial grid, cell size = reach, so a node's possible partners
+    // are confined to its own cell plus the 8 around it. This is what keeps
+    // the piece from going O(n^2) as density rises.
+    const cell = Math.max(reach, 1);
+    const cols = Math.max(1, Math.ceil(canvas.width / cell));
+    const rows = Math.max(1, Math.ceil(canvas.height / cell));
+    const buckets = new Map();
+    const keyOf = (cx, cy) => cy * cols + cx;
+
+    for (const n of nodes) {
+      const cx = Math.min(cols - 1, Math.max(0, Math.floor(n.x / cell)));
+      const cy = Math.min(rows - 1, Math.max(0, Math.floor(n.y / cell)));
+      const k = keyOf(cx, cy);
+      let arr = buckets.get(k);
+      if (!arr) { arr = []; buckets.set(k, arr); }
+      arr.push(n);
+    }
+
+    const reach2 = reach * reach;
     const stopA = paletteHsl(values, 0);
-    drawFamily(cx - dx, cy - dy, rings, spacing,
-      hslToRgb(stopA.h, stopA.s, light), values);
-
+    const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
     const stopB = paletteHsl(values, 1);
-    drawFamily(cx + dx, cy + dy, rings, spacing,
-      hslToRgb(stopB.h, stopB.s, light), values);
+    const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
+
+    for (let cy = 0; cy < rows; cy++) {
+      for (let cx = 0; cx < cols; cx++) {
+        const here = buckets.get(keyOf(cx, cy));
+        if (!here) continue;
+
+        for (let dy = 0; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            // Visit each cell pair once: the current cell and the half-ring
+            // after it, skipping the mirror images already handled.
+            if (dy === 0 && dx < 0) continue;
+            const nx = cx + dx;
+            const ny = cy + dy;
+            if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
+            const there = buckets.get(keyOf(nx, ny));
+            if (!there) continue;
+            const same = dx === 0 && dy === 0;
+
+            for (let i = 0; i < here.length; i++) {
+              const a = here[i];
+              for (let j = same ? i + 1 : 0; j < there.length; j++) {
+                const b = there[j];
+                const ddx = a.x - b.x;
+                const ddy = a.y - b.y;
+                const d2 = ddx * ddx + ddy * ddy;
+                if (d2 > reach2 || d2 === 0) continue;
+
+                const closeness = 1 - Math.sqrt(d2) / reach;
+                // Pulse travels as a wave through the field.
+                const pulse = (Math.sin(elapsed * 2 * values.speed + a.j + b.j) + 1) / 2;
+                const mix = pulse;
+                const cr = r0 + (r1 - r0) * mix;
+                const cg = g0 + (g1 - g0) * mix;
+                const cb = b0 + (b1 - b0) * mix;
+                const alpha = Math.min(1, values.opacity * closeness * (0.25 + pulse * 0.75));
+
+                ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${alpha})`;
+                ctx.lineWidth = lineWidth;
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                if (values.glow > 0) {
+                  ctx.lineWidth = lineWidth + values.glow * 2.5;
+                  ctx.globalAlpha = values.glow * 0.25;
+                  ctx.stroke();
+                  ctx.globalAlpha = 1;
+                  ctx.lineWidth = lineWidth;
+                }
+                ctx.stroke();
+                paths.push([[a.x, a.y], [b.x, b.y]]);
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   const loop = createLoop({
@@ -1304,7 +1464,8 @@ function describeForAI({ pieceName, values }) {
   document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
   document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
   document.getElementById('btn-baked')?.addEventListener('click', () => {
-    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
   });
   document.getElementById('btn-source')?.addEventListener('click', () => {
     exportSource().catch((err) => console.error('exportSource failed', err));

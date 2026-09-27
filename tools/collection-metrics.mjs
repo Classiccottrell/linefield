@@ -15,10 +15,10 @@
 // A pixel counts as MARKED when its brightest channel exceeds MARK_LEVEL.
 // Every piece clears to #0a0a0d (brightest channel 13), so the threshold sits
 // just above the background — high enough to ignore the near-black haze the
-// two accumulator pieces (`flow-field`, `accretion`) leave behind, which is
+// two accumulator pieces (`flow-field`, `infall`) leave behind, which is
 // canvas fade, not a mark. This reproduces the twelve values published in
 // ROADMAP before this tool existed, to within one unit in the last printed
-// digit on 34 of 36 numbers (`wireframe-lattice` ink, `event-horizon` sat).
+// digit on 34 of 36 numbers (`wireframe-lattice` ink, `funnel` sat).
 //
 // No pass/fail gate — this is a curation instrument, like tools/mode-sheet.mjs.
 // Not run in CI.
