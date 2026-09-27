@@ -2,9 +2,9 @@
   {
     "slug": "flow-field",
     "title": "Flow Field",
-    "blurb": "Organic ribbons drifting along a simplex-noise vector field.",
-    "tags": ["flow"],
-    "hue": 200, "hueB": 280, "saturation": 0.6
+    "blurb": "Composed ribbons bending around a quiet central void.",
+    "tags": ["flow", "ribbons"],
+    "hue": 34, "hueB": 168, "saturation": 0.48
   },
   {
     "slug": "contour-grid",
@@ -65,9 +65,9 @@
   {
     "slug": "tether",
     "title": "Tether",
-    "blurb": "Heavy cables mooring to a single converging point.",
-    "tags": ["sparse"],
-    "hue": 220, "hueB": 250, "saturation": 0.25
+    "blurb": "Slack arcs spanning the frame between small anchor and load points.",
+    "tags": ["sparse", "arcs"],
+    "hue": 196, "hueB": 224, "saturation": 0.25
   },
   {
     "slug": "event-horizon",

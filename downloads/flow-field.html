@@ -1,15 +1,12 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
-<!-- Without this a phone uses a ~980px layout viewport, so the panel's
-     max-width:640px sheet rule never matches and the page renders zoomed
-     out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — flow-field</title>
+<title>linefield - flow-field</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
-  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: calc(100vw - 24px); z-index: 9999; }
   .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
     padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
 </style>
@@ -122,14 +119,14 @@
 }
 </style></head>
 <body>
-<canvas id="canvas" width="1280" height="800"></canvas>
+<canvas id="canvas" role="img" aria-label="Animated flow field background" width="1280" height="800"></canvas>
 
 
 
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.6,"colorMode":"gradient","colorA":"#00aaff","colorB":"#aa00ff","hue":200,"hueB":280,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"mode":false};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.48,"colorMode":"gradient","colorA":"#f2a65a","colorB":"#53c7a5","hue":34,"hueB":168,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"mode":false};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1318,219 +1315,191 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
   const PIECE_ID = 'flow-field';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
-
-  // Base count is deliberately modest so the default reads as a background;
-  // the Density slider is what makes it loud (up to 2x). Chunk 11's mask
-  // gave the piece real negative space around the mass, but 500 crossing
-  // ribbons packed into that one focal region was still enough to read as
-  // a tangled purple blob rather than legible flow lines next to
-  // Driftwork's woven mesh — this is the actual lever, not another
-  // modulation on top of the same crossing count.
-  const BASE_COUNT = 280;
-  let particles = [];
+  const BASE_RIBBONS = 15;
+  const SAMPLES = 72;
   let paths = [];
 
-  // Composition: earlier versions seeded particles edge-to-edge, so the
-  // piece read as a uniform wallpaper with no negative space next to the
-  // newer collection pieces. A soft off-center mask concentrates the mark
-  // toward one focal region and lets the rest of the canvas go quiet.
-  const FOCUS = { x: 0.58, y: 0.42 };
-  const MASK_INNER = 0.3; // fully opaque within this normalized radius
-  const MASK_OUTER = 0.62; // true zero at/beyond this radius, not just faint
-
-  function maskValue(x, y, width, height) {
-    const r = Math.min(width, height);
-    const dx = (x - width * FOCUS.x) / r;
-    const dy = (y - height * FOCUS.y) / r;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    if (d <= MASK_INNER) return 1;
-    if (d >= MASK_OUTER) return 0;
-    const t = (d - MASK_INNER) / (MASK_OUTER - MASK_INNER);
-    return 1 - t * t * (3 - 2 * t);
-  }
-
-  function sampleFocusPoint(width, height) {
-    const r = Math.min(width, height);
-    for (let i = 0; i < 8; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const rad = Math.sqrt(Math.random()) * MASK_OUTER * r;
-      const x = width * FOCUS.x + Math.cos(ang) * rad;
-      const y = height * FOCUS.y + Math.sin(ang) * rad;
-      if (x >= 0 && x <= width && y >= 0 && y <= height && maskValue(x, y, width, height) > 0) {
-        return { x, y };
-      }
-    }
-    return { x: width * FOCUS.x, y: height * FOCUS.y };
-  }
-
-  function seedParticles(count) {
-    particles = Array.from({ length: count }, () => {
-      const spot = sampleFocusPoint(canvas.width, canvas.height);
-      return { x: spot.x, y: spot.y, trail: [] };
-    });
-  }
-
   const PRESETS = {
-    whisper: { opacity: 0.16, stroke: 0.5, density: 0.35, saturation: 0.05, glow: 0, mode: false },
-    ink:     { opacity: 1, stroke: 1.6, density: 0.55, saturation: 0, glow: 0, mode: true },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 0.7, saturation: 0.95, glow: 1.4, mode: false },
-    drift:   { opacity: 0.45, stroke: 0.8, density: 0.5, speed: 0.3, motion: 1.7, mode: false },
-    dense:   { opacity: 0.55, stroke: 0.7, density: 1.4, speed: 0.9, saturation: 0.2, glow: 0, mode: true },
+    whisper: { opacity: 0.2, stroke: 0.45, density: 0.38, saturation: 0.12, glow: 0, mode: false, scale: 0.82 },
+    ink:     { opacity: 0.9, stroke: 1.35, density: 0.7, saturation: 0.08, glow: 0, mode: false, scale: 1.1 },
+    neon:    { opacity: 0.84, stroke: 0.7, density: 0.95, saturation: 0.9, glow: 1.55, mode: true, angle: 14, scale: 1.18 },
+    drift:   { opacity: 0.48, stroke: 0.62, density: 0.58, saturation: 0.35, glow: 0.15, mode: false, speed: 0.32, motion: 1.75, phase: 0.75, scale: 1.32 },
+    dense:   { opacity: 0.62, stroke: 0.62, density: 1.65, saturation: 0.25, glow: 0.35, mode: true, speed: 0.88, motion: 0.7, phase: 0.15, scale: 1.48 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
     presets: PRESETS,
-    onChange: (name, value, values) => {
-      if (name === 'density') seedParticles(Math.round(BASE_COUNT * values.density));
-    },
+    onChange() {},
     extraControls: [
-      // Defaults off: continuous mode's long ribbons are this piece's identity.
-      // In particle mode it renders short dashes that read too much like grain-field.
       { name: 'mode', label: 'Particle mode', type: 'checkbox', default: false, category: 'visual' },
     ],
-    // Pinned deliberately, not inherited. These happen to equal the shared
-    // control defaults, but stating them here is what makes 200/280 visible as
-    // TAKEN to the next contributor grepping pieces' `defaults` blocks for a
-    // free hue — and keeps flow-field's violet if the shared defaults ever move.
-    defaults: { hue: 200, hueB: 280, saturation: 0.6, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
+    defaults: { hue: 34, hueB: 168, saturation: 0.48, colorMode: 'gradient', colorA: '#f2a65a', colorB: '#53c7a5' },
   });
   const currentValues = baked || panel.values;
 
-  function applyResize({ width, height }) {
+  function resize({ width, height }) {
     canvas.width = width;
     canvas.height = height;
-    seedParticles(Math.round(BASE_COUNT * currentValues.density));
   }
-  // dpr fixed at 1: flow-field draws in CSS-pixel space (canvas.width ===
-  // window.innerWidth), and particle coords / exportPng's multiplier both
-  // assume that — a real devicePixelRatio backing store would break both.
-  const resizeBatcher = createResizeBatcher(document.body, applyResize, 1);
-  resizeBatcher.evaluate(); // sizes the canvas + seeds particles before the first frame
+  const resizeBatcher = createResizeBatcher(document.body, resize, 1);
+  resizeBatcher.evaluate();
 
-  function fieldAngle(x, y, elapsed, values) {
-    const noiseScale = 0.002 * (0.2 + values.scale);
-    const n = simplex2(
-      x * noiseScale + elapsed * 0.05 * values.motion,
-      y * noiseScale + values.phase
-    );
-    // Give the noise a shared travelling current. Without it the field's
-    // local directions close into a vortex, which overlaps event-horizon's
-    // orbital read; this keeps the ribbons moving through the frame.
-    const wave = Math.sin(
-      (y / canvas.height) * Math.PI * 2.2 +
-      (x / canvas.width) * 1.4 +
-      elapsed * 0.05 * values.motion
-    );
-    const current = 0.45 + wave * 0.55;
-    return current + n * 0.9 + (values.angle * Math.PI) / 180;
+  function rotatePoint(x, y, cx, cy, theta) {
+    const dx = x - cx;
+    const dy = y - cy;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
+  }
+
+  function transformPoints(points, theta, cx, cy) {
+    return points.map(([x, y]) => rotatePoint(x, y, cx, cy, theta));
+  }
+
+  function paletteColor(values, f, light) {
+    const { h, s } = paletteHsl(values, f);
+    const [baseR, baseG, baseB] = hslToRgb(h, s, light);
+    return values.invert ? [255 - baseR, 255 - baseG, 255 - baseB] : [baseR, baseG, baseB];
+  }
+
+  function circlePoints(x, y, radius, theta, cx, cy) {
+    const points = [];
+    for (let i = 0; i <= 16; i++) {
+      const a = i / 16 * Math.PI * 2;
+      points.push(rotatePoint(x + Math.cos(a) * radius, y + Math.sin(a) * radius, cx, cy, theta));
+    }
+    return points;
+  }
+
+  function laneSeed(index, count) {
+    const topCount = Math.ceil(count / 2);
+    if (index < topCount) {
+      return 0.1 + (topCount <= 1 ? 0.12 : index / (topCount - 1) * 0.3);
+    }
+    const lowerIndex = index - topCount;
+    const lowerCount = count - topCount;
+    return 0.9 - (lowerCount <= 1 ? 0.12 : lowerIndex / (lowerCount - 1) * 0.3);
+  }
+
+  function streamPoint(u, seed, index, elapsed, values) {
+    const t = elapsed * values.motion * 0.13;
+    const travel = elapsed * values.speed * 0.1;
+    const gapSide = seed < 0.5 ? -1 : 1;
+    const distanceFromGap = Math.max(0.05, Math.abs(seed - 0.5) * 2);
+    const voidWidth = 0.18 + values.scale * 0.045;
+    const voidShape = Math.exp(-Math.pow((u - 0.43) / voidWidth, 2));
+    const voidPush = gapSide * voidShape * (0.065 + distanceFromGap * 0.045) * (0.8 + values.scale * 0.18);
+    const currentWave = Math.sin(u * Math.PI * 2.1 - travel * 2.4 + seed * 7.1 + values.phase * Math.PI * 2);
+    const secondaryWave = Math.sin(u * Math.PI * 4.3 + t + index * 0.8) * 0.014 * values.motion;
+    const quietBend = Math.sin((u - 0.43) * Math.PI * 1.3) * 0.018 * values.motion;
+    const grain = simplex2(u * 2.2 + index * 0.31, t * 0.35 + seed * 4) * 0.012 * values.motion;
+    const y = seed + currentWave * (0.026 + values.scale * 0.012) * (0.5 + values.motion * 0.25)
+      + secondaryWave + quietBend + grain + voidPush;
+    const x = (u - 0.04) / 0.92;
+    return [x * canvas.width, y * canvas.height];
+  }
+
+  function pathFor(seed, index, values, elapsed, start = 0, end = 1) {
+    const points = [];
+    const from = Math.max(0, start);
+    const to = Math.min(1, end);
+    const sampleCount = Math.max(2, Math.ceil((to - from) * SAMPLES));
+    for (let i = 0; i <= sampleCount; i++) {
+      const u = from + (to - from) * (i / sampleCount);
+      points.push(streamPoint(u, seed, index, elapsed, values));
+    }
+    return points;
+  }
+
+  function drawPath(points) {
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+    ctx.stroke();
   }
 
   function drawFrame(dt, elapsed, values) {
-    const stopA = paletteHsl(values, 0);
-    const [r, g, b] = hslToRgb(stopA.h, stopA.s, 0.55);
-    const stopB = paletteHsl(values, 1);
-    const [rB, gB, bB] = hslToRgb(stopB.h, stopB.s, 0.55);
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W / 2;
+    const cy = H / 2;
+    const theta = values.angle * Math.PI / 180;
+    const count = Math.max(4, Math.round(BASE_RIBBONS * values.density));
+    const lineWidth = 0.35 + values.stroke * 1.35;
+    const bg = values.invert ? '#f1f2ee' : '#0a0a0d';
+    const light = values.invert ? 0.34 : 0.66;
 
-    // Low fade alpha: each frame only partially clears, so the streaks a
-    // particle leaves behind persist long enough to read as flowing lines.
-    ctx.fillStyle = values.invert ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,13,0.045)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     paths = [];
-    const lineWidth = 0.3 + values.stroke * 1.2;
-    for (const p of particles) {
-      // Mask read at the pre-move position: this frame's stroke belongs to
-      // where the particle currently is, not where it's about to land.
-      const m = maskValue(p.x, p.y, canvas.width, canvas.height);
-      let angle = fieldAngle(p.x, p.y, elapsed, values);
 
-      // Base px/sec must stay well above lineWidth, or each frame's segment is
-      // shorter than the stroke is wide and renders as a dot, not a line.
-      const speed = 260 * values.speed * (dt || 0.016);
-      const nx = p.x + Math.cos(angle) * speed;
-      const ny = p.y + Math.sin(angle) * speed;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(theta);
+    ctx.translate(-cx, -cy);
 
-      if (m > 0) {
-        // Tied to the field's own local direction instead of an arbitrary
-        // position/time sine — the colour now IS the flow, a compass
-        // rather than decorative banding unrelated to what's moving.
-        const mix = (Math.sin(angle) + 1) / 2;
-        const cr = r + (rB - r) * mix;
-        const cg = g + (gB - g) * mix;
-        const cb = b + (bB - b) * mix;
-        const [fr, fg, fb] = values.invert ? [255 - cr, 255 - cg, 255 - cb] : [cr, cg, cb];
+    for (let i = 0; i < count; i++) {
+      const seed = laneSeed(i, count);
+      const quietBias = Math.abs(seed - 0.5) * 2;
+      const hierarchy = 0.55 + quietBias * 0.45 + (i % 4 === 0 ? 0.22 : 0);
+      const colorMix = 0.12 + seed * 0.76;
+      const [r, g, b] = paletteColor(values, colorMix, light);
+      const alpha = Math.min(1, values.opacity * hierarchy * (0.72 + quietBias * 0.2));
+      const width = lineWidth * (0.72 + hierarchy * 0.48);
+      const fullPath = pathFor(seed, i, values, elapsed);
 
-        // Width rides the same mask value as alpha, but on a gentler curve
-        // (0.4 floor, not 0) — alpha alone fading at the mask boundary read
-        // as flat cutout edges; thinning the stroke too sells the mass
-        // dissolving into the negative space around it rather than just
-        // going transparent.
-        const strokeWidth = lineWidth * (0.4 + 0.6 * m);
-        ctx.strokeStyle = `rgba(${fr | 0},${fg | 0},${fb | 0},${values.opacity * m})`;
-        ctx.lineWidth = strokeWidth;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.lineWidth = width;
 
-        if (values.mode) {
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(nx, ny);
-          if (values.glow > 0) {
-            // Underlay pass: wider, dimmer stroke approximates bloom cheaply
-            // (canvas shadowBlur costs 5-10x per draw call at this element count).
-            ctx.lineWidth = strokeWidth + values.glow * 3;
-            ctx.globalAlpha = values.glow * 0.25 * m;
-            ctx.stroke();
-            ctx.lineWidth = strokeWidth;
-            ctx.globalAlpha = 1;
-          }
-          ctx.stroke();
-          paths.push([[p.x, p.y], [nx, ny]]);
+      if (!values.mode) {
+        if (values.glow > 0) {
+          ctx.lineWidth = width + values.glow * 3.2;
+          ctx.globalAlpha = values.glow * 0.15 * alpha;
+          drawPath(fullPath);
+          ctx.globalAlpha = 1;
+          ctx.lineWidth = width;
         }
-      }
+        drawPath(fullPath);
+        paths.push(transformPoints(fullPath, theta, cx, cy));
 
-      p.x = nx;
-      p.y = ny;
-
-      // Respawn on leaving the canvas OR the mask (not the canvas alone) —
-      // otherwise the noise field advects particles back out to uniform
-      // coverage within a few seconds and the negative space collapses.
-      const outOfMask = maskValue(p.x, p.y, canvas.width, canvas.height) <= 0;
-      if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height || outOfMask) {
-        const spot = sampleFocusPoint(canvas.width, canvas.height);
-        p.x = spot.x;
-        p.y = spot.y;
-        p.trail = [];
-      }
-
-      if (!values.mode && m > 0) {
-        p.trail.push([p.x, p.y]);
-        // Longer than before (40 -> 56): fewer, longer-lived ribbons read
-        // as legible currents; short trails at this particle count were
-        // part of why the mass read as a tangle rather than a flow.
-        if (p.trail.length > 56) p.trail.shift();
-
-        if (p.trail.length > 1) {
-          const strokeWidth = lineWidth * (0.4 + 0.6 * m);
-          ctx.lineWidth = strokeWidth;
-          ctx.beginPath();
-          ctx.moveTo(p.trail[0][0], p.trail[0][1]);
-          for (let i = 1; i < p.trail.length; i++) {
-            ctx.lineTo(p.trail[i][0], p.trail[i][1]);
-          }
+        const pulseU = (elapsed * values.speed * 0.075 + i / Math.max(1, count) + values.phase * 0.13) % 1;
+        const pulse = pathFor(seed, i, values, elapsed, Math.max(0, pulseU - 0.075), Math.min(1, pulseU + 0.035));
+        ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(1, alpha * 1.65)})`;
+        ctx.lineWidth = width * 1.25;
+        drawPath(pulse);
+        paths.push(transformPoints(pulse, theta, cx, cy));
+      } else {
+        const particleCount = Math.max(1, Math.round(1 + values.density * 0.7));
+        for (let p = 0; p < particleCount; p++) {
+          const headU = (elapsed * values.speed * 0.11 + i / Math.max(1, count) + p / particleCount * 0.5 + values.phase * 0.15) % 1;
+          const tail = pathFor(seed, i, values, elapsed, Math.max(0, headU - 0.065), headU);
+          ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(1, alpha * 1.45)})`;
+          ctx.lineWidth = width * 1.2;
           if (values.glow > 0) {
-            ctx.lineWidth = strokeWidth + values.glow * 3;
-            ctx.globalAlpha = values.glow * 0.25 * m;
-            ctx.stroke();
-            ctx.lineWidth = strokeWidth;
+            ctx.lineWidth = width * 1.2 + values.glow * 3;
+            ctx.globalAlpha = values.glow * 0.18 * alpha;
+            drawPath(tail);
             ctx.globalAlpha = 1;
+            ctx.lineWidth = width * 1.2;
           }
-          ctx.stroke();
-          paths.push(p.trail.slice());
+          drawPath(tail);
+          const head = tail[tail.length - 1];
+          const radius = 1.1 + values.stroke * 1.15;
+          ctx.fillStyle = `rgba(${r},${g},${b},${Math.min(1, alpha * 1.8)})`;
+          ctx.beginPath();
+          ctx.arc(head[0], head[1], radius, 0, Math.PI * 2);
+          ctx.fill();
+          paths.push(transformPoints(tail, theta, cx, cy));
+          paths.push(circlePoints(head[0], head[1], radius, theta, cx, cy));
         }
       }
     }
 
+    ctx.restore();
   }
 
   const loop = createLoop({
@@ -1544,13 +1513,7 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
   document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
   document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
   document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
-  document.getElementById('btn-baked')?.addEventListener('click', () => {
-    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
-  });
-  document.getElementById('btn-source')?.addEventListener('click', () => {
-    exportSource().catch((err) => console.error('exportSource failed', err));
-  });
-  document.getElementById('btn-prompt')?.addEventListener('click', () => {
-    describeForAI({ pieceName: PIECE_ID, values: panel.values });
-  });
+  document.getElementById('btn-baked')?.addEventListener('click', () => bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err)));
+  document.getElementById('btn-source')?.addEventListener('click', () => exportSource().catch((err) => console.error('exportSource failed', err)));
+  document.getElementById('btn-prompt')?.addEventListener('click', () => describeForAI({ pieceName: PIECE_ID, values: panel.values }));
 </script></body></html>

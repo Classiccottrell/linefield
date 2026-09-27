@@ -205,18 +205,18 @@
 <div class="chips" id="chips" role="group" aria-label="Filter pieces by category"></div>
 
 <div class="grid" id="grid">
-  <article class="card" data-tags="flow" style="--accent:hsl(200 60% 60%)">
+  <article class="card" data-tags="flow ribbons" style="--accent:hsl(34 48% 60%)">
     <a class="frame" href="pieces/flow-field/" data-src="pieces/flow-field/" aria-label="Open Flow Field">
       <img src="thumbs/flow-field.png" alt="Flow Field preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">200&deg;</span>
+      <span class="frame-label">34&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(200 60% 60%),hsl(280 60% 60%))"></span>
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(34 48% 60%),hsl(168 48% 60%))"></span>
         Flow Field
       </h2>
-      <p class="blurb">Organic ribbons drifting along a simplex-noise vector field.</p>
-      <div class="tags"><span class="tag">flow</span></div>
+      <p class="blurb">Composed ribbons bending around a quiet central void.</p>
+      <div class="tags"><span class="tag">flow</span><span class="tag">ribbons</span></div>
       <div class="actions">
         <a class="btn" href="pieces/flow-field/">Open</a>
         <button class="btn" type="button" data-embed="pieces/flow-field/">Copy embed</button>
@@ -385,18 +385,18 @@
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
-  <article class="card" data-tags="sparse" style="--accent:hsl(220 25% 60%)">
+  <article class="card" data-tags="sparse arcs" style="--accent:hsl(196 25% 60%)">
     <a class="frame" href="pieces/tether/" data-src="pieces/tether/" aria-label="Open Tether">
       <img src="thumbs/tether.png" alt="Tether preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">220&deg;</span>
+      <span class="frame-label">196&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(220 25% 60%),hsl(250 25% 60%))"></span>
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(196 25% 60%),hsl(224 25% 60%))"></span>
         Tether
       </h2>
-      <p class="blurb">Heavy cables mooring to a single converging point.</p>
-      <div class="tags"><span class="tag">sparse</span></div>
+      <p class="blurb">Slack arcs spanning the frame between small anchor and load points.</p>
+      <div class="tags"><span class="tag">sparse</span><span class="tag">arcs</span></div>
       <div class="actions">
         <a class="btn" href="pieces/tether/">Open</a>
         <button class="btn" type="button" data-embed="pieces/tether/">Copy embed</button>
@@ -593,13 +593,14 @@ const PIECES = [
   {
     "slug": "flow-field",
     "title": "Flow Field",
-    "blurb": "Organic ribbons drifting along a simplex-noise vector field.",
+    "blurb": "Composed ribbons bending around a quiet central void.",
     "tags": [
-      "flow"
+      "flow",
+      "ribbons"
     ],
-    "hue": 200,
-    "hueB": 280,
-    "saturation": 0.6,
+    "hue": 34,
+    "hueB": 168,
+    "saturation": 0.48,
     "presets": [
       "whisper",
       "ink",
@@ -759,12 +760,13 @@ const PIECES = [
   {
     "slug": "tether",
     "title": "Tether",
-    "blurb": "Heavy cables mooring to a single converging point.",
+    "blurb": "Slack arcs spanning the frame between small anchor and load points.",
     "tags": [
-      "sparse"
+      "sparse",
+      "arcs"
     ],
-    "hue": 220,
-    "hueB": 250,
+    "hue": 196,
+    "hueB": 224,
     "saturation": 0.25,
     "presets": [
       "whisper",
