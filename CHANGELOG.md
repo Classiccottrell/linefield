@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The control panel can be dragged by its header on screens wider than
+  640px. It is clamped to the viewport, re-clamped on resize, and its
+  position is persisted per piece in localStorage next to the tuned values.
+  The header's click-to-collapse still works, since a move under 4px counts
+  as a click. The mobile bottom sheet is unchanged. This shipped in PR #17
+  (`53dcfe9`) without an entry, so it is recorded here.
+
+### Changed
+
+- `ROADMAP.md` is restructured around a gap analysis against the reference
+  that first inspired the project. The chunk-by-chunk delivery history
+  moved intact to `docs/roadmap-history.md`.
+
+Entries for the work merged between 1.5.0 and this point are incomplete.
+That includes the home page, the specimen-grid gallery, the docs pages,
+Wake's configuration, and the piece refinement passes. Backfilling them is
+a Phase 0 item in `ROADMAP.md`.
+
 ## [1.5.0] — 2026-09-12
 
 ### Changed

@@ -373,7 +373,7 @@ if (isMain) {
   // LF_BUILD_PORT pins an explicit port (CI, or a human who wants a stable
   // URL); unset, the default 5799 is tried first and falls back to an
   // OS-assigned ephemeral port on collision (multiple agents sharing a
-  // worktree — see ROADMAP.md).
+  // worktree — see docs/roadmap-history.md, Chunk 11).
   const pinned = process.env.LF_BUILD_PORT != null;
   const requestedPort = pinned ? Number(process.env.LF_BUILD_PORT) : 5799;
   const { server, port, base } = await serveRepo(ROOT, requestedPort, { pinned });

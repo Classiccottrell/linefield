@@ -183,6 +183,12 @@ fits on screen at rest. Reset is a sticky footer, always visible at the
 panel's bottom edge regardless of scroll position. Below ~640px the panel
 docks as a bottom sheet, collapsed to a handle by default.
 
+On wider screens the panel can be dragged by its header to anywhere in the
+viewport. A move of under 4px still counts as a click, so the header keeps
+its collapse toggle. The panel stays clamped inside the window and is
+re-clamped on resize. Its position is saved per piece, alongside the tuned
+values. The mobile bottom sheet can't be dragged.
+
 Wake is a separate, opt-in pointer-trail overlay for any canvas — not a
 piece, and not baked into piece exports. It's promoted to the top of the
 gallery (`interactions/wake/`) and both home-page directions. Its public
@@ -286,9 +292,12 @@ persists exactly as before.
 
 ## Roadmap
 
-[ROADMAP.md](ROADMAP.md) records what is deliberately not built yet and why,
+[ROADMAP.md](ROADMAP.md) is the live plan. It covers the gap analysis
+against the reference that inspired the project, the phases that close it,
+the line between matching that reference's craft and copying its catalogue,
 the limitations accepted along the way, and the constraints any new piece
-inherits.
+inherits. The delivery log for earlier work is archived in
+[docs/roadmap-history.md](docs/roadmap-history.md).
 
 ## Performance
 

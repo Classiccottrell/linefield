@@ -1,0 +1,34 @@
+docs: restructure the roadmap around a gap analysis against the reference
+
+ROADMAP.md had grown to 1,042 lines of chunk-by-chunk delivery history
+across five intake rounds. Planning the next stage on top of that would
+have inherited all of it. The history moves intact to
+docs/roadmap-history.md via git mv, so `git log --follow` still reaches
+every line, under a header marking it as a record not to be edited.
+
+The new ROADMAP.md is written from a fresh study of the reference that
+first inspired linefield: its product page and published stills, set side
+by side with the live gallery and a regenerated collection-metrics table.
+It records only what was observed. The reference's carousel and FAQ did not
+load, and nothing is inferred from them. The largest gap is palette (the
+reference is monochrome with one bright focal point, while 9 of our 18
+pieces have mean saturation ≥ 0.30), followed by composition and line
+craft. It puts a hard boundary up front: match the reference's craft bar,
+never its catalogue. The boundary is concrete because six linefield piece
+names are identical to reference piece names, which Phase 1 fixes before
+any aesthetic work.
+
+Also closes two pieces of baseline debt. The draggable control panel from
+PR #17 (53dcfe9) shipped undocumented and is now in README and CHANGELOG,
+and BRIEF's piece count said seventeen. Stale pointers to chunk-numbered
+sections that moved (tool comments, home/docs page comments, INSPIRATION,
+COMPARISON) now point at the history file. The collection-constraints
+table, known limitations, npm reasoning and principles are still
+referenced by tools and docs, so they stay in the live roadmap, refreshed
+(the cipher-bloom text-export note replaces a removed matrix-code one).
+
+AGENTS.md is deliberately untouched. It is a governance file and needs the
+owner's sign-off before it is repointed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NPHukpb5mgmKRPY5vLiPFP

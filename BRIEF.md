@@ -3,7 +3,8 @@
 ## Goal
 Open-source library of self-contained, paste-and-run generative line-art
 HTML pieces usable as interactive website backgrounds. Free alternative to
-Filament.
+Filament. It matches that product's craft bar, not its catalogue: no reused
+piece names, copy, stills or code. See ROADMAP.md.
 
 ## Non-Goals
 - Framework wrappers, WebGL, community submissions (out of scope for now)
@@ -29,4 +30,4 @@ Filament.
       external references and runs from anywhere, including outside this repo
 
 ## Status
-**shipped** — seventeen pieces, six shared modules, and a gallery
+**shipped** — eighteen pieces, six shared modules, and a gallery
