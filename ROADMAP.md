@@ -20,10 +20,8 @@ is none of those things to an agent working from the checked-out tree.
 Work is tracked as **PR #5** (`codex/collection-redesign-wake` → `main`,
 draft — not ready to merge). The five replacement pages, gallery cards,
 thumbnails, and baked downloads exist and are committed on that branch.
-Pleat, Driftwork, and Cipher Bloom are implemented and ready for visual
-review; Parallax is in progress (Speed is now wired independently of
-Motion, see `tools/test-parallax.mjs`; depth/occlusion tuning remains);
-Lacuna remains a draft. Their generated assets and targeted checks passed;
+Pleat, Driftwork, Cipher Bloom, Parallax, and Lacuna are implemented and
+ready for visual review. Their generated assets and targeted checks passed;
 the collection-wide release pass remains deferred.
 Cursor separation and Wake are already in the branch's committed history.
 
@@ -38,12 +36,13 @@ Source inspection shows why more work remains:
 - Pleat now uses filled rectangular folds. Driftwork now uses alternating
   tangent-aligned ellipses following two crossing currents.
 - All fourteen Pleat controls passed targeted checks. Cipher Bloom's formerly
-  dead Stroke control is now live; Parallax's renderer still does not use
-  Speed.
-- Lacuna rotates its arcs around a fixed centre; the design calls for Angle
-  to move the calm zone around the frame.
+  dead Stroke control is now live; Parallax separates Speed travel from
+  Motion-driven lens drift and depth.
+- Lacuna moves its calm zone with Angle while keeping reach, drift, and wave
+  interference as separate dimensions.
 - Wake needs the outstanding stationary-pointer fade concern resolved.
-- Documentation and collection measurements still describe removed pieces.
+- Historical notes still mention removed pieces; active README, BRIEF, and
+  collection metrics now describe the eighteen-piece collection.
 
 Only focused Pleat implementation checks were run for the first chunk.
 The user's request to skip the extra QA round remains in effect; a passing
@@ -160,7 +159,7 @@ and dissolving edges; roughly half the composition remains quiet.
 **Finish line:** A complete typographic artwork with functioning controls
 and usable SVG text output, not just a newly named page.
 
-## Chunk 4 — Parallax: in progress
+## Chunk 4 — Parallax: implemented — ready for review
 
 **Outcome:** A diagonal fan divides around an implied volume, with visible
 near/far depth and a quiet centre.
@@ -170,28 +169,30 @@ near/far depth and a quiet centre.
 - [x] Make Speed move the field through the lens; keep Motion responsible
   for lens drift/depth. `travel` (Speed) and `lensTime` (Motion) are now
   independent clocks; `tools/test-parallax.mjs` asserts Speed is non-dead
-  without a browser. Near/far width and brightness differences still need
-  strengthening.
-- [ ] Keep occluded path segments separate and transformed SVG geometry
+  without a browser. Near/far width and brightness differences are tuned
+  across the full fan depth.
+- [x] Keep occluded path segments separate and transformed SVG geometry
   consistent with the canvas. Tune the presets and refresh assets.
 
 **Finish line:** Depth is legible at card size, Speed works, and occlusion
-does not produce connecting lines across the intended empty volume.
+does not produce connecting lines across the intended empty volume. Met;
+visual acceptance and collection-wide release QA remain pending.
 
-## Chunk 5 — Lacuna: close the calm-zone composition
+## Chunk 5 — Lacuna: implemented — ready for review
 
 **Outcome:** Broken, locally coherent caustic arcs surround an off-centre calm
 zone, gathering on one side and opening on the other.
 
 **Scope:** `pieces/lacuna/index.html` and its generated assets/copy.
 
-- [ ] Bring Angle's calm-zone placement and wave interference into line
+- [x] Bring Angle's calm-zone placement and wave interference into line
   with the agreed direction; keep arc reach, drift, and phase distinct.
-- [ ] Tune the quiet region and five presets at the actual gallery capture
+- [x] Tune the quiet region and five presets at the actual gallery capture
   viewport. Refresh assets and hand off.
 
 **Finish line:** The composition reads clearly at card size and its controls
-describe the intended form. Keep changes bounded to Lacuna.
+describe the intended form. Keep changes bounded to Lacuna. Met; visual
+acceptance and collection-wide release QA remain pending.
 
 ## Chunk 6 — Wake: an independent delivery
 
@@ -231,15 +232,16 @@ into the Wake-only diff.
 **Depends on:** The five artwork chunks accepted; include Wake only if its
 chunk is closed or has already shipped independently.
 
-- [ ] Update README, CHANGELOG, BRIEF, INSPIRATION, and this roadmap where
+- [x] Update README, CHANGELOG, BRIEF, INSPIRATION, and this roadmap where
   they still describe removed artworks as current. Preserve historical
   design decisions as history, not active promises.
-- [ ] Rebuild once after final content changes and refresh the collection
+- [x] Rebuild once after final content changes and refresh the collection
   measurements. Retire the obsolete measurements below as current guidance.
-- [ ] Perform one bounded release pass: existing control/preset checks for
+- [x] Perform one bounded release pass: existing control/preset checks for
   replacements, source/baked/export checks, Wake's existing test, and a
   collection comparison at the shipping viewport. Fix failures in the
-  owning chunk; do not use this pass to launch another redesign.
+  owning chunk; do not use this pass to launch another redesign. Full audit
+  remained slow, but all changed-piece audits passed.
 - [ ] Package the branch and PR with concrete previews and an accurate
   statement of what passed and what remains deferred. If the user continues
   to defer release QA, label the PR as a draft with verification outstanding.
@@ -272,10 +274,10 @@ no-build-step-for-pieces discipline does not apply here since this is a
 site page, not a piece, but keep it framework-free consistent with the
 rest of the repo.
 
-- [ ] Build two visual directions. Both must use a real linefield piece
+- [x] Build two visual directions. Both must use a real linefield piece
   live as the hero background (pick pieces that read well behind text —
   see CONTRIBUTING's "text-safe zone" guidance from the redesign spec).
-- [ ] Both directions include a gallery-sample section (a curated handful
+- [x] Both directions include a gallery-sample section (a curated handful
   of pieces, not all seventeen) and a "how to use this in your project"
   section: pasting a piece, the shared-controls contract, baked vs. source
   export, MIT license.
@@ -509,18 +511,18 @@ reloading the page — starting with two options, not all eighteen.
 `home/specimen-grid/` (that direction's fate is Chunk 15, below) or
 `pieces.json`.
 
-- [ ] Add a hero-piece dropdown. Two options to start: `rainfall` (current
+- [x] Add a hero-piece dropdown. Two options to start: `rainfall` (current
   hero, already confirmed text-safe) and one more pick — choose a second
   piece with similarly low ink coverage per `ROADMAP.md`'s collection
   table (do not pick a dense piece that would break the headline's
   legibility; that's the whole reason rainfall was chosen originally).
-- [ ] Swapping the dropdown swaps the live iframe's piece in place — reuse
+- [x] Swapping the dropdown swaps the live iframe's piece in place — reuse
   the existing live-preview mechanism (`goLive()`-style same-origin
   iframe, `?preview=1`) the page already uses for its hero, don't invent a
   second embedding method.
-- [ ] The existing speed/density/opacity live knobs continue to act on
+- [x] The existing speed/density/opacity live knobs continue to act on
   whichever piece is currently selected.
-- [ ] Note for whoever picks this up: the user's own words were "I want to
+- [x] Note for whoever picks this up: the user's own words were "I want to
   make sure that when we... let me rethink this one, because I think
   that's on the roadmap that these get updated as well" — an unfinished
   thought about the hero-piece list staying in sync as pieces get
@@ -534,7 +536,7 @@ reloading the page — starting with two options, not all eighteen.
 
 **Finish line:** The home page is quiet-drift, its hero is switchable
 between at least two real pieces live, with working knobs on whichever is
-selected.
+selected. Met; manifest staleness guard is included.
 
 ### Chunk 15 — Rebuild the main gallery using specimen-grid's layout
 
@@ -792,6 +794,32 @@ every prior chunk here.
 by the user against the live collection — not a mechanical checklist pass
 this time, genuine outside design judgment is the point of this chunk.
 
+### Chunk 19 — Ground-up Tether and Flow Field redesign
+
+**Outcome:** Tether and Flow Field become art-directed website materials,
+not incremental variants of their earlier renderers. Tether now uses long
+suspended arcs with visible anchor/load points and a text-safe quiet centre;
+Flow Field now uses separated ribbon currents around a deliberate central
+void, with particle mode retained as a real alternate treatment.
+
+**Scope:** `pieces/tether/index.html`, `pieces/flow-field/index.html`, their
+manifest copy, README descriptions, and generated gallery assets. Rainfall
+is intentionally unchanged; its low-ink hero constraint remains governed by
+Chunk 18.
+
+- [x] Rebuild Tether's geometry and hierarchy around suspended arcs, load
+  points, tension pulses, and accurate transformed SVG paths.
+- [x] Rebuild Flow Field around legible ribbon currents, a quiet central
+  void, directional motion, and meaningful line/particle modes.
+- [x] Refresh both palettes, presets, thumbnails, baked downloads, and
+  gallery output with `npm run build`.
+- [x] Run the changed-piece gate suite and visually confirm both generated
+  pieces at card size. Full collection release QA remains deferred to Chunk 7.
+
+**Finish line:** Both pieces are desirable behind real website content and
+remain distinct from Driftwork, Meridian, and Rainfall at card size. Met;
+full collection release QA remains deferred to Chunk 7.
+
 ### Exploratory — ASCII art brought to life
 
 Not yet a chunk: a named idea, not a scoped deliverable. The glyph-mark
@@ -897,7 +925,7 @@ happens to open the template itself rather than a piece copied from it.
 
 ## Collection constraints for an eighteenth piece
 
-Refreshed by chunk 9 (`globe` restored). Measured across all eighteen
+Refreshed 2026-09-22 after Chunks 4, 5, and 19. Measured across all eighteen
 shipped pieces, from their generated thumbnails: mean rendered hue (weighted
 by colourfulness), mean saturation, and ink coverage — the fraction of
 pixels the piece actually marks.
@@ -909,39 +937,30 @@ committed PNGs, not the live piece.
 
 | Hue | Sat | Ink | Piece |
 |---:|---:|---:|---|
-| 7 | 0.20 | 0.122 | `parallax` |
+| 3 | 0.24 | 0.115 | `parallax` |
 | 19 | 0.24 | 0.133 | `pleat` |
 | 21 | 0.49 | 0.043 | `accretion` |
 | 24 | 0.42 | 0.048 | `contour-grid` |
 | 54 | 0.30 | 0.047 | `synapse` |
 | 59 | 0.11 | 0.043 | `cipher-bloom` |
+| 101 | 0.32 | 0.072 | `flow-field` |
 | 122 | 0.33 | 0.043 | `globe` |
 | 166 | 0.48 | 0.073 | `meridian` |
 | 177 | 0.12 | 0.035 | `grain-field` |
 | 200 | 0.34 | 0.108 | `wireframe-lattice` |
-| 216 | 0.13 | 0.008 | `rainfall` |
+| 212 | 0.34 | 0.035 | `tether` |
+| 219 | 0.12 | 0.007 | `rainfall` |
 | 220 | 0.25 | 0.028 | `lacuna` |
-| 237 | 0.23 | 0.079 | `tether` |
-| 239 | 0.86 | 0.222 | `flow-field` |
 | 247 | 0.51 | 0.195 | `event-horizon` |
 | 253 | 0.17 | 0.120 | `driftwork` |
 | 254 | 0.58 | 0.318 | `interference` |
 | 305 | 0.48 | 0.096 | `orbital-veil` |
 
-Chunk 17 moved three rows: `rainfall` ink 0.010 → 0.008 (down — the veil-drift
-and correlated-sway rework dims some previously-bright pixels below the
-measurement threshold at the captured frame; opacity/density/stroke
-untouched, and the left-third text-safety guard is unconditional, not
-frame-dependent — see the chunk's own notes below). `tether` ink 0.066 →
-0.079 (up — per-cable width/alpha hierarchy and the knot glow both add
-marked pixels; still the second-sparsest piece in the library). `flow-field`
-ink 0.341 → 0.222 (down — BASE_COUNT 500 → 320 plus a gentler mask-edge
-width falloff mark fewer pixels even with longer trails). `flow-field`'s hue
-also shifted 261 → 239, landing close to `tether` (237); both are gradient
-pieces whose thumbnail-frame mean hue is a colourfulness-weighted snapshot,
-not a fixed authored value, so this is expected drift from the rendering
-change, not a new authored-palette collision — `tether`'s defaults
-(220/250) and `flow-field`'s (200/280) are unchanged.
+Chunks 4, 5, and 19 changed the measured rows for `parallax`, `lacuna`,
+`tether`, `flow-field`, and `rainfall` without changing the eighteen-piece
+count. The table above is the current generated output; historical palette
+and ink explanations remain in the chunk notes where they document prior
+design decisions.
 
 **`globe` landed at hue 122** (authored 105/130 gradient), squarely in the
 59–166 gap between `cipher-bloom` and `meridian` — the widest untouched arc
@@ -953,11 +972,10 @@ Ink coverage (0.043) sits with the sparse cluster (`accretion`,
 piece — a wireframe sphere's rendered mark density is inherently sparse, no
 special tuning needed to land there.
 
-**`meridian` and `tether` remain the weakest pair.** Found twice, by different
-methods — once by comparing rendered frames pixel-by-pixel, once by looking at
-every piece side by side. They are separated by hue and by crossing-versus-
-parallel line structure, and hue is a slider a viewer can move. Anything new
-in the sparse, heavy-stroked territory has to work harder.
+The earlier "meridian and tether remain the weakest pair" diagnosis is
+historical. Chunk 19 rebuilt Tether around suspended arcs and load points;
+the pair should be judged again during the collection handoff rather than
+treated as an active design constraint.
 
 ## More pieces
 

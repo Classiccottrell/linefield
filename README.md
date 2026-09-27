@@ -145,7 +145,7 @@ tooling" below and CONTRIBUTING.md.
 
 ## Pieces
 
-- `flow-field` — organic flowing lines following a simplex-noise vector field
+- `flow-field` — composed ribbons bending around a quiet central void
 - `contour-grid` — topographic contour bands undulating like breathing terrain
 - `interference` — two concentric ring families crossing to produce moiré
 - `orbital-veil` — concentric orbital arcs with differential rotation
@@ -154,7 +154,7 @@ tooling" below and CONTRIBUTING.md.
 - `meridian` — seven long ribbons sweeping the full width
 - `synapse` — drifting nodes wired to their neighbours, pulsing
 - `accretion` — matter spiralling inward to a bright core
-- `tether` — heavy cables mooring to a single converging point
+- `tether` — slack arcs spanning the frame between small anchor and load points
 - `event-horizon` — a polar grid bent inward by a gravity well
 - `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
 - `lacuna` — broken caustic arcs gathering around an off-centre calm zone

@@ -1214,11 +1214,11 @@ function describeForAI({ pieceName, values }) {
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.18, stroke: 0.45, density: 0.55, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 0.88, stroke: 1.25, density: 0.72, saturation: 0, angle: 18 },
-    neon:    { opacity: 0.72, stroke: 0.72, density: 1.12, saturation: 0.68, glow: 1.05 },
-    drift:   { opacity: 0.34, stroke: 0.55, density: 0.68, speed: 0.28, motion: 1.55, phase: 0.7 },
-    dense:   { opacity: 0.58, stroke: 0.48, density: 1.65, speed: 0.62, angle: 338 },
+    whisper: { opacity: 0.16, stroke: 0.42, density: 0.5, scale: 0.88, saturation: 0.05, angle: 210, glow: 0 },
+    ink:     { opacity: 0.84, stroke: 1.15, density: 0.76, scale: 1.18, saturation: 0.03, angle: 26 },
+    neon:    { opacity: 0.68, stroke: 0.72, density: 1.08, scale: 0.92, saturation: 0.64, angle: 112, phase: 0.35, glow: 0.95 },
+    drift:   { opacity: 0.32, stroke: 0.54, density: 0.64, scale: 1.1, speed: 0.26, motion: 1.45, phase: 0.72, angle: 198 },
+    dense:   { opacity: 0.56, stroke: 0.48, density: 1.58, scale: 1.02, speed: 0.58, phase: 0.18, angle: 322 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1237,23 +1237,26 @@ function describeForAI({ pieceName, values }) {
     paths = [];
     const W = canvas.width;
     const H = canvas.height;
-    const cx = W * 0.62;
-    const cy = H * 0.48;
-    const theta = values.angle * Math.PI / 180;
+    const calmTheta = values.angle * Math.PI / 180;
+    const cx = W * (0.57 + Math.cos(calmTheta) * 0.14);
+    const cy = H * (0.48 + Math.sin(calmTheta) * 0.12);
     const fronts = Math.max(4, Math.round(BASE_FRONTS * values.density));
     const light = values.invert ? 0.35 : 0.62;
     const baseWidth = 0.35 + values.stroke * 0.9;
+    const waveTime = elapsed * values.speed * 0.9;
+    const drift = elapsed * values.motion * 0.08;
 
     for (let front = 0; front < fronts; front++) {
       const segments = [];
       let current = [];
-      const phase = front * 0.71;
+      const sourcePhase = front * 0.71;
       for (let s = 0; s <= SEG; s++) {
         const u = s / SEG;
         const a = (-0.9 + u * 1.8) * Math.PI;
-        const drift = elapsed * values.motion * 0.08;
-        const wave = Math.sin(a * 3 + phase - elapsed * values.speed * 0.9 + values.phase * Math.PI * 2);
-        const radius = (70 + front * 15) * values.scale + wave * (5 + front * 0.12);
+        const reach = (70 + front * 15) * values.scale;
+        const interference = Math.sin(a * 3 + sourcePhase - waveTime + values.phase * Math.PI * 2)
+          + Math.sin(a * 5.2 - sourcePhase * 1.7 + waveTime * 0.55 + values.phase * Math.PI) * 0.42;
+        const radius = reach + interference * (5 + front * 0.12);
         const keep = Math.sin(a * 2.3 + front * 0.8 + drift) > -0.18;
         if (!keep) {
           if (current.length > 1) segments.push(current);
@@ -1262,8 +1265,8 @@ function describeForAI({ pieceName, values }) {
         }
         const ex = Math.cos(a) * radius;
         const ey = Math.sin(a) * radius * 0.58;
-        const x = cx + ex * Math.cos(theta) - ey * Math.sin(theta);
-        const y = cy + ex * Math.sin(theta) + ey * Math.cos(theta);
+        const x = cx + ex;
+        const y = cy + ey;
         current.push([x, y]);
       }
       if (current.length > 1) segments.push(current);
@@ -1273,7 +1276,7 @@ function describeForAI({ pieceName, values }) {
       const frontAlpha = values.opacity * (0.42 + 0.58 * (front / fronts));
       for (const segment of segments) {
         const meanX = segment.reduce((sum, point) => sum + point[0], 0) / segment.length;
-        const quiet = Math.max(0.16, Math.min(1, (meanX / W + 0.08) / 0.92));
+        const quiet = Math.max(0.08, Math.min(1, (meanX / W - 0.14) / 0.72));
         const alpha = frontAlpha * quiet;
         ctx.beginPath();
         ctx.moveTo(segment[0][0], segment[0][1]);

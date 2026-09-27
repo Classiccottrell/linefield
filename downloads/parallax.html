@@ -1214,11 +1214,11 @@ function describeForAI({ pieceName, values }) {
   let lensTime = 0;
 
   const PRESETS = {
-    whisper: { opacity: 0.4, stroke: 0.55, density: 0.55, scale: 0.7, motion: 0.45, saturation: 0.08 },
-    ink:     { opacity: 0.9, stroke: 1.4, density: 0.7, scale: 1.2, saturation: 0, angle: 12, phase: 0.4 },
-    neon:    { opacity: 0.85, stroke: 1.1, density: 1.1, scale: 0.85, saturation: 0.6, glow: 0.9, phase: 0.65 },
-    drift:   { opacity: 0.65, stroke: 0.8, density: 0.75, scale: 1.3, speed: 0.25, motion: 1.5, phase: 1.2, angle: 352 },
-    dense:   { opacity: 0.8, stroke: 0.75, density: 1.65, scale: 0.9, speed: 0.65, angle: 344, phase: 0.3 },
+    whisper: { opacity: 0.32, stroke: 0.42, density: 0.5, scale: 0.75, speed: 0.35, motion: 0.35, saturation: 0.05, angle: 4 },
+    ink:     { opacity: 0.88, stroke: 1.3, density: 0.7, scale: 1.1, speed: 0.8, motion: 0.25, saturation: 0, angle: 14, phase: 0.35 },
+    neon:    { opacity: 0.8, stroke: 1, density: 1.05, scale: 0.9, speed: 0.85, motion: 1.2, saturation: 0.6, glow: 0.9, phase: 0.65, angle: 6 },
+    drift:   { opacity: 0.58, stroke: 0.65, density: 0.75, scale: 1.35, speed: 0.22, motion: 1.5, saturation: 0.2, phase: 1.2, angle: 352 },
+    dense:   { opacity: 0.72, stroke: 0.55, density: 1.65, scale: 0.85, speed: 0.65, motion: 0.8, saturation: 0.38, glow: 0.35, angle: 344, phase: 0.3 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1249,7 +1249,7 @@ function describeForAI({ pieceName, values }) {
     // entire rainbow when the authored palette straddles zero degrees.
     const palette = { ...values, hueB: values.hue + ((values.hueB - values.hue + 540) % 360) - 180 };
     for (let row = 0; row < lines; row++) {
-      const depth = (row % 4) / 3;
+      const depth = row / Math.max(1, lines - 1);
       const lane = ((row + 0.5) / lines + travel * (0.3 + depth * 0.9) + values.phase * 0.13) % 1 - 0.5;
       const segments = [];
       let points = [];
@@ -1274,12 +1274,15 @@ function describeForAI({ pieceName, values }) {
         points.push([tx, ty]);
       }
       if (points.length > 1) segments.push(points);
-      const width = unit * (0.25 + values.stroke * (0.35 + depth * 2.5));
+      const width = unit * (0.16 + values.stroke * (0.18 + depth * 3.4));
       const stop = paletteHsl(palette, depth * 0.85 + row / lines * 0.15);
-      const [r, g, b] = hslToRgb(stop.h, stop.s, values.invert ? 0.25 + depth * 0.15 : 0.45 + depth * 0.3);
+      const [r, g, b] = hslToRgb(stop.h, stop.s, values.invert ? 0.24 + depth * 0.16 : 0.32 + depth * 0.4);
       const fade = Math.min(1, (0.5 - Math.abs(lane)) * 9);
-      const alpha = values.opacity * (0.16 + depth * depth * 0.84) * fade;
+      const alpha = values.opacity * (0.08 + depth * depth * 0.92) * fade;
       for (const path of segments) {
+        // Store transformed screen-space points once; canvas and SVG export
+        // consume the same separated geometry, so neither reconnects the cut.
+        paths.push(path);
         ctx.beginPath(); ctx.moveTo(...path[0]);
         for (let j = 1; j < path.length; j++) ctx.lineTo(...path[j]);
         ctx.lineCap = 'round';
@@ -1292,7 +1295,6 @@ function describeForAI({ pieceName, values }) {
         }
         ctx.lineWidth = width;
         ctx.stroke();
-        paths.push(path);
       }
     }
   }

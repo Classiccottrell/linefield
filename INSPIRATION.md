@@ -213,17 +213,17 @@ stone-like field may map to `grain-mask`. The last match is uncertain.
 From `ROADMAP.md`, repeated here because they bite hardest when adding
 pieces:
 
-**The hue wheel is still nearly full.** Roughly 95–135 remains the only open
-band, and it abuts `meridian` at 166. `rainfall` did not take it — it went
-near-achromatic (sat 0.12) and differentiated on density instead, which is
-exactly what this constraint asks a new piece to do. Differentiate on **form
-or density**, not on a free colour.
+**The hue wheel is still nearly full.** The current collection fills the
+wheel from `parallax` at 3 through `orbital-veil` at 305, with the widest
+remaining gap between `globe` at 122 and `meridian` at 166. `rainfall` stayed
+near-achromatic and differentiated on density instead. Differentiate on
+**form or density**, not on a free colour.
 
 **Every shared control must visibly affect every new piece.** Two pieces have
 shipped with a control that read a value and changed nothing, both passing
 review because the arithmetic looked right. Run `npm run audit-controls`.
 
-**Judge it against the other seventeen, not just against its own intent.** That
+**Judge it against the other eighteen, not just against its own intent.** That
 is the check that catches a piece which is individually good and
 collectively redundant.
 
