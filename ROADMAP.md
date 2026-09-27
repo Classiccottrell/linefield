@@ -107,9 +107,10 @@ having.
   README and CHANGELOG.
 - [x] Chunk history is archived to `docs/roadmap-history.md`, and this
   roadmap is written.
-- [ ] `AGENTS.md` needs to point here instead of at the finished redesign
-  (PR #5). It is a governance file, so it needs the owner's explicit
-  sign-off before the edit lands.
+- [x] `AGENTS.md` now points here instead of at the finished redesign
+  (PR #5). It adds the originality rule, and requires every chunk to use
+  its own worktree and leave nothing uncommitted. The owner signed off on
+  2026-09-27.
 - [ ] Backfill CHANGELOG for everything merged since 1.5.0, then cut a
   release.
 - [ ] Settle PR #18. The suggestion is to salvage only the `flow-field`
@@ -127,8 +128,12 @@ folder, README, the gallery, downloads, thumbs, both home pages, the docs
 pages, the tests, the `collection-metrics` rows, and INSPIRATION's
 `filament-ring` stub.
 
-**Candidate names.** These are proposed, not decided. The owner picks,
-and each is checked against the full reference list first.
+**Names: decided by the owner on 2026-09-27.** Checked on 2026-09-27
+against the reference's published stills path
+(`/filament/stills/<name>.webp`). All seven new names return 404, and a
+known reference name returns 200 as a control. That's strong evidence
+rather than proof, since not all 128 reference pieces may have public
+stills.
 
 | Today | Candidate | Why |
 |---|---|---|
@@ -140,19 +145,17 @@ and each is checked against the full reference list first.
 | `synapse` | `relay` | Nodes passing a pulse to their neighbours |
 | `orbital-veil` | `orbitals` | Arcs turning at different rates around one centre |
 
-**A decision needed before any code: what happens to the six live URLs.**
-The pieces are published at `…/linefield/pieces/<slug>/` and
-`…/downloads/<slug>.html`, and copied embeds may point at them. The options:
-
-- (a) **Break them.** This matches the redesign's precedent, which ruled
-  compatibility aliases out of scope when it removed five pieces.
-- (b) **Tiny redirect stubs** at the old paths. That's six extra files kept
-  out of `pieces.json`.
-- (c) **Keep the old slugs and change only the display names.** This is the
-  cheapest, but the collision survives in every URL.
+**Old URLs: decided by the owner on 2026-09-27. They break.** No redirect
+stubs and no aliases, which matches the redesign's precedent when it
+removed five pieces. `…/pieces/<old-slug>/` and `…/downloads/<old-slug>.html`
+will 404 after this chunk ships. Say so in the CHANGELOG entry, so anyone
+with a copied embed has one place to find out why. The other options
+considered were redirect stubs, and keeping the old slugs with new display
+names.
 
 **Finish line:** no linefield piece or stub shares a name with a reference
-piece, and the URL decision is recorded here.
+piece. Every internal link, test and doc uses the new slugs. The CHANGELOG
+records the broken URLs.
 
 ### Chunk 1.2 — Re-differentiate the close concepts
 
