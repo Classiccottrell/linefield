@@ -34,11 +34,15 @@ It does **not** set out to reproduce its **catalogue**. Concretely:
 piece: `meridian`, `interference`, `accretion`, `event-horizon`, `tether`
 and `synapse`. `orbital-veil` contains one ("Veil"), and INSPIRATION's
 `filament-ring` stub uses the reference's product name. Several concepts are
-close as well (see Phase 1). Reference piece names seen on its product page
-on 2026-09-27, as a partial avoid-list: Meridian, Interference, Accretion,
-Corridor, Undertow, Signal, Richter, Event Horizon, Comma, Iris, Refract,
-Basin, Tether, Column, Synapse, Marble, Cortex, Veil. That is 18 of its 128,
-so check its full published list before naming anything new.
+close as well (see Phase 1).
+
+Reference piece names seen on its product page on 2026-09-27, as a partial
+avoid-list. Sixteen come from its published stills, each with a named file
+and alt text: Meridian, Interference, Accretion, Corridor, Undertow, Signal,
+Richter, Event Horizon, Comma, Iris, Refract, Basin, Tether, Column,
+Synapse, Marble. Cortex is named in its "living orbs" section. Veil appears
+as its example piece file (`veil.html`) in its export section. That is 18 of
+its 128, so check its full published list before naming anything new.
 
 ---
 
@@ -116,19 +120,39 @@ having.
 ### Chunk 1.1 — Rename the colliding pieces
 
 For each of `meridian`, `interference`, `accretion`, `event-horizon`,
-`tether` and `synapse` (and `orbital-veil`'s "Veil"):
+`tether` and `synapse` (and `orbital-veil`'s "Veil"), choose a new original
+name that isn't on the avoid-list. Check it against the reference's full
+published list. Then carry the new slug through `pieces.json`, the piece
+folder, README, the gallery, downloads, thumbs, both home pages, the docs
+pages, the tests, the `collection-metrics` rows, and INSPIRATION's
+`filament-ring` stub.
 
-- Choose a new original name that isn't on the avoid-list, and check it
-  against the reference's full published list.
-- Carry the new slug through `pieces.json`, the piece folder, README, the
-  gallery, downloads, thumbs, both home pages, the docs pages, the tests,
-  `collection-metrics` rows, and INSPIRATION's `filament-ring` stub.
-- Decide up front whether old piece URLs redirect. The redesign spec ruled
-  compatibility aliases out of scope once already. Re-confirm that before
-  six live URLs break.
+**Candidate names.** These are proposed, not decided. The owner picks,
+and each is checked against the full reference list first.
+
+| Today | Candidate | Why |
+|---|---|---|
+| `meridian` | `longwave` | Seven long ribbons sweeping the width |
+| `interference` | `moire` | Names the effect itself: two ring families beating |
+| `accretion` | `infall` | Matter falling inward to a bright core |
+| `event-horizon` | `funnel` | A polar grid pulled down into a well |
+| `tether` | `mooring` | Cables converging on one fixed point |
+| `synapse` | `relay` | Nodes passing a pulse to their neighbours |
+| `orbital-veil` | `orbitals` | Arcs turning at different rates around one centre |
+
+**A decision needed before any code: what happens to the six live URLs.**
+The pieces are published at `…/linefield/pieces/<slug>/` and
+`…/downloads/<slug>.html`, and copied embeds may point at them. The options:
+
+- (a) **Break them.** This matches the redesign's precedent, which ruled
+  compatibility aliases out of scope when it removed five pieces.
+- (b) **Tiny redirect stubs** at the old paths. That's six extra files kept
+  out of `pieces.json`.
+- (c) **Keep the old slugs and change only the display names.** This is the
+  cheapest, but the collision survives in every URL.
 
 **Finish line:** no linefield piece or stub shares a name with a reference
-piece.
+piece, and the URL decision is recorded here.
 
 ### Chunk 1.2 — Re-differentiate the close concepts
 
@@ -137,10 +161,18 @@ sentence as a reference piece. For each flagged piece, write its own
 one-sentence description first, without looking at the reference's copy,
 then change the dominant gesture wherever it still reads as the same idea.
 
-Close today: `tether` (slack cables between anchors), `synapse` and `globe`
-(wire spheres with nodes, and a lat/long sphere), `accretion` (concentric
-disc around a dark eye), `event-horizon` (void ringed by filaments), and
-`interference` (two ripple families).
+Close today:
+
+- `tether`: slack cables between anchors.
+- `synapse` and `globe`: wire spheres with nodes, and a lat/long sphere.
+  The reference's *Meridian* is itself a longitude globe.
+- `accretion`: a concentric disc around a dark eye.
+- `event-horizon`: a grid pulled into a well. That's nearer the reference's
+  *Basin* ("grid draped into a … bowl") than its Event Horizon.
+- `interference`: two ripple families.
+
+Compare against the reference's descriptions to spot overlap, never to
+borrow wording.
 
 **Finish line:** each reads as its own idea, both at card size and in one
 sentence.
