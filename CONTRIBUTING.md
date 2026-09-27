@@ -66,7 +66,7 @@ actually touched will show a diff in `thumbs/`.
 
 **CI will not catch a forgotten rebuild.** CI (`.github/workflows/checks.yml`)
 runs, in order: `npm run verify` (manifest vs. pieces vs. README
-agreement), `node tools/test-presets.mjs synapse` (preset mechanism on one
+agreement), `node tools/test-presets.mjs relay` (preset mechanism on one
 piece, preset value/enum data on all seventeen — see "Presets" below),
 `npm run test-bake-fresh` (bakes every piece live — the real `bakeHtml()`
 in `shared/export.js`, against today's source — and validates that

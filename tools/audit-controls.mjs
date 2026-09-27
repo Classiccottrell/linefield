@@ -75,8 +75,8 @@ async function sample(page) {
 
 // Percentage of sampled PIXELS (not channels) whose combined |dR|+|dG|+|dB|
 // clears PIXEL_DIFF_MIN. A plain mean-absolute-diff over all channels
-// dilutes sparse pieces to near-zero: most of a piece like synapse or
-// tether's canvas is empty background, so even a stark, obviously-visible
+// dilutes sparse pieces to near-zero: most of a piece like relay or
+// mooring's canvas is empty background, so even a stark, obviously-visible
 // recolour of the line-art averages out across a mostly-unchanged canvas.
 // Counting *how much of the canvas actually changed* survives that dilution.
 const PIXEL_DIFF_MIN = 12;
@@ -122,7 +122,7 @@ async function renderVariant(page, base, slug, name, value) {
 }
 
 // A single lo/hi comparison aliases on any control whose effect is periodic
-// across its own range — hue/angle wrap at 360, tether's `phase` maps to a
+// across its own range — hue/angle wrap at 360, mooring's `phase` maps to a
 // sin() argument that's a full 2*PI cycle over [0,2]. Sample 5 points across
 // the range instead and take the largest pairwise diff, so a control is only
 // called DEAD if it produces near-zero change between EVERY pair of test
@@ -139,7 +139,7 @@ function samplePoints(control) {
   if (control.kind === 'enum') return control.options;
   if (control.kind === 'color') return COLOR_SAMPLE_POINTS;
   const { min, max } = control;
-  // Uneven fractions avoid aliasing discrete symmetries too: event-horizon's
+  // Uneven fractions avoid aliasing discrete symmetries too: funnel's
   // 36 spokes repeat every 10deg, so quarter-turn samples all looked equal.
   return [0, 0.19, 0.43, 0.71, 1].map((f) => min + f * (max - min));
 }

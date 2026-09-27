@@ -24,8 +24,8 @@ shipped: `puddle`, `globe`, `matrix code`, `chain haze` and `stock market`
 **`globe`** — shipped. A real 3D lat/long wire sphere via
 `shared/project.js`'s camera: latitude small-circles at radius `R·cos(lat)`
 plus longitude great-circles converging at both poles, tagged `3d`/`geometric`
-rather than `orb`. Distinct from `orbital-veil`, `accretion` and
-`event-horizon` on structure, not just hue — all three are flat screen-space
+rather than `orb`. Distinct from `orbitals`, `infall` and
+`funnel` on structure, not just hue — all three are flat screen-space
 discs squashed by a tilt factor; globe is genuine sphere geometry with a
 scale-driven depth fade (`shared/project.js`'s projected `scale` sets
 per-segment alpha, so the far hemisphere recedes) so it reads as a surface,
@@ -66,7 +66,7 @@ source, so the pattern is genuine interference — crests crossing and
 cancelling — not the shared Ripples cursor mode (one expanding ring from the
 pointer) made permanent. The rim itself is an irregular, harmonic-perturbed
 boundary that damps the wave toward its edge instead of reflecting or
-tiling infinitely, which is the structural difference from `interference`.
+tiling infinitely, which is the structural difference from `moire`.
 
 **`chain haze`** — shipped. Lines of chains receding into the distance, built
 from **repeated linked marks along a path** rather than a continuous stroke —
@@ -76,10 +76,10 @@ point (`FOV / (FOV + z)`, a scalar perspective divisor — not the shared 3D
 camera, which is more machinery than a straight receding line needs); links
 alternate a face-on ellipse (full width) and an edge-on ellipse (squashed to
 ~35% width) at ~30% spacing overlap, which is what reads as interlocking
-links rather than a dashed/dotted line. Distinct from `tether` (one
+links rather than a dashed/dotted line. Distinct from `mooring` (one
 continuous stroked cable per line, no discrete marks): Grow/Shrink scale
 individual link size, matching `matrix-code`'s per-mark precedent, not
-`tether`'s amplify-an-existing-deformation. Depth fade borrows `globe`'s
+`mooring`'s amplify-an-existing-deformation. Depth fade borrows `globe`'s
 clamped-alpha shape but floors link scale at 0.38 so recession is carried by
 alpha and perspective bunching, never by shrinking a link below legibility.
 
@@ -120,7 +120,7 @@ glance.
   `shared/project.js`.
 - **`halftone-torus`** — the same idea on a ring, where the dot grid and the
   ring's curvature beat against each other and produce moiré for free. This
-  is `interference`'s optical territory reached by a different route.
+  is `moire`'s optical territory reached by a different route.
 
 Shared need: a dot-grid renderer where radius is a function of a field.
 Worth building once and using twice.
@@ -138,13 +138,13 @@ particle piece re-usable inside a shape.
 
 ### Radial fibre — many short strokes on a common centre
 
-**`filament-ring`** — a void ringed by thousands of fine, slightly
+**`void-ring`** — a void ringed by thousands of fine, slightly
 misaligned strokes, like iron filings round a magnet or brushed fur. Dense
-and directional where `event-horizon` is sparse and geometric, so the two
+and directional where `funnel` is sparse and geometric, so the two
 would not collide despite both having a hole in the middle.
 
 Needs cheap per-stroke jitter at high count — closer to `grain-field`'s
-budget than `synapse`'s.
+budget than `relay`'s.
 
 ---
 
@@ -157,11 +157,11 @@ These reuse what exists and would be faster to build, but each adds less.
 - ~~**`meridian-globe`** — longitude lines wrapping a sphere, converging to a
   bright point at the pole.~~ Built as `globe` (see "Commissioned, not yet
   built" above) — latitude rings included as well, not longitude alone.
-- **`node-sphere`** — `synapse`'s network mapped onto a sphere's surface, so
+- **`node-sphere`** — `relay`'s network mapped onto a sphere's surface, so
   connections follow curvature. Combines `network` + `orb` + `3d`.
 
 **Caution, and it is a real one.** The library already has three `orb`-tagged
-pieces (`orbital-veil`, `accretion`, `event-horizon`) plus `globe`
+pieces (`orbitals`, `infall`, `funnel`) plus `globe`
 (`3d`/`geometric`, deliberately not tagged `orb`). A `node-sphere` would be
 the fourth sphere-shaped piece regardless of its tag — weigh that against
 the failure this project already had once, where five pieces were
@@ -190,7 +190,7 @@ individually fine and collectively looked like one thing, before adding it.
   form, which no current piece does.
 - **Ripple rings** — concentric rings pulsing asynchronously rather than as a
   single synchronized wave. Needs an intended-look spec to distinguish it
-  from `interference` and `orbital-veil`.
+  from `moire` and `orbitals`.
 ~~**Candlestick field** — stock-market-style vertical bodies and wicks
 across the canvas.~~ Built as `stock market` (see "Commissioned, not yet
 built" above) — filled bars rather than open/high/low/close bodies-and-wicks,
@@ -214,7 +214,7 @@ From `ROADMAP.md`, repeated here because they bite hardest when adding
 pieces:
 
 **The hue wheel is still nearly full.** Roughly 95–135 remains the only open
-band, and it abuts `meridian` at 166. `rainfall` did not take it — it went
+band, and it abuts `longwave` at 166. `rainfall` did not take it — it went
 near-achromatic (sat 0.12) and differentiated on density instead, which is
 exactly what this constraint asks a new piece to do. Differentiate on **form
 or density**, not on a free colour.
@@ -238,7 +238,7 @@ If the goal is maximum variety per unit of work:
 2. **`halftone-sphere`** — new mark vocabulary, and the dot-grid renderer
    pays for itself twice
 3. **`corridor`** — strong distinct silhouette, reuses the camera
-4. **`filament-ring`** — striking, but density tuning will be fussy
+4. **`void-ring`** — striking, but density tuning will be fussy
 5. **`vortex-polygon`** — curves from straight lines is a good trick
 6. **`node-sphere`** — only if the orb crowding is accepted deliberately
 7. **`drape`** — likely too close to `wireframe-lattice` to earn a slot

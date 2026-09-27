@@ -31,7 +31,7 @@ jobs:
       # mechanism end to end for one piece. `npm run verify` never runs
       # this because --verify-only exits before launching a browser.
       - name: Verify preset mechanism
-        run: node tools/test-presets.mjs synapse
+        run: node tools/test-presets.mjs relay
 
       # Bakes each piece live (clicks its real "Baked HTML" button,
       # exercising today's shared/export.js) and validates that output. This
