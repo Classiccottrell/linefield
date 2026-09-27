@@ -236,9 +236,9 @@ npm run build            # NOT run in CI — verify, then regenerate thumbs/ and
 # Below this line, every command runs in CI (.github/workflows/checks.yml),
 # in EXACTLY this order (see that file's own comments for why — the last
 # one is deliberately last, slowest and broadest, so it can never hide a
-# faster/narrower step's failure behind itself), except the last three
-# below, which are curation tools with no pass/fail gate — read their output
-# yourself, nothing exits nonzero.
+# faster/narrower step's failure behind itself), except the ones after the
+# blank line below, which do not run in CI. The first two are curation tools
+# with no pass/fail gate — read their output yourself, nothing exits nonzero.
 npm run verify          # check pieces.json / pieces/ / README agree; no generation
 node tools/test-presets.mjs <slug>   # preset mechanism (one piece) + value/enum gate (all pieces, regardless of <slug>)
 npm run test-bake-fresh  # bakes every piece live, rather than reading committed downloads/
@@ -249,6 +249,7 @@ npm run audit-controls   # empirically check every shared+piece control moves pi
 
 node tools/preset-sheet.mjs <slug>   # NOT run in CI — render a piece's presets for review
 npm run collection-metrics           # NOT run in CI — hue/sat/ink per piece, as ROADMAP's table
+npm run collection-check             # NOT run in CI yet, but DOES exit non-zero — house-look sat ≤ 0.06, ink 0.03–0.15 (heroes ≤ 0.035); CI wiring after Phase 2 converts the pieces
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
@@ -281,7 +282,10 @@ constraints" table ready to paste. It decodes the committed
 dependency, and it measures what was last built: run `npm run build` first
 if a piece changed. There is no pass/fail gate — it answers "where is the
 hue wheel open, and which density is under-served", which is a judgement a
-human makes.
+human makes. The exception is `--check` (`npm run collection-check`), which
+holds the same numbers against `docs/house-look.md` and exits non-zero on
+any piece that breaks it, printing each failure and any recorded per-piece
+override with its reason.
 
 The gallery's live hover/keyboard preview loads pieces with `?preview=1`.
 `shared/controls.js` checks for that flag and, when present, skips both
