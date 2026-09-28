@@ -16,9 +16,11 @@
   {
     "slug": "moire",
     "title": "Moiré",
-    "blurb": "Two concentric ring families crossing into moiré.",
-    "tags": ["optical"],
-    "hue": 185, "hueB": 320, "saturation": 0.75
+    "blurb": "Two gratings of straight lines in one disc, rocking so broad moiré bands sweep across it.",
+    "tags": ["optical", "geometric"],
+    "safeZone": "outside the disc, widest on the left",
+    "anchor": "pinned band at the pivot, left of the disc's centre",
+    "hue": 185, "hueB": 320, "saturation": 0
   },
   {
     "slug": "orbitals",
@@ -44,9 +46,11 @@
   {
     "slug": "longwave",
     "title": "Longwave",
-    "blurb": "Seven long ribbons sweeping the full width.",
-    "tags": ["flow", "sparse"],
-    "hue": 150, "hueB": 180, "saturation": 0.5
+    "blurb": "A band of hairlines riding one long wave, pinching together at its nodes.",
+    "tags": ["flow"],
+    "safeZone": "upper left, above the band",
+    "anchor": "tightest node, just right of centre",
+    "hue": 150, "hueB": 180, "saturation": 0
   },
   {
     "slug": "relay",
@@ -58,9 +62,11 @@
   {
     "slug": "infall",
     "title": "Infall",
-    "blurb": "Matter spiralling inward to a bright core.",
-    "tags": ["orb", "dense"],
-    "hue": 10, "hueB": 40, "saturation": 0.8
+    "blurb": "Hairline streamlines spiralling into one small, bright core.",
+    "tags": ["orb", "flow"],
+    "safeZone": "left third",
+    "anchor": "core, right of centre",
+    "hue": 10, "hueB": 40, "saturation": 0
   },
   {
     "slug": "mooring",
