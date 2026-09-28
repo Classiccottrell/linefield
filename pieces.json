@@ -131,7 +131,7 @@
     "blurb": "One wind-cut ridge built from film grain, its face caught by a low raking light and crossed by faint ripples.",
     "tags": ["grain", "organic", "depth"],
     "hue": 45, "hueB": 0, "saturation": 0,
-    "safeZone": "top band and upper left",
+    "safeZone": "top band and upper right",
     "anchor": "lit brink, centre"
   },
   {

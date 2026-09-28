@@ -134,7 +134,9 @@
       if (b > depth) return 0;
       const v = b / depth; // 0 at the lip, 1 in the trough
       // Bright lip, a darker concave face, a paler foot, then the trough.
-      const lip = Math.exp(-v / 0.07);
+      // The lip is brightest near the peak: a short anchor, not a long band.
+      const pa = a / (unit * 0.28 * size);
+      const lip = Math.exp(-v / 0.07) * (0.4 + 0.6 * Math.exp(-pa * pa));
       const foot = Math.exp(-((v - 0.62) * (v - 0.62)) / 0.035);
       let L = env * (0.92 * lip + 0.24 + 0.3 * foot) * (1 - v * v);
       // Water moving up the face: soft streaks across the lip line.

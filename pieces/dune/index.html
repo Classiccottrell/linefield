@@ -25,7 +25,7 @@
   Anchor: the lit crest, the upper face just under the brink where the
   ridge stands tallest (centre of the frame).
   Text-safe zone: the sky band above the ridge (the top ~40%) and the upper
-  left. Nothing is lit there: only the ridge carries grain.
+  right. Nothing is lit there: only the ridge carries grain.
 
   Technique (the grain / lit-volume material): the ridge is a heightfield
   seen in an oblique orthographic view, marched column by column front to
@@ -191,9 +191,11 @@
     const TILT = 24 * Math.PI / 180;
     const cosT = Math.cos(TILT), sinT = Math.sin(TILT);
     const k = gh * 0.085; // grain px per world unit
-    const ox = gw * 0.47;
+    // Screen X is mirrored (the ridge rises to the upper LEFT), so its
+    // gesture doesn't repeat swell's rise to the upper right.
+    const ox = gw * 0.55;
     const oy = gh * 0.66;
-    const toX = (X) => ox + X * k;
+    const toX = (X) => ox - X * k;
     const toY = (Y, Z) => oy - (Y * cosT + Z * sinT) * k;
 
     // Profile across the crest: p(s) in [0, 1]; s = crest X - X, so s < 0
@@ -223,7 +225,7 @@
       // Light gathers just under the brink and thins down the face.
       const near = s <= 0 ? 0.35 + 0.65 * Math.exp(-(s * s) / (0.12 * LW * LW)) : 1;
       const tall = cH / HMAX;
-      return (0.035 + 3.4 * lambert * lambert * lambert * near * (0.35 + 0.65 * tall * tall)) * rise;
+      return (0.035 + 3.4 * lambert * lambert * lambert * near * (0.3 + 0.7 * tall * tall * tall * tall)) * rise;
     }
 
     // Ripples cross the lit face obliquely to the crest. Field value
@@ -237,7 +239,7 @@
     lum.fill(0);
     const zStep = 0.7 / (k * sinT);
     for (let col = 0; col < gw; col++) {
-      const X = (col - ox) / k;
+      const X = (ox - col) / k;
       let yMax = gh;
       for (let Z = ZA; Z < ZB && yMax > 0; Z += zStep) {
         crest(Z);
