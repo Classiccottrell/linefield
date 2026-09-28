@@ -105,8 +105,16 @@ const LIVE_THRESHOLD = 0.05; // % of sampled pixels changed, below this = no vis
 // colours before probing colorMode specifically, so its own test isolates
 // the mechanism rather than inheriting a piece's palette choice.
 //
+// The house look (docs/house-look.md §1) defaults every piece to saturation
+// 0. At saturation 0 the colour pickers genuinely change nothing, so probing
+// them at defaults would call a working mechanism DEAD. The colour controls
+// are therefore probed with saturation raised, for the same reason colorMode
+// already pins distinct stops: a piece's palette choice shouldn't decide
+// whether the mechanism is tested.
 const PREREQS = {
-  colorMode: { colorA: '#ff2d2d', colorB: '#2de0ff' },
+  colorMode: { saturation: 1, colorA: '#ff2d2d', colorB: '#2de0ff' },
+  colorA: { saturation: 1 },
+  colorB: { saturation: 1 },
 };
 
 async function renderVariant(page, base, slug, name, value) {

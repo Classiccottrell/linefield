@@ -55,9 +55,11 @@
   {
     "slug": "relay",
     "title": "Relay",
-    "blurb": "Drifting nodes wired to their neighbours, pulsing.",
-    "tags": ["network", "dense"],
-    "hue": 75, "hueB": 45, "saturation": 0.7
+    "blurb": "A canopy of branching hairlines grown from one root, a pulse climbing to the tips.",
+    "tags": ["network", "organic"],
+    "hue": 150, "hueB": 50, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "root, bottom centre-right"
   },
   {
     "slug": "infall",
@@ -71,16 +73,20 @@
   {
     "slug": "mooring",
     "title": "Mooring",
-    "blurb": "Heavy cables mooring to a single converging point.",
-    "tags": ["sparse"],
-    "hue": 220, "hueB": 250, "saturation": 0.25
+    "blurb": "One rope of twisted hairlines rising into a single loose loop; the crossing glows.",
+    "tags": ["organic", "flow"],
+    "hue": 12, "hueB": 48, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "loop crossing, lower centre-right"
   },
   {
     "slug": "funnel",
     "title": "Funnel",
-    "blurb": "A polar grid bent inward by a gravity well.",
-    "tags": ["3d", "orb"],
-    "hue": 285, "hueB": 230, "saturation": 0.6
+    "blurb": "A funnel seen side-on: stacked hairline ellipses narrowing to one bright tip, slowly twisting.",
+    "tags": ["3d", "geometric"],
+    "hue": 290, "hueB": 190, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "tip and lower stem, centre"
   },
   {
     "slug": "rainfall",
