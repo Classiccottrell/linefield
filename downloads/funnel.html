@@ -129,7 +129,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.6,"colorMode":"gradient","colorA":"#bf00ff","colorB":"#002bff","hue":285,"hueB":230,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"mass":1,"rotX":32,"rotY":0};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#aa00ff","colorB":"#00aaff","hue":290,"hueB":190,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"flare":1,"twist":1,"rotX":24,"rotY":0};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1401,6 +1401,20 @@ function createOrbit({
 
 
 
+  // funnel — a funnel seen from the side: ninety stacked hairline
+  // ellipses narrowing down to a point, slowly twisting, with the tip as the
+  // one bright anchor.
+  //
+  // Text-safe zone: the left third of the frame. The funnel stands in the
+  // central square, a little right of centre, mouth up, tip down.
+  // Anchor: the tip, lower centre. It is not drawn as a glow: the smallest
+  // rings stack on top of each other there and brighten additively.
+  //
+  // Each ring is an ellipse (not a circle) in its own cross-section, and the
+  // ellipse's long axis turns with depth (Twist) and with time, so the
+  // silhouette reads as a twisting column rather than a solid of revolution.
+  // The asymmetry is also what keeps Yaw and Phase visible: a circular
+  // stack would look identical from every yaw.
   const PIECE_ID = 'funnel';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -1412,18 +1426,20 @@ function createOrbit({
   window.addEventListener('resize', resize);
   resize();
 
-  // Ring and spoke counts derive per frame from density — no persistent array.
-  const BASE_RINGS = 40;
-  const SEG = 96;   // segments per ring
-  const SPOKES = 36;
+  // Ring count derives per frame from density — no persistent array.
+  const BASE_RINGS = 90;
+  const SEG = 120;          // segments per ring
+  const ECC = 0.72;         // cross-section minor/major axis ratio
+  const SPIN_PERIOD = 14;   // seconds per full turn of the twist at speed 1
+  const SWAY_PERIOD = 11;   // seconds per sway cycle (Motion's gesture)
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.2, stroke: 0.8, density: 0.45, saturation: 0.06, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.5, density: 0.7, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.9, stroke: 0.8, density: 1.2, saturation: 1, glow: 1.2 },
-    drift:   { opacity: 0.45, stroke: 0.7, density: 0.6, speed: 0.25, motion: 1.6 },
-    dense:   { opacity: 0.6, stroke: 0.55, density: 1.8, speed: 0.85 },
+    whisper: { opacity: 0.55, stroke: 0.6, density: 0.5, flare: 0.8, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.35, density: 0.85, twist: 0.6, glow: 0, rotX: 12 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.7, stroke: 0.8, density: 0.8, speed: 0.4, motion: 1.8, twist: 1.6, flare: 1.4 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.7, glow: 0.5, flare: 1.3, rotX: 24 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1432,11 +1448,12 @@ function createOrbit({
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'mass', label: 'Mass', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
-      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32, category: 'interaction' },
+      { name: 'flare', label: 'Flare', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'twist', label: 'Twist', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 24, category: 'interaction' },
       { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
     ],
-    defaults: { hue: 285, hueB: 230, saturation: 0.6, colorMode: 'gradient', colorA: '#bf00ff', colorB: '#002bff' },
+    defaults: { hue: 290, hueB: 190, saturation: 0, colorMode: 'gradient', colorA: '#aa00ff', colorB: '#00aaff' },
   });
   const currentValues = baked || panel.values;
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -1465,107 +1482,155 @@ function createOrbit({
     },
   });
 
-  const camera = createCamera({ fov: 700 });
+  const camera = createCamera({ fov: 900 });
 
-  function strokePts(pts, values, lineWidth, rgb) {
-    // Walk in order and break the run at any point behind the camera
-    // (scale <= 0) instead of filtering — a skipped interior point must
-    // start a new subpath, not get bridged over by a single polyline.
-    let anyRun = false;
-    ctx.beginPath();
+  // Splits one projected ring into front and back runs. A point is "front"
+  // when its perspective scale beats the ring centre's, so the near half of
+  // every ellipse can draw brighter than the far half and the stack reads
+  // as a solid. Runs also break at any point at or behind the near plane
+  // (scale <= 0) instead of bridging it with a straight line.
+  function ringRuns(pts, centreScale) {
+    const front = [];
+    const back = [];
     let run = [];
-    const flushRun = () => {
-      if (run.length >= 2) {
-        anyRun = true;
-        ctx.moveTo(run[0].x, run[0].y);
-        for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
-        paths.push(run.map((p) => [p.x, p.y]));
-      }
+    let runFront = null;
+    const flush = () => {
+      if (run.length >= 2) (runFront ? front : back).push(run);
       run = [];
     };
     for (const p of pts) {
-      if (p.scale > 0) run.push(p);
-      else flushRun();
+      if (p.scale <= 0) { flush(); runFront = null; continue; }
+      const isFront = p.scale >= centreScale;
+      if (runFront !== null && isFront !== runFront) {
+        const seam = run[run.length - 1];
+        flush();
+        run.push(seam); // the next run starts where this one ended
+      }
+      runFront = isFront;
+      run.push(p);
     }
-    flushRun();
-    if (!anyRun) return;
+    flush();
+    return { front, back };
+  }
 
-    const [r, g, b] = rgb;
-    ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-    if (values.glow > 0) {
-      ctx.lineWidth = lineWidth + values.glow * 3;
-      ctx.globalAlpha = values.glow * 0.25;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+  function strokeRuns(runs, alpha, lineWidth, rgb) {
+    if (!runs.length || alpha <= 0) return;
+    ctx.beginPath();
+    for (const run of runs) {
+      ctx.moveTo(run[0].x, run[0].y);
+      for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
     }
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.min(1, alpha)})`;
     ctx.lineWidth = lineWidth;
     ctx.stroke();
   }
 
   function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, W, H);
+    // Additive on the dark ground, so wherever rings stack the image
+    // brightens on its own. On the light (inverted) ground `lighter` would
+    // clip everything to white, so dark ink layers with plain alpha there.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at a shared point (alpha buckets), and round caps
+    // would overlap there and add up to a bright bead under 'lighter'.
+    ctx.lineCap = 'butt';
 
     paths = [];
-    const rings = Math.max(6, Math.round(BASE_RINGS * values.density));
-    const extent = Math.min(canvas.width, canvas.height) * 0.85 * (0.4 + values.scale * 0.6);
-    // The horizon: nothing is drawn inside it, which is the void at the centre.
-    // Clamped so it can never swallow the whole disc on a small viewport
-    // (e.g. a phone in portrait), which would collapse the void entirely.
-    const horizon = Math.min(40 + 70 * values.mass, extent * 0.6);
-    const t = elapsed * values.speed * 0.25;
-    const light = values.invert ? 0.35 : 0.62;
-    const lineWidth = 0.3 + values.stroke * 1.0;
+    const S = Math.min(W, H);
+    const size = 0.35 + 0.65 * values.scale;
+    const height = S * 0.62 * size;
+    const mouth = S * 0.3 * size;
+    const rings = Math.max(10, Math.round(BASE_RINGS * values.density));
+    // Silhouette exponent: below 1 the wall bulges like a bowl, 1 is a cone,
+    // above 1 it pinches into a trumpet.
+    const flareExp = 0.8 + values.flare * 0.9;
+    const t = elapsed * values.speed;
+    const spin = (t / SPIN_PERIOD) * Math.PI * 2;
+    const twistTotal = values.twist * Math.PI * 1.25;
+    const phaseOff = values.phase * Math.PI * 0.8;
+    const swayAmp = S * 0.045 * values.motion * size;
+    const swayT = (t / SWAY_PERIOD) * Math.PI * 2;
+    const lean = S * 0.05 * size; // a fixed lean of the tip, so the form has a heading Yaw can turn
+    const light = values.invert ? 0.14 : 0.9 - 0.28 * values.saturation;
+    const lineWidth = 0.5 + values.stroke * 0.4;
+    const baseAlpha = values.opacity * (values.invert ? 0.55 : 1);
 
     camera.set({
       tilt: (values.rotX * Math.PI) / 180,
-      yaw: (values.rotY * Math.PI) / 180 + t * values.motion * 0.35,
+      yaw: (values.rotY * Math.PI) / 180,
       roll: (values.angle * Math.PI) / 180,
-      cx: canvas.width / 2,
-      cy: canvas.height / 2,
+      // Nudged right of centre so the mouth stays clear of the left third.
+      cx: W / 2 + 0.06 * S,
+      cy: H / 2,
     });
 
-    // Lensing: rings bunch just outside the horizon and spread further out.
-    // u is 0 at the horizon and 1 at the outer extent.
-    // Phase warps the radial mapping (not yaw — a constant yaw offset is
-    // imperceptible on a figure this rotationally symmetric and already
-    // spinning). The warp vanishes at u=0 and u=1 so the void and outer
-    // extent are untouched, and stays monotonic in u so rings never cross.
-    const phaseWobble = Math.sin(values.phase * Math.PI * 1.5);
-    const warpU = (u) => Math.max(0, Math.min(1, u + 0.4 * u * (1 - u) * phaseWobble));
-    const radiusAt = (u) => horizon + (extent - horizon) * Math.pow(warpU(u), 1 + values.mass * 0.9);
-    const projectWithLens = (pts) => camera.projectPath(pts);
+    // Axis centre at depth u (0 = mouth, 1 = tip): the fixed lean plus a
+    // slow wave that travels down the column, growing toward the tip.
+    const axisAt = (u) => {
+      const w = u * u;
+      return [
+        lean * w + swayAmp * w * Math.sin(swayT - u * 2.2 + phaseOff),
+        -height / 2 + height * u,
+        swayAmp * 0.8 * w * Math.cos(swayT * 0.8 - u * 1.7 + phaseOff),
+      ];
+    };
 
-    // Concentric rings, drawn on the XZ plane so the camera's tilt makes a disc.
-    for (let i = 1; i <= rings; i++) {
-      const u = i / rings;
-      const R = radiusAt(u);
-      const { h, s } = paletteHsl(values, u);
-      const [r, g, b] = hslToRgb(h, s, light);
+    let tip = null;
+    for (let i = 0; i < rings; i++) {
+      const x = i / (rings - 1);
+      // Rings pile up toward the tip (spacing -> 0), which is what makes the
+      // tip the brightest point without drawing a glow.
+      const u = 1 - Math.pow(1 - x, 1.8);
+      const R = mouth * Math.pow(1 - u, flareExp) + S * 0.0015 * size;
+      // Differential spin: the lower rings turn faster, so the twist keeps
+      // tightening and loosening instead of rotating as one rigid stack.
+      const theta = spin * (0.6 + 0.8 * u) + twistTotal * u + phaseOff;
+      const ct = Math.cos(theta);
+      const st = Math.sin(theta);
+      const [ax, ay, az] = axisAt(u);
 
       const pts = [];
       for (let s = 0; s <= SEG; s++) {
         const a = (s / SEG) * Math.PI * 2;
-        pts.push([Math.cos(a) * R, 0, Math.sin(a) * R]);
+        const ex = Math.cos(a) * R;
+        const ez = Math.sin(a) * R * ECC;
+        pts.push([ax + ex * ct - ez * st, ay, az + ex * st + ez * ct]);
       }
-      strokePts(projectWithLens(pts), values, lineWidth, [r, g, b]);
+      const centre = camera.project(ax, ay, az);
+      if (i === rings - 1) tip = centre;
+      const { front, back } = ringRuns(camera.projectPath(pts), centre.scale);
+      for (const run of front) paths.push(run.map((p) => [p.x, p.y]));
+      for (const run of back) paths.push(run.map((p) => [p.x, p.y]));
+
+      const { h, s } = paletteHsl(values, u);
+      const rgb = hslToRgb(h, s, light);
+      const alphaFront = baseAlpha * (0.7 + 0.3 * u);
+      if (values.glow > 0) {
+        strokeRuns(front, alphaFront * values.glow * 0.2, lineWidth + values.glow * 2.2, rgb);
+      }
+      strokeRuns(back, alphaFront * 0.7, lineWidth, rgb);
+      strokeRuns(front, alphaFront, lineWidth, rgb);
     }
 
-    // Radial spokes, from the horizon outward.
-    const spokes = Math.max(4, Math.round(SPOKES * values.density));
-    for (let k = 0; k < spokes; k++) {
-      const a = (k / spokes) * Math.PI * 2;
-      const stopB = paletteHsl(values, 1);
-      const [r, g, b] = hslToRgb(stopB.h, stopB.s, light * 0.85);
-
-      const pts = [];
-      for (let s = 0; s <= 24; s++) {
-        const R = radiusAt(s / 24);
-        pts.push([Math.cos(a) * R, 0, Math.sin(a) * R]);
-      }
-      strokePts(projectWithLens(pts), values, lineWidth * 0.7, [r, g, b]);
+    // Glow is a fallback for the anchor, off by default: the tip is already
+    // the brightest point from the stacked rings alone.
+    if (values.glow > 0 && tip && tip.scale > 0) {
+      const { h, s } = paletteHsl(values, 1);
+      const [r, g, b] = hslToRgb(h, s, light);
+      const gr = (10 + 26 * values.glow) * size;
+      const grad = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${Math.min(1, 0.5 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, gr, 0, Math.PI * 2);
+      ctx.fill();
     }
-
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({
