@@ -31,9 +31,21 @@
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
-  import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
 
+  // relay — a branching network grown from one root into a single rounded
+  // canopy, with a slow pulse climbing from root to tips and lighting each
+  // branch point as it passes.
+  //
+  // A branch is drawn as a bundle of hairlines, as many as it has tips above
+  // it up to a cap: single threads at the edge of the canopy, a dense bright
+  // trunk gathered into its root.
+  //
+  // Text-safe zone: the left third of the frame. The tree stands right of
+  // centre, inside the central square.
+  // Anchor: the root and lower trunk, bottom centre-right, where every
+  // hairline converges and brightens additively. Glow adds a halo only when
+  // asked for.
   const PIECE_ID = 'relay';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -45,171 +57,290 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // Persistent node array — must re-seed when density changes.
-  const BASE_COUNT = 220;
-  let nodes = [];
+  const PULSE_PERIOD = 10;  // seconds for the pulse to climb root -> tips at speed 1
+  const SWAY_PERIOD = 12;   // seconds per sway cycle (Motion's gesture)
+  const BANDS = 4;          // colour bands, root -> tips
+  const LEVELS = 8;         // brightness levels (pulse x fork squeeze)
+  const GAIN_MIN = 0.3;
+  const GAIN_MAX = 2.2;
   let paths = [];
 
-  function seedNodes(count) {
-    nodes = Array.from({ length: count }, () => {
-      const x = Math.random() * canvas.width;
-      const y = Math.random() * canvas.height;
-      return {
-        x, y,
-        homeX: x, homeY: y, // anchor: noise-field drift wanders around this,
-        // it never travels far from it, so the field can't collapse into thin
-        // filaments over time the way pure unbounded advection does.
-        j: Math.random() * Math.PI * 2, // per-node phase, so pulses aren't in lockstep
-      };
-    });
+  // Own seeded PRNG: the canopy is a designed silhouette, so it grows the
+  // same way on every load instead of depending on Math.random.
+  function mulberry32(a) {
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
 
-  // connection-based: cost scales with node count x reach, so `dense` is
-  // held at 1.8, not the control max of 2, to protect frame rate.
+  // Grows the topology in unit space (root at 0,0, up is -y, height ~1).
+  // Segments come out parent-before-child; tips are numbered left to right,
+  // and each segment knows the contiguous range of tips it carries.
+  const CANOPY = { cx: 0, cy: -0.6, rx: 0.56, ry: 0.42 };
+  function growTree(maxDepth, spreadDeg) {
+    const rnd = mulberry32(0x7e1a7);
+    const spread = (spreadDeg * Math.PI) / 180;
+    const segs = [];
+    const inCanopy = (x, y) => ((x - CANOPY.cx) / CANOPY.rx) ** 2 + ((y - CANOPY.cy) / CANOPY.ry) ** 2 <= 1;
+    function add(parent, rel, len, depth, x0, y0, absAng, dist) {
+      const ang = absAng + rel;
+      const x1 = x0 + Math.sin(ang) * len;
+      const y1 = y0 - Math.cos(ang) * len;
+      const seg = { parent, rel, len, depth, bend: (rnd() - 0.5) * 0.16, dist0: dist, dist1: dist + len, children: [] };
+      const idx = segs.push(seg) - 1;
+      if (parent >= 0) segs[parent].children.push(idx);
+      const stop = depth >= maxDepth || (depth >= 3 && rnd() < 0.05) || (depth >= 2 && !inCanopy(x1, y1));
+      if (stop) return;
+      // Tropism: children lean back toward vertical, which rounds the crown.
+      const lean = -ang * 0.18;
+      const kids = [];
+      if (depth >= 1 && rnd() < 0.35) {
+        // Leader split: one child carries on, the other peels away.
+        const side = rnd() < 0.5 ? -1 : 1;
+        kids.push([side * spread * (0.2 + 0.25 * rnd()) + lean, 0.84]);
+        kids.push([-side * spread * (1.1 + 0.5 * rnd()) + lean, 0.62]);
+      } else {
+        kids.push([-spread * (0.7 + 0.5 * rnd()) + lean, 0.74 + 0.08 * rnd()]);
+        kids.push([spread * (0.7 + 0.5 * rnd()) + lean, 0.74 + 0.08 * rnd()]);
+      }
+      kids.sort((a, b) => a[0] - b[0]); // left child first, so tips run left to right
+      for (const [r, k] of kids) add(idx, r, len * k * (0.9 + 0.2 * rnd()), depth + 1, x1, y1, ang, dist + len);
+    }
+    add(-1, 0, 0.3, 0, 0, 0, 0, 0);
+    // Tip ranges, walked children-first from the end (children follow parents).
+    const tipsOf = [];
+    let next = 0;
+    (function number(i) {
+      const s = segs[i];
+      s.tip0 = next;
+      if (!s.children.length) { tipsOf.push(i); next++; }
+      for (const c of s.children) number(c);
+      s.tip1 = next;
+    })(0);
+    let maxDist = 0;
+    for (const s of segs) maxDist = Math.max(maxDist, s.dist1);
+    // Root-to-tip segment chain for each tip.
+    const chains = tipsOf.map((i) => {
+      const chain = [];
+      for (let j = i; j >= 0; j = segs[j].parent) chain.push(j);
+      return chain.reverse();
+    });
+    return { segs, chains, maxDist };
+  }
+
+  let tree = null;
+  let treeKey = '';
+
   const PRESETS = {
-    whisper: { opacity: 0.5, stroke: 1.6, density: 0.7, saturation: 0.05, glow: 0, reach: 130 },
-    ink:     { opacity: 1, stroke: 1.7, density: 1.3, saturation: 0, glow: 0, reach: 150 },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.95, glow: 1.1 },
-    drift:   { opacity: 0.55, stroke: 0.9, density: 0.85, speed: 0.3, motion: 1.7, reach: 140 },
-    dense:   { opacity: 0.62, stroke: 0.65, density: 1.8, speed: 0.8, reach: 105 },
+    whisper: { opacity: 0.6, stroke: 0.6, density: 0.55, spread: 22, scale: 0.85 },
+    ink:     { opacity: 1, stroke: 1.3, density: 0.85, glow: 0, spread: 20, motion: 0.4 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.75, stroke: 0.8, density: 0.9, speed: 0.4, motion: 1.8, spread: 34 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.5, glow: 0.5, spread: 22, scale: 1.15 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
     presets: PRESETS,
-    onChange: (name, value, values) => {
-      if (name === 'density') seedNodes(Math.max(8, Math.round(BASE_COUNT * values.density)));
-    },
+    onChange: () => {},
     extraControls: [
-      { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 90, category: 'visual' },
+      { name: 'spread', label: 'Spread', type: 'range', min: 8, max: 45, step: 1, default: 25, category: 'visual' },
     ],
-    defaults: { hue: 75, hueB: 45, saturation: 0.7, colorMode: 'gradient', colorA: '#bfff00', colorB: '#ffbf00' },
+    defaults: { hue: 150, hueB: 50, saturation: 0, colorMode: 'gradient', colorA: '#00ff80', colorB: '#ffd500' },
   });
   const currentValues = baked || panel.values;
 
-  seedNodes(Math.max(8, Math.round(BASE_COUNT * currentValues.density)));
-  window.addEventListener('resize', () =>
-    seedNodes(Math.max(8, Math.round(BASE_COUNT * currentValues.density)))
-  );
-
   function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, W, H);
+    // Additive on the dark ground so the bundles brighten where they
+    // gather; plain alpha on the light (inverted) ground.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at a shared point (alpha buckets), and round caps
+    // would overlap there and add up to a bright bead under 'lighter'.
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+
+    // Depth 5..9 from density: 32 to ~500 tips. Grown once per setting,
+    // not per frame (and not in onChange, which a baked export never fires).
+    const maxDepth = Math.max(5, Math.min(9, Math.round(4.5 + 3.5 * values.density)));
+    const key = `${maxDepth}|${values.spread}`;
+    if (key !== treeKey) { tree = growTree(maxDepth, values.spread); treeKey = key; }
+    const { segs, chains, maxDist } = tree;
 
     paths = [];
-    const reach = values.reach;
-    const noiseScale = 0.0016 * (0.3 + values.scale);
-    const t = elapsed * 0.2 * values.motion;
-    const stepDt = dt || 0.016;
-    const drift = 18 * values.speed * stepDt;
-    // Scale sets how far a node can wander from its seeded home before the
-    // spring pulls it back — 0 pins nodes to a crisp, evenly-spread lattice;
-    // 2 lets them roam far enough for the noise field's spatial frequency
-    // (see noiseScale above) to actually show up as clumps/filaments/voids.
-    // pull is derived from it, not hardcoded, so the equilibrium radius
-    // stays ~wanderRadius regardless of speed (speed only affects how fast
-    // nodes approach that radius, not how far they get).
-    const wanderRadius = 4 + values.scale * 80;
-    const pull = (18 * values.speed) / wanderRadius; // per-second return-to-home rate
-    const light = values.invert ? 0.35 : 0.62;
-    const lineWidth = 0.25 + values.stroke * 0.8;
-    ctx.lineWidth = lineWidth;
+    const S = Math.min(W, H);
+    const size = 0.4 + 0.6 * values.scale;
+    const unit = S * 0.66 * size;           // px per unit of tree height
+    const rootX = W / 2 + 0.12 * S;
+    const rootY = H / 2 + 0.5 * unit;
+    const t = elapsed * values.speed;
+    const phaseOff = values.phase * Math.PI;
+    const swayT = (t / SWAY_PERIOD) * Math.PI * 2;
+    const swayAmp = 0.05 * values.motion;
+    // Angle turns the whole tree about the middle of its canopy.
+    const th = (values.angle * Math.PI) / 180;
+    const pivX = rootX + CANOPY.cx * unit;
+    const pivY = rootY + CANOPY.cy * unit;
+    const cth = Math.cos(th), sth = Math.sin(th);
+    const place = (x, y) => [pivX + (x - pivX) * cth - (y - pivY) * sth, pivY + (x - pivX) * sth + (y - pivY) * cth];
 
-    // Drift the nodes on a noise field, wrapping at the edges.
-    for (const n of nodes) {
-      const a =
-        simplex2(n.x * noiseScale + values.phase, n.y * noiseScale + t) * Math.PI * 2 +
-        (values.angle * Math.PI) / 180;
-      n.x += Math.cos(a) * drift - (n.x - n.homeX) * pull * stepDt;
-      n.y += Math.sin(a) * drift - (n.y - n.homeY) * pull * stepDt;
-
-
-      if (n.x < 0) n.x += canvas.width;
-      if (n.x > canvas.width) n.x -= canvas.width;
-      if (n.y < 0) n.y += canvas.height;
-      if (n.y > canvas.height) n.y -= canvas.height;
+    // Forward kinematics with a slow sway that grows toward the tips.
+    const P = new Array(segs.length);
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      const par = s.parent >= 0 ? P[s.parent] : null;
+      const sway = swayAmp * (s.depth / 6) * Math.sin(swayT - s.depth * 0.5 + phaseOff);
+      const ang = (par ? par.ang : 0) + s.rel + sway;
+      const x0 = par ? par.x1 : rootX;
+      const y0 = par ? par.y1 : rootY;
+      const len = s.len * unit;
+      const x1 = x0 + Math.sin(ang) * len;
+      const y1 = y0 - Math.cos(ang) * len;
+      P[i] = { ang, x0, y0, x1, y1, len, nx: Math.cos(ang), ny: Math.sin(ang) };
     }
 
-    // Uniform spatial grid, cell size = reach, so a node's possible partners
-    // are confined to its own cell plus the 8 around it. This is what keeps
-    // the piece from going O(n^2) as density rises.
-    const cell = Math.max(reach, 1);
-    const cols = Math.max(1, Math.ceil(canvas.width / cell));
-    const rows = Math.max(1, Math.ceil(canvas.height / cell));
-    const buckets = new Map();
-    const keyOf = (cx, cy) => cy * cols + cx;
+    // The pulse front, as a fraction of root-to-tip distance. It runs a
+    // little past both ends so the root and the outermost tips both light.
+    const pulse = (((t / PULSE_PERIOD + values.phase * 0.5) % 1) + 1) % 1 * 1.3 - 0.12;
+    const litAt = (d) => Math.exp(-(((d / maxDist - pulse) / 0.07) ** 2));
 
-    for (const n of nodes) {
-      const cx = Math.min(cols - 1, Math.max(0, Math.floor(n.x / cell)));
-      const cy = Math.min(rows - 1, Math.max(0, Math.floor(n.y / cell)));
-      const k = keyOf(cx, cy);
-      let arr = buckets.get(k);
-      if (!arr) { arr = []; buckets.set(k, arr); }
-      arr.push(n);
-    }
+    const light = values.invert ? 0.14 : 0.86 - 0.24 * values.saturation;
+    const lineWidth = 0.45 + values.stroke * 0.35;
+    const baseAlpha = values.opacity * (values.invert ? 0.4 : 0.6);
+    // A branch is a bundle of up to CAP hairlines, as wide as it has
+    // hairlines. Each segment's bundle starts inside its share of the
+    // parent's bundle and eases out to its own width, so bundles part at
+    // every fork and gather toward the trunk.
+    // The cap rides density too, so the top of the slider (where depth has
+    // already reached 9) still thickens the bundles.
+    const CAP = Math.round(6 + 6 * values.density);
+    const gap = 1.1 + values.stroke * 0.3; // px between neighbouring hairlines
+    const widthOf = (s) => Math.min(s.tip1 - s.tip0, CAP) * gap;
 
-    const reach2 = reach * reach;
-    const stopA = paletteHsl(values, 0);
-    const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
-    const stopB = paletteHsl(values, 1);
-    const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
-
-    for (let cy = 0; cy < rows; cy++) {
-      for (let cx = 0; cx < cols; cx++) {
-        const here = buckets.get(keyOf(cx, cy));
-        if (!here) continue;
-
-        for (let dy = 0; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            // Visit each cell pair once: the current cell and the half-ring
-            // after it, skipping the mirror images already handled.
-            if (dy === 0 && dx < 0) continue;
-            const nx = cx + dx;
-            const ny = cy + dy;
-            if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
-            const there = buckets.get(keyOf(nx, ny));
-            if (!there) continue;
-            const same = dx === 0 && dy === 0;
-
-            for (let i = 0; i < here.length; i++) {
-              const a = here[i];
-              for (let j = same ? i + 1 : 0; j < there.length; j++) {
-                const b = there[j];
-                const ddx = a.x - b.x;
-                const ddy = a.y - b.y;
-                const d2 = ddx * ddx + ddy * ddy;
-                if (d2 > reach2 || d2 === 0) continue;
-
-                const closeness = 1 - Math.sqrt(d2) / reach;
-                // Pulse travels as a wave through the field.
-                const pulse = (Math.sin(elapsed * 2 * values.speed + a.j + b.j) + 1) / 2;
-                const mix = pulse;
-                const cr = r0 + (r1 - r0) * mix;
-                const cg = g0 + (g1 - g0) * mix;
-                const cb = b0 + (b1 - b0) * mix;
-                const alpha = Math.min(1, values.opacity * closeness * (0.25 + pulse * 0.75));
-
-                ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${alpha})`;
-                ctx.lineWidth = lineWidth;
-                ctx.beginPath();
-                ctx.moveTo(a.x, a.y);
-                ctx.lineTo(b.x, b.y);
-                if (values.glow > 0) {
-                  ctx.lineWidth = lineWidth + values.glow * 2.5;
-                  ctx.globalAlpha = values.glow * 0.25;
-                  ctx.stroke();
-                  ctx.globalAlpha = 1;
-                  ctx.lineWidth = lineWidth;
-                }
-                ctx.stroke();
-                paths.push([[a.x, a.y], [b.x, b.y]]);
-              }
-            }
+    const buckets = Array.from({ length: BANDS }, () => Array.from({ length: LEVELS }, () => []));
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      const p = P[i];
+      const m = Math.min(s.tip1 - s.tip0, CAP);
+      const wEnd = widthOf(s);
+      let lo, hi, snx, sny;
+      if (s.parent >= 0) {
+        const ps = segs[s.parent];
+        const pc = ps.tip1 - ps.tip0;
+        const pw = widthOf(ps);
+        lo = ((s.tip0 - ps.tip0) / pc - 0.5) * pw;
+        hi = ((s.tip1 - ps.tip0) / pc - 0.5) * pw;
+        snx = P[s.parent].nx;
+        sny = P[s.parent].ny;
+      } else {
+        // The root gathers the trunk's hairlines in tight: the anchor.
+        lo = -0.06 * wEnd;
+        hi = 0.06 * wEnd;
+        snx = p.nx;
+        sny = p.ny;
+      }
+      const cx = (p.x0 + p.x1) / 2 + p.nx * s.bend * p.len;
+      const cy = (p.y0 + p.y1) / 2 + p.ny * s.bend * p.len;
+      const n = Math.max(3, Math.ceil(p.len / 7));
+      // A capped bundle leaving a fork starts squeezed into its share of the
+      // parent's width; dim it by the squeeze so forks don't flare brighter
+      // than the root. The root's own squeeze is left bright: it's the anchor.
+      const squeeze = s.parent >= 0 ? Math.max(1, wEnd / Math.max(1e-6, hi - lo)) : 1;
+      for (let k = 0; k < m; k++) {
+        const fr = (k + 0.5) / m;
+        const o0 = lo + (hi - lo) * fr;
+        const o1 = (fr - 0.5) * wEnd;
+        const strand = [];
+        let run = null, runKey = -1;
+        for (let j = 0; j <= n; j++) {
+          const u = j / n;
+          const e = u * u * (3 - 2 * u);
+          const bx = (1 - u) * (1 - u) * p.x0 + 2 * u * (1 - u) * cx + u * u * p.x1;
+          const by = (1 - u) * (1 - u) * p.y0 + 2 * u * (1 - u) * cy + u * u * p.y1;
+          const [x, y] = place(
+            bx + snx * o0 * (1 - e) + p.nx * o1 * e,
+            by + sny * o0 * (1 - e) + p.ny * o1 * e,
+          );
+          strand.push([x, y]);
+          const d = s.dist0 + (s.dist1 - s.dist0) * u;
+          const band = Math.min(BANDS - 1, Math.floor((d / maxDist) * BANDS));
+          const gain = (1 + 0.6 * litAt(d)) * (1 / squeeze + (1 - 1 / squeeze) * e);
+          const level = Math.max(0, Math.min(LEVELS - 1, Math.floor(((gain - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)) * LEVELS)));
+          const bk = band * LEVELS + level;
+          if (!run || bk !== runKey) {
+            const last = run ? run[run.length - 1] : null;
+            if (run && run.length >= 2) buckets[Math.floor(runKey / LEVELS)][runKey % LEVELS].push(run);
+            run = last ? [last] : [];
+            runKey = bk;
           }
+          run.push([x, y]);
         }
+        if (run && run.length >= 2) buckets[Math.floor(runKey / LEVELS)][runKey % LEVELS].push(run);
+        paths.push(strand);
       }
     }
+
+    for (let b = 0; b < BANDS; b++) {
+      const { h, s } = paletteHsl(values, b / (BANDS - 1));
+      const [cr, cg, cb] = hslToRgb(h, s, light);
+      for (let lv = 0; lv < LEVELS; lv++) {
+        const runs = buckets[b][lv];
+        if (!runs.length) continue;
+        ctx.beginPath();
+        for (const run of runs) {
+          ctx.moveTo(run[0][0], run[0][1]);
+          for (let i = 1; i < run.length; i++) ctx.lineTo(run[i][0], run[i][1]);
+        }
+        const a = baseAlpha * (GAIN_MIN + ((lv + 0.5) / LEVELS) * (GAIN_MAX - GAIN_MIN));
+        if (values.glow > 0) {
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, a * values.glow * 0.15)})`;
+          ctx.lineWidth = lineWidth + values.glow * 2.2;
+          ctx.stroke();
+        }
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, a)})`;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+    }
+
+    // Branch points the pulse is passing: a small lit ring at each fork.
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      const lit = litAt(s.dist1);
+      if (lit < 0.05) continue;
+      const [x, y] = place(P[i].x1, P[i].y1);
+      const { h, s: sat } = paletteHsl(values, s.dist1 / maxDist);
+      const [cr, cg, cb] = hslToRgb(h, sat, light);
+      const r = (1.4 + 2.4 * lit + values.glow * 3 * lit) * (s.children.length ? 1 : 0.6);
+      ctx.fillStyle = `rgba(${cr},${cg},${cb},${Math.min(1, lit * values.opacity * 0.4)})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Glow is a fallback for the anchor, off by default.
+    if (values.glow > 0) {
+      const [x, y] = place(rootX, rootY - 0.08 * unit);
+      const { h, s } = paletteHsl(values, 0);
+      const [cr, cg, cb] = hslToRgb(h, s, light);
+      const gr = (16 + 30 * values.glow) * size;
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, gr);
+      grad.addColorStop(0, `rgba(${cr},${cg},${cb},${Math.min(1, 0.35 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({
