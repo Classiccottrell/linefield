@@ -233,8 +233,27 @@ sheet reads as one collection.
 - **4.1 Grain / lit-volume technique.** This is a new capability: soft,
   film-grain shaded forms rendered in Canvas 2D with no dependencies.
   Decide its SVG export story up front, because it is raster by nature.
+  - [x] First piece: `dune`, one wind-cut ridge. A heightfield is marched
+    column by column in an oblique orthographic view into a half-resolution
+    luminance buffer, shaded by one low directional light (Angle turns it).
+    Each buffer pixel becomes a grain with a probability set by its light,
+    hashed from (x, y, grain frame), never `Math.random`. The buffer is
+    written through a `Uint32Array` view of ImageData and upscaled with
+    `drawImage`, smoothing off. Grain is composed as `max(ground, ink)`,
+    not blended, so faint grain doesn't pick up the ground's blue cast and
+    fail the saturation check. About 7 ms a frame at 1280×800, 60fps.
+  - [x] SVG story, decided: export the line geometry only (the brink and the
+    ripple lines as polylines). No embedded bitmap. See Known limitations.
 - **4.2 Halftone, 4.3 Masking, 4.4 Radial fibre.** These are the three
   families INSPIRATION already stubs, and each yields more than one piece.
+  - [x] 4.2 first piece: `swell`, one ocean swell as a halftone screen. Dot
+    area is proportional to light, tone is carried by size at full alpha,
+    and a hard tone floor keeps dark water empty. The light field is long
+    along the lip and asymmetric across it, so dot sizes never form rings.
+    Density sets the pitch and Angle the screen angle; Scale sizes the
+    swell, because screen frequency and pitch would be one control twice.
+    SVG exports each dot as a `<circle>` via `exportSvg()`'s additive
+    `circles` option.
 - **Growth is by quality, not a count.** There is no 128 target. Every new
   piece clears the originality line and the collection constraints.
 
@@ -327,6 +346,20 @@ geometry. PNG export is unaffected.
 measures 0.047% changed pixels against a floor other colour controls clear
 at about 0.06%. The hue link is real. It's just too subtle at the
 collection's lowest ink coverage, which is deliberate for the home-page hero.
+
+**`dune`'s SVG has no grain.** Film grain has no line geometry, so the
+SVG carries the brink and the ripple lines as polylines and nothing else.
+Embedding the grain as a bitmap would make the SVG a PNG in disguise. PNG
+export carries the grain.
+
+**`audit-controls` probes colour on monochrome pieces at saturation 0.6.**
+A piece whose default saturation is below 0.05 (`dune`, `swell`, and every
+Phase 2 conversion to come) renders every hue as the same grey, so its
+Color A, Color B and Color Mode would read as dead at defaults however they
+were wired. For those pieces only, the audit raises saturation before
+probing the three colour controls. Pieces above the threshold are audited
+exactly as before (`lacuna` and `rainfall` produce byte-identical audit
+output with and without the change).
 
 **`cipher-bloom` exports SVG `<text>`, not `<polyline>`.** A glyph has no
 line geometry to export. `shared/export.js`'s `exportSvg()` takes an

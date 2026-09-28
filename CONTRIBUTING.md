@@ -131,7 +131,11 @@ panel — but they are implementation values `colorA`/`colorB` drive one-way
 (pick a colour -> hue updates); a piece's own code should never read them.
 
 A new piece should make **each** authored control visibly affect its
-render — don't leave a control wired up but inert. If a control doesn't map
+render — don't leave a control wired up but inert. A monochrome-default
+piece (saturation below 0.05, per `docs/house-look.md`) can't show a hue
+change at its defaults, so `audit-controls` probes its Color A, Color B and
+Color Mode at saturation 0.6 instead; the colour must still reach the
+render once saturation is raised. If a control doesn't map
 naturally onto your piece's visuals, find a reasonable interpretation (e.g.
 `angle` can rotate a field, `motion` can scale a secondary animation speed
 distinct from `speed`, `colorB`/stop B can drive a second color family)

@@ -8,6 +8,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Two pieces that introduce new materials (ROADMAP Phase 4.1 and 4.2).
+  `dune` is a single wind-cut ridge built from film grain: a heightfield
+  shaded by one low raking light, rendered to a half-resolution buffer
+  through ImageData, grained per pixel from a deterministic hash, and
+  upscaled. `swell` is one ocean swell drawn as a halftone screen whose dot
+  area carries the light. Both default to the monochrome house look and
+  carry `safeZone` and `anchor` in `pieces.json`.
+- `exportSvg()` in `shared/export.js` takes an additive `circles` option
+  for filled dots (`swell`). Callers that don't pass it get byte-identical
+  output; `tools/test-svg-circles.mjs` checks both.
+
 - The control panel can be dragged by its header on screens wider than
   640px. It is clamped to the viewport, re-clamped on resize, and its
   position is persisted per piece in localStorage next to the tuned values.
@@ -16,6 +27,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`53dcfe9`) without an entry, so it is recorded here.
 
 ### Changed
+
+- `npm run audit-controls` probes Color A, Color B and Color Mode at
+  saturation 0.6 on any piece whose default saturation is below 0.05, since
+  a grey default can't show a hue change however the control is wired.
+  Pieces at or above that threshold are audited exactly as before.
 
 - `ROADMAP.md` is restructured around a gap analysis against the reference
   that first inspired the project. The chunk-by-chunk delivery history

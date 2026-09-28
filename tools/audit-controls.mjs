@@ -109,12 +109,27 @@ const PREREQS = {
   colorMode: { colorA: '#ff2d2d', colorB: '#2de0ff' },
 };
 
+// The same reasoning covers saturation. A monochrome-default piece
+// (docs/house-look.md §1: saturation 0) renders every hue as the same grey,
+// so Color A, Color B and Color Mode can't move a pixel at defaults however
+// correctly they're wired — the palette choice would decide the verdict,
+// not the mechanism. For a piece whose own default saturation is below
+// MONO_SATURATION, the colour controls are probed at MONO_PROBE_SATURATION.
+// Every piece at or above the threshold is probed exactly as before.
+const MONO_SATURATION = 0.05;
+const MONO_PROBE_SATURATION = 0.6;
+const COLOR_CONTROLS = new Set(['colorA', 'colorB', 'colorMode']);
+
 async function renderVariant(page, base, slug, name, value) {
   await page.goto(`${base}/pieces/${slug}/?preview=1`, { waitUntil: 'load' });
   await page.waitForSelector('.lf-panel .lf-row', { state: 'attached' });
   const prereq = name !== null ? PREREQS[name] : null;
   if (prereq) {
     for (const [n, v] of Object.entries(prereq)) await setControl(page, n, v);
+  }
+  if (COLOR_CONTROLS.has(name)) {
+    const saturation = await page.evaluate(() => window.__LF_VALUES__.saturation);
+    if (saturation < MONO_SATURATION) await setControl(page, 'saturation', MONO_PROBE_SATURATION);
   }
   if (name !== null) await setControl(page, name, value);
   await stepFrames(page);

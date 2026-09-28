@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — swell</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  swell — one ocean swell rising on a diagonal, drawn as a halftone grid in
+  which each dot's size carries the wave's light.
+
+  Anchor: the swell's lip, upper right, where the wave stands tallest.
+  Text-safe zone: the lower left. The tone has a hard floor, so dark water
+  draws no dots at all rather than a carpet of specks.
+
+  Technique (the halftone material): a light field for the swell is sampled
+  on a screen of dots, slightly rotated. Each dot's AREA is proportional to
+  the light, as in print halftone, so tone is carried by size, never by
+  alpha. The field is long along the lip and asymmetric across it (steep lit
+  face, short dark back), so the dot sizes never form rings.
+
+  Controls: Density sets the grid pitch and Angle the screen angle. Scale
+  sizes the swell itself, not the screen, since screen frequency and grid
+  pitch would be the same control twice. Stroke sets the largest dot.
+
+  SVG export: every drawn dot is a <circle> with its own radius and fill.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'swell';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const BUCKETS = 12; // colour ramp steps, one fill call each
+  let circles = [];
+  let clock = 0;
+
+  const PRESETS = {
+    whisper: { opacity: 0.55, stroke: 0.6, density: 0.8, scale: 0.85, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.45, density: 0.75, angle: 30, glow: 0 },
+    neon:    { opacity: 1, stroke: 1.1, density: 1.15, saturation: 0.8, glow: 1.1, angle: 8 },
+    drift:   { opacity: 0.85, stroke: 0.9, density: 0.9, speed: 0.35, motion: 1.8, phase: 1.2, scale: 1.2 },
+    dense:   { opacity: 0.95, stroke: 1.2, density: 1.8, scale: 1.15, glow: 0.4, angle: 345 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    defaults: { hue: 185, hueB: 250, saturation: 0, colorMode: 'gradient', colorA: '#8cd3d9', colorB: '#9a8cd9', angle: 15 },
+  });
+  const currentValues = baked || panel.values;
+
+  function drawFrame(dt, elapsed, values) {
+    clock += dt * values.speed;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const unit = Math.min(W, H);
+    const size = 0.6 + values.scale * 0.4;
+    const w = clock * (2 * Math.PI / 11); // ~11 s swell cycle at speed 1
+    const ph = values.phase * Math.PI;
+
+    // Frame of the swell: the lip runs from the peak (upper right) down
+    // toward its shoulder (lower left). u points along the lip toward the
+    // shoulder, n points down the face.
+    const lipAngle = (150 + 4 * Math.sin(w * 0.5 + ph)) * Math.PI / 180;
+    const ux = Math.cos(lipAngle), uy = Math.sin(lipAngle);
+    const nx = uy, ny = -ux;
+    const travel = values.motion * unit * 0.07 * Math.sin(w + ph * 0.5);
+    const px = W * 0.7 + ux * travel;
+    const py = H * 0.25 + uy * travel;
+    const rise = 0.86 + 0.14 * Math.sin(w + ph);
+    const reachShoulder = unit * 0.78 * size;
+    const reachPeak = unit * 0.6 * size;
+    const faceDepth = unit * 0.5 * size;
+    const back = unit * 0.022 * size;
+    const curl = 0.0004 / size;
+
+    function light(x, y) {
+      const dx = x - px, dy = y - py;
+      const a = dx * ux + dy * uy;
+      // The lip is highest at the peak and falls away on both sides of it,
+      // faster past the peak than along the long shoulder.
+      const b = dx * nx + dy * ny + curl * (a > 0 ? a * a * 0.5 : -a * a * 1.6);
+      const ea = a < 0 ? a / reachPeak : a / reachShoulder;
+      const env = Math.exp(-ea * ea * 2.2) * rise;
+      if (env < 0.03) return 0;
+      if (b < 0) {
+        // Behind the lip the light is gone almost at once: a hard top edge.
+        const t = -b / back;
+        return env * Math.exp(-t * t);
+      }
+      const depth = faceDepth * (0.3 + 0.7 * env);
+      if (b > depth) return 0;
+      const v = b / depth; // 0 at the lip, 1 in the trough
+      // Bright lip, a darker concave face, a paler foot, then the trough.
+      const lip = Math.exp(-v / 0.07);
+      const foot = Math.exp(-((v - 0.62) * (v - 0.62)) / 0.035);
+      let L = env * (0.92 * lip + 0.24 + 0.3 * foot) * (1 - v * v);
+      // Water moving up the face: soft streaks across the lip line.
+      L *= 1 + 0.17 * Math.sin(a * 0.03 / size - v * 2.5 - w * 2 + ph * 2) * Math.min(1, v * 6);
+      return L;
+    }
+
+    // The screen: a square grid at `angle`, pitch from `density`.
+    const pitch = Math.max(3, (unit * 0.0135) / values.density);
+    const theta = values.angle * Math.PI / 180;
+    const ex = Math.cos(theta), ey = Math.sin(theta);
+    const maxR = pitch * (0.16 + 0.34 * values.stroke);
+    const cx = W / 2, cy = H / 2;
+    const half = Math.hypot(W, H) / 2;
+    const steps = Math.ceil(half / pitch);
+    const floor = 0.06; // hard tone floor: darker water draws nothing
+
+    const buckets = Array.from({ length: BUCKETS }, () => []);
+    circles = [];
+    for (let i = -steps; i <= steps; i++) {
+      for (let j = -steps; j <= steps; j++) {
+        const x = cx + (i * ex - j * ey) * pitch;
+        const y = cy + (i * ey + j * ex) * pitch;
+        if (x < -pitch || y < -pitch || x > W + pitch || y > H + pitch) continue;
+        const L = Math.min(1, light(x, y));
+        if (L < floor) continue;
+        const r = maxR * Math.sqrt((L - floor) / (1 - floor));
+        if (r < 0.6) continue;
+        const f = Math.min(BUCKETS - 1, Math.floor((1 - L) * BUCKETS));
+        buckets[f].push(x, y, r, L);
+      }
+    }
+
+    for (let f = 0; f < BUCKETS; f++) {
+      const list = buckets[f];
+      if (!list.length) continue;
+      const stop = paletteHsl(values, (f + 0.5) / BUCKETS);
+      const [r, g, b] = hslToRgb(stop.h, stop.s, values.invert ? 0.14 : 0.86);
+      const color = `rgb(${r},${g},${b})`;
+      if (values.glow > 0 && !values.invert) {
+        // Bloom: a wide, faint underlay on the brighter dots only.
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = values.glow * 0.09 * values.opacity;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        for (let q = 0; q < list.length; q += 4) {
+          if (list[q + 3] < 0.45) continue;
+          const rr = list[q + 2] * (1.6 + values.glow);
+          ctx.moveTo(list[q] + rr, list[q + 1]);
+          ctx.arc(list[q], list[q + 1], rr, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.globalAlpha = values.opacity;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (let q = 0; q < list.length; q += 4) {
+        ctx.moveTo(list[q] + list[q + 2], list[q + 1]);
+        ctx.arc(list[q], list[q + 1], list[q + 2], 0, Math.PI * 2);
+        circles.push({ cx: list[q], cy: list[q + 1], r: list[q + 2], fill: color, opacity: values.opacity });
+      }
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg([], { width: canvas.width, height: canvas.height, circles }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
