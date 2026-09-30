@@ -31,10 +31,28 @@
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
-  import { createCamera } from '../../shared/project.js';
+  import { createCamera, rotatePoint } from '../../shared/project.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createOrbit } from '../../shared/pointer.js';
 
+  // globe — a tilted sphere described only by parallel latitude slices,
+  // whose hairlines crowd and brighten toward the limb.
+  //
+  // There are no longitude lines and no pole marker: the slices are spaced
+  // evenly along the axis (not evenly in latitude angle, which would bunch
+  // them at the poles), stop short of both poles, and fade as they shrink,
+  // so neither pole ever collects light.
+  //
+  // Text-safe zone: the left third of the frame. The sphere sits in the
+  // central square, nudged right of centre.
+  // Anchor: the brightest limb arc, upper right. It is not drawn as a glow:
+  // a screen-fixed rim weight lifts the slices where they turn edge-on on
+  // that side, and they stack there additively.
+  //
+  // Latitude slices are rotationally symmetric about their own axis, so a
+  // spin about the pole would be invisible. The axis therefore leans at a
+  // fixed obliquity and precesses (Speed) and nods (Motion); that keeps the
+  // slices sweeping and keeps Yaw visible.
   const PIECE_ID = 'globe';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -46,30 +64,25 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // Ring/meridian counts derive per frame from density — no persistent
-  // array. SEG_* are per-curve segment resolution, for SVG export fidelity
-  // and smooth circles at rest.
-  const BASE_LATS = 10;  // latitude rings, excluding the two poles
-  const BASE_LONS = 16;  // longitude meridians, pole to pole
-  const SEG_LAT = 64;
-  const SEG_LON = 48;
-  const MAX_LAT_DEG = 82; // stops short of the poles so a ring never degenerates to a point
-  const FOV = 650;
+  // Slice count derives per frame from density — no persistent array.
+  const BASE_SLICES = 70;
+  const SEG = 144;            // segments per slice
+  const Y_MAX = 0.94;         // slices stop short of the poles
+  const OBLIQUITY = 0.3;      // radians the axis leans off its mean direction
+  const PRECESS_PERIOD = 20;  // seconds per precession turn at speed 1
+  const NOD_PERIOD = 13;      // seconds per nod cycle (Motion's gesture)
+  const BUCKETS = 8;          // alpha levels a slice's runs are stroked in
+  // Screen direction of the rim light, pointing away from the left-third
+  // safe zone (canvas y runs down, so this is up and to the right).
+  const LX = 0.78, LY = -0.62;
   let paths = [];
 
-  // Distinct from the three orb pieces (orbitals, infall,
-  // funnel), which are all flat screen-space discs squashed by a
-  // tilt factor, and from parallax, which is a flat diagonal fan/lens with
-  // no real depth axis. globe is a real 3D sphere — latitude small-circles
-  // at radius R*cos(lat) plus longitude great-circles converging at the
-  // poles, both walked through shared/project.js's perspective camera,
-  // same as wireframe-lattice. Structure, not colour, is the differentiator.
   const PRESETS = {
-    whisper: { opacity: 0.28, stroke: 1, density: 0.55, saturation: 0.08, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.6, density: 0.75, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.9, stroke: 0.85, density: 1.1, saturation: 0.95, glow: 1.1 },
-    drift:   { opacity: 0.5, stroke: 0.8, density: 0.65, speed: 0.3, motion: 1.7 },
-    dense:   { opacity: 0.62, stroke: 0.6, density: 1.8, speed: 0.7, glow: 0 },
+    whisper: { opacity: 1, stroke: 1, density: 0.6, glow: 0, motion: 0.5 },
+    ink:     { opacity: 1, stroke: 1.5, density: 0.75, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.05, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.75, stroke: 0.8, density: 0.8, speed: 0.4, motion: 1.8, phase: 0.8 },
+    dense:   { opacity: 0.9, stroke: 0.9, density: 1.5, glow: 0.4, rotX: 26 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -78,20 +91,12 @@
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 18, category: 'interaction' },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 34, category: 'interaction' },
       { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
     ],
-    // Hue 105/130: the old globe (pre-redesign) sat at 340/355, which
-    // parallax's own 344/24 now occupies (parallax replaced globe, so it
-    // inherited territory near its hue). Checked against every piece's
-    // full hue->hueB ramp, not just start hues — 285->344 (the gap a
-    // start-hue-only scan suggests) is a false gap: it's crossed by
-    // orbitals's 265->330 ramp. The actual open arc is cipher-bloom's
-    // 76 to longwave's 150, ~74 degrees untouched by any ramp on either
-    // end. Centred inside it (green, unrelated to any orb-family hue) so
-    // globe's colour doesn't reinforce the orb-family read even
-    // incidentally — the real differentiator is the geometry below.
-    defaults: { hue: 105, hueB: 130, saturation: 0.4, colorMode: 'gradient', colorA: '#3fd166', colorB: '#4bd18f' },
+    // Monochrome by default (house look §1). The hue pair is what the neon
+    // preset and the colour pickers light up.
+    defaults: { hue: 105, hueB: 130, saturation: 0, colorMode: 'gradient', colorA: '#3fd166', colorB: '#4bd18f' },
   });
   const currentValues = baked || panel.values;
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -120,136 +125,165 @@
     },
   });
 
-  const camera = createCamera({ fov: FOV });
+  const camera = createCamera({ fov: 1200 });
 
-  // Draws one already-projected polyline. Walks in order and breaks the
-  // run at any point behind the camera (scale <= 0) instead of filtering —
-  // a skipped interior point must start a new subpath, not get bridged
-  // over. Each segment is stroked individually so its own average `scale`
-  // (the projection's perspective divisor — larger is nearer) can drive a
-  // per-segment alpha: the far hemisphere recedes instead of reading flat,
-  // which is the depth cue a lat/long wire mesh needs to read as a surface
-  // rather than a mandala.
-  function strokeRun(pts, values, lineWidth, rgb) {
-    const run = pts.filter((p) => p.scale > 0);
-    // Still record broken sub-runs for SVG fidelity.
-    let cur = [];
-    for (const p of pts) {
-      if (p.scale > 0) cur.push([p.x, p.y]);
-      else if (cur.length >= 2) { paths.push(cur); cur = []; }
-      else cur = [];
+  function strokeRuns(runs, alpha, lineWidth, rgb) {
+    if (!runs.length || alpha <= 0) return;
+    ctx.beginPath();
+    for (const run of runs) {
+      ctx.moveTo(run[0].x, run[0].y);
+      for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
     }
-    if (cur.length >= 2) paths.push(cur);
-    if (run.length < 2) return;
-
-    const [r, g, b] = rgb;
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.min(1, alpha)})`;
     ctx.lineWidth = lineWidth;
-    for (let i = 0; i < run.length - 1; i++) {
-      // A point right at the run's seam (scale <= 0 neighbour skipped) can
-      // still be drawn against the next in-front point — fine, since both
-      // endpoints here are already filtered to scale > 0.
-      const a = run[i], b2 = run[i + 1];
-      const avgScale = (a.scale + b2.scale) / 2;
-      const depthAlpha = Math.max(0.22, Math.min(1, avgScale * 0.72));
-      const alpha = values.opacity * depthAlpha;
-      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
-        ctx.globalAlpha = values.glow * 0.25 * depthAlpha;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b2.x, b2.y);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        ctx.lineWidth = lineWidth;
-      }
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b2.x, b2.y);
-      ctx.stroke();
-    }
+    ctx.stroke();
   }
 
   function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, W, H);
+    // Additive on the dark ground, so wherever slices crowd (the limb) the
+    // image brightens on its own. On the light ground `lighter` would clip
+    // to white, so dark ink layers with plain alpha there.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at shared points (alpha buckets), and round caps
+    // would overlap there and add up to beads under 'lighter'.
+    ctx.lineCap = 'butt';
 
     paths = [];
-    // R stays under 0.8*FOV even at Scale's max (2), so the near-plane cap
-    // in shared/project.js (20% of fov ahead of the lens) never silently
-    // swallows the sphere's front cap: 0.35*2 = 0.7 < 0.8.
-    const R = FOV * 0.35 * values.scale;
-    const lats = Math.max(3, Math.round(BASE_LATS * values.density));
-    const lons = Math.max(4, Math.round(BASE_LONS * values.density));
-    const light = values.invert ? 0.35 : 0.62;
-    const baseWidth = 0.3 + values.stroke * 1.0;
+    const S = Math.min(W, H);
+    const size = 0.35 + 0.65 * values.scale;
+    const R = S * 0.3 * size;
+    // fov tracks the frame so the perspective reads the same at any size,
+    // and stays well over R / 0.8 at Scale 2, so the near plane in
+    // shared/project.js never clips the sphere's front.
+    const fov = S * 1.6;
+    const slices = Math.max(8, Math.round(BASE_SLICES * values.density));
+    const light = values.invert ? 0.14 : 0.88 - 0.26 * values.saturation;
+    const lineWidth = 0.5 + values.stroke * 0.4;
+    const peak = values.opacity * (values.invert ? 0.5 : 0.4);
 
-    // Speed drives the continuous spin — the piece's headline motion, so a
-    // spinning globe survives Speed 0 as a still frame rather than going
-    // inert (the read is just frozen, not gone). Motion drives an
-    // independent axial wobble (precession), a small oscillation on tilt
-    // distinct from the yaw spin — Motion 0 flattens it to a fixed tilt,
-    // Speed 0 leaves it oscillating; neither is a proxy for the other.
-    const spin = elapsed * values.speed * 0.35;
-    const wobble = Math.sin(elapsed * values.motion * 0.22) * 6 * (Math.PI / 180);
+    // Speed is the tempo of everything (Speed 0 is a still frame). The axis
+    // precesses once per PRECESS_PERIOD; Motion is the amplitude of a
+    // separate slow nod of its lean, so Motion 0 keeps the precession and
+    // loses the nod.
+    const t = elapsed * values.speed;
+    // Starts half a turn in, so the opening frames show the slices open.
+    const precess = (t / PRECESS_PERIOD + 0.5) * Math.PI * 2;
+    const lean = OBLIQUITY + values.motion * 0.1 * Math.sin((t / NOD_PERIOD) * Math.PI * 2);
+    const cl = Math.cos(lean), sl = Math.sin(lean);
+    const cp = Math.cos(precess), sp = Math.sin(precess);
 
-    camera.set({
-      tilt: (values.rotX * Math.PI) / 180 + wobble,
-      yaw: (values.rotY * Math.PI) / 180 + spin,
+    const view = {
+      tilt: (values.rotX * Math.PI) / 180,
+      yaw: (values.rotY * Math.PI) / 180,
       roll: (values.angle * Math.PI) / 180,
-      cx: canvas.width / 2,
-      cy: canvas.height / 2,
-    });
+    };
+    const cx = W / 2 + 0.07 * S;
+    const cy = H / 2;
+    camera.set({ ...view, fov, cx, cy });
 
-    // Phase RESTRUCTURES the latitude spacing rather than translating the
-    // whole mesh (translation on a rotationally symmetric, already-spinning
-    // figure is imperceptible — see funnel's own note on why it
-    // warps radius instead of yaw). warpLat is the identity at Phase 0 and
-    // stays monotonic in v across [-1, 1], so rings never cross; increasing
-    // Phase bunches rings toward the equator.
-    const warpLat = (v) => Math.sign(v) * Math.pow(Math.abs(v), 1 + values.phase * 1.5);
+    // Phase restructures the slicing: identity at 0, and increasingly
+    // bunches slices toward the equator. Monotonic in v, so slices never
+    // cross.
+    const warp = (v) => Math.sign(v) * Math.pow(Math.abs(v), 1 + values.phase * 0.9);
 
-    // --- Latitude rings (small circles at fixed y, radius R*cos(lat)) ---
-    for (let i = 0; i < lats; i++) {
-      const u = lats === 1 ? 0.5 : i / (lats - 1);
-      const v = warpLat(u * 2 - 1); // -1..1
-      const latDeg = v * MAX_LAT_DEG;
-      const lat = (latDeg * Math.PI) / 180;
-      const ringR = Math.cos(lat);
-      const y = Math.sin(lat);
+    for (let k = 0; k < slices; k++) {
+      const f = slices === 1 ? 0.5 : k / (slices - 1);
+      const y = warp(f * 2 - 1) * Y_MAX;
+      const ring = Math.sqrt(1 - y * y);
+      // Small polar slices fade out so the poles never gather light.
+      const polarFade = Math.min(1, Math.max(0, (ring - 0.2) / 0.3));
 
-      const f = (i + 0.5) / lats;
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
+      const model = [];
+      const weights = [];
+      for (let s = 0; s <= SEG; s++) {
+        const a = (s / SEG) * Math.PI * 2;
+        // Unit sphere point, pole along +Y, then lean about Z and precess
+        // about Y.
+        const x0 = Math.cos(a) * ring, z0 = Math.sin(a) * ring;
+        const x1 = x0 * cl - y * sl;
+        const y1 = x0 * sl + y * cl;
+        const nx = x1 * cp - z0 * sp;
+        const nz = x1 * sp + z0 * cp;
+        model.push([nx * R, y1 * R, nz * R]);
 
-      const pts = [];
-      for (let s = 0; s <= SEG_LAT; s++) {
-        const a = (s / SEG_LAT) * Math.PI * 2;
-        const dx = Math.cos(a) * ringR;
-        const dz = Math.sin(a) * ringR;
-        pts.push([dx * R, y * R, dz * R]);
+        // Limb weight, against the true eye position (the camera is close
+        // enough that a straight-on view direction misplaces the limb).
+        const n = rotatePoint(nx, y1, nz, view);
+        const vz = R * n.z + fov;
+        const facing = (R + fov * n.z) / Math.sqrt(R * R * (n.x * n.x + n.y * n.y) + vz * vz);
+        const limb = 1 - Math.abs(facing);
+        const nl = Math.hypot(n.x, n.y) || 1;
+        const rim = Math.max(0, (n.x * LX + n.y * LY) / nl);
+        const back = facing > 0 ? 0.5 : 1;
+        // Toward the lit side the limb brightens; away from it the limb is
+        // held down, since the slices' envelope already crowds there.
+        const lit = rim * rim;
+        weights.push(back * (0.3 * (1 - 0.6 * limb * (1 - rim)) + 0.7 * limb * limb * lit));
       }
-      strokeRun(camera.projectPath(pts), values, baseWidth, [r, g, b]);
+
+      const pts = camera.projectPath(model);
+      const buckets = Array.from({ length: BUCKETS }, () => []);
+      const svgRuns = [];
+      let run = [];
+      let svgRun = [];
+      let runB = -1;
+      for (let s = 0; s < SEG; s++) {
+        const p = pts[s], q = pts[s + 1];
+        if (p.scale <= 0 || q.scale <= 0) {
+          if (run.length >= 2) buckets[runB].push(run);
+          if (svgRun.length >= 2) svgRuns.push(svgRun);
+          run = []; svgRun = []; runB = -1;
+          continue;
+        }
+        const w = (weights[s] + weights[s + 1]) / 2;
+        const b = Math.min(BUCKETS - 1, Math.floor(w * BUCKETS));
+        if (b !== runB) {
+          if (run.length >= 2) buckets[runB].push(run);
+          run = [p];
+          runB = b;
+        }
+        run.push(q);
+        if (!svgRun.length) svgRun.push([p.x, p.y]);
+        svgRun.push([q.x, q.y]);
+      }
+      if (run.length >= 2) buckets[runB].push(run);
+      if (svgRun.length >= 2) svgRuns.push(svgRun);
+      for (const r of svgRuns) paths.push(r);
+
+      const { h, s } = paletteHsl(values, f);
+      const rgb = hslToRgb(h, s, light);
+      for (let b = 0; b < BUCKETS; b++) {
+        const alpha = peak * polarFade * ((b + 0.5) / BUCKETS);
+        if (values.glow > 0 && b >= BUCKETS - 3) {
+          strokeRuns(buckets[b], alpha * values.glow * 0.3, lineWidth + values.glow * 2.2, rgb);
+        }
+        strokeRuns(buckets[b], alpha, lineWidth, rgb);
+      }
     }
 
-    // --- Longitude meridians (great circles through both poles) ---
-    for (let j = 0; j < lons; j++) {
-      const lon = (j / lons) * Math.PI * 2;
-      const f = j / lons;
-      const { h, s } = paletteHsl(values, f);
+    // Glow is a fallback for the anchor, off by default: the lit limb arc is
+    // already the brightest place from the stacked slices alone.
+    const centre = camera.project(0, 0, 0);
+    if (values.glow > 0 && centre.scale > 0) {
+      const rs = R * centre.scale * 0.96;
+      const gx = centre.x + LX * rs, gy = centre.y + LY * rs;
+      const { h, s } = paletteHsl(values, 1);
       const [r, g, b] = hslToRgb(h, s, light);
-
-      const pts = [];
-      for (let s = 0; s <= SEG_LON; s++) {
-        const lat = (s / SEG_LON) * Math.PI - Math.PI / 2; // -90..90 (pole to pole)
-        const cLat = Math.cos(lat);
-        const dx = Math.cos(lon) * cLat;
-        const dy = Math.sin(lat);
-        const dz = Math.sin(lon) * cLat;
-        pts.push([dx * R, dy * R, dz * R]);
-      }
-      strokeRun(camera.projectPath(pts), values, baseWidth * 0.85, [r, g, b]);
+      const gr = (18 + 40 * values.glow) * size;
+      const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${Math.min(1, 0.35 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(gx, gy, gr, 0, Math.PI * 2);
+      ctx.fill();
     }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({
