@@ -241,13 +241,29 @@ sheet reads as one collection.
 
 ## Phase 4 — Materials and range
 
-- **4.1 Grain / lit-volume technique**, in progress as **`dune`**: a
-  wind-shaped ridge of film grain under a low raking light. This is a new
-  capability: soft, film-grain shaded forms rendered in Canvas 2D with no
-  dependencies. Its SVG export story is decided up front, because it is
-  raster by nature.
-- **4.2 Halftone**, in progress as **`swell`**: one ocean swell drawn in dots
-  whose size carries the light. Deliberately not a sphere or a ring.
+- **4.1 Grain / lit-volume technique.** This is a new capability: soft,
+  film-grain shaded forms rendered in Canvas 2D with no dependencies.
+  - [x] First piece: `dune`, a wind-shaped ridge of film grain under a low
+    raking light. A heightfield is marched column by column in an oblique
+    orthographic view into a half-resolution luminance buffer, shaded by one
+    low directional light (Angle turns it). Each buffer pixel becomes a
+    grain with a probability set by its light, hashed from (x, y, grain
+    frame), never `Math.random`. The buffer is written through a
+    `Uint32Array` view of ImageData and upscaled with `drawImage`, smoothing
+    off. Grain is composed as `max(ground, ink)`, not blended, so faint
+    grain carries no blue cast from the ground. About 7 ms a frame at
+    1280×800, 60fps.
+  - [x] SVG story, decided: export the line geometry only (the brink and the
+    ripple lines as polylines). No embedded bitmap. See Known limitations.
+- **4.2 Halftone.**
+  - [x] First piece: `swell`, one ocean swell drawn in dots whose area
+    carries the light. Deliberately not a sphere or a ring. Tone is carried
+    by size at full alpha, and a hard tone floor keeps dark water empty.
+    The light field is long along the lip and asymmetric across it, so dot
+    sizes never form rings. Density sets the pitch and Angle the screen
+    angle. Scale sizes the swell, because screen frequency and pitch would
+    be one control twice. SVG exports each dot as a `<circle>` via
+    `exportSvg()`'s additive `circles` option.
 - **4.3 Masking** (`grain-mask`, with a shape of our own) comes next.
 - **"Radial fibre" is dropped.** Every stub it held matched a reference
   piece (see INSPIRATION's audit).
@@ -345,6 +361,11 @@ geometry. PNG export is unaffected.
 measures 0.047% changed pixels against a floor other colour controls clear
 at about 0.06%. The hue link is real. It's just too subtle at the
 collection's lowest ink coverage, which is deliberate for the home-page hero.
+
+**`dune`'s SVG has no grain.** Film grain has no line geometry, so the
+SVG carries the brink and the ripple lines as polylines and nothing else.
+Embedding the grain as a bitmap would make the SVG a PNG in disguise. PNG
+export carries the grain.
 
 **`cipher-bloom` exports SVG `<text>`, not `<polyline>`.** A glyph has no
 line geometry to export. `shared/export.js`'s `exportSvg()` takes an

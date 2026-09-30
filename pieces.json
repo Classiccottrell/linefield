@@ -130,5 +130,23 @@
     "blurb": "A lat/long wire sphere spinning in true perspective, tilt and yaw draggable.",
     "tags": ["3d", "geometric"],
     "hue": 105, "hueB": 130, "saturation": 0.4
+  },
+  {
+    "slug": "dune",
+    "title": "Dune",
+    "blurb": "One wind-cut ridge built from film grain, its face caught by a low raking light and crossed by faint ripples.",
+    "tags": ["grain", "organic", "depth"],
+    "hue": 45, "hueB": 0, "saturation": 0,
+    "safeZone": "top band and upper right",
+    "anchor": "lit brink, centre"
+  },
+  {
+    "slug": "swell",
+    "title": "Swell",
+    "blurb": "A single ocean swell rising on a diagonal, drawn in halftone dots whose size carries the light on its face.",
+    "tags": ["geometric", "optical", "editorial"],
+    "hue": 185, "hueB": 250, "saturation": 0,
+    "safeZone": "lower left",
+    "anchor": "lip, upper right"
   }
 ]

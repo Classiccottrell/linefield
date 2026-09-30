@@ -133,7 +133,7 @@ inventory than invitation.
 
 ## Gallery
 
-`index.html` at the repo root shows all eighteen pieces with live previews,
+`index.html` at the repo root shows all twenty pieces with live previews,
 filtering, and per-piece downloads. Serve the repo and open `/`:
 
 ```bash
@@ -163,6 +163,8 @@ tooling" below and CONTRIBUTING.md.
 - `driftwork` — alternating violet-grey ellipse marks following two crossing currents, with depth and dissolving edges
 - `pleat` — coral and ivory rectangular marks gathering into two folded surfaces with a clean cut between them
 - `globe` — a lat/long wire sphere spinning in true perspective, tilt and yaw draggable
+- `dune` — one wind-cut ridge built from film grain, lit by a low raking light, with faint ripples crossing its lit face
+- `swell` — a single ocean swell rising on a diagonal, drawn as a halftone screen whose dot size carries its light
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,
@@ -255,7 +257,7 @@ npm run collection-check             # NOT run in CI yet, but DOES exit non-zero
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
 canvas, captured at 1280×800) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
-never reimplemented) for all eighteen pieces, then renders `index.html` at
+never reimplemented) for all twenty pieces, then renders `index.html` at
 the repo root from `tools/templates/gallery.html` and the manifest — the
 gallery page itself, with live hover/keyboard previews, tag filtering, and
 per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
@@ -373,6 +375,10 @@ Two things to know:
   their path points are recorded before that rotation is applied, so the
   exported SVG shows the unrotated geometry. Use PNG export if you need the
   rotated view.
+- `dune`'s SVG export carries its line geometry only: the brink and the
+  ripple lines, as polylines. Its film grain is raster by nature and is not
+  in the SVG, embedded or otherwise. Use PNG export for the grain.
+  `swell` exports every dot as a `<circle>`.
 
 ## License
 

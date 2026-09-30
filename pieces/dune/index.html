@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — dune</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  dune — a single wind-shaped ridge built from film grain, lit by a low
+  raking light, with faint ripple lines crossing its lit face.
+
+  Anchor: the lit crest, the upper face just under the brink where the
+  ridge stands tallest (centre of the frame).
+  Text-safe zone: the sky band above the ridge (the top ~40%) and the upper
+  right. Nothing is lit there: only the ridge carries grain.
+
+  Technique (the grain / lit-volume material): the ridge is a heightfield
+  seen in an oblique orthographic view, marched column by column front to
+  back into a half-resolution luminance buffer, and shaded by one low
+  directional light. Each buffer pixel then becomes a
+  grain or stays ground, with a probability set by its light, hashed from
+  (x, y, grain frame) so a frame is deterministic. The buffer is written
+  through ImageData and upscaled with drawImage. Ripples and the crest are
+  real hairlines drawn over it.
+
+  SVG export: the grain is raster by nature and has no line geometry, so it
+  is NOT exported (no embedded bitmap). The SVG carries the crest line and
+  the ripple lines as polylines — the piece's honest line geometry. Use PNG
+  for the grain.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'dune';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // One grain is GRAIN x GRAIN canvas pixels. Half resolution keeps the
+  // per-pixel pass inside a frame budget and gives grain a visible size.
+  const GRAIN = 2;
+  const LEVELS = 32; // grain intensity steps
+  const HUES = 16; // colour ramp steps
+
+  let gw = 0, gh = 0, grain, grainCtx, image, pixels, lum;
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    gw = Math.ceil(canvas.width / GRAIN);
+    gh = Math.ceil(canvas.height / GRAIN);
+    grain = document.createElement('canvas');
+    grain.width = gw;
+    grain.height = gh;
+    grainCtx = grain.getContext('2d');
+    image = grainCtx.createImageData(gw, gh);
+    pixels = new Uint32Array(image.data.buffer);
+    lum = new Float32Array(gw * gh);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const palette = new Uint32Array(HUES * LEVELS);
+  let paths = [];
+  let clock = 0;
+
+  const PRESETS = {
+    whisper: { opacity: 0.55, density: 0.45, stroke: 0.5, scale: 0.8, glow: 0 },
+    ink:     { opacity: 1, density: 1.2, stroke: 1.6, scale: 0.9, angle: 35, glow: 0 },
+    neon:    { opacity: 0.95, density: 1.1, saturation: 0.8, glow: 1.2, angle: 330 },
+    drift:   { opacity: 0.8, density: 0.8, speed: 0.35, motion: 1.8, phase: 1.1, scale: 1.15 },
+    dense:   { opacity: 0.9, density: 2, stroke: 0.7, scale: 1.35, glow: 0.6, angle: 345 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    defaults: { hue: 45, hueB: 0, saturation: 0, colorMode: 'gradient', colorA: '#d9c08c', colorB: '#d98c8c', opacity: 0.9 },
+  });
+  const currentValues = baked || panel.values;
+
+  // Integer hash of (x, y, frame) -> 32 bits. Never Math.random: the grain
+  // must be the same for the same frame, whatever else the page has drawn.
+  function hash(x, y, f) {
+    let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(f, 2246822519);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+
+  function buildPalette(values) {
+    const ground = values.invert ? [242, 242, 244] : [10, 10, 13];
+    for (let c = 0; c < HUES; c++) {
+      const stop = paletteHsl(values, c / (HUES - 1));
+      const ink = hslToRgb(stop.h, stop.s, values.invert ? 0.12 : 0.86);
+      for (let l = 0; l < LEVELS; l++) {
+        const a = (l + 1) / LEVELS;
+        let r, g, b;
+        if (values.invert) {
+          r = ground[0] + (ink[0] - ground[0]) * a;
+          g = ground[1] + (ink[1] - ground[1]) * a;
+          b = ground[2] + (ink[2] - ground[2]) * a;
+        } else {
+          // max(ground, ink), not a blend: a faint grain never inherits the
+          // ground's blue cast, so the monochrome default stays neutral.
+          r = Math.max(ground[0], ink[0] * a);
+          g = Math.max(ground[1], ink[1] * a);
+          b = Math.max(ground[2], ink[2] * a);
+        }
+        palette[c * LEVELS + l] = (255 << 24) | (Math.round(b) << 16) | (Math.round(g) << 8) | Math.round(r);
+      }
+    }
+    return (255 << 24) | (ground[2] << 16) | (ground[1] << 8) | ground[0];
+  }
+
+  // Crest tables over depth Z, rebuilt each frame (the crest sways).
+  const ZN = 640;
+  const tabX = new Float32Array(ZN + 1), tabDX = new Float32Array(ZN + 1);
+  const tabH = new Float32Array(ZN + 1), tabDH = new Float32Array(ZN + 1);
+
+  function drawFrame(dt, elapsed, values) {
+    clock += dt * values.speed;
+
+    // --- the ridge -----------------------------------------------------
+    // World: X across, Y up, Z away from the viewer, seen from a low angle
+    // (TILT) in an orthographic projection, so each grain column is one X.
+    // The crest runs away from the viewer on a diagonal; the windward face
+    // (with the ripples) faces right and toward the viewer, into the light;
+    // the slip face falls away behind it into shadow.
+    const size = 0.55 + values.scale * 0.45;
+    const HMAX = 2.6 * size;
+    const LONG = 6.2 * size;
+    const LW = 3.4 * size; // windward run
+    const LL = 2.4 * size; // slip-face run
+    const Z0 = 0.5;
+    const ZA = -9, ZB = 11;
+    const sway = values.motion * 0.55;
+    const tp = clock * 0.52; // ~12 s period at speed 1
+    const ph = values.phase * Math.PI;
+    for (let i = 0; i <= ZN; i++) {
+      const Z = ZA + (i / ZN) * (ZB - ZA);
+      tabX[i] = 0.62 * Z + 1.0 * Math.sin(Z * 0.34 + ph + 0.5) + 0.3 * Math.sin(Z * 0.8 - ph * 0.7)
+        + sway * Math.sin(Z * 0.27 - tp);
+      // A long shoulder toward the viewer, a shorter fall at the far end.
+      const e = (Z - Z0) / (Z < Z0 ? LONG * 1.25 : LONG * 0.8);
+      tabH[i] = HMAX * Math.exp(-e * e * 1.8) * (1 + 0.08 * Math.sin(Z * 0.6 + ph + tp * 0.5));
+    }
+    const dz = (ZB - ZA) / ZN;
+    for (let i = 0; i <= ZN; i++) {
+      const a = Math.max(0, i - 1), b = Math.min(ZN, i + 1);
+      tabDX[i] = (tabX[b] - tabX[a]) / ((b - a) * dz);
+      tabDH[i] = (tabH[b] - tabH[a]) / ((b - a) * dz);
+    }
+    // Crest sample at depth Z, written to cX/cH/cDX/cDH.
+    let cX = 0, cH = 0, cDX = 0, cDH = 0;
+    function crest(Z) {
+      let t = (Z - ZA) / dz;
+      if (t < 0) t = 0; else if (t > ZN - 1e-3) t = ZN - 1e-3;
+      const i = t | 0, f = t - i;
+      cX = tabX[i] + (tabX[i + 1] - tabX[i]) * f;
+      cH = tabH[i] + (tabH[i + 1] - tabH[i]) * f;
+      cDX = tabDX[i] + (tabDX[i + 1] - tabDX[i]) * f;
+      cDH = tabDH[i] + (tabDH[i + 1] - tabDH[i]) * f;
+    }
+
+    const TILT = 24 * Math.PI / 180;
+    const cosT = Math.cos(TILT), sinT = Math.sin(TILT);
+    const k = gh * 0.085; // grain px per world unit
+    // Screen X is mirrored (the ridge rises to the upper LEFT), so its
+    // gesture doesn't repeat swell's rise to the upper right.
+    const ox = gw * 0.55;
+    const oy = gh * 0.66;
+    const toX = (X) => ox - X * k;
+    const toY = (Y, Z) => oy - (Y * cosT + Z * sinT) * k;
+
+    // Profile across the crest: p(s) in [0, 1]; s = crest X - X, so s < 0
+    // is the windward side, to the right of the brink.
+    let p = 0, dp = 0;
+    function profile(s) {
+      if (s <= 0) {
+        const q = 1 + s / LW;
+        if (q > 0) { p = 0.4 * q + 0.6 * q * q; dp = (0.4 + 1.2 * q) / LW; } else { p = 0; dp = 0; }
+      } else {
+        const q = 1 - s / LL;
+        if (q > 0) { p = q; dp = -1 / LL; } else { p = 0; dp = 0; }
+      }
+    }
+
+    // Light: low and raking from the right. Angle turns it around the ridge.
+    const az = (110 + values.angle) * Math.PI / 180;
+    const el = 14 * Math.PI / 180;
+    const lx = Math.cos(el) * Math.sin(az), ly = Math.sin(el), lz = Math.cos(el) * Math.cos(az);
+    // Needs crest(Z) already called.
+    function shade(s) {
+      profile(s);
+      const hx = -cH * dp;
+      const hz = cDH * p + cH * dp * cDX;
+      const lambert = Math.max(0, (-hx * lx + ly - hz * lz) / Math.sqrt(hx * hx + 1 + hz * hz));
+      const rise = Math.min(1, (cH * p) / (0.16 * HMAX));
+      // Light gathers just under the brink and thins down the face.
+      const near = s <= 0 ? 0.35 + 0.65 * Math.exp(-(s * s) / (0.12 * LW * LW)) : 1;
+      const tall = cH / HMAX;
+      return (0.035 + 3.4 * lambert * lambert * lambert * near * (0.3 + 0.7 * tall * tall * tall * tall)) * rise;
+    }
+
+    // Ripples cross the lit face obliquely to the crest. Field value
+    // r(s, Z) = (Z + 0.85 s + wobble) / LAMBDA; line j sits at r = j + creep,
+    // so the lines creep along the ridge with the clock.
+    const LAMBDA = 0.34 * size;
+    const creep = (clock * 0.12) % 1;
+    const wob = (s, Z) => 0.22 * LAMBDA * Math.sin(s * 2.4 + Z * 0.9 + ph) + 0.1 * LAMBDA * Math.sin(Z * 2.7 - s)
+      + 0.9 * LAMBDA * Math.sin(Z * 0.31 - s * 0.6 + 1.3);
+
+    lum.fill(0);
+    const zStep = 0.7 / (k * sinT);
+    for (let col = 0; col < gw; col++) {
+      const X = (ox - col) / k;
+      let yMax = gh;
+      for (let Z = ZA; Z < ZB && yMax > 0; Z += zStep) {
+        crest(Z);
+        const s = cX - X;
+        if (s < -LW || s > LL || cH < 0.02 * HMAX) continue;
+        let L = shade(s);
+        const y = toY(cH * p, Z);
+        if (y >= yMax) continue;
+        if (s < 0) {
+          // Grain gathers on each ripple's lit side and thins between them.
+          const r = (Z + 0.85 * s + wob(s, Z)) / LAMBDA - creep;
+          const d = (r - Math.round(r)) / 0.2;
+          L *= 0.45 + 0.85 * Math.exp(-d * d);
+        }
+        if (L > 1) L = 1;
+        const top = Math.max(0, Math.ceil(y));
+        for (let row = top; row < yMax; row++) lum[row * gw + col] = L;
+        yMax = top;
+      }
+    }
+
+    // --- grain ---------------------------------------------------------
+    const ground = buildPalette(values);
+    const frame = Math.floor(clock * 24);
+    const gain = 0.35 + values.density * 0.65;
+    const amount = values.opacity;
+    for (let y = 0, i = 0; y < gh; y++) {
+      for (let x = 0; x < gw; x++, i++) {
+        const L = lum[i];
+        if (L <= 0) { pixels[i] = ground; continue; }
+        const h = hash(x, y, frame);
+        // Capped below 1 so even the brightest face keeps its grain.
+        if ((h & 0xffff) / 65536 >= L * gain * 0.8) { pixels[i] = ground; continue; }
+        const v = amount * (0.6 + 0.4 * L) * (0.8 + 0.2 * ((h >>> 16) & 255) / 255);
+        const level = Math.min(LEVELS - 1, Math.max(0, Math.round(v * LEVELS) - 1));
+        const hueIndex = Math.round((1 - L) * (HUES - 1));
+        pixels[i] = palette[hueIndex * LEVELS + level];
+      }
+    }
+    grainCtx.putImageData(image, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(grain, 0, 0, gw * GRAIN, gh * GRAIN);
+
+    // --- lines: ripples and the brink ------------------------------------
+    paths = [];
+    const stop = paletteHsl(values, 0);
+    const [lr, lg, lb] = hslToRgb(stop.h, stop.s, values.invert ? 0.12 : 0.88);
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    ctx.lineCap = 'round';
+
+    function strokeRun(points, weights, width, alphaScale) {
+      // Short runs so alpha can follow the light along one line.
+      for (let a = 0; a < points.length - 1; a += 5) {
+        const b = Math.min(points.length - 1, a + 5);
+        let w = 0;
+        for (let q = a; q <= b; q++) w += weights[q];
+        const alpha = (w / (b - a + 1)) * alphaScale;
+        if (alpha < 0.004) continue;
+        ctx.beginPath();
+        ctx.moveTo(points[a][0], points[a][1]);
+        for (let q = a + 1; q <= b; q++) ctx.lineTo(points[q][0], points[q][1]);
+        ctx.strokeStyle = `rgba(${lr},${lg},${lb},${Math.min(1, alpha)})`;
+        ctx.lineWidth = width;
+        ctx.stroke();
+      }
+    }
+
+    // Each ripple runs from the foot of the face up to the brink.
+    const width = 0.3 + values.stroke * 0.55;
+    const NS = 28;
+    const jMin = Math.floor((ZA + 0.85 * -LW) / LAMBDA), jMax = Math.ceil(ZB / LAMBDA);
+    for (let j = jMin; j <= jMax; j++) {
+      const pts = [], wts = [];
+      let any = false;
+      for (let q = 0; q <= NS; q++) {
+        const s = -LW + (q / NS) * (LW - 0.02);
+        let Z = (j + creep) * LAMBDA - 0.85 * s;
+        Z -= wob(s, Z);
+        crest(Z);
+        const L = Math.min(1, shade(s));
+        const fade = Math.min(1, (s + LW) / (0.3 * LW));
+        const w = L * fade * Math.min(1, cH / (0.3 * HMAX));
+        if (w > 0.01) any = true;
+        pts.push([toX(cX - s) * GRAIN, toY(cH * p, Z) * GRAIN]);
+        wts.push(w);
+      }
+      if (!any) continue;
+      strokeRun(pts, wts, width, values.opacity * 0.3);
+      paths.push(pts);
+    }
+
+    // The brink itself, brightest where the ridge stands tallest.
+    const crestPts = [], crestW = [];
+    const NC = 220;
+    for (let q = 0; q <= NC; q++) {
+      const Z = ZA + (q / NC) * (ZB - ZA);
+      crest(Z);
+      if (cH < 0.03 * HMAX) continue;
+      const L = shade(-0.01);
+      crestPts.push([toX(cX) * GRAIN, toY(cH, Z) * GRAIN]);
+      crestW.push(Math.pow(cH / HMAX, 2) * Math.min(1, 0.25 + L));
+    }
+    strokeRun(crestPts, crestW, 0.4 + values.stroke * 0.5, values.opacity * 0.9);
+    if (values.glow > 0) {
+      strokeRun(crestPts, crestW, 4 + values.glow * 10, values.glow * 0.07 * values.opacity);
+      strokeRun(crestPts, crestW, 14 + values.glow * 26, values.glow * 0.03 * values.opacity);
+    }
+    if (crestPts.length > 1) paths.push(crestPts);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

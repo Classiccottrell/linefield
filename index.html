@@ -565,6 +565,46 @@
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
+  <article class="card" data-tags="grain organic depth" style="--accent:hsl(45 0% 60%)">
+    <a class="frame" href="pieces/dune/" data-src="pieces/dune/" aria-label="Open Dune">
+      <img src="thumbs/dune.png" alt="Dune preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">45&deg;</span>
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(45 0% 60%),hsl(0 0% 60%))"></span>
+        Dune
+      </h2>
+      <p class="blurb">One wind-cut ridge built from film grain, its face caught by a low raking light and crossed by faint ripples.</p>
+      <div class="tags"><span class="tag">grain</span><span class="tag">organic</span><span class="tag">depth</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/dune/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/dune/">Copy embed</button>
+        <a class="btn" href="downloads/dune.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
+  <article class="card" data-tags="geometric optical editorial" style="--accent:hsl(185 0% 60%)">
+    <a class="frame" href="pieces/swell/" data-src="pieces/swell/" aria-label="Open Swell">
+      <img src="thumbs/swell.png" alt="Swell preview" loading="lazy" width="240" height="150" />
+      <span class="frame-label">185&deg;</span>
+    </a>
+    <div class="meta">
+      <h2 class="name">
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(185 0% 60%),hsl(250 0% 60%))"></span>
+        Swell
+      </h2>
+      <p class="blurb">A single ocean swell rising on a diagonal, drawn in halftone dots whose size carries the light on its face.</p>
+      <div class="tags"><span class="tag">geometric</span><span class="tag">optical</span><span class="tag">editorial</span></div>
+      <div class="actions">
+        <a class="btn" href="pieces/swell/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/swell/">Copy embed</button>
+        <a class="btn" href="downloads/swell.html" download>Download</a>
+      </div>
+      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+  </article>
 </div>
 
 <section class="skill" id="skill">
@@ -929,6 +969,50 @@ const PIECES = [
     "hue": 105,
     "hueB": 130,
     "saturation": 0.4,
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
+  },
+  {
+    "slug": "dune",
+    "title": "Dune",
+    "blurb": "One wind-cut ridge built from film grain, its face caught by a low raking light and crossed by faint ripples.",
+    "tags": [
+      "grain",
+      "organic",
+      "depth"
+    ],
+    "hue": 45,
+    "hueB": 0,
+    "saturation": 0,
+    "safeZone": "top band and upper right",
+    "anchor": "lit brink, centre",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ]
+  },
+  {
+    "slug": "swell",
+    "title": "Swell",
+    "blurb": "A single ocean swell rising on a diagonal, drawn in halftone dots whose size carries the light on its face.",
+    "tags": [
+      "geometric",
+      "optical",
+      "editorial"
+    ],
+    "hue": 185,
+    "hueB": 250,
+    "saturation": 0,
+    "safeZone": "lower left",
+    "anchor": "lip, upper right",
     "presets": [
       "whisper",
       "ink",
