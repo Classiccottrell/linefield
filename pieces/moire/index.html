@@ -173,7 +173,7 @@
     const ground = values.invert ? '242,242,244' : '10,10,13';
     for (let i = 0; i <= 6; i++) {
       const d = (i / 6) * veilR;
-      veil.addColorStop(i / 6, `rgba(${ground},${0.25 * (1 - Math.exp(-(d * d) / (2 * (R * 0.55) ** 2)))})`);
+      veil.addColorStop(i / 6, `rgba(${ground},${0.5 * (1 - Math.exp(-(d * d) / (2 * (R * 0.55) ** 2)))})`);
     }
     ctx.fillStyle = veil;
     ctx.fillRect(cx - R - 2, cy - R - 2, 2 * R + 4, 2 * R + 4);
