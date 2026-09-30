@@ -124,12 +124,21 @@
 <body>
 <canvas id="canvas" width="1280" height="800"></canvas>
 
+<!--
+  moire — two gratings of fine parallel straight lines inside one circular
+  aperture, one rocking slowly against the other, so broad moiré bands
+  sweep across the disc.
+  Text-safe zone: everything outside the aperture; the left third is
+  widest.
+  Anchor: the pinned bright band at the pivot, left of the disc's centre.
+-->
 
 
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.75,"colorMode":"gradient","colorA":"#00eaff","colorB":"#ff00aa","hue":185,"hueB":320,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"split":1};
+
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#00eaff","colorB":"#ff00aa","hue":185,"hueB":320,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"split":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1209,17 +1218,29 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // Ring count is derived per frame from density — no persistent array.
-  const BASE_RINGS = 60;
-  const SEG = 64; // polygon segments per ring, for SVG export fidelity
+  // Two gratings of straight parallel lines, clipped to one circular
+  // aperture. Grating B rocks a few degrees about a pivot left of the
+  // aperture's centre; the beat between the two is the moiré, and a tilt
+  // of a few degrees magnifies the line spacing into bands ~20x wider.
+  // B sits half a period off A at the pivot, so the band pinned there is a
+  // bright one: as the tilt grows the other bands close in on it.
+  //
+  // House-look exception (§3): the gratings draw near-opaque with
+  // source-over, not low-alpha 'lighter'. Additive blending keeps the local
+  // mean the same whether the two gratings coincide or interleave, so the
+  // bands exist only as fine texture and vanish at card size. Occlusion
+  // makes interleaved regions carry more coverage, which is what a moiré
+  // band is. Only the anchor glow uses 'lighter'.
+  const BASE_LINES = 96; // per grating, across the aperture's diameter
+  const LINE_ANGLE = 58 * Math.PI / 180;
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.16, stroke: 0.6, density: 0.35, saturation: 0.08, glow: 0 },
-    ink:     { opacity: 0.9, stroke: 1.2, density: 0.5, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.85, stroke: 0.7, density: 1, saturation: 1, glow: 1.2 },
-    drift:   { opacity: 0.28, stroke: 0.5, density: 0.4, speed: 0.25, motion: 1.7, saturation: 0.25 },
-    dense:   { opacity: 0.8, stroke: 0.6, density: 1.8, speed: 0.7, saturation: 0.6, glow: 0 },
+    whisper: { opacity: 0.55, stroke: 0.7, density: 0.6, glow: 0, split: 1.4 },
+    ink:     { opacity: 1, stroke: 1.4, density: 0.85, saturation: 0, glow: 0, split: 0.75 },
+    neon:    { opacity: 0.95, stroke: 1, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.85, density: 0.8, speed: 0.4, motion: 1.8, split: 0.45, scale: 1.2 },
+    dense:   { opacity: 0.95, stroke: 0.7, density: 1.7, split: 1.5, glow: 0.5 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1228,69 +1249,113 @@ function describeForAI({ pieceName, values }) {
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
+      // Resting tilt between the two gratings: more tilt, narrower bands.
       { name: 'split', label: 'Split', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
     ],
-    defaults: { hue: 185, hueB: 320, saturation: 0.75, colorMode: 'gradient', colorA: '#00eaff', colorB: '#ff00aa' },
+    defaults: { hue: 185, hueB: 320, saturation: 0, colorMode: 'gradient', colorA: '#00eaff', colorB: '#ff00aa' },
   });
   const currentValues = baked || panel.values;
 
-  // One family of concentric rings, centred at (cx, cy).
-  function drawFamily(cx, cy, rings, spacing, rgb, values) {
+  let clock = 0;
+
+  // Draws one grating as chords of the aperture (centre cx,cy radius R),
+  // all in one path. Lines run along `dir`; line k sits at signed offset
+  // k*period + offset from the aperture centre, measured along the normal.
+  function drawGrating(cx, cy, R, dir, period, offset, rgb, alpha, shade) {
+    const ux = Math.cos(dir), uy = Math.sin(dir);
+    const nx = -uy, ny = ux;
     const [r, g, b] = rgb;
-    ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-    const lineWidth = ctx.lineWidth;
-    for (let i = 1; i <= rings; i++) {
-      const radius = i * spacing;
-      const pts = [];
-      ctx.beginPath();
-      for (let s = 0; s <= SEG; s++) {
-        const a = (s / SEG) * Math.PI * 2;
-        let x = cx + Math.cos(a) * radius;
-        let y = cy + Math.sin(a) * radius;
-        if (s === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-        pts.push([x, y]);
-      }
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
-        ctx.globalAlpha = values.glow * 0.25;
-        ctx.stroke();
-        ctx.lineWidth = lineWidth;
-        ctx.globalAlpha = 1;
-      }
-      ctx.stroke();
-      paths.push(pts);
+    const kLo = Math.ceil((-R - offset) / period);
+    const kHi = Math.floor((R - offset) / period);
+    ctx.beginPath();
+    for (let k = kLo; k <= kHi; k++) {
+      const d = k * period + offset;
+      const half = Math.sqrt(Math.max(0, R * R - d * d));
+      if (half < 1) continue;
+      const px = cx + nx * d, py = cy + ny * d;
+      const a = [px - ux * half, py - uy * half], z = [px + ux * half, py + uy * half];
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(z[0], z[1]);
+      paths.push([a, z]);
     }
+    // A shaded grating first lays a slightly wider stroke of ground colour,
+    // so where it lies over the other grating it hides it, like a slatted
+    // screen held over a lit one.
+    if (shade) {
+      const w = ctx.lineWidth;
+      ctx.lineWidth = w * 2.4;
+      ctx.strokeStyle = shade;
+      ctx.stroke();
+      ctx.lineWidth = w;
+    }
+    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.stroke();
   }
 
   function drawFrame(dt, elapsed, values) {
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    clock += dt * values.speed;
 
     paths = [];
-    const rings = Math.max(4, Math.round(BASE_RINGS * values.density));
-    // Tight spacing is what makes the moiré appear; scale tunes it.
-    const spacing = 6 + 14 * values.scale;
-    const t = elapsed * values.speed * 0.4 * values.motion;
+    const W = canvas.width, H = canvas.height;
+    const R = Math.min(W, H) * 0.26 * (0.5 + 0.5 * values.scale);
+    const cx = W * 0.6, cy = H * 0.5;
+    const lines = Math.max(6, Math.round(BASE_LINES * values.density));
+    const period = (2 * R) / lines;
+    const pivotX = cx - R * 0.3, pivotY = cy + R * 0.16;
 
-    ctx.lineWidth = 0.4 + values.stroke * 0.9;
+    // B rocks against A: one slow swing every 16s at Speed 1.
+    const tilt = (values.split * 2 + 1.1 * Math.sin(clock * (Math.PI * 2 / 16))) * Math.PI / 180;
+    // Motion sways B sideways, sliding the bands across the disc; Phase is
+    // a fixed sideways offset of B (half a period turns bands inside out).
+    const slide = period * (0.5 + values.phase * 0.5
+      + values.motion * 0.3 * Math.sin(clock * (Math.PI * 2 / 11) - 0.7));
 
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    // The two centres drift apart and back; their separation drives the moiré.
-    const sep = (60 + Math.sin(t + values.phase * Math.PI) * 55) * values.split;
-    const dir = (values.angle * Math.PI) / 180;
-    const dx = Math.cos(dir) * sep;
-    const dy = Math.sin(dir) * sep;
+    const dirA = LINE_ANGLE + (values.angle * Math.PI) / 180;
+    const dirB = dirA + tilt;
+    // Offsets measured from the aperture centre: A passes a line through
+    // the pivot, B does too before its slide.
+    const pOff = (dir) => (pivotX - cx) * -Math.sin(dir) + (pivotY - cy) * Math.cos(dir);
+    const offA = pOff(dirA);
+    const offB = pOff(dirB) + slide;
 
-    const light = values.invert ? 0.35 : 0.6;
+    const light = values.invert ? 0.12 : 0.88 - 0.28 * values.saturation;
+    const alpha = values.opacity;
+    ctx.lineWidth = 0.4 + values.stroke * 0.5;
     const stopA = paletteHsl(values, 0);
-    drawFamily(cx - dx, cy - dy, rings, spacing,
-      hslToRgb(stopA.h, stopA.s, light), values);
-
+    drawGrating(cx, cy, R, dirA, period, offA, hslToRgb(stopA.h, stopA.s, light), alpha);
     const stopB = paletteHsl(values, 1);
-    drawFamily(cx + dx, cy + dy, rings, spacing,
-      hslToRgb(stopB.h, stopB.s, light), values);
+    drawGrating(cx, cy, R, dirB, period, offB, hslToRgb(stopB.h, stopB.s, light), alpha * 0.65,
+      values.invert ? '#f2f2f4' : '#0a0a0d');
+
+    // Lines are brightest around the pivot and ease off toward the rim: a
+    // smooth veil of ground colour, so no stepped (ring-like) falloff. Ground
+    // over ground is a no-op, so it needs no clip to the aperture.
+    const veilR = R * 1.6;
+    const veil = ctx.createRadialGradient(pivotX, pivotY, 0, pivotX, pivotY, veilR);
+    const ground = values.invert ? '242,242,244' : '10,10,13';
+    for (let i = 0; i <= 6; i++) {
+      const d = (i / 6) * veilR;
+      veil.addColorStop(i / 6, `rgba(${ground},${0.5 * (1 - Math.exp(-(d * d) / (2 * (R * 0.55) ** 2)))})`);
+    }
+    ctx.fillStyle = veil;
+    ctx.fillRect(cx - R - 2, cy - R - 2, 2 * R + 4, 2 * R + 4);
+
+    // Optional soft bloom on the pivot. Off by default.
+    if (values.glow > 0) {
+      ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+      const { h, s } = paletteHsl(values, 0.5);
+      const [r, g, b] = hslToRgb(h, s, light);
+      const gr = R * 0.4 * (0.6 + values.glow * 0.4);
+      const grad = ctx.createRadialGradient(pivotX, pivotY, 0, pivotX, pivotY, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${0.28 * values.glow * values.opacity})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(pivotX - gr, pivotY - gr, gr * 2, gr * 2);
+      ctx.globalCompositeOperation = 'source-over';
+    }
   }
 
   const loop = createLoop({

@@ -245,18 +245,18 @@
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
-  <article class="card" data-tags="optical" style="--accent:hsl(185 75% 60%)">
+  <article class="card" data-tags="optical geometric" style="--accent:hsl(185 0% 60%)">
     <a class="frame" href="pieces/moire/" data-src="pieces/moire/" aria-label="Open Moiré">
       <img src="thumbs/moire.png" alt="Moiré preview" loading="lazy" width="240" height="150" />
       <span class="frame-label">185&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(185 75% 60%),hsl(320 75% 60%))"></span>
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(185 0% 60%),hsl(320 0% 60%))"></span>
         Moiré
       </h2>
-      <p class="blurb">Two concentric ring families crossing into moiré.</p>
-      <div class="tags"><span class="tag">optical</span></div>
+      <p class="blurb">Two gratings of straight lines in one disc, rocking so broad moiré bands sweep across it.</p>
+      <div class="tags"><span class="tag">optical</span><span class="tag">geometric</span></div>
       <div class="actions">
         <a class="btn" href="pieces/moire/">Open</a>
         <button class="btn" type="button" data-embed="pieces/moire/">Copy embed</button>
@@ -325,18 +325,18 @@
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
-  <article class="card" data-tags="flow sparse" style="--accent:hsl(150 50% 60%)">
+  <article class="card" data-tags="flow" style="--accent:hsl(150 0% 60%)">
     <a class="frame" href="pieces/longwave/" data-src="pieces/longwave/" aria-label="Open Longwave">
       <img src="thumbs/longwave.png" alt="Longwave preview" loading="lazy" width="240" height="150" />
       <span class="frame-label">150&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(150 50% 60%),hsl(180 50% 60%))"></span>
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(150 0% 60%),hsl(180 0% 60%))"></span>
         Longwave
       </h2>
-      <p class="blurb">Seven long ribbons sweeping the full width.</p>
-      <div class="tags"><span class="tag">flow</span><span class="tag">sparse</span></div>
+      <p class="blurb">A band of hairlines riding one long wave, pinching together at its nodes.</p>
+      <div class="tags"><span class="tag">flow</span></div>
       <div class="actions">
         <a class="btn" href="pieces/longwave/">Open</a>
         <button class="btn" type="button" data-embed="pieces/longwave/">Copy embed</button>
@@ -365,18 +365,18 @@
       <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
     </div>
   </article>
-  <article class="card" data-tags="orb dense" style="--accent:hsl(10 80% 60%)">
+  <article class="card" data-tags="orb flow" style="--accent:hsl(10 0% 60%)">
     <a class="frame" href="pieces/infall/" data-src="pieces/infall/" aria-label="Open Infall">
       <img src="thumbs/infall.png" alt="Infall preview" loading="lazy" width="240" height="150" />
       <span class="frame-label">10&deg;</span>
     </a>
     <div class="meta">
       <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(10 80% 60%),hsl(40 80% 60%))"></span>
+        <span class="swatch" style="background:linear-gradient(90deg,hsl(10 0% 60%),hsl(40 0% 60%))"></span>
         Infall
       </h2>
-      <p class="blurb">Matter spiralling inward to a bright core.</p>
-      <div class="tags"><span class="tag">orb</span><span class="tag">dense</span></div>
+      <p class="blurb">Hairline streamlines spiralling into one small, bright core.</p>
+      <div class="tags"><span class="tag">orb</span><span class="tag">flow</span></div>
       <div class="actions">
         <a class="btn" href="pieces/infall/">Open</a>
         <button class="btn" type="button" data-embed="pieces/infall/">Copy embed</button>
@@ -669,13 +669,16 @@ const PIECES = [
   {
     "slug": "moire",
     "title": "Moiré",
-    "blurb": "Two concentric ring families crossing into moiré.",
+    "blurb": "Two gratings of straight lines in one disc, rocking so broad moiré bands sweep across it.",
     "tags": [
-      "optical"
+      "optical",
+      "geometric"
     ],
+    "safeZone": "outside the disc, widest on the left",
+    "anchor": "pinned band at the pivot, left of the disc's centre",
     "hue": 185,
     "hueB": 320,
-    "saturation": 0.75,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
@@ -742,14 +745,15 @@ const PIECES = [
   {
     "slug": "longwave",
     "title": "Longwave",
-    "blurb": "Seven long ribbons sweeping the full width.",
+    "blurb": "A band of hairlines riding one long wave, pinching together at its nodes.",
     "tags": [
-      "flow",
-      "sparse"
+      "flow"
     ],
+    "safeZone": "upper left, above the band",
+    "anchor": "tightest node, just right of centre",
     "hue": 150,
     "hueB": 180,
-    "saturation": 0.5,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
@@ -782,14 +786,16 @@ const PIECES = [
   {
     "slug": "infall",
     "title": "Infall",
-    "blurb": "Matter spiralling inward to a bright core.",
+    "blurb": "Hairline streamlines spiralling into one small, bright core.",
     "tags": [
       "orb",
-      "dense"
+      "flow"
     ],
+    "safeZone": "left third",
+    "anchor": "core, right of centre",
     "hue": 10,
     "hueB": 40,
-    "saturation": 0.8,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",

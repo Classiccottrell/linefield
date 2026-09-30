@@ -18,6 +18,14 @@
 <body>
 <canvas id="canvas"></canvas>
 
+<!--
+  infall — logarithmic-spiral streamlines of hairlines winding into a
+  small, off-centre bright core, brightening by accumulation as they
+  converge.
+  Text-safe zone: the left third of the frame (the spiral sits right of it).
+  Anchor: the core, right of centre — lit by line convergence, not a glow.
+-->
+
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
   <button id="btn-source">Source</button>
@@ -44,131 +52,131 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // Persistent particle array — must re-seed when density changes.
-  const BASE_COUNT = 900;
-  const CORE = 18; // world radius of the core; particles respawn on reaching it
-  let motes = [];
+  // Every streamline shares one pitch, so no two ever cross: a log spiral
+  // turned about its own pole is a scaled copy of itself. That is also why
+  // a slow rigid rotation reads as matter flowing inward, not as spinning.
+  const BASE_LINES = 140;
+  const MAX_LINES = BASE_LINES * 2; // density max, so no reseed is needed
+  const R_MIN = 1.5; // lines run into the core: no dark eye
+  const CHUNKS = 14; // alpha/colour steps along a line (pulses, gradient)
   let paths = [];
 
-  function maxRadius() {
-    return Math.min(canvas.width, canvas.height) * 0.46;
+  // Seeded, so the composition (and its anchor) is the same on every load.
+  function mulberry32(a) {
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
+  const rand = mulberry32(0x1f4a11);
+  // Outer radius varies per line so the outer ends never line up into a rim.
+  const pool = Array.from({ length: MAX_LINES }, () => ({
+    jitter: rand() - 0.5,
+    reach: 0.55 + 0.45 * Math.pow(rand(), 0.7),
+    pulse: rand() * Math.PI * 2,
+  }));
 
-  function seedMotes(count) {
-    const rim = maxRadius();
-    motes = Array.from({ length: count }, () => ({
-      a: Math.random() * Math.PI * 2,
-      r: CORE + Math.random() * (rim - CORE),
-      j: Math.random(), // per-mote colour/rate jitter
-    }));
-  }
-
-  // Short partial-clear trails make low-opacity presets read bolder in a
-  // stepped capture than the number alone suggests — judge these on the
-  // rendered sheet, not by arithmetic.
   const PRESETS = {
-    whisper: { opacity: 0.35, stroke: 1.2, density: 0.55, saturation: 0.06, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.6, density: 0.7, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.95, stroke: 0.9, density: 1.2, saturation: 1, glow: 1.2 },
-    drift:   { opacity: 0.55, stroke: 1.3, density: 0.8, speed: 0.25, motion: 1.6 },
-    dense:   { opacity: 0.6, stroke: 0.6, density: 1.8, speed: 0.85 },
+    whisper: { opacity: 0.7, stroke: 0.7, density: 0.45, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.3, density: 0.8, saturation: 0, glow: 0, motion: 0.4 },
+    neon:    { opacity: 0.9, stroke: 1, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.8, density: 0.7, speed: 0.35, motion: 1.8, spin: 0.55, scale: 1.2 },
+    dense:   { opacity: 0.85, stroke: 0.8, density: 1.9, spin: 1.35, glow: 0.5 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
   const panel = baked ? null : createControlPanel({
     pieceId: PIECE_ID,
     presets: PRESETS,
-    onChange: (name, value, values) => {
-      if (name === 'density') seedMotes(Math.max(20, Math.round(BASE_COUNT * values.density)));
-    },
+    onChange: () => {},
     extraControls: [
-      { name: 'spin', label: 'Spin', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'motion' },
+      // How tightly the streamlines wind on their way in (their pitch).
+      { name: 'spin', label: 'Spin', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'form' },
     ],
-    defaults: { hue: 10, hueB: 40, saturation: 0.8, colorMode: 'gradient', colorA: '#ff2b00', colorB: '#ffaa00' },
+    defaults: { hue: 10, hueB: 40, saturation: 0, colorMode: 'gradient', colorA: '#ff2b00', colorB: '#ffaa00' },
   });
   const currentValues = baked || panel.values;
 
-  seedMotes(Math.max(20, Math.round(BASE_COUNT * currentValues.density)));
-  window.addEventListener('resize', () =>
-    seedMotes(Math.max(20, Math.round(BASE_COUNT * currentValues.density)))
-  );
+  let clock = 0;
 
   function drawFrame(dt, elapsed, values) {
-    // Partial clear leaves short motion trails behind each mote.
-    ctx.fillStyle = values.invert ? 'rgba(242,242,244,0.14)' : 'rgba(10,10,13,0.14)';
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    clock += dt * values.speed;
 
     paths = [];
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const rim = maxRadius() * (0.4 + values.scale * 0.6);
-    const step = dt || 0.016;
-    const light = values.invert ? 0.4 : 0.6;
-    const lineWidth = 0.4 + values.stroke * 1.4;
-    const baseAngle = (values.angle * Math.PI) / 180;
-    // Phase bunches the (otherwise angularly uniform) mote ensemble into
-    // spiral arms and warps their pitch by radius, instead of rotating the
-    // whole disc like angle does — it restructures the disc rather than
-    // turning it. The sin() term reads the mote's own angle, so it survives
-    // rotation by `angle` as a rigid pattern rather than washing out.
-    const twist = values.phase * 2.2;
-    const ARMS = 3;
-    const bunch = values.phase * 0.28;
-    const rNorm = (r) => 1 - Math.min(1, Math.max(0, (r - CORE) / Math.max(1, rim - CORE)));
-    const drawAngle = (a, r) => a + baseAngle + twist * rNorm(r) + bunch * Math.sin(ARMS * a);
+    const W = canvas.width, H = canvas.height;
+    const cx = W * 0.57, cy = H * 0.5;
+    const rMax = Math.min(W, H) * 0.34 * (0.45 + 0.55 * values.scale);
+    const count = Math.max(10, Math.round(BASE_LINES * values.density));
+    // Pitch angle: 60deg (almost radial) at Spin 0 down to 15deg at Spin 2.
+    const pitch = (24 / (0.4 + 0.6 * values.spin)) * Math.PI / 180;
+    const k = Math.tan(pitch);
+    const slant = Math.sqrt(1 + k * k);
+    // One slow turn every ~20s at Speed 1; negative so the pattern flows in.
+    const turn = -clock * (Math.PI * 2 / 20) + (values.angle * Math.PI) / 180;
+    // Phase gathers the evenly spread streamlines into two arms.
+    const bunch = values.phase * 0.24;
+    const pulseAmp = Math.min(0.85, values.motion * 0.45);
 
-    const stopA = paletteHsl(values, 0);
-    const [r0, g0, b0] = hslToRgb(stopA.h, stopA.s, light);
-    const stopB = paletteHsl(values, 1);
-    const [r1, g1, b1] = hslToRgb(stopB.h, stopB.s, light);
-    for (const m of motes) {
-      const prevA = m.a;
-      const prevR = m.r;
+    const light = values.invert ? 0.12 : 0.86 - 0.26 * values.saturation;
+    const alpha = 0.3 * values.opacity;
+    ctx.lineWidth = 0.4 + values.stroke * 0.5;
+    ctx.lineCap = 'round';
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
 
-      // Angular velocity rises as radius falls — the spiral tightens inward.
-      const omega = (900 / (m.r + 40)) * 0.05 * values.speed * (0.4 + values.spin * 1.2);
-      m.a += omega * step * (0.75 + m.j * 0.5);
-      // Inward drift.
-      m.r -= (14 + 40 / (m.r / 60 + 1)) * values.motion * step;
-
-      let respawned = false;
-      if (m.r <= CORE) {
-        m.a = Math.random() * Math.PI * 2;
-        m.r = rim;
-        m.j = Math.random();
-        respawned = true;
+    for (let i = 0; i < count; i++) {
+      const p = pool[i];
+      const base = ((i + 0.5 + p.jitter * 0.8) / count) * Math.PI * 2;
+      const theta0 = base - bunch * Math.sin(2 * base) + turn;
+      const rOut = rMax * p.reach;
+      const span = Math.log(rOut / R_MIN) / k; // total winding, radians
+      const pts = [];
+      let phi = 0;
+      while (true) {
+        const r = rOut * Math.exp(-k * phi);
+        pts.push([cx + Math.cos(theta0 + phi) * r, cy + Math.sin(theta0 + phi) * r, phi, r]);
+        if (phi >= span) break;
+        // ~5px arc steps, so the outer turns stay smooth.
+        phi = Math.min(span, phi + Math.min(0.3, 5 / (r * slant)));
       }
 
-      // On respawn, don't connect the old near-core point to the new rim point —
-      // that would draw a long spoke across the whole disc every respawn.
-      const startA = respawned ? m.a : prevA;
-      const startR = respawned ? m.r : prevR;
-      const x0 = cx + Math.cos(drawAngle(startA, startR)) * startR;
-      const y0 = cy + Math.sin(drawAngle(startA, startR)) * startR;
-      const x1 = cx + Math.cos(drawAngle(m.a, m.r)) * m.r;
-      const y1 = cy + Math.sin(drawAngle(m.a, m.r)) * m.r;
-
-      // Hot near the core, cooler at the rim.
-      const heat = 1 - Math.min(1, (m.r - CORE) / Math.max(1, rim - CORE));
-      const cr = r0 + (r1 - r0) * (1 - heat);
-      const cg = g0 + (g1 - g0) * (1 - heat);
-      const cb = b0 + (b1 - b0) * (1 - heat);
-
-      const lw = lineWidth;
-      ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${values.opacity})`;
-      ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      ctx.lineTo(x1, y1);
-      if (values.glow > 0) {
-        ctx.lineWidth = lw + values.glow * 3;
-        ctx.globalAlpha = values.glow * 0.25;
+      // Chunked strokes: colour runs rim (stop A) -> core (stop B), and
+      // Motion's bright pulses travel inward along each line.
+      const per = Math.ceil(pts.length / CHUNKS);
+      for (let c = 0; c < pts.length - 1; c += per) {
+        const end = Math.min(pts.length - 1, c + per);
+        const mid = pts[(c + end) >> 1];
+        const f = 1 - Math.min(1, mid[3] / rMax);
+        const wave = 0.5 + 0.5 * Math.sin(mid[2] * 1.3 - clock * 0.9 + p.pulse);
+        const a = Math.min(1, alpha * (1 + 1.4 * pulseAmp * wave ** 4));
+        const { h, s } = paletteHsl(values, f);
+        const [r, g, b] = hslToRgb(h, s, light);
+        ctx.strokeStyle = `rgba(${r},${g},${b},${a})`;
+        ctx.beginPath();
+        ctx.moveTo(pts[c][0], pts[c][1]);
+        for (let j = c + 1; j <= end; j++) ctx.lineTo(pts[j][0], pts[j][1]);
         ctx.stroke();
-        ctx.globalAlpha = 1;
       }
-      ctx.lineWidth = lw;
-      ctx.stroke();
-      paths.push([[x0, y0], [x1, y1]]);
+      paths.push(pts.map((q) => [q[0], q[1]]));
     }
+
+    // Optional soft bloom on the core. Off by default: the core already
+    // brightens from the lines converging on it.
+    if (values.glow > 0) {
+      const { h, s } = paletteHsl(values, 1);
+      const [r, g, b] = hslToRgb(h, s, light);
+      const gr = rMax * 0.22 * (0.6 + values.glow * 0.4);
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${0.32 * values.glow * values.opacity})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(cx - gr, cy - gr, gr * 2, gr * 2);
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({
