@@ -91,23 +91,29 @@
   {
     "slug": "rainfall",
     "title": "Rainfall",
-    "blurb": "Sparse vertical streaks falling at their own speed, each with a brighter head.",
+    "blurb": "Sparse vertical streaks falling at their own speed, gathered in a veil that leaves the left third quiet.",
     "tags": ["sparse"],
-    "hue": 205, "hueB": 195, "saturation": 0.18
+    "safeZone": "left third",
+    "anchor": "brightest heads, right of centre",
+    "hue": 205, "hueB": 195, "saturation": 0
   },
   {
     "slug": "lacuna",
     "title": "Lacuna",
     "blurb": "Broken caustic arcs gather around an off-centre calm zone.",
     "tags": ["optical", "organic", "sparse"],
-    "hue": 198, "hueB": 224, "saturation": 0.24
+    "safeZone": "left third",
+    "anchor": "outermost arc's densest crossing, right of centre",
+    "hue": 198, "hueB": 224, "saturation": 0
   },
   {
     "slug": "parallax",
     "title": "Parallax",
-    "blurb": "A rose-to-amber fan parts around an unseen volume, with near strands slipping past finer distant lines.",
-    "tags": ["depth", "optical", "sparse"],
-    "hue": 344, "hueB": 24, "saturation": 0.3
+    "blurb": "Parallel diagonal lines part around an unseen volume, near strands heavier than the finer distant ones.",
+    "tags": ["depth", "optical"],
+    "safeZone": "upper-left corner",
+    "anchor": "near lines bending tightest around the invisible volume",
+    "hue": 344, "hueB": 24, "saturation": 0
   },
   {
     "slug": "cipher-bloom",

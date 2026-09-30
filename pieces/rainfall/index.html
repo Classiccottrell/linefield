@@ -18,6 +18,15 @@
 <body>
 <canvas id="canvas"></canvas>
 
+<!--
+  rainfall — sparse vertical streaks with brighter heads, gathered in a
+  veil that leaves the left third quiet.
+  Text-safe zone: the left third of the frame (the veil's envelope is
+  dimmest there by construction — see envelopeAt/DRIFT_LEFT_GUARD below).
+  Anchor: the brightest streak heads, right of centre, where the veil's
+  envelope peaks.
+-->
+
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
   <button id="btn-source">Source</button>
@@ -125,10 +134,10 @@
   // Sparsest piece in the library at ink coverage 0.011, so `whisper` barely
   // moves off the default and `dense` is what gives the piece its range.
   const PRESETS = {
-    whisper: { opacity: 0.42, stroke: 1.35, density: 0.75, saturation: 0.04, glow: 0 },
+    whisper: { opacity: 0.85, stroke: 1.8, density: 0.85, glow: 0 },
     ink:     { opacity: 1, stroke: 1.9, density: 1, saturation: 0, glow: 0 },
     neon:    { opacity: 0.95, stroke: 1.1, density: 1.4, saturation: 0.9, glow: 1.2 },
-    drift:   { opacity: 0.5, stroke: 1.5, density: 0.85, speed: 0.3, motion: 1.6 },
+    drift:   { opacity: 0.75, stroke: 1.75, density: 0.9, speed: 0.3, motion: 1.6 },
     dense:   { opacity: 0.7, stroke: 0.7, density: 1.9, speed: 1.2 },
   };
 
@@ -146,7 +155,7 @@
     ],
     // Cool, desaturated blue-grey — reads as overcast/rain, distinct from
     // mooring's indigo (220/250) and wireframe-lattice's cyan (190/205).
-    defaults: { hue: 205, hueB: 195, saturation: 0.18, colorMode: 'gradient', colorA: '#0095ff', colorB: '#00bfff' },
+    defaults: { hue: 205, hueB: 195, saturation: 0, colorMode: 'gradient', colorA: '#0095ff', colorB: '#00bfff' },
   });
   const currentValues = baked || panel.values;
 
@@ -154,7 +163,10 @@
 
   function drawFrame(dt, elapsed, values) {
     // Full repaint each frame — streaks are drawn whole every frame, not
-    // accumulated as trails, so there's nothing to fade out.
+    // accumulated as trails, so there's nothing to fade out. Reset first:
+    // 'lighter' (set below, per-streak) must never touch this clear, or
+    // last frame's brightness would add into this one instead of clearing.
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -162,9 +174,27 @@
     const W = canvas.width;
     const H = canvas.height;
     const t = elapsed * values.speed * BASE_FALL;
-    const lineWidth = 0.6 + values.stroke * 1.8;
+    // Slightly above the hairline floor (house-look §3 exception): at only
+    // ~15-38 streaks — the sparsest piece in the library, by brief — a pure
+    // 0.4-0.9px line drops whisper/drift below the minimum legible
+    // luminance variance. Depth alone (below) still narrows it for
+    // distant drops.
+    const lineWidth = 0.5 + values.stroke * 0.85;
     const baseLen = H * 0.07 * (0.4 + values.scale);
     const theta = (values.angle * Math.PI) / 180;
+    // Stroke lightness is fixed in the 0.82-0.90 band (house-look §1/§3);
+    // "brighter head" comes from the alpha gradient below, not from
+    // lightening the head or darkening the tail.
+    const light = values.invert ? 0.12 : 0.86 - 0.26 * values.saturation;
+    const stopB = paletteHsl(values, 1);
+    const [hr, hg, hb] = hslToRgb(stopB.h, stopB.s, light);
+    const stopA = paletteHsl(values, 0);
+    const [tr, tg, tb] = hslToRgb(stopA.h, stopA.s, light);
+    const mid = paletteHsl(values, 0.65);
+    const [mr, mg, mb] = hslToRgb(mid.h, mid.s, light);
+    // Additive accumulation where streaks cross (house-look §3). Off under
+    // invert: dark ink on a light ground must not brighten toward white.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
     // Veil breathing, independent of fall speed too, and gated by Motion
     // (near-static at motion=0, full pace at motion=1) so the shared
     // control has a second, composition-level effect on this piece rather
@@ -191,16 +221,6 @@
       const xHead = d.x * W;
       const xTail = xHead;
       const lw = lineWidth * (0.55 + d.depth * 0.75);
-
-      const lightBase = values.invert ? 0.3 : 0.68;
-      const headLight = Math.min(0.95, lightBase + 0.22);
-      const tailLight = Math.max(0.10, lightBase - 0.3);
-      const stopB = paletteHsl(values, 1);
-      const [hr, hg, hb] = hslToRgb(stopB.h, stopB.s, headLight);
-      const stopA = paletteHsl(values, 0);
-      const [tr, tg, tb] = hslToRgb(stopA.h, stopA.s, tailLight);
-      const mid = paletteHsl(values, 0.65);
-      const [mr, mg, mb] = hslToRgb(mid.h, mid.s, (tailLight + headLight) * 0.5);
 
       // Envelope shapes brightness, not count or width — a drop in a thin
       // stretch of the veil still falls at full speed, just paler, so the
@@ -233,11 +253,11 @@
       ctx.lineTo(xHead, headY);
       ctx.stroke();
 
-      if (values.glint && d.depth > 0.68) {
+      if (values.glint && d.depth > 0.55) {
         // Soft radial highlight at the head — bigger than the stroke itself
         // so "brighter head" reads clearly even at a glance, still small
         // enough relative to the canvas to stay calm rather than blobby.
-        const r = lw * 2.2;
+        const r = lw * 3.4;
         const glintGrad = ctx.createRadialGradient(xHead, headY, 0, xHead, headY, r);
         glintGrad.addColorStop(0, `rgba(${hr},${hg},${hb},${op})`);
         glintGrad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
@@ -251,7 +271,7 @@
     }
 
     ctx.restore();
-
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({
