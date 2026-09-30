@@ -25,9 +25,11 @@
   {
     "slug": "orbitals",
     "title": "Orbitals",
-    "blurb": "Concentric arcs turning at different rates around one centre.",
-    "tags": ["orb"],
-    "hue": 265, "hueB": 330, "saturation": 0.55
+    "blurb": "A tilted ring of hairline arcs, each turning at its own rate, whose overlaps gather into one bright crescent that travels slowly round.",
+    "tags": ["orb", "kinetic"],
+    "hue": 265, "hueB": 330, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "crescent on the ring's near side, lower centre, travelling slowly round"
   },
   {
     "slug": "grain-field",
@@ -39,9 +41,11 @@
   {
     "slug": "wireframe-lattice",
     "title": "Wireframe Lattice",
-    "blurb": "A rigid 3D grid rippling in perspective.",
+    "blurb": "One finite lattice sheet with crisp edges, floating tilted in space and flexing, its fold catching the light where it turns edge-on.",
     "tags": ["geometric", "3d"],
-    "hue": 190, "hueB": 205, "saturation": 0.35
+    "hue": 190, "hueB": 205, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "fold crest, upper right, travelling across the sheet"
   },
   {
     "slug": "longwave",
@@ -133,9 +137,11 @@
   {
     "slug": "globe",
     "title": "Globe",
-    "blurb": "A lat/long wire sphere spinning in true perspective, tilt and yaw draggable.",
+    "blurb": "A tilted sphere drawn only in parallel latitude slices, with no meridians, crowding and brightening toward one lit limb.",
     "tags": ["3d", "geometric"],
-    "hue": 105, "hueB": 130, "saturation": 0.4
+    "hue": 105, "hueB": 130, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "limb arc, upper right"
   },
   {
     "slug": "dune",

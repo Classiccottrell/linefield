@@ -31,11 +31,21 @@
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
-  import { simplex2 } from '../../shared/noise.js';
-  import { createCamera } from '../../shared/project.js';
+    import { createCamera, rotatePoint } from '../../shared/project.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createOrbit } from '../../shared/pointer.js';
 
+  // wireframe-lattice — one finite lattice sheet with crisp edges, floating
+  // tilted in space and flexing slowly, brightest along its fold's crest.
+  //
+  // The sheet is a square of hairline rows and columns, not a plane running
+  // to the horizon: its four edges draw brighter so it reads as one object.
+  //
+  // Text-safe zone: the left third of the frame. The sheet sits in the
+  // central square, nudged right of centre.
+  // Anchor: the travelling fold where it turns most nearly edge-on, centre
+  // right. Its lines close up in projection and brighten with the grazing
+  // angle, so it emerges from line density, not from a drawn glow.
   const PIECE_ID = 'wireframe-lattice';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -47,17 +57,20 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // Grid resolution is derived per frame from density — no persistent array.
-  const BASE_STEPS = 24;
-  const SPAN = 900; // world-space width/depth of the sheet
+  // Line counts derive per frame from density — no persistent array.
+  const BASE_LINES = 56;     // lines each way, edges included
+  const SEG = 72;            // segments per line
+  const FLEX_PERIOD = 12;    // seconds per flex-wave cycle at speed 1
+  const FLOAT_PERIOD = 17;   // seconds per rocking cycle at speed 1
+  const BUCKETS = 6;
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.3, stroke: 1.1, density: 0.6, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.7, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.95, glow: 1.1 },
-    drift:   { opacity: 0.5, stroke: 0.8, density: 0.7, speed: 0.35, motion: 1.8 },
-    dense:   { opacity: 0.6, stroke: 0.6, density: 1.8, speed: 0.8, glow: 0 },
+    whisper: { opacity: 1, stroke: 0.75, density: 0.5, motion: 0.9, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.5, density: 0.7, glow: 0, rotX: 30 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.05, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.85, stroke: 0.8, density: 0.8, speed: 0.4, motion: 1.8, phase: 0.7 },
+    dense:   { opacity: 0.9, stroke: 0.85, density: 1.6, glow: 0.4, motion: 1.3 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -66,10 +79,12 @@
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32, category: 'interaction' },
-      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 36, category: 'interaction' },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: -28, category: 'interaction' },
     ],
-    defaults: { hue: 190, hueB: 205, saturation: 0.35, colorMode: 'gradient', colorA: '#00d4ff', colorB: '#0095ff' },
+    // Monochrome by default (house look §1). The hue pair is what the neon
+    // preset and the colour pickers light up.
+    defaults: { hue: 190, hueB: 205, saturation: 0, colorMode: 'gradient', colorA: '#00d4ff', colorB: '#0095ff' },
   });
   const currentValues = baked || panel.values;
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -98,87 +113,167 @@
     },
   });
 
-  const camera = createCamera({ fov: 620 });
-  function strokePath(pts, values, lineWidth, rgb) {
-    // pts: array of {x, y, scale}. Walk in order and break the run at any
-    // point behind the camera (scale <= 0) instead of filtering — a skipped
-    // interior point must start a new subpath, not get bridged over.
-    let anyRun = false;
-    ctx.beginPath();
-    let run = [];
-    const flushRun = () => {
-      if (run.length >= 2) {
-        anyRun = true;
-        ctx.moveTo(run[0].x, run[0].y);
-        for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
-        paths.push(run.map((p) => [p.x, p.y]));
-      }
-      run = [];
-    };
-    for (const p of pts) {
-      if (p.scale > 0) run.push(p);
-      else flushRun();
-    }
-    flushRun();
-    if (!anyRun) return;
+  const camera = createCamera({ fov: 1200 });
 
-    const [r, g, b] = rgb;
-    ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-    if (values.glow > 0) {
-      ctx.lineWidth = lineWidth + values.glow * 3;
-      ctx.globalAlpha = values.glow * 0.25;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+  function strokeRuns(runs, alpha, lineWidth, rgb) {
+    if (!runs.length || alpha <= 0) return;
+    ctx.beginPath();
+    for (const run of runs) {
+      ctx.moveTo(run[0].x, run[0].y);
+      for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
     }
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.min(1, alpha)})`;
     ctx.lineWidth = lineWidth;
     ctx.stroke();
   }
 
   function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, W, H);
+    // Additive on the dark ground, so wherever the sheet folds away and its
+    // lines close up the image brightens on its own. On the light ground
+    // `lighter` would clip to white, so dark ink layers with plain alpha.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at shared points (alpha buckets), and round caps
+    // would overlap there and add up to beads under 'lighter'.
+    ctx.lineCap = 'butt';
 
     paths = [];
-    const steps = Math.max(4, Math.round(BASE_STEPS * values.density));
-    const t = elapsed * values.speed * 0.5;
-    const noiseScale = 0.0035 * (0.3 + values.scale);
-    const amp = 45 * values.motion;
-    const light = values.invert ? 0.35 : 0.62;
+    const S = Math.min(W, H);
+    const size = 0.5 + 0.5 * values.scale;
+    const half = S * 0.25 * size;
+    // fov tracks the frame so the perspective reads the same at any size.
+    // The sheet's half-diagonal plus its flex stays under 0.8 * fov even at
+    // Scale 2, so no pitch ever reaches shared/project.js's near plane.
+    const fov = S * 1.6;
+    const lines = Math.max(10, Math.round(BASE_LINES * values.density));
+    const light = values.invert ? 0.14 : 0.88 - 0.26 * values.saturation;
+    const lineWidth = 0.5 + values.stroke * 0.4;
+    const peak = values.opacity * (values.invert ? 0.5 : 0.38);
+    const edgeAlpha = values.opacity * (values.invert ? 0.7 : 0.45);
 
-    camera.set({
-      tilt: (values.rotX * Math.PI) / 180,
-      yaw: (values.rotY * Math.PI) / 180,
+    // Speed is the tempo of everything (Speed 0 is a still frame): the flex
+    // wave travels across the sheet once per FLEX_PERIOD, and the sheet
+    // floats, rocking slowly once per FLOAT_PERIOD. Motion is the depth of
+    // the flex, so Motion 0 leaves a flat sheet that still floats. Phase
+    // moves where the fold sits.
+    const t = elapsed * values.speed;
+    const wave = (t / FLEX_PERIOD) * Math.PI * 2 + values.phase * Math.PI + 3.2;
+    const fl = (t / FLOAT_PERIOD) * Math.PI * 2;
+    const amp = half * 0.42 * values.motion;
+    const bob = S * 0.018 * Math.sin(fl);
+
+    const view = {
+      tilt: (values.rotX * Math.PI) / 180 + 0.06 * Math.sin(fl * 0.7),
+      yaw: (values.rotY * Math.PI) / 180 + 0.14 * Math.sin(fl),
       roll: (values.angle * Math.PI) / 180,
-      cx: canvas.width / 2,
-      cy: canvas.height / 2,
-    });
+    };
+    camera.set({ ...view, fov, cx: W / 2 + 0.11 * S, cy: H / 2 });
 
-    const heightAt = (x, z) => {
-      return simplex2(x * noiseScale + values.phase, z * noiseScale + t) * amp;
+    // Height of the sheet at normalised (u, v) in [-1, 1]: one broad fold
+    // travelling diagonally, plus a slower cross-bend, so the sheet flexes
+    // like a held card rather than rippling like water.
+    const heightAt = (u, v) => {
+      const fold = Math.sin(0.9 * u + 2.2 * v + wave);
+      const cross = Math.cos(1.5 * u - 0.5 * v - wave * 0.6);
+      return amp * (0.75 * fold + 0.35 * cross * (0.5 + 0.5 * u));
     };
 
-    const half = SPAN / 2;
-    const step = SPAN / steps;
-    const baseWidth = 0.3 + values.stroke * 1.0;
+    let bestW = -1;
+    let anchor = null;
+    // Rows (constant v), then columns (constant u). The first and last of
+    // each are the sheet's edges.
+    for (let dir = 0; dir < 2; dir++) {
+      for (let i = 0; i < lines; i++) {
+        const f = i / (lines - 1);
+        const a = -1 + 2 * f;
+        const edge = i === 0 || i === lines - 1;
+        const model = [];
+        const weights = [];
+        for (let j = 0; j <= SEG; j++) {
+          const b = -1 + (2 * j) / SEG;
+          const u = dir === 0 ? b : a;
+          const v = dir === 0 ? a : b;
+          const h = heightAt(u, v);
+          const x = u * half, y = h - bob, z = v * half;
+          model.push([x, y, z]);
+          // Where the fold turns the sheet edge-on to the eye, its lines
+          // close up in projection; they brighten there too, so the fold
+          // reads as a sheen. Measured against the true eye at z = -fov.
+          const dx = (heightAt(u + 0.02, v) - heightAt(u - 0.02, v)) / (0.04 * half);
+          const dz = (heightAt(u, v + 0.02) - heightAt(u, v - 0.02)) / (0.04 * half);
+          const n = rotatePoint(-dx, 1, -dz, view);
+          const q = rotatePoint(x, y, z, view);
+          const vz = q.z + fov;
+          const facing = (n.x * q.x + n.y * q.y + n.z * vz)
+            / (Math.hypot(n.x, n.y, n.z) * Math.hypot(q.x, q.y, vz));
+          const graze = 1 - Math.abs(facing);
+          weights.push(0.28 + 0.72 * graze * graze * graze * graze);
+        }
+        const pts = camera.projectPath(model);
+        for (let j = 0; j <= SEG; j++) {
+          if (weights[j] > bestW && pts[j].scale > 0) { bestW = weights[j]; anchor = pts[j]; }
+        }
+        const { h, s } = paletteHsl(values, f);
+        const rgb = hslToRgb(h, s, light);
 
-    // Rows (constant z), then columns (constant x).
-    for (let i = 0; i <= steps; i++) {
-      const f = i / steps;
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
+        // Runs break at any point at or behind the near plane rather than
+        // bridging it; buckets group runs by alpha.
+        const buckets = Array.from({ length: BUCKETS }, () => []);
+        let run = [];
+        let svgRun = [];
+        let runB = -1;
+        const flushSvg = () => { if (svgRun.length >= 2) paths.push(svgRun); svgRun = []; };
+        for (let j = 0; j < SEG; j++) {
+          const p = pts[j], q = pts[j + 1];
+          if (p.scale <= 0 || q.scale <= 0) {
+            if (run.length >= 2) buckets[runB].push(run);
+            run = []; runB = -1; flushSvg();
+            continue;
+          }
+          const w = edge ? 1 : (weights[j] + weights[j + 1]) / 2;
+          const bk = Math.min(BUCKETS - 1, Math.floor(w * BUCKETS));
+          if (bk !== runB) {
+            if (run.length >= 2) buckets[runB].push(run);
+            run = [p];
+            runB = bk;
+          }
+          run.push(q);
+          if (!svgRun.length) svgRun.push([p.x, p.y]);
+          svgRun.push([q.x, q.y]);
+        }
+        if (run.length >= 2) buckets[runB].push(run);
+        flushSvg();
 
-      const rowPts = [];
-      const colPts = [];
-      const a = -half + i * step;
-      for (let j = 0; j <= steps; j++) {
-        const c = -half + j * step;
-        rowPts.push([c, heightAt(c, a), a]);
-        colPts.push([a, heightAt(a, c), c]);
+        for (let bk = 0; bk < BUCKETS; bk++) {
+          const alpha = edge ? edgeAlpha : peak * ((bk + 0.5) / BUCKETS);
+          if (values.glow > 0 && (edge || bk >= BUCKETS - 2)) {
+            strokeRuns(buckets[bk], alpha * values.glow * 0.3, lineWidth + values.glow * 2.2, rgb);
+          }
+          strokeRuns(buckets[bk], alpha, lineWidth, rgb);
+        }
       }
-      strokePath(camera.projectPath(rowPts), values, baseWidth, [r, g, b]);
-      strokePath(camera.projectPath(colPts), values, baseWidth, [r, g, b]);
     }
 
+    // Glow is a fallback for the anchor, off by default: the fold is
+    // already the brightest place from its lines closing up. It sits on the
+    // most nearly edge-on point of the sheet.
+    if (values.glow > 0 && anchor) {
+      const { h, s } = paletteHsl(values, 0.5);
+      const [r, g, b] = hslToRgb(h, s, light);
+      const gr = (16 + 36 * values.glow) * size;
+      const grad = ctx.createRadialGradient(anchor.x, anchor.y, 0, anchor.x, anchor.y, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${Math.min(1, 0.3 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(anchor.x, anchor.y, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({
