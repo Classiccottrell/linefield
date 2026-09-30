@@ -162,7 +162,7 @@
     const stopA = paletteHsl(values, 0);
     drawGrating(cx, cy, R, dirA, period, offA, hslToRgb(stopA.h, stopA.s, light), alpha);
     const stopB = paletteHsl(values, 1);
-    drawGrating(cx, cy, R, dirB, period, offB, hslToRgb(stopB.h, stopB.s, light), alpha * 0.65,
+    drawGrating(cx, cy, R, dirB, period, offB, hslToRgb(stopB.h, stopB.s, light), alpha * 0.4,
       values.invert ? '#f2f2f4' : '#0a0a0d');
 
     // Lines are brightest around the pivot and ease off toward the rim: a
