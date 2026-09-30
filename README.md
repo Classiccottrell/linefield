@@ -121,7 +121,7 @@ the previous one's value. This is deliberately the opposite of
 `window.__LF_BAKED_VALUES__`, which is used exactly as given.
 
 Open a piece at a preset directly with `?preset=<name>`, for example
-`pieces/meridian/?preset=ink`. An unknown name is ignored and the piece opens
+`pieces/longwave/?preset=ink`. An unknown name is ignored and the piece opens
 normally, so a stale link still works. Moving any slider clears the active
 chip, since the configuration is no longer that preset. Picking a preset
 persists like any manual tuning, and "Reset to defaults" still returns to the
@@ -147,15 +147,15 @@ tooling" below and CONTRIBUTING.md.
 
 - `flow-field` — organic flowing lines following a simplex-noise vector field
 - `contour-grid` — topographic contour bands undulating like breathing terrain
-- `interference` — two concentric ring families crossing to produce moiré
-- `orbital-veil` — concentric orbital arcs with differential rotation
+- `moire` — two concentric ring families crossing to produce moiré
+- `orbitals` — concentric orbital arcs with differential rotation
 - `grain-field` — fine drifting grain, the subtlest piece; good behind text
 - `wireframe-lattice` — rigid 3D wireframe grid rippling in perspective
-- `meridian` — seven long ribbons sweeping the full width
-- `synapse` — drifting nodes wired to their neighbours, pulsing
-- `accretion` — matter spiralling inward to a bright core
-- `tether` — heavy cables mooring to a single converging point
-- `event-horizon` — a polar grid bent inward by a gravity well
+- `longwave` — seven long ribbons sweeping the full width
+- `relay` — drifting nodes wired to their neighbours, pulsing
+- `infall` — matter spiralling inward to a bright core
+- `mooring` — heavy cables mooring to a single converging point
+- `funnel` — a polar grid bent inward by a gravity well
 - `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
 - `lacuna` — broken caustic arcs gathering around an off-centre calm zone
 - `parallax` — a rose-to-amber fan parting around an invisible volume, with near strands moving faster than distant lines
@@ -172,7 +172,7 @@ invert, density) plus its own piece-specific control. Color
 mode switches between a single hue (Solid) and a two-stop blend (Gradient,
 the default — every piece's own look); Color A/B are hex pickers, B shown
 only in Gradient mode. `density` multiplies the piece's base element count.
-`wireframe-lattice`, `event-horizon`, and `globe` also provide Pitch and Yaw
+`wireframe-lattice`, `funnel`, and `globe` also provide Pitch and Yaw
 controls; Angle is roll, and
 dragging the canvas orbits the camera on direct piece pages. Gallery
 previews disable drag-to-orbit.
@@ -270,7 +270,7 @@ floor to reason about), then diffs sampled canvas pixels. It flags a
 control DEAD if no pair of test points produces a visible change, and
 exits non-zero if any control is DEAD, so CI actually fails on a
 regression. Two pieces have shipped a control that read a value but
-changed nothing (`tether` and `synapse`'s Scale) — both passed per-piece
+changed nothing (`mooring` and `relay`'s Scale) — both passed per-piece
 review by inspection alone, which is why this exists as a script instead
 of a one-off check. It drives controls via `window.__LF_PANEL__.setValue`
 and reads `window.__LF_SPECS__`, not DOM position, so it survives whatever
@@ -308,8 +308,8 @@ inherits. The delivery log for earlier work is archived in
 ## Performance
 
 All pieces hold 60fps at their default settings on ordinary hardware. The
-two heaviest were measured at their worst case — `synapse` at density 2.0
-with reach 200, and `accretion` at density 2.0 — and both held 60fps.
+two heaviest were measured at their worst case — `relay` at density 2.0
+with reach 200, and `infall` at density 2.0 — and both held 60fps.
 
 What costs the most, in order:
 
@@ -319,13 +319,13 @@ What costs the most, in order:
   which costs a blur pass per draw call and took `grain-field` from 60fps to
   2.7fps; it is now a wider, dimmer underlay stroke instead, which is
   cheap enough to leave on.
-- **Connection-based pieces** — `synapse` links each node to its neighbours.
+- **Connection-based pieces** — `relay` links each node to its neighbours.
   It uses a uniform spatial grid rather than checking every pair, without
   which it would degrade quadratically as density rises.
 
 One thing that is not a performance problem but looks like one: browsers
 throttle animation in background tabs, so pieces that build their image from
-accumulated trails — `flow-field`, `accretion` — look wrong if you switch
+accumulated trails — `flow-field`, `infall` — look wrong if you switch
 away and back. They recover within a second.
 
 ## Browser support
@@ -371,7 +371,7 @@ Two things to know:
   default. If a piece looks different from its documented palette, click
   "Reset to defaults" in its control panel to pick up the current default.
 - SVG export doesn't reflect the Angle control for pieces that rotate the
-  whole scene via a canvas transform (`contour-grid`, `meridian`, `tether`):
+  whole scene via a canvas transform (`contour-grid`, `longwave`, `mooring`):
   their path points are recorded before that rotation is applied, so the
   exported SVG shows the unrotated geometry. Use PNG export if you need the
   rotated view.

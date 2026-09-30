@@ -28,14 +28,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- `npm run audit-controls` probes Color A, Color B and Color Mode at
-  saturation 0.6 on any piece whose default saturation is below 0.05, since
-  a grey default can't show a hue change however the control is wired.
-  Pieces at or above that threshold are audited exactly as before.
-
 - `ROADMAP.md` is restructured around a gap analysis against the reference
   that first inspired the project. The chunk-by-chunk delivery history
   moved intact to `docs/roadmap-history.md`.
+- Renamed seven pieces whose names collided with the reference product's
+  catalogue (ROADMAP Chunk 1.1). Rendering, defaults and presets are
+  unchanged. `meridian` → `longwave`, `interference` → `moire` (titled
+  Moiré), `accretion` → `infall`, `event-horizon` → `funnel`, `tether` →
+  `mooring`, `synapse` → `relay`, `orbital-veil` → `orbitals`.
+  **The old URLs break.** `pieces/<old>/` and `downloads/<old>.html` now
+  return 404 for all seven, with no redirects or aliases, so update any
+  copied link or embed to the new slug. Saved panel settings are stored in
+  localStorage keyed by piece id, so any tuning saved for a renamed piece
+  resets to that piece's defaults.
 
 Entries for the work merged between 1.5.0 and this point are incomplete.
 That includes the home page, the specimen-grid gallery, the docs pages,

@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — orbital-veil</title>
+<title>linefield — moire</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -129,7 +129,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.55,"colorMode":"gradient","colorA":"#6a00ff","colorB":"#ff0080","hue":265,"hueB":330,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"sweep":0.62};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.75,"colorMode":"gradient","colorA":"#00eaff","colorB":"#ff00aa","hue":185,"hueB":320,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"split":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1198,7 +1198,7 @@ function describeForAI({ pieceName, values }) {
 
 
 
-  const PIECE_ID = 'orbital-veil';
+  const PIECE_ID = 'moire';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1210,16 +1210,16 @@ function describeForAI({ pieceName, values }) {
   resize();
 
   // Ring count is derived per frame from density — no persistent array.
-  const BASE_RINGS = 34;
-  const SEG = 72;
+  const BASE_RINGS = 60;
+  const SEG = 64; // polygon segments per ring, for SVG export fidelity
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.3, stroke: 1.1, density: 0.55, saturation: 0.06, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.6, density: 0.7, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 1.2, saturation: 0.95, glow: 1.1 },
-    drift:   { opacity: 0.45, stroke: 0.8, density: 0.6, speed: 0.25, motion: 1.6 },
-    dense:   { opacity: 0.6, stroke: 0.6, density: 2, speed: 0.85, saturation: 0.5, glow: 0 },
+    whisper: { opacity: 0.16, stroke: 0.6, density: 0.35, saturation: 0.08, glow: 0 },
+    ink:     { opacity: 0.9, stroke: 1.2, density: 0.5, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.85, stroke: 0.7, density: 1, saturation: 1, glow: 1.2 },
+    drift:   { opacity: 0.28, stroke: 0.5, density: 0.4, speed: 0.25, motion: 1.7, saturation: 0.25 },
+    dense:   { opacity: 0.8, stroke: 0.6, density: 1.8, speed: 0.7, saturation: 0.6, glow: 0 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1228,50 +1228,25 @@ function describeForAI({ pieceName, values }) {
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'sweep', label: 'Sweep', type: 'range', min: 0.05, max: 1, step: 0.01, default: 0.62, category: 'form' },
+      { name: 'split', label: 'Split', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
     ],
-    defaults: { hue: 265, hueB: 330, saturation: 0.55, colorMode: 'gradient', colorA: '#6a00ff', colorB: '#ff0080' },
+    defaults: { hue: 185, hueB: 320, saturation: 0.75, colorMode: 'gradient', colorA: '#00eaff', colorB: '#ff00aa' },
   });
   const currentValues = baked || panel.values;
 
-  function drawFrame(dt, elapsed, values) {
-    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    paths = [];
-    const rings = Math.max(3, Math.round(BASE_RINGS * values.density));
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const maxR = Math.min(canvas.width, canvas.height) * 0.44 * (0.35 + values.scale * 0.65);
-    const t = elapsed * values.speed;
-    // Tilt squashes the rings vertically, giving the orb its 3D read.
-    const tilt = 0.35 + 0.65 * Math.abs(Math.cos((values.angle * Math.PI) / 180));
-
-    const lineWidth = 0.4 + values.stroke * 1.2;
-    ctx.lineWidth = lineWidth;
-
-    const light = values.invert ? 0.35 : 0.6;
-
-    for (let i = 0; i < rings; i++) {
-      const f = i / (rings - 1 || 1);
-      // Pulse each ring's radius, offset per ring so the orb breathes unevenly.
-      const pulse = 1 + Math.sin(t * 0.8 + f * 6 + values.phase * Math.PI) * 0.05;
-      const radius = maxR * (0.12 + f * 0.88) * pulse;
-      // Differential rotation: outer rings lag inner ones.
-      const rot = t * (0.9 - f * 0.65) * values.motion + f * 0.6;
-      const sweep = Math.PI * 2 * values.sweep;
-      const start = rot;
-
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-
+  // One family of concentric rings, centred at (cx, cy).
+  function drawFamily(cx, cy, rings, spacing, rgb, values) {
+    const [r, g, b] = rgb;
+    ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
+    const lineWidth = ctx.lineWidth;
+    for (let i = 1; i <= rings; i++) {
+      const radius = i * spacing;
       const pts = [];
       ctx.beginPath();
       for (let s = 0; s <= SEG; s++) {
-        const a = start + (s / SEG) * sweep;
+        const a = (s / SEG) * Math.PI * 2;
         let x = cx + Math.cos(a) * radius;
-        let y = cy + Math.sin(a) * radius * tilt;
+        let y = cy + Math.sin(a) * radius;
         if (s === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         pts.push([x, y]);
@@ -1286,7 +1261,36 @@ function describeForAI({ pieceName, values }) {
       ctx.stroke();
       paths.push(pts);
     }
+  }
 
+  function drawFrame(dt, elapsed, values) {
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    paths = [];
+    const rings = Math.max(4, Math.round(BASE_RINGS * values.density));
+    // Tight spacing is what makes the moiré appear; scale tunes it.
+    const spacing = 6 + 14 * values.scale;
+    const t = elapsed * values.speed * 0.4 * values.motion;
+
+    ctx.lineWidth = 0.4 + values.stroke * 0.9;
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    // The two centres drift apart and back; their separation drives the moiré.
+    const sep = (60 + Math.sin(t + values.phase * Math.PI) * 55) * values.split;
+    const dir = (values.angle * Math.PI) / 180;
+    const dx = Math.cos(dir) * sep;
+    const dy = Math.sin(dir) * sep;
+
+    const light = values.invert ? 0.35 : 0.6;
+    const stopA = paletteHsl(values, 0);
+    drawFamily(cx - dx, cy - dy, rings, spacing,
+      hslToRgb(stopA.h, stopA.s, light), values);
+
+    const stopB = paletteHsl(values, 1);
+    drawFamily(cx + dx, cy + dy, rings, spacing,
+      hslToRgb(stopB.h, stopB.s, light), values);
   }
 
   const loop = createLoop({

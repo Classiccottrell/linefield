@@ -14,15 +14,15 @@
     "hue": 35, "hueB": 15, "saturation": 0.5
   },
   {
-    "slug": "interference",
-    "title": "Interference",
+    "slug": "moire",
+    "title": "Moiré",
     "blurb": "Two concentric ring families crossing into moiré.",
     "tags": ["optical"],
     "hue": 185, "hueB": 320, "saturation": 0.75
   },
   {
-    "slug": "orbital-veil",
-    "title": "Orbital Veil",
+    "slug": "orbitals",
+    "title": "Orbitals",
     "blurb": "Concentric arcs turning at different rates around one centre.",
     "tags": ["orb"],
     "hue": 265, "hueB": 330, "saturation": 0.55
@@ -42,39 +42,45 @@
     "hue": 190, "hueB": 205, "saturation": 0.35
   },
   {
-    "slug": "meridian",
-    "title": "Meridian",
+    "slug": "longwave",
+    "title": "Longwave",
     "blurb": "Seven long ribbons sweeping the full width.",
     "tags": ["flow", "sparse"],
     "hue": 150, "hueB": 180, "saturation": 0.5
   },
   {
-    "slug": "synapse",
-    "title": "Synapse",
-    "blurb": "Drifting nodes wired to their neighbours, pulsing.",
-    "tags": ["network", "dense"],
-    "hue": 75, "hueB": 45, "saturation": 0.7
+    "slug": "relay",
+    "title": "Relay",
+    "blurb": "A canopy of branching hairlines grown from one root, a pulse climbing to the tips.",
+    "tags": ["network", "organic"],
+    "hue": 150, "hueB": 50, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "root, bottom centre-right"
   },
   {
-    "slug": "accretion",
-    "title": "Accretion",
+    "slug": "infall",
+    "title": "Infall",
     "blurb": "Matter spiralling inward to a bright core.",
     "tags": ["orb", "dense"],
     "hue": 10, "hueB": 40, "saturation": 0.8
   },
   {
-    "slug": "tether",
-    "title": "Tether",
-    "blurb": "Heavy cables mooring to a single converging point.",
-    "tags": ["sparse"],
-    "hue": 220, "hueB": 250, "saturation": 0.25
+    "slug": "mooring",
+    "title": "Mooring",
+    "blurb": "One rope of twisted hairlines rising into a single loose loop; the crossing glows.",
+    "tags": ["organic", "flow"],
+    "hue": 12, "hueB": 48, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "loop crossing, lower centre-right"
   },
   {
-    "slug": "event-horizon",
-    "title": "Event Horizon",
-    "blurb": "A polar grid bent inward by a gravity well.",
-    "tags": ["3d", "orb"],
-    "hue": 285, "hueB": 230, "saturation": 0.6
+    "slug": "funnel",
+    "title": "Funnel",
+    "blurb": "A funnel seen side-on: stacked hairline ellipses narrowing to one bright tip, slowly twisting.",
+    "tags": ["3d", "geometric"],
+    "hue": 290, "hueB": 190, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "tip and lower stem, centre"
   },
   {
     "slug": "rainfall",

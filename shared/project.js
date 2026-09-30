@@ -43,7 +43,7 @@ export function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, c
     // the geometry) is the degenerate exception where a dropped point can
     // still be near-frame, and dropping it can visibly change the render.
     // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
-    // steps) at which event-horizon's SVG export at Scale 2, an angle
+    // steps) at which funnel's SVG export at Scale 2, an angle
     // exposing the near plane, has no coordinate over magnitude 5000. At
     // or beyond the near plane there is no meaningful projection; scale 0
     // is the caller's signal to skip this point.

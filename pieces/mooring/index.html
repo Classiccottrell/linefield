@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — mooring</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  // mooring — one rope of three dozen hairline strands twisted into a helix.
+  // It rises from the bottom edge, throws one loose loop, and leaves by the
+  // right edge; where the loop crosses itself is the bright anchor.
+  //
+  // Text-safe zone: the left third of the frame. The rope never enters it.
+  // Anchor: the loop's crossing, lower centre-right. It brightens on its own
+  // (two passes of the rope overlap there under additive blending); Glow
+  // adds a soft halo on top only when asked for.
+  //
+  // Angle rotates the geometry itself, about the crossing, before anything
+  // is drawn or recorded, so an SVG export matches the canvas.
+  const PIECE_ID = 'mooring';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const BASE_STRANDS = 36;  // 12 fibres in each of three plies at density 1
+  const STEP = 3;           // px between rope samples
+  const ROLL_PERIOD = 10;   // seconds for the lay to roll one full turn at speed 1
+  const SWAY_PERIOD = 13;   // seconds per breath of the loop (Motion's gesture)
+  const LEVELS = 6;         // alpha buckets, so a frame is ~18 strokes, not one per segment
+  let paths = [];
+
+  // The rope's centreline, in units of the frame's shorter side, relative to
+  // the frame centre (y down). Hand-placed: up from below, over the top of
+  // the loop anticlockwise, back down through its own rising run, then out
+  // to the right. The ends are extended in a straight line past the frame.
+  // Slack blends the tight loop toward the loose one.
+  const TIGHT = [
+    [-0.08, 0.62], [-0.03, 0.40], [0.05, 0.19], [0.14, 0.02], [0.15, -0.14],
+    [0.04, -0.22], [-0.07, -0.13], [-0.05, 0.03], [0.07, 0.11], [0.28, 0.14],
+    [0.56, 0.08], [0.95, 0.02],
+  ];
+  const LOOSE = [
+    [-0.10, 0.62], [-0.04, 0.40], [0.05, 0.19], [0.22, -0.02], [0.23, -0.27],
+    [0.03, -0.40], [-0.17, -0.25], [-0.15, 0.03], [0.07, 0.13], [0.30, 0.16],
+    [0.58, 0.09], [0.95, 0.02],
+  ];
+
+  // Centripetal Catmull-Rom through pts, `n` samples per span.
+  function spline(pts, n) {
+    const out = [];
+    const P = [pts[0], ...pts, pts[pts.length - 1]];
+    for (let i = 1; i < P.length - 2; i++) {
+      const [p0, p1, p2, p3] = [P[i - 1], P[i], P[i + 1], P[i + 2]];
+      const d = (a, b) => Math.max(1e-6, Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])));
+      const t0 = 0, t1 = t0 + d(p0, p1), t2 = t1 + d(p1, p2), t3 = t2 + d(p2, p3);
+      for (let k = 0; k < n; k++) {
+        const t = t1 + ((t2 - t1) * k) / n;
+        const lerp = (a, b, ta, tb) => {
+          const w = (t - ta) / (tb - ta);
+          return [a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w];
+        };
+        const A1 = lerp(p0, p1, t0, t1), A2 = lerp(p1, p2, t1, t2), A3 = lerp(p2, p3, t2, t3);
+        const B1 = lerp(A1, A2, t0, t2), B2 = lerp(A2, A3, t1, t3);
+        out.push(lerp(B1, B2, t1, t2));
+      }
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+  }
+
+  // Resample a polyline to even spacing, so the helix twists at a constant
+  // rate along the rope rather than bunching where the spline is slow.
+  function resample(line, step) {
+    const out = [line[0]];
+    let carry = 0;
+    for (let i = 1; i < line.length; i++) {
+      const [ax, ay] = line[i - 1];
+      const [bx, by] = line[i];
+      const len = Math.hypot(bx - ax, by - ay);
+      let d = step - carry;
+      while (d <= len) {
+        out.push([ax + ((bx - ax) * d) / len, ay + ((by - ay) * d) / len]);
+        d += step;
+      }
+      carry = len - (d - step);
+    }
+    return out;
+  }
+
+  const PRESETS = {
+    whisper: { opacity: 0.55, stroke: 0.6, density: 0.7, scale: 0.8, slack: 0.6, twist: 0.8 },
+    ink:     { opacity: 1, stroke: 1.3, density: 1, glow: 0, twist: 1.5, slack: 0.8 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.75, stroke: 0.8, density: 0.85, speed: 0.4, motion: 1.8, slack: 1.8, twist: 0.3, scale: 0.9 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.33, glow: 0.5, twist: 1.3, scale: 1.2 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      { name: 'slack', label: 'Slack', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'twist', label: 'Twist', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+    ],
+    defaults: { hue: 12, hueB: 48, saturation: 0, colorMode: 'gradient', colorA: '#ff3300', colorB: '#ffcc00' },
+  });
+  const currentValues = baked || panel.values;
+
+  function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, W, H);
+    // Additive on the dark ground so crossings brighten on their own; plain
+    // alpha on the light (inverted) ground, where `lighter` would clip white.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at a shared point (alpha buckets), and round caps
+    // would overlap there and add up to a bright bead under 'lighter'.
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+
+    paths = [];
+    const S = Math.min(W, H);
+    const size = 0.4 + 0.6 * values.scale;
+    const t = elapsed * values.speed;
+    const phaseOff = values.phase * Math.PI;
+    const loose = 0.35 + 0.4 * values.slack; // 1.15 at Slack 2: a little past LOOSE, by design
+    const swayAmp = 0.022 * values.motion;
+    const swayT = (t / SWAY_PERIOD) * Math.PI * 2;
+
+    // Control points: tight/loose blend, a slow breath (Motion), scaled
+    // about the crossing (Scale), then placed in the frame.
+    const ox = W / 2 + 0.07 * S;
+    const oy = H / 2 + 0.12 * S;
+    const ctrl = TIGHT.map((p, i) => {
+      const q = LOOSE[i];
+      const bx = p[0] + (q[0] - p[0]) * loose + swayAmp * Math.sin(swayT + i * 1.3 + phaseOff);
+      const by = p[1] + (q[1] - p[1]) * loose + swayAmp * Math.cos(swayT * 0.8 + i * 1.7 + phaseOff);
+      return [ox + (bx - 0.07) * S * size, oy + (by - 0.12) * S * size];
+    });
+    let line = spline(ctrl, 24);
+    // Straight run-outs past both ends so the rope always reaches the frame
+    // edge, at any Scale or Angle.
+    const reach = Math.hypot(W, H) * 1.2;
+    const ext = (a, b) => {
+      const len = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1;
+      return [a[0] + ((a[0] - b[0]) / len) * reach, a[1] + ((a[1] - b[1]) / len) * reach];
+    };
+    line = [ext(line[0], line[3]), ...line, ext(line[line.length - 1], line[line.length - 4])];
+    line = resample(line, STEP);
+
+    // Angle: rotate the sampled centreline about the crossing's rest position.
+    const th = (values.angle * Math.PI) / 180;
+    if (th) {
+      const c = Math.cos(th), s = Math.sin(th);
+      line = line.map(([x, y]) => [ox + (x - ox) * c - (y - oy) * s, oy + (x - ox) * s + (y - oy) * c]);
+    }
+
+    // Find the crossing: the closest pair of samples that are far apart
+    // along the rope. Only samples near the loop are searched.
+    const near = [];
+    for (let i = 0; i < line.length; i += 2) {
+      if (Math.hypot(line[i][0] - ox, line[i][1] - oy) < 0.3 * S * size) near.push(i);
+    }
+    let anchor = [ox, oy];
+    let best = Infinity;
+    const minGap = (0.5 * S * size) / STEP;
+    for (let a = 0; a < near.length; a++) {
+      for (let b = a + 1; b < near.length; b++) {
+        if (near[b] - near[a] < minGap) continue;
+        const p = line[near[a]], q = line[near[b]];
+        const d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2;
+        if (d < best) { best = d; anchor = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; }
+      }
+    }
+
+    // Normals and a brightness envelope: full on the loop, fading along the
+    // run-outs so the loop is the object and the ends just leave.
+    const n = line.length;
+    const normals = new Array(n);
+    const env = new Float32Array(n);
+    const loopR = 0.34 * S * size;
+    for (let i = 0; i < n; i++) {
+      const a = line[Math.max(0, i - 1)], b = line[Math.min(n - 1, i + 1)];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      normals[i] = [-(b[1] - a[1]) / len, (b[0] - a[0]) / len];
+      const d = Math.hypot(line[i][0] - anchor[0], line[i][1] - anchor[1]) / loopR;
+      env[i] = 0.3 + 0.7 * Math.exp(-d * d * 0.6);
+    }
+
+    const strands = Math.max(6, Math.round(BASE_STRANDS * values.density));
+    const perPly = Math.ceil(strands / 3);
+    const rr = 0.02 * S * size;                      // rope radius
+    const twistRate = values.twist * (Math.PI * 2) / (0.11 * S * size); // radians per px
+    const roll = (t / ROLL_PERIOD) * Math.PI * 2 + phaseOff;
+    const light = values.invert ? 0.14 : 0.86 - 0.24 * values.saturation;
+    const lineWidth = 0.5 + values.stroke * 0.4;
+    const baseAlpha = values.opacity * (values.invert ? 0.5 : 0.6);
+    const margin = 40;
+    const inFrame = (x, y) => x > -margin && y > -margin && x < W + margin && y < H + margin;
+
+    // buckets[ply][level] collects every sub-run at that alpha, so each
+    // (ply, level) pair costs one stroke however many strands feed it.
+    const buckets = Array.from({ length: 3 }, () => Array.from({ length: LEVELS }, () => []));
+    for (let k = 0; k < strands; k++) {
+      const ply = k % 3;
+      const j = Math.floor(k / 3);
+      const lay = (Math.PI * 2 * ply) / 3 + ((j + 0.5) / perPly - 0.5) * 1.05;
+      const r = rr * (0.8 + 0.2 * (((j * 7) % perPly) / Math.max(1, perPly - 1)));
+      let run = null;
+      let runLevel = -1;
+      const strandPath = [];
+      const flush = () => {
+        if (run && run.length >= 2) buckets[ply][runLevel].push(run);
+        run = null;
+      };
+      for (let i = 0; i < n; i++) {
+        const psi = lay + i * STEP * twistRate + roll;
+        const off = r * Math.cos(psi);
+        const x = line[i][0] + normals[i][0] * off;
+        const y = line[i][1] + normals[i][1] * off;
+        if (!inFrame(x, y)) {
+          flush();
+          if (strandPath.length >= 2) paths.push(strandPath.splice(0));
+          else strandPath.length = 0;
+          continue;
+        }
+        strandPath.push([x, y]);
+        // Front of the rope (sin psi > 0) draws brighter than the back.
+        const depth = 0.3 + 0.7 * (Math.sin(psi) + 1) / 2;
+        const level = Math.min(LEVELS - 1, Math.floor(env[i] * depth * LEVELS));
+        if (!run || level !== runLevel) {
+          const last = run ? run[run.length - 1] : null;
+          flush();
+          run = last ? [last] : [];
+          runLevel = level;
+        }
+        run.push([x, y]);
+      }
+      flush();
+      if (strandPath.length >= 2) paths.push(strandPath);
+    }
+
+    for (let ply = 0; ply < 3; ply++) {
+      const { h, s } = paletteHsl(values, ply / 2);
+      const [cr, cg, cb] = hslToRgb(h, s, light);
+      for (let lv = 0; lv < LEVELS; lv++) {
+        const runs = buckets[ply][lv];
+        if (!runs.length) continue;
+        ctx.beginPath();
+        for (const run of runs) {
+          ctx.moveTo(run[0][0], run[0][1]);
+          for (let i = 1; i < run.length; i++) ctx.lineTo(run[i][0], run[i][1]);
+        }
+        const a = baseAlpha * ((lv + 0.5) / LEVELS);
+        if (values.glow > 0) {
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, a * values.glow * 0.18)})`;
+          ctx.lineWidth = lineWidth + values.glow * 2.4;
+          ctx.stroke();
+        }
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, a)})`;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+    }
+
+    // Glow is a fallback for the anchor, off by default.
+    if (values.glow > 0) {
+      const { h, s } = paletteHsl(values, 0.5);
+      const [cr, cg, cb] = hslToRgb(h, s, light);
+      const gr = (14 + 30 * values.glow) * size;
+      const grad = ctx.createRadialGradient(anchor[0], anchor[1], 0, anchor[0], anchor[1], gr);
+      grad.addColorStop(0, `rgba(${cr},${cg},${cb},${Math.min(1, 0.4 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(anchor[0], anchor[1], gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

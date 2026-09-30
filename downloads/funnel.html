@@ -5,7 +5,7 @@
      max-width:640px sheet rule never matches and the page renders zoomed
      out — the controls become an unusable corner card. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>linefield — meridian</title>
+<title>linefield — funnel</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -129,7 +129,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.5,"colorMode":"gradient","colorA":"#00ff80","colorB":"#00ffff","hue":150,"hueB":180,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"sweep":1};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#aa00ff","colorB":"#00aaff","hue":290,"hueB":190,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"flare":1,"twist":1,"rotX":24,"rotY":0};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1003,79 +1003,71 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
-// --- inlined: ../../shared/noise.js ---
-// shared/noise.js
-// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
-// reference algorithm (Stefan Gustavson).
+// --- inlined: ../../shared/project.js ---
+// shared/project.js
+// 3D -> 2D projection for pieces that want perspective geometry.
+//
+// Shaped as an extension point: behaviour is configured through an options
+// bag on a camera object, so future capability (roll, camera position, an
+// orthographic mode) arrives as a new option that existing callers ignore,
+// rather than a changed signature at every call site.
+//
+// Deliberately absent, by choice rather than oversight: depth sorting and
+// occlusion, matrix stacks, lighting, mesh loading, orthographic mode.
 
-const GRAD = [
-  [1, 1], [-1, 1], [1, -1], [-1, -1],
-  [1, 0], [-1, 0], [1, 0], [-1, 0],
-  [0, 1], [0, -1], [0, 1], [0, -1],
-];
+// Rotate a point: yaw about Y, pitch about X, then roll about Z.
+function rotatePoint(x, y, z, { tilt = 0, yaw = 0, roll = 0 } = {}) {
+  const cyaw = Math.cos(yaw);
+  const syaw = Math.sin(yaw);
+  const rx = x * cyaw - z * syaw;
+  let rz = x * syaw + z * cyaw;
 
-function buildPermutation(seed = 1337) {
-  const p = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) p[i] = i;
-  let s = seed;
-  const rand = () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-  for (let i = 255; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [p[i], p[j]] = [p[j], p[i]];
+  const ct = Math.cos(tilt);
+  const st = Math.sin(tilt);
+  const ry = y * ct - rz * st;
+  rz = y * st + rz * ct;
+
+  const cr = Math.cos(roll);
+  const sr = Math.sin(roll);
+  return { x: rx * cr - ry * sr, y: rx * sr + ry * cr, z: rz };
+}
+
+function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 } = {}) {
+  const opt = { tilt, yaw, roll, fov, cx, cy };
+
+  function project(x, y, z) {
+    const r = rotatePoint(x, y, z, opt);
+    const denom = opt.fov + r.z;
+    // Near plane sits at 20% of the fov ahead of the lens (not at the lens
+    // itself), capping scale at 1/0.2 = 5x. Without this, points just past
+    // the lens (denom -> 0) blow up toward arbitrary magnification, which
+    // canvas draw calls and exported paths share the same coordinates for —
+    // canvas just clips silently at the screen edge, export doesn't. A
+    // blown-up point lands off the visible frame whenever the near-plane
+    // crossing is off the camera's optical axis, which any meaningful tilt
+    // guarantees; a tilt at or near zero (camera roughly in the plane of
+    // the geometry) is the degenerate exception where a dropped point can
+    // still be near-frame, and dropping it can visibly change the render.
+    // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
+    // steps) at which funnel's SVG export at Scale 2, an angle
+    // exposing the near plane, has no coordinate over magnitude 5000. At
+    // or beyond the near plane there is no meaningful projection; scale 0
+    // is the caller's signal to skip this point.
+    const nearPlane = opt.fov * 0.2;
+    if (denom <= nearPlane) return { x: 0, y: 0, scale: 0 };
+    const scale = opt.fov / denom;
+    return { x: opt.cx + r.x * scale, y: opt.cy + r.y * scale, scale };
   }
-  const perm = new Uint8Array(512);
-  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-  return perm;
-}
 
-const perm = buildPermutation();
-
-function dot(g, x, y) {
-  return g[0] * x + g[1] * y;
-}
-
-const F2 = 0.5 * (Math.sqrt(3) - 1);
-const G2 = (3 - Math.sqrt(3)) / 6;
-
-function simplex2(xin, yin) {
-  const s = (xin + yin) * F2;
-  const i = Math.floor(xin + s);
-  const j = Math.floor(yin + s);
-  const t = (i + j) * G2;
-  const X0 = i - t;
-  const Y0 = j - t;
-  const x0 = xin - X0;
-  const y0 = yin - Y0;
-
-  let i1, j1;
-  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
-
-  const x1 = x0 - i1 + G2;
-  const y1 = y0 - j1 + G2;
-  const x2 = x0 - 1 + 2 * G2;
-  const y2 = y0 - 1 + 2 * G2;
-
-  const ii = i & 255;
-  const jj = j & 255;
-  const gi0 = perm[ii + perm[jj]] % 12;
-  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
-  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
-
-  let n0 = 0, n1 = 0, n2 = 0;
-
-  let t0 = 0.5 - x0 * x0 - y0 * y0;
-  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
-
-  let t1 = 0.5 - x1 * x1 - y1 * y1;
-  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
-
-  let t2 = 0.5 - x2 * x2 - y2 * y2;
-  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
-
-  return 70 * (n0 + n1 + n2);
+  return {
+    project,
+    projectPath(points) {
+      return points.map((p) => project(p[0], p[1], p[2]));
+    },
+    set(partial) {
+      Object.assign(opt, partial);
+    },
+  };
 }
 
 
@@ -1269,13 +1261,161 @@ function describeForAI({ pieceName, values }) {
 }
 
 
+// --- inlined: ../../shared/pointer.js ---
+// shared/pointer.js
+// Tracks the cursor relative to one canvas. A leaf module: no imports, no
+// state beyond its own listeners.
+
+function createPointer({ canvas, enabled = true }) {
+  const p = {
+    x: 0, y: 0, nx: 0, ny: 0, vx: 0, vy: 0,
+    active: false, influence: 0,
+  };
+
+  let lastX = 0, lastY = 0, lastT = 0;
+
+  function onMove(e) {
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (canvas.width / r.width);
+    const y = (e.clientY - r.top) * (canvas.height / r.height);
+    const t = performance.now();
+    const dt = lastT ? Math.max((t - lastT) / 1000, 1 / 240) : 0;
+    if (dt) { p.vx = (x - lastX) / dt; p.vy = (y - lastY) / dt; }
+    p.x = x; p.y = y;
+    p.nx = (x / canvas.width) * 2 - 1;
+    p.ny = (y / canvas.height) * 2 - 1;
+    p.active = true;
+    lastX = x; lastY = y; lastT = t;
+  }
+  function onEnter() { p.active = true; }
+  function onLeave() { p.active = false; }
+
+  if (enabled) {
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerenter', onEnter);
+    canvas.addEventListener('pointerleave', onLeave);
+  }
+
+  // Called once per frame by the piece. `influence` rises while the pointer
+  // is over the canvas and eases back to 0 when it leaves, so a piece never
+  // snaps as the cursor exits.
+  //
+  // It takes NO dt argument and keeps its own clock, deliberately. Influence
+  // is a UI-response quantity — how present the cursor is right now — not
+  // an animation quantity, so it should not track animation timing at all.
+  // Accepting a piece's dt would couple the two regardless of how that
+  // piece happens to apply values.speed downstream; keeping its own clock
+  // keeps cursor response independent of any piece's animation rate,
+  // including at Speed 0.
+  //
+  // performance.now() is safe under the deterministic harness: it is not
+  // frozen, it is a controlled clock that stepFrames advances 16ms per frame,
+  // so influence rises normally during an audit and two runs stay identical.
+  let stepT = 0;
+  p.step = () => {
+    const now = performance.now();
+    const dt = stepT ? Math.min((now - stepT) / 1000, 0.1) : 0;
+    stepT = now;
+    if (!dt) return;
+    const target = p.active ? 1 : 0;
+    const rate = p.active ? 6 : 2.5;
+    p.influence += (target - p.influence) * Math.min(rate * dt, 1);
+    const decay = Math.exp(-4 * dt);
+    p.vx *= decay; p.vy *= decay;
+  };
+
+  // 0..1 proximity of a canvas point to the pointer, for pieces that
+  // modulate locally rather than globally.
+  p.falloff = (x, y, radius) => {
+    if (!radius) return 0;
+    const d = Math.hypot(x - p.x, y - p.y);
+    return Math.max(0, 1 - d / radius);
+  };
+
+  p.destroy = () => {
+    canvas.removeEventListener('pointermove', onMove);
+    canvas.removeEventListener('pointerenter', onEnter);
+    canvas.removeEventListener('pointerleave', onLeave);
+  };
+
+  return p;
+}
+
+// Stateless delta emitter: holds no pitch/yaw of its own. Each drag move
+// calls onOrbit(dPitchRad, dYawRad) with the frame's delta only; the caller
+// (a piece, via panel.setValue) owns where that delta lands, so the panel's
+// Pitch/Yaw sliders and the rendered camera can never read two different
+// numbers. onSettle fires once on pointerup, for the caller to persist the
+// drag's final position without writing to localStorage on every move.
+function createOrbit({
+  canvas,
+  enabled = new URLSearchParams(location.search).get('preview') !== '1',
+  sensitivity = 0.008,
+  onOrbit = () => {},
+  onSettle = () => {},
+} = {}) {
+  let dragging = false;
+  let lastX = 0, lastY = 0;
+
+  function onDown(e) {
+    if (e.button !== 0) return;
+    dragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.setPointerCapture?.(e.pointerId);
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    const dYaw = (e.clientX - lastX) * sensitivity;
+    const dPitch = (e.clientY - lastY) * sensitivity;
+    lastX = e.clientX; lastY = e.clientY;
+    onOrbit(dPitch, dYaw);
+  }
+  function onUp(e) {
+    dragging = false;
+    canvas.releasePointerCapture?.(e.pointerId);
+    onSettle();
+  }
+
+  if (enabled) {
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onUp);
+  }
+
+  return {
+    destroy() {
+      canvas.removeEventListener('pointerdown', onDown);
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointercancel', onUp);
+    },
+  };
+}
+
+
 // --- piece script ---
 
 
 
 
 
-  const PIECE_ID = 'meridian';
+
+  // funnel — a funnel seen from the side: ninety stacked hairline
+  // ellipses narrowing down to a point, slowly twisting, with the tip as the
+  // one bright anchor.
+  //
+  // Text-safe zone: the left third of the frame. The funnel stands in the
+  // central square, a little right of centre, mouth up, tip down.
+  // Anchor: the tip, lower centre. It is not drawn as a glow: the smallest
+  // rings stack on top of each other there and brighten additively.
+  //
+  // Each ring is an ellipse (not a circle) in its own cross-section, and the
+  // ellipse's long axis turns with depth (Twist) and with time, so the
+  // silhouette reads as a twisting column rather than a solid of revolution.
+  // The asymmetry is also what keeps Yaw and Phase visible: a circular
+  // stack would look identical from every yaw.
+  const PIECE_ID = 'funnel';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1286,17 +1426,20 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // Deliberately sparse: seven enormous ribbons, derived per frame.
-  const BASE_RIBBONS = 7;
-  const STEP_PX = 8;
+  // Ring count derives per frame from density — no persistent array.
+  const BASE_RINGS = 90;
+  const SEG = 120;          // segments per ring
+  const ECC = 0.72;         // cross-section minor/major axis ratio
+  const SPIN_PERIOD = 14;   // seconds per full turn of the twist at speed 1
+  const SWAY_PERIOD = 11;   // seconds per sway cycle (Motion's gesture)
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.22, stroke: 0.6, density: 0.5, saturation: 0.06, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.9, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.95, stroke: 1.1, density: 1.2, saturation: 0.95, glow: 1.2 },
-    drift:   { opacity: 0.5, stroke: 1, density: 0.7, speed: 0.25, motion: 1.6 },
-    dense:   { opacity: 0.6, stroke: 0.7, density: 2, speed: 0.8, glow: 0 },
+    whisper: { opacity: 0.55, stroke: 0.6, density: 0.5, flare: 0.8, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.35, density: 0.85, twist: 0.6, glow: 0, rotX: 12 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.7, stroke: 0.8, density: 0.8, speed: 0.4, motion: 1.8, twist: 1.6, flare: 1.4 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.7, glow: 0.5, flare: 1.3, rotX: 24 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1305,72 +1448,189 @@ function describeForAI({ pieceName, values }) {
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'sweep', label: 'Sweep', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'motion' },
+      { name: 'flare', label: 'Flare', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'twist', label: 'Twist', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 24, category: 'interaction' },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
     ],
-    defaults: { hue: 150, hueB: 180, saturation: 0.5, colorMode: 'gradient', colorA: '#00ff80', colorB: '#00ffff' },
+    defaults: { hue: 290, hueB: 190, saturation: 0, colorMode: 'gradient', colorA: '#aa00ff', colorB: '#00aaff' },
   });
   const currentValues = baked || panel.values;
+  const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
+  // In panel mode the drag writes straight into rotX/rotY through setValue —
+  // the only write path — so the Pitch/Yaw sliders and the rendered camera
+  // never disagree. A baked export has no panel to write through, so it
+  // mutates currentValues directly, clamped to the same ranges the panel
+  // would have enforced.
+  const orbit = createOrbit({
+    canvas,
+    onOrbit: (dPitch, dYaw) => {
+      const dPitchDeg = (dPitch * 180) / Math.PI;
+      const dYawDeg = (dYaw * 180) / Math.PI;
+      if (panel) {
+        panel.setValue('rotX', panel.values.rotX + dPitchDeg, { persist: false });
+        panel.setValue('rotY', panel.values.rotY + dYawDeg, { persist: false });
+      } else {
+        currentValues.rotX = clampDeg(currentValues.rotX + dPitchDeg, -90, 90);
+        currentValues.rotY = clampDeg(currentValues.rotY + dYawDeg, -180, 180);
+      }
+    },
+    onSettle: () => {
+      if (!panel) return;
+      panel.setValue('rotX', panel.values.rotX, { persist: true });
+      panel.setValue('rotY', panel.values.rotY, { persist: true });
+    },
+  });
+
+  const camera = createCamera({ fov: 900 });
+
+  // Splits one projected ring into front and back runs. A point is "front"
+  // when its perspective scale beats the ring centre's, so the near half of
+  // every ellipse can draw brighter than the far half and the stack reads
+  // as a solid. Runs also break at any point at or behind the near plane
+  // (scale <= 0) instead of bridging it with a straight line.
+  function ringRuns(pts, centreScale) {
+    const front = [];
+    const back = [];
+    let run = [];
+    let runFront = null;
+    const flush = () => {
+      if (run.length >= 2) (runFront ? front : back).push(run);
+      run = [];
+    };
+    for (const p of pts) {
+      if (p.scale <= 0) { flush(); runFront = null; continue; }
+      const isFront = p.scale >= centreScale;
+      if (runFront !== null && isFront !== runFront) {
+        const seam = run[run.length - 1];
+        flush();
+        run.push(seam); // the next run starts where this one ended
+      }
+      runFront = isFront;
+      run.push(p);
+    }
+    flush();
+    return { front, back };
+  }
+
+  function strokeRuns(runs, alpha, lineWidth, rgb) {
+    if (!runs.length || alpha <= 0) return;
+    ctx.beginPath();
+    for (const run of runs) {
+      ctx.moveTo(run[0].x, run[0].y);
+      for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
+    }
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.min(1, alpha)})`;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
 
   function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, W, H);
+    // Additive on the dark ground, so wherever rings stack the image
+    // brightens on its own. On the light (inverted) ground `lighter` would
+    // clip everything to white, so dark ink layers with plain alpha there.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at a shared point (alpha buckets), and round caps
+    // would overlap there and add up to a bright bead under 'lighter'.
+    ctx.lineCap = 'butt';
 
     paths = [];
-    const ribbons = Math.max(3, Math.round(BASE_RIBBONS * values.density));
-    const noiseScale = 0.0009 * (0.25 + values.scale);
-    const t = elapsed * values.speed * 0.12;
-    // sweep owns the ribbon's signature broad excursion; motion owns a
-    // separate, independently-scaled flutter layer — no longer the same term.
-    const sweepAmp = canvas.height * 0.165 * values.sweep;
-    const flutterAmp = canvas.height * 0.055 * values.motion;
-    const light = values.invert ? 0.35 : 0.6;
-    const lineWidth = 2.2 + values.stroke * 3.6; // heavy; only tether is heavier
+    const S = Math.min(W, H);
+    const size = 0.35 + 0.65 * values.scale;
+    const height = S * 0.62 * size;
+    const mouth = S * 0.3 * size;
+    const rings = Math.max(10, Math.round(BASE_RINGS * values.density));
+    // Silhouette exponent: below 1 the wall bulges like a bowl, 1 is a cone,
+    // above 1 it pinches into a trumpet.
+    const flareExp = 0.8 + values.flare * 0.9;
+    const t = elapsed * values.speed;
+    const spin = (t / SPIN_PERIOD) * Math.PI * 2;
+    const twistTotal = values.twist * Math.PI * 1.25;
+    const phaseOff = values.phase * Math.PI * 0.8;
+    const swayAmp = S * 0.045 * values.motion * size;
+    const swayT = (t / SWAY_PERIOD) * Math.PI * 2;
+    const lean = S * 0.05 * size; // a fixed lean of the tip, so the form has a heading Yaw can turn
+    const light = values.invert ? 0.14 : 0.9 - 0.28 * values.saturation;
+    const lineWidth = 0.5 + values.stroke * 0.4;
+    const baseAlpha = values.opacity * (values.invert ? 0.55 : 1);
 
-    const rcx = canvas.width / 2, rcy = canvas.height / 2;
-    const theta = (values.angle * Math.PI) / 180;
+    camera.set({
+      tilt: (values.rotX * Math.PI) / 180,
+      yaw: (values.rotY * Math.PI) / 180,
+      roll: (values.angle * Math.PI) / 180,
+      // Nudged right of centre so the mouth stays clear of the left third.
+      cx: W / 2 + 0.06 * S,
+      cy: H / 2,
+    });
 
-    ctx.save();
-    ctx.translate(rcx, rcy);
-    ctx.rotate(theta);
-    ctx.translate(-rcx, -rcy);
+    // Axis centre at depth u (0 = mouth, 1 = tip): the fixed lean plus a
+    // slow wave that travels down the column, growing toward the tip.
+    const axisAt = (u) => {
+      const w = u * u;
+      return [
+        lean * w + swayAmp * w * Math.sin(swayT - u * 2.2 + phaseOff),
+        -height / 2 + height * u,
+        swayAmp * 0.8 * w * Math.cos(swayT * 0.8 - u * 1.7 + phaseOff),
+      ];
+    };
 
-    // Overdraw horizontally so rotation never exposes a ribbon end.
-    const margin = canvas.width * 0.4;
-
-    for (let i = 0; i < ribbons; i++) {
-      const f = ribbons === 1 ? 0.5 : i / (ribbons - 1);
-      const baseY = canvas.height * (0.12 + f * 0.76);
-
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
+    let tip = null;
+    for (let i = 0; i < rings; i++) {
+      const x = i / (rings - 1);
+      // Rings pile up toward the tip (spacing -> 0), which is what makes the
+      // tip the brightest point without drawing a glow.
+      const u = 1 - Math.pow(1 - x, 1.8);
+      const R = mouth * Math.pow(1 - u, flareExp) + S * 0.0015 * size;
+      // Differential spin: the lower rings turn faster, so the twist keeps
+      // tightening and loosening instead of rotating as one rigid stack.
+      const theta = spin * (0.6 + 0.8 * u) + twistTotal * u + phaseOff;
+      const ct = Math.cos(theta);
+      const st = Math.sin(theta);
+      const [ax, ay, az] = axisAt(u);
 
       const pts = [];
-      ctx.beginPath();
-      for (let x = -margin; x <= canvas.width + margin; x += STEP_PX) {
-        // Two octaves so the sweep is broad but not mechanical.
-        const n1 = simplex2(x * noiseScale + values.phase, f * 3 + t);
-        const n2 = simplex2(x * noiseScale * 2.7 + values.phase, f * 3 + t * 1.4);
-        let y = baseY + n1 * sweepAmp + n2 * flutterAmp;
-        let px = x;
-          if (x === -margin) ctx.moveTo(px, y);
-        else ctx.lineTo(px, y);
-        pts.push([px, y]);
+      for (let s = 0; s <= SEG; s++) {
+        const a = (s / SEG) * Math.PI * 2;
+        const ex = Math.cos(a) * R;
+        const ez = Math.sin(a) * R * ECC;
+        pts.push([ax + ex * ct - ez * st, ay, az + ex * st + ez * ct]);
       }
+      const centre = camera.project(ax, ay, az);
+      if (i === rings - 1) tip = centre;
+      const { front, back } = ringRuns(camera.projectPath(pts), centre.scale);
+      for (const run of front) paths.push(run.map((p) => [p.x, p.y]));
+      for (const run of back) paths.push(run.map((p) => [p.x, p.y]));
 
+      const { h, s } = paletteHsl(values, u);
+      const rgb = hslToRgb(h, s, light);
+      const alphaFront = baseAlpha * (0.7 + 0.3 * u);
       if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 4;
-        ctx.globalAlpha = values.glow * 0.25;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+        strokeRuns(front, alphaFront * values.glow * 0.2, lineWidth + values.glow * 2.2, rgb);
       }
-      ctx.lineWidth = lineWidth;
-      ctx.stroke();
-      paths.push(pts);
+      strokeRuns(back, alphaFront * 0.7, lineWidth, rgb);
+      strokeRuns(front, alphaFront, lineWidth, rgb);
     }
 
-    ctx.restore();
-
+    // Glow is a fallback for the anchor, off by default: the tip is already
+    // the brightest point from the stacked rings alone.
+    if (values.glow > 0 && tip && tip.scale > 0) {
+      const { h, s } = paletteHsl(values, 1);
+      const [r, g, b] = hslToRgb(h, s, light);
+      const gr = (10 + 26 * values.glow) * size;
+      const grad = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${Math.min(1, 0.5 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({

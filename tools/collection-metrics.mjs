@@ -15,10 +15,10 @@
 // A pixel counts as MARKED when its brightest channel exceeds MARK_LEVEL.
 // Every piece clears to #0a0a0d (brightest channel 13), so the threshold sits
 // just above the background — high enough to ignore the near-black haze the
-// two accumulator pieces (`flow-field`, `accretion`) leave behind, which is
+// two accumulator pieces (`flow-field`, `infall`) leave behind, which is
 // canvas fade, not a mark. This reproduces the twelve values published in
 // ROADMAP before this tool existed, to within one unit in the last printed
-// digit on 34 of 36 numbers (`wireframe-lattice` ink, `event-horizon` sat).
+// digit on 34 of 36 numbers (`wireframe-lattice` ink, `funnel` sat).
 //
 // No pass/fail gate — this is a curation instrument, like tools/mode-sheet.mjs.
 // Not run in CI.
@@ -94,10 +94,24 @@ function decodePng(path) {
   return { width, height, channels, data: out };
 }
 
+// The ground `#0a0a0d` is faintly blue (chroma 3). A faint near-white hairline
+// anti-aliased over it lands at pixels like (22,22,25): chroma 3 over a max of
+// 25 reads as HSV saturation 0.12, even though nothing coloured was drawn.
+// Hairline pieces are mostly such faint edge pixels, so the raw mean punished
+// exactly the low-alpha accumulation the house look asks for. The --check mode
+// therefore treats chroma <= CHROMA_FLOOR as achromatic. The default table
+// keeps the raw figure so previously published rows stay comparable.
+const CHROMA_FLOOR = 3;
+const checkSat = (r, g, b) => {
+  const max = Math.max(r, g, b);
+  const chroma = max - Math.min(r, g, b);
+  return chroma > CHROMA_FLOOR ? chroma / max : 0;
+};
+
 function measure(slug) {
   const { width, height, channels, data } = decodePng(join(ROOT, 'thumbs', `${slug}.png`));
   const total = width * height;
-  let marked = 0, satSum = 0, hx = 0, hy = 0, chromaSum = 0;
+  let marked = 0, satSum = 0, checkSatSum = 0, hx = 0, hy = 0, chromaSum = 0;
   for (let i = 0; i < total; i++) {
     const r = data[i * channels], g = data[i * channels + 1], b = data[i * channels + 2];
     const max = Math.max(r, g, b);
@@ -105,6 +119,7 @@ function measure(slug) {
     marked++;
     const chroma = max - Math.min(r, g, b);
     satSum += chroma / max;
+    checkSatSum += checkSat(r, g, b);
     if (chroma === 0) continue;
     let hue;
     if (max === r) hue = ((g - b) / chroma) % 6;
@@ -120,6 +135,7 @@ function measure(slug) {
     slug,
     hue: Math.round(((Math.atan2(hy, hx) * 180) / Math.PI + 360) % 360),
     saturation: satSum / marked,
+    checkSaturation: checkSatSum / marked,
     ink: marked / total,
   };
 }
@@ -173,6 +189,9 @@ function selfTest() {
     return { fail: failures.map((f) => f.rule), over: overridden.map((f) => f.rule) };
   };
   // rainfall today: saturated, but low ink is fine for a hero (no 0.03 floor).
+  // Ground-tint floor: a faint white edge over #0a0a0d is achromatic; real colour is not.
+  assert.equal(checkSat(22, 22, 25), 0);
+  assert.ok(checkSat(40, 20, 20) > 0.4);
   assert.deepEqual(run('rainfall', 0.19, 0.007).fail, ['sat']);
   assert.deepEqual(run('grain-field', 0, 0.036).fail, ['ink']);
   assert.deepEqual(run('lacuna', 0, 0.028).fail, ['ink']);
@@ -224,7 +243,7 @@ if (process.argv.includes('--self-test')) {
 } else {
   const pieces = JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8'));
   if (process.argv.includes('--check')) {
-    check(pieces.map((p) => measure(p.slug)), OVERRIDES);
+    check(pieces.map((p) => { const m = measure(p.slug); return { ...m, saturation: m.checkSaturation }; }), OVERRIDES);
   } else {
     const rows = pieces.map((p) => measure(p.slug)).sort((a, b) => a.hue - b.hue);
 

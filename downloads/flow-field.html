@@ -1416,7 +1416,7 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
       y * noiseScale + values.phase
     );
     // Give the noise a shared travelling current. Without it the field's
-    // local directions close into a vortex, which overlaps event-horizon's
+    // local directions close into a vortex, which overlaps funnel's
     // orbital read; this keeps the ribbons moving through the frame.
     const wave = Math.sin(
       (y / canvas.height) * Math.PI * 2.2 +
