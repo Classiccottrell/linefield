@@ -112,23 +112,29 @@
   {
     "slug": "cipher-bloom",
     "title": "Cipher Bloom",
-    "blurb": "Irregular glyphs gather into a bright oblique core, then dissolve into warm chalk and shadow.",
+    "blurb": "A compressed oblique band of shifting glyph fragments, drawing a small bright core along its own length.",
     "tags": ["glyph", "organic", "sparse"],
-    "hue": 42, "hueB": 76, "saturation": 0.22
+    "safeZone": "top and bottom thirds, clear of the band",
+    "anchor": "core, drifting along the band's centre",
+    "hue": 42, "hueB": 76, "saturation": 0
   },
   {
     "slug": "driftwork",
     "title": "Driftwork",
-    "blurb": "Violet-grey ellipse marks drift through two crossing currents, gathering and dissolving like woven air.",
+    "blurb": "Tangent-aligned ellipse links follow two crossing currents, brightening by accumulation where they meet.",
     "tags": ["organic", "depth", "kinetic"],
-    "hue": 250, "hueB": 278, "saturation": 0.16
+    "safeZone": "left third",
+    "anchor": "crossing, centre of the frame",
+    "hue": 250, "hueB": 278, "saturation": 0
   },
   {
     "slug": "pleat",
     "title": "Pleat",
-    "blurb": "Coral and ivory marks gather into two folded surfaces, divided by a clean cut of space.",
+    "blurb": "Two folded bands of ivory marks, divided by a clean cut of empty space where they don't touch.",
     "tags": ["geometric", "organic", "editorial"],
-    "hue": 12, "hueB": 38, "saturation": 0.3
+    "safeZone": "top, above the folded bands",
+    "anchor": "crease, where the two bands meet",
+    "hue": 46, "hueB": 54, "saturation": 0
   },
   {
     "slug": "globe",
