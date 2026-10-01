@@ -585,13 +585,16 @@ const PIECES = [
   {
     "slug": "flow-field",
     "title": "Flow Field",
-    "blurb": "Organic ribbons drifting along a simplex-noise vector field.",
+    "blurb": "Particles confined to one soft, organic region around a quiet central void, trailing hairlines that brighten only where they cross.",
     "tags": [
-      "flow"
+      "flow",
+      "organic"
     ],
     "hue": 200,
     "hueB": 280,
-    "saturation": 0.6,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "band's inner edge, upper right",
     "presets": [
       "whisper",
       "ink",
@@ -604,13 +607,16 @@ const PIECES = [
   {
     "slug": "contour-grid",
     "title": "Contour Grid",
-    "blurb": "Topographic bands undulating like breathing terrain.",
+    "blurb": "The contour lines of one island, cropped as a single landform with its summit as the brightest point.",
     "tags": [
-      "geometric"
+      "topographic",
+      "organic"
     ],
     "hue": 35,
     "hueB": 15,
-    "saturation": 0.5,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "summit, right of centre",
     "presets": [
       "whisper",
       "ink",
@@ -667,13 +673,16 @@ const PIECES = [
   {
     "slug": "grain-field",
     "title": "Grain Field",
-    "blurb": "Fine drifting grain — the quietest piece, good behind text.",
+    "blurb": "Fine grain gathered into one soft drifting cloud with a long falloff — the quietest piece, and the home-page hero.",
     "tags": [
-      "grain"
+      "grain",
+      "hero"
     ],
     "hue": 30,
     "hueB": 210,
-    "saturation": 0.12,
+    "saturation": 0,
+    "safeZone": "left ~60%, clear of the hero copy",
+    "anchor": "cloud's centre, right of frame-centre",
     "presets": [
       "whisper",
       "ink",
@@ -883,15 +892,17 @@ const PIECES = [
   {
     "slug": "cipher-bloom",
     "title": "Cipher Bloom",
-    "blurb": "Irregular glyphs gather into a bright oblique core, then dissolve into warm chalk and shadow.",
+    "blurb": "A compressed oblique band of shifting glyph fragments, drawing a small bright core along its own length.",
     "tags": [
       "glyph",
       "organic",
       "sparse"
     ],
+    "safeZone": "top and bottom thirds, clear of the band",
+    "anchor": "core, drifting along the band's centre",
     "hue": 42,
     "hueB": 76,
-    "saturation": 0.22,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
@@ -904,15 +915,17 @@ const PIECES = [
   {
     "slug": "driftwork",
     "title": "Driftwork",
-    "blurb": "Violet-grey ellipse marks drift through two crossing currents, gathering and dissolving like woven air.",
+    "blurb": "Tangent-aligned ellipse links follow two crossing currents, brightening by accumulation where they meet.",
     "tags": [
       "organic",
       "depth",
       "kinetic"
     ],
+    "safeZone": "left third",
+    "anchor": "crossing, centre of the frame",
     "hue": 250,
     "hueB": 278,
-    "saturation": 0.16,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
@@ -925,15 +938,17 @@ const PIECES = [
   {
     "slug": "pleat",
     "title": "Pleat",
-    "blurb": "Coral and ivory marks gather into two folded surfaces, divided by a clean cut of space.",
+    "blurb": "Two folded bands of ivory marks, divided by a clean cut of empty space where they don't touch.",
     "tags": [
       "geometric",
       "organic",
       "editorial"
     ],
-    "hue": 12,
-    "hueB": 38,
-    "saturation": 0.3,
+    "safeZone": "top, above the folded bands",
+    "anchor": "crease, where the two bands meet",
+    "hue": 46,
+    "hueB": 54,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",

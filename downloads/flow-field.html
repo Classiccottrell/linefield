@@ -52,7 +52,7 @@
 .lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .lf-row:last-child { margin-bottom: 0; }
 .lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.lf-row label { font-size: 11px; color: #8a8a9a; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
 .lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
 .lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
 .lf-row-checkbox label { order: -1; }
@@ -62,18 +62,43 @@
   color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
   padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
 
-.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-  border-radius: 999px; background-color: #26262e;
-  background-image: linear-gradient(90deg,#2a4637,#437057 50%,#93bea6);
-  background-repeat: no-repeat; background-size: var(--lf-pct, 0%) 100%; cursor: pointer; }
-.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
-  border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6);
-  cursor: pointer; margin-top: 0; }
-.lf-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6); cursor: pointer; }
-.lf-row input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: transparent; }
-.lf-ticks { display: flex; justify-content: space-between; padding: 0 1px; margin-top: -1px; }
-.lf-ticks span { width: 2px; height: 2px; border-radius: 50%; background: #3a3a46; }
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
 
 .lf-color-row { display: flex; align-items: center; gap: 8px; }
 .lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
@@ -129,7 +154,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.6,"colorMode":"gradient","colorA":"#00aaff","colorB":"#aa00ff","hue":200,"hueB":280,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"mode":false};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#00aaff","colorB":"#aa00ff","hue":200,"hueB":280,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"mode":false};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -222,7 +247,9 @@ const SHARED_CONTROLS = [
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1, category: 'color' },
-  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, category: 'color' },
+  // House look default is 0 (docs/house-look.md #1 — monochrome first); a
+  // piece pins its own saturation in its `defaults` block regardless.
+  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0, category: 'color' },
   // Solid/gradient palette. `colorA`/`colorB` are the authored controls a
   // user actually sees and drags; `hue`/`hueB` are hidden (no panel row) —
   // the exact numeric degrees every piece's render math still reads. Picking
@@ -292,7 +319,7 @@ const PANEL_CSS = `
 .lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .lf-row:last-child { margin-bottom: 0; }
 .lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.lf-row label { font-size: 11px; color: #8a8a9a; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
 .lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
 .lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
 .lf-row-checkbox label { order: -1; }
@@ -302,18 +329,43 @@ const PANEL_CSS = `
   color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
   padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
 
-.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-  border-radius: 999px; background-color: #26262e;
-  background-image: linear-gradient(90deg,#2a4637,#437057 50%,#93bea6);
-  background-repeat: no-repeat; background-size: var(--lf-pct, 0%) 100%; cursor: pointer; }
-.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
-  border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6);
-  cursor: pointer; margin-top: 0; }
-.lf-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6); cursor: pointer; }
-.lf-row input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: transparent; }
-.lf-ticks { display: flex; justify-content: space-between; padding: 0 1px; margin-top: -1px; }
-.lf-ticks span { width: 2px; height: 2px; border-radius: 50%; background: #3a3a46; }
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
 
 .lf-color-row { display: flex; align-items: center; gap: 8px; }
 .lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
@@ -745,10 +797,6 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
         input.value = values[spec.name];
         row.append(head, input);
         setRangeFill(input, spec, values[spec.name]);
-        const ticks = document.createElement('div');
-        ticks.className = 'lf-ticks';
-        for (let i = 0; i < 9; i++) ticks.appendChild(document.createElement('span'));
-        row.appendChild(ticks);
       }
     }
 
@@ -1111,7 +1159,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [], circles = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -1137,7 +1185,14 @@ function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = []
     const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
     return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
   }).join('\n');
-  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  // Halftone pieces pass filled dots as circles. Every other caller leaves
+  // this empty, so its serialization is byte-identical to before.
+  const circleEls = circles.map(({ cx, cy, r, fill = 'black', opacity = 1 }) => {
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls, circleEls].filter(Boolean).join('\n');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
@@ -1315,52 +1370,67 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
 
 
 
+  // flow-field — particles confined to one soft organic region around a
+  // quiet central void, trailing hairlines that gather brightness only
+  // where their paths happen to cross.
+  //
+  // Text-safe zone: the left third of the frame. The region sits right of
+  // centre, inside the central square.
+  // Anchor: the band's inner edge, upper right of the void — checked by
+  // measuring the rendered brightest cluster, not assumed from the field's
+  // formula, since the noise-driven current doesn't distribute evenly.
   const PIECE_ID = 'flow-field';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
-  // Base count is deliberately modest so the default reads as a background;
-  // the Density slider is what makes it loud (up to 2x). Chunk 11's mask
-  // gave the piece real negative space around the mass, but 500 crossing
-  // ribbons packed into that one focal region was still enough to read as
-  // a tangled purple blob rather than legible flow lines next to
-  // Driftwork's woven mesh — this is the actual lever, not another
-  // modulation on top of the same crossing count.
-  const BASE_COUNT = 280;
+  // Base count deliberately modest — Density (up to 2x) is the loud knob.
+  // House-look ink 0.03-0.15 needed a real cut from the old 280/56-point-
+  // trail/0.045-fade version (which measured 0.27): fewer particles,
+  // shorter trails, and a full clear each frame (see drawFrame) so trails
+  // never accumulate brightness across frames under `lighter`, only within
+  // one frame where paths actually cross.
+  const BASE_COUNT = 580;
+  const TRAIL_MAX = 40; // points captured per particle; also the ink budget
   let particles = [];
   let paths = [];
 
-  // Composition: earlier versions seeded particles edge-to-edge, so the
-  // piece read as a uniform wallpaper with no negative space next to the
-  // newer collection pieces. A soft off-center mask concentrates the mark
-  // toward one focal region and lets the rest of the canvas go quiet.
-  const FOCUS = { x: 0.58, y: 0.42 };
-  const MASK_INNER = 0.3; // fully opaque within this normalized radius
-  const MASK_OUTER = 0.62; // true zero at/beyond this radius, not just faint
+  // Composition: one soft organic ring around a quiet central void — not a
+  // filled disc. Particles respawn the moment they drift into the void or
+  // off the ring's outer edge, so the hole in the middle stays genuinely
+  // empty instead of just thin.
+  const FOCUS = { x: 0.58, y: 0.46 };
+  const VOID_R = 0.10;   // true zero inside this normalized radius (the void)
+  const RING_PEAK = 0.22; // mask reaches 1 here
+  const RING_OUTER = 0.36; // true zero at/beyond this radius
+
+  function smoothstep(a, b, x) {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  }
 
   function maskValue(x, y, width, height) {
     const r = Math.min(width, height);
     const dx = (x - width * FOCUS.x) / r;
     const dy = (y - height * FOCUS.y) / r;
     const d = Math.sqrt(dx * dx + dy * dy);
-    if (d <= MASK_INNER) return 1;
-    if (d >= MASK_OUTER) return 0;
-    const t = (d - MASK_INNER) / (MASK_OUTER - MASK_INNER);
-    return 1 - t * t * (3 - 2 * t);
+    if (d <= VOID_R) return 0;
+    if (d <= RING_PEAK) return smoothstep(VOID_R, RING_PEAK, d);
+    if (d <= RING_OUTER) return 1 - smoothstep(RING_PEAK, RING_OUTER, d);
+    return 0;
   }
 
   function sampleFocusPoint(width, height) {
     const r = Math.min(width, height);
     for (let i = 0; i < 8; i++) {
       const ang = Math.random() * Math.PI * 2;
-      const rad = Math.sqrt(Math.random()) * MASK_OUTER * r;
+      const rad = Math.sqrt(Math.random()) * RING_OUTER * r;
       const x = width * FOCUS.x + Math.cos(ang) * rad;
       const y = height * FOCUS.y + Math.sin(ang) * rad;
       if (x >= 0 && x <= width && y >= 0 && y <= height && maskValue(x, y, width, height) > 0) {
         return { x, y };
       }
     }
-    return { x: width * FOCUS.x, y: height * FOCUS.y };
+    return { x: width * FOCUS.x, y: height * (FOCUS.y - RING_PEAK) };
   }
 
   function seedParticles(count) {
@@ -1371,11 +1441,11 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
   }
 
   const PRESETS = {
-    whisper: { opacity: 0.16, stroke: 0.5, density: 0.35, saturation: 0.05, glow: 0, mode: false },
-    ink:     { opacity: 1, stroke: 1.6, density: 0.55, saturation: 0, glow: 0, mode: true },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 0.7, saturation: 0.95, glow: 1.4, mode: false },
-    drift:   { opacity: 0.45, stroke: 0.8, density: 0.5, speed: 0.3, motion: 1.7, mode: false },
-    dense:   { opacity: 0.55, stroke: 0.7, density: 1.4, speed: 0.9, saturation: 0.2, glow: 0, mode: true },
+    whisper: { opacity: 0.9, stroke: 0.55, density: 0.4, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.2, density: 0.9, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1, saturation: 0.85, glow: 1.2 },
+    drift:   { opacity: 0.8, stroke: 0.75, density: 0.75, speed: 0.4, motion: 1.8 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.7, glow: 0.6 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1386,15 +1456,14 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
       if (name === 'density') seedParticles(Math.round(BASE_COUNT * values.density));
     },
     extraControls: [
-      // Defaults off: continuous mode's long ribbons are this piece's identity.
-      // In particle mode it renders short dashes that read too much like grain-field.
+      // Off by default: full trails are this piece's identity. On, each
+      // particle draws only its bright head — a sparser, dottier read.
       { name: 'mode', label: 'Particle mode', type: 'checkbox', default: false, category: 'visual' },
     ],
-    // Pinned deliberately, not inherited. These happen to equal the shared
-    // control defaults, but stating them here is what makes 200/280 visible as
-    // TAKEN to the next contributor grepping pieces' `defaults` blocks for a
-    // free hue — and keeps flow-field's violet if the shared defaults ever move.
-    defaults: { hue: 200, hueB: 280, saturation: 0.6, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
+    // Pinned deliberately, not inherited — keeps flow-field's hue TAKEN to
+    // the next contributor even if the shared defaults ever move.
+    // saturation: 0 per house look §1; colour lives in the neon preset.
+    defaults: { hue: 200, hueB: 280, saturation: 0, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
   });
   const currentValues = baked || panel.values;
 
@@ -1428,109 +1497,110 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
   }
 
   function drawFrame(dt, elapsed, values) {
+    const W = canvas.width, H = canvas.height;
+    const light = values.invert ? 0.14 : 0.86 - 0.24 * values.saturation;
     const stopA = paletteHsl(values, 0);
-    const [r, g, b] = hslToRgb(stopA.h, stopA.s, 0.55);
+    const [r, g, b] = hslToRgb(stopA.h, stopA.s, light);
     const stopB = paletteHsl(values, 1);
-    const [rB, gB, bB] = hslToRgb(stopB.h, stopB.s, 0.55);
+    const [rB, gB, bB] = hslToRgb(stopB.h, stopB.s, light);
 
-    // Low fade alpha: each frame only partially clears, so the streaks a
-    // particle leaves behind persist long enough to read as flowing lines.
-    ctx.fillStyle = values.invert ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,13,0.045)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Full clear, not a low-alpha fade: under `lighter` compositing (below)
+    // a partial fade would re-stroke nearly the same trail geometry on top
+    // of itself every frame and blow out to white. A full clear means ink
+    // coverage is exactly what this frame draws, not an unbounded
+    // accumulation across frames — reset to source-over for it regardless
+    // of what the previous frame left the context in.
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    ctx.lineCap = 'round';
 
     paths = [];
-    const lineWidth = 0.3 + values.stroke * 1.2;
+    // Hairline floor 0.4-0.9px at stroke:1; slower than the old 260px/s —
+    // that number was tuned for a 2.5px stroke, and at this hairline width
+    // 90px/s already clears displacement-over-stroke-width by a wide margin.
+    const lineWidth = 0.4 + values.stroke * 0.5;
+    const baseAlpha = values.opacity * (values.invert ? 0.42 : 0.32);
+
     for (const p of particles) {
       // Mask read at the pre-move position: this frame's stroke belongs to
       // where the particle currently is, not where it's about to land.
-      const m = maskValue(p.x, p.y, canvas.width, canvas.height);
-      let angle = fieldAngle(p.x, p.y, elapsed, values);
-
-      // Base px/sec must stay well above lineWidth, or each frame's segment is
-      // shorter than the stroke is wide and renders as a dot, not a line.
-      const speed = 260 * values.speed * (dt || 0.016);
+      const m = maskValue(p.x, p.y, W, H);
+      const angle = fieldAngle(p.x, p.y, elapsed, values);
+      const speed = 90 * values.speed * (dt || 0.016);
       const nx = p.x + Math.cos(angle) * speed;
       const ny = p.y + Math.sin(angle) * speed;
 
-      if (m > 0) {
-        // Tied to the field's own local direction instead of an arbitrary
-        // position/time sine — the colour now IS the flow, a compass
-        // rather than decorative banding unrelated to what's moving.
-        const mix = (Math.sin(angle) + 1) / 2;
-        const cr = r + (rB - r) * mix;
-        const cg = g + (gB - g) * mix;
-        const cb = b + (bB - b) * mix;
-        const [fr, fg, fb] = values.invert ? [255 - cr, 255 - cg, 255 - cb] : [cr, cg, cb];
-
-        // Width rides the same mask value as alpha, but on a gentler curve
-        // (0.4 floor, not 0) — alpha alone fading at the mask boundary read
-        // as flat cutout edges; thinning the stroke too sells the mass
-        // dissolving into the negative space around it rather than just
-        // going transparent.
-        const strokeWidth = lineWidth * (0.4 + 0.6 * m);
-        ctx.strokeStyle = `rgba(${fr | 0},${fg | 0},${fb | 0},${values.opacity * m})`;
-        ctx.lineWidth = strokeWidth;
-
-        if (values.mode) {
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(nx, ny);
-          if (values.glow > 0) {
-            // Underlay pass: wider, dimmer stroke approximates bloom cheaply
-            // (canvas shadowBlur costs 5-10x per draw call at this element count).
-            ctx.lineWidth = strokeWidth + values.glow * 3;
-            ctx.globalAlpha = values.glow * 0.25 * m;
-            ctx.stroke();
-            ctx.lineWidth = strokeWidth;
-            ctx.globalAlpha = 1;
-          }
-          ctx.stroke();
-          paths.push([[p.x, p.y], [nx, ny]]);
-        }
-      }
+      if (m > 0) p.trail.push([p.x, p.y]);
+      if (p.trail.length > TRAIL_MAX) p.trail.shift();
 
       p.x = nx;
       p.y = ny;
 
       // Respawn on leaving the canvas OR the mask (not the canvas alone) —
-      // otherwise the noise field advects particles back out to uniform
-      // coverage within a few seconds and the negative space collapses.
-      const outOfMask = maskValue(p.x, p.y, canvas.width, canvas.height) <= 0;
-      if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height || outOfMask) {
-        const spot = sampleFocusPoint(canvas.width, canvas.height);
+      // otherwise the field advects particles back out to uniform coverage
+      // within a few seconds and the void/negative space collapses.
+      const outOfMask = maskValue(p.x, p.y, W, H) <= 0;
+      if (p.x < 0 || p.x > W || p.y < 0 || p.y > H || outOfMask) {
+        const spot = sampleFocusPoint(W, H);
         p.x = spot.x;
         p.y = spot.y;
         p.trail = [];
+        continue;
       }
 
-      if (!values.mode && m > 0) {
-        p.trail.push([p.x, p.y]);
-        // Longer than before (40 -> 56): fewer, longer-lived ribbons read
-        // as legible currents; short trails at this particle count were
-        // part of why the mass read as a tangle rather than a flow.
-        if (p.trail.length > 56) p.trail.shift();
+      if (p.trail.length < 2) continue;
 
-        if (p.trail.length > 1) {
-          const strokeWidth = lineWidth * (0.4 + 0.6 * m);
-          ctx.lineWidth = strokeWidth;
-          ctx.beginPath();
-          ctx.moveTo(p.trail[0][0], p.trail[0][1]);
-          for (let i = 1; i < p.trail.length; i++) {
-            ctx.lineTo(p.trail[i][0], p.trail[i][1]);
-          }
-          if (values.glow > 0) {
-            ctx.lineWidth = strokeWidth + values.glow * 3;
-            ctx.globalAlpha = values.glow * 0.25 * m;
-            ctx.stroke();
-            ctx.lineWidth = strokeWidth;
-            ctx.globalAlpha = 1;
-          }
-          ctx.stroke();
-          paths.push(p.trail.slice());
+      // Tied to the field's own local direction instead of an arbitrary
+      // position/time sine — the colour is the flow, a compass rather than
+      // decorative banding unrelated to what's moving.
+      const mix = (Math.sin(angle) + 1) / 2;
+      const cr = (r + (rB - r) * mix) | 0;
+      const cg = (g + (gB - g) * mix) | 0;
+      const cb = (b + (bB - b) * mix) | 0;
+
+      const drawPoly = (pts) => {
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.stroke();
+      };
+
+      ctx.lineWidth = lineWidth;
+      if (values.mode) {
+        // Particle mode: only the bright head, a sparser dotty read.
+        const head = p.trail.slice(-4);
+        if (values.glow > 0) {
+          ctx.lineWidth = lineWidth + values.glow * 2.5;
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m * values.glow * 0.3)})`;
+          drawPoly(head);
+          ctx.lineWidth = lineWidth;
         }
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m * 1.8)})`;
+        drawPoly(head);
+        paths.push(head);
+      } else {
+        if (values.glow > 0) {
+          ctx.lineWidth = lineWidth + values.glow * 2.5;
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m * values.glow * 0.3)})`;
+          drawPoly(p.trail);
+          ctx.lineWidth = lineWidth;
+        }
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m)})`;
+        drawPoly(p.trail);
+        // Brighter head on the last few points, so motion reads as a
+        // travelling mark rather than a static line.
+        const head = p.trail.slice(-6);
+        if (head.length > 1) {
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, baseAlpha * m * 1.6)})`;
+          drawPoly(head);
+        }
+        paths.push(p.trail.slice());
       }
     }
 
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({
