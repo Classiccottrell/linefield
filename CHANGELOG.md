@@ -8,6 +8,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Stills pack and `catalogue.md`** (ROADMAP Phase 5). `node tools/build.mjs`
+  now also captures an 800×800 square PNG of every piece at its defaults
+  into `stills/`, zips them into `stills.zip`, and links that zip from the
+  gallery's intro copy. It generates `catalogue.md` from `pieces.json` plus
+  the live control list each piece already exposes on `window.__LF_SPECS__`
+  — one entry per piece: blurb, tags, text-safe zone, anchor, and controls
+  — so it can't drift from the pieces themselves and never hand-copies
+  Filament's catalogue wording. Checked PNG export's size range (1x/2x/4x,
+  unchanged, no gap) and whether transparent-background export works — it
+  doesn't, for any piece, and can't be added without a render-architecture
+  change across all 20; recorded as a known limitation rather than chased.
+
 - `collections.json` groups the twenty pieces into five named collections
   — Currents, Volumes, Orbits, Surfaces, Codes — replacing the flat tag
   chips. `pieces.json` is untouched; `node tools/build.mjs --verify-only`

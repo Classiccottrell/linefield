@@ -440,6 +440,19 @@ build reads defaults off the running page. `readReadmeSlugs` scans the whole
 README, not just the Pieces section. Both fail loudly, and neither fails
 silently.
 
+**PNG export has no transparent background, for every piece.** Checked for
+Phase 5.3: the size range is fine as shipped (1x / 2x / 4x, via
+`exportPng`'s `multiplier`), but transparency doesn't work and can't be
+added cheaply. Every piece repaints the full canvas opaque each frame —
+`flow-field` with `ctx.fillRect(0, 0, W, H)`, `dune` with `ctx.drawImage()`
+of an opaque grain texture — because the accumulation trail (and the grain
+technique) needs a full repaint to work at all; `clearRect` would erase the
+trail instead of fading it. `canvas.toBlob('image/png')` faithfully exports
+what's actually on the canvas, so there's no transparent region to export.
+Giving every piece a real alpha channel means tracking ink separately from
+background through each one's own compositing — a render-architecture
+change across all 20 pieces, not a Phase 5 packaging fix. Not chased here.
+
 **`pieces/_template/` has no automated coverage.** It's excluded from
 `pieces.json`, so every manifest-driven gate skips it. Only CONTRIBUTING's
 manual "verify in a browser" step would catch a regression in the scaffold

@@ -30,4 +30,4 @@ piece names, copy, stills or code. See ROADMAP.md.
       external references and runs from anywhere, including outside this repo
 
 ## Status
-**shipped** — eighteen pieces, six shared modules, and a gallery
+**shipped** — twenty pieces, six shared modules, and a gallery

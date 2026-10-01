@@ -265,6 +265,14 @@ the gallery page itself, with live hover/keyboard previews and per-piece
 "Copy embed" / "Download" actions revealed on hover or focus. All three
 (`thumbs/`, `downloads/`, `index.html`) are committed.
 
+It also produces `stills/<slug>.png` (an 800×800 square crop of the same
+capture, full resolution rather than the thumbnail's half-scale) zipped into
+`stills.zip` and linked from the gallery's intro copy, and `catalogue.md` —
+generated from `pieces.json` plus the live control list already exposed on
+`window.__LF_SPECS__`, one entry per piece (blurb, tags, text-safe zone,
+anchor, controls), so it can't drift. Both are committed alongside the
+other three.
+
 `tools/audit-controls.mjs` drives every control on every piece between
 points across its full range with a seeded RNG and a manually-stepped
 clock (so two identical-settings renders are pixel-identical — no noise
@@ -372,15 +380,23 @@ Two things to know:
   versions, but a saved localStorage value always outranks the piece's
   default. If a piece looks different from its documented palette, click
   "Reset to defaults" in its control panel to pick up the current default.
-- SVG export doesn't reflect the Angle control for pieces that rotate the
-  whole scene via a canvas transform (`contour-grid`, `longwave`, `mooring`):
-  their path points are recorded before that rotation is applied, so the
-  exported SVG shows the unrotated geometry. Use PNG export if you need the
-  rotated view.
+- SVG export doesn't reflect the Angle control for `rainfall`, the one
+  piece left that still rotates the whole scene via a canvas transform
+  (`ctx.rotate`): its path points are recorded before that rotation is
+  applied, so the exported SVG shows the unrotated geometry. `contour-grid`,
+  `longwave` and `mooring` were rewritten in Phase 2 to compute rotated
+  points directly, so their exports already match the canvas. Use PNG
+  export if you need `rainfall`'s rotated view.
 - `dune`'s SVG export carries its line geometry only: the brink and the
   ripple lines, as polylines. Its film grain is raster by nature and is not
   in the SVG, embedded or otherwise. Use PNG export for the grain.
   `swell` exports every dot as a `<circle>`.
+- PNG export has no transparent background, for any piece. Every piece
+  repaints the full canvas opaque each frame — it's how the accumulation
+  trail (and the grain technique) works at all — so there's no transparent
+  region for `canvas.toBlob('image/png')` to export. Checked for ROADMAP
+  Phase 5.3; giving every piece a real alpha channel would mean a
+  render-architecture change across all twenty, not a packaging fix.
 
 ## License
 
