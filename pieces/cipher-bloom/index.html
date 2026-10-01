@@ -18,6 +18,13 @@
 <body>
 <canvas id="canvas"></canvas>
 
+<!--
+  cipher-bloom — a compressed oblique band of changing glyph fragments
+  with a bright core, drifting slowly along the band's own length.
+  Text-safe zone: top and bottom thirds, clear of the band.
+  Anchor: the core, drifting along the band's centre.
+-->
+
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
   <button id="btn-source">Source</button>
@@ -57,11 +64,11 @@
   }
 
   const PRESETS = {
-    whisper: { opacity: 0.35, stroke: 0.2, density: 0.5, scale: 0.75, saturation: 0.08, motion: 0.4, phase: 0.4 },
-    ink:     { opacity: 0.9, stroke: 1.2, density: 0.75, scale: 1.2, saturation: 0, angle: 352, phase: 0.6 },
-    neon:    { opacity: 0.86, stroke: 0.75, density: 1.15, scale: 0.8, saturation: 0.65, glow: 0.8, angle: 335, phase: 0.2 },
+    whisper: { opacity: 0.35, stroke: 0.2, density: 0.5, scale: 0.75, motion: 0.4, phase: 0.4 },
+    ink:     { opacity: 1, stroke: 1.2, density: 0.75, scale: 1.2, saturation: 0, glow: 0, angle: 352, phase: 0.6 },
+    neon:    { opacity: 0.86, stroke: 0.75, density: 1.15, scale: 0.8, saturation: 0.9, glow: 1.1, angle: 335, phase: 0.2 },
     drift:   { opacity: 0.6, stroke: 0.45, density: 0.68, scale: 1.35, speed: 0.25, motion: 0.6, phase: 1.2, angle: 355 },
-    dense:   { opacity: 0.8, stroke: 0.7, density: 1.65, scale: 0.9, speed: 0.6, angle: 340, phase: 0.75 },
+    dense:   { opacity: 0.8, stroke: 0.7, density: 1.65, scale: 0.9, speed: 0.6, angle: 340, phase: 0.75, glow: 0.4 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -69,11 +76,12 @@
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    defaults: { hue: 42, hueB: 76, saturation: 0.22, colorMode: 'gradient', colorA: '#d3a565', colorB: '#e7d9a6', opacity: 0.88, stroke: 0.55, angle: 347, speed: 0.5, motion: 0.55 },
+    defaults: { hue: 42, hueB: 76, saturation: 0, colorMode: 'gradient', colorA: '#d3a565', colorB: '#e7d9a6', opacity: 0.88, stroke: 0.55, angle: 347, speed: 0.5, motion: 0.55 },
   });
   const currentValues = baked || panel.values;
 
   function drawFrame(dt, elapsed, values) {
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -86,32 +94,41 @@
     const rows = Math.max(8, Math.round(30 * Math.sqrt(values.density)));
     const theta = values.angle * Math.PI / 180;
     const c = Math.cos(theta), s = Math.sin(theta);
-    const cx = W * 0.58, cy = H * 0.54;
+    const cx = W * 0.5, cy = H * 0.5;
+    // One object: the band's length is a fixed fraction of the frame, not
+    // edge to edge, so it sits inside the central square.
+    const L = Math.min(W, H) * (0.34 + 0.28 * values.scale);
     const breadth = H * (0.07 + values.scale * 0.12);
     const strokeWidth = values.stroke * size * 0.038;
-    travel += dt * values.speed * 0.025;
+    travel += dt * values.speed;
     identities += dt * values.motion * 1.4;
+    // The core drifts slowly along the band's own length — the one small
+    // anchor, not a bright stripe down the whole centreline.
+    const corePos = 0.5 + 0.22 * Math.sin(travel * (Math.PI * 2 / 22));
+    const light0 = values.invert ? 0.14 : 0.86 - 0.26 * values.saturation;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
-      const u = ((col + 0.5) / cols + travel) % 1;
+      const u = (col + 0.5) / cols;
       const v = ((row + 0.5 + (hash(col, row, 1) - 0.5) * 0.8) / rows) * 2 - 1;
-      const core = Math.exp(-v * v / 0.09);
+      const edge = Math.pow(Math.sin(u * Math.PI), 0.8); // tapers the band's two ends
+      const vCore = Math.exp(-v * v / 0.09); // thickness envelope across the band
       const shoulder = Math.exp(-v * v / 0.42);
-      const edge = Math.pow(Math.sin(u * Math.PI), 0.8);
+      const du = u - corePos;
+      const anchorCore = Math.exp(-(du * du) / 0.006 - (v * v) / 0.035); // small, under 5% of frame
       // Occupancy and jitter stay attached to each mark. Motion changes
       // its identity, not its presence, avoiding whole-band flicker.
-      if (hash(col, row, 2) > (0.13 + core * 0.78) * edge) continue;
-      const rawX = W * (0.13 + u) + (hash(col, row, 3) - 0.5) * size * 0.6;
-      const center = H * (0.59 + Math.sin(u * 5 + values.phase * 1.4) * 0.045 + Math.sin(travel * 1.2) * 0.03);
+      if (hash(col, row, 2) > (0.16 + vCore * 0.7) * edge) continue;
+      const rawX = cx + (u - 0.5) * L + (hash(col, row, 3) - 0.5) * size * 0.6;
+      const center = cy + Math.sin(u * 5 - travel * 0.5 + values.phase * 1.4) * H * 0.045;
       const rawY = center + v * breadth * (0.45 + 0.55 * edge);
       const dx = rawX - cx, dy = rawY - cy;
       const x = cx + dx * c - dy * s, y = cy + dx * s + dy * c;
       if (x < -size || x > W + size || y < -size || y > H + size) continue;
       const stop = paletteHsl(values, u);
-      const light = values.invert ? 0.3 : 0.43 + core * 0.4;
+      const light = light0 + anchorCore * 0.04;
       const [r, g, b] = hslToRgb(stop.h, stop.s, light);
-      const alpha = values.opacity * edge * shoulder * (0.23 + core * 0.77);
+      const alpha = values.opacity * edge * shoulder * (0.14 + vCore * 0.32 + anchorCore * 1.2);
       const bucket = Math.floor(identities + hash(col, row, 4) * 3);
       const ch = GLYPHS[Math.floor(hash(col + 11, row + 7, bucket) * GLYPHS.length)];
       // Three type sizes retain irregular texture without churning the
@@ -124,14 +141,31 @@
       ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
       ctx.strokeStyle = ctx.fillStyle;
       ctx.lineWidth = strokeWidth;
-      ctx.shadowColor = `rgb(${r},${g},${b})`;
-      ctx.shadowBlur = values.glow * core * 7 * unit;
       ctx.fillText(ch, 0, 0);
       if (strokeWidth > 0) ctx.strokeText(ch, 0, 0);
       texts.push({ x, y, ch, size: glyphSize, fontFamily: FONT_STACK, anchor: 'middle', baseline: 'central', rotation, strokeWidth });
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.shadowBlur = 0;
+
+    // One soft glow at the core, drawn once rather than per glyph — a
+    // per-mark shadowBlur here would cost a blur pass per glyph and tank
+    // frame rate. Glyphs themselves stay source-over; only this pass adds.
+    if (values.glow > 0) {
+      const rawXA = cx + (corePos - 0.5) * L;
+      const centerA = cy + Math.sin(corePos * 5 - travel * 0.5 + values.phase * 1.4) * H * 0.045;
+      const dxA = rawXA - cx, dyA = centerA - cy;
+      const ax = cx + dxA * c - dyA * s, ay = cy + dxA * s + dyA * c;
+      const stop = paletteHsl(values, corePos);
+      const [r, g, b] = hslToRgb(stop.h, stop.s, 0.88);
+      const gr = size * (2.4 + values.glow * 1.6);
+      ctx.globalCompositeOperation = 'lighter';
+      const grad = ctx.createRadialGradient(ax, ay, 0, ax, ay, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${0.3 * values.glow * values.opacity})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(ax - gr, ay - gr, gr * 2, gr * 2);
+      ctx.globalCompositeOperation = 'source-over';
+    }
   }
 
   const loop = createLoop({

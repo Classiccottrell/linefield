@@ -18,6 +18,13 @@
 <body>
 <canvas id="canvas"></canvas>
 
+<!--
+  driftwork — tangent-aligned ellipse links following two crossing
+  currents, brightening by accumulation where the currents cross.
+  Text-safe zone: left third, clear of the bounded span.
+  Anchor: the crossing, centre of the frame.
+-->
+
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
   <button id="btn-source">Source</button>
@@ -49,11 +56,11 @@
   let evolution = 0;
 
   const PRESETS = {
-    whisper: { opacity: 0.32, stroke: 0.55, density: 0.52, scale: 0.7, motion: 0.5, saturation: 0.06 },
-    ink:     { opacity: 0.9, stroke: 1.3, density: 0.7, scale: 1.2, saturation: 0, angle: 350, phase: 0.3 },
-    neon:    { opacity: 0.82, stroke: 0.8, density: 1.1, scale: 0.85, saturation: 0.55, glow: 0.8, phase: 0.65 },
+    whisper: { opacity: 0.45, stroke: 0.7, density: 0.7, scale: 0.7, motion: 0.5 },
+    ink:     { opacity: 1, stroke: 1.1, density: 0.7, scale: 1.2, saturation: 0, glow: 0, angle: 350, phase: 0.3 },
+    neon:    { opacity: 0.82, stroke: 0.8, density: 1.1, scale: 0.85, saturation: 0.85, glow: 1, phase: 0.65 },
     drift:   { opacity: 0.65, stroke: 0.75, density: 0.72, scale: 1.3, speed: 0.22, motion: 1.6, phase: 1.1 },
-    dense:   { opacity: 0.76, stroke: 0.8, density: 1.65, scale: 0.85, speed: 0.5, angle: 346, phase: 0.45 },
+    dense:   { opacity: 0.76, stroke: 0.8, density: 1.65, scale: 0.85, speed: 0.5, angle: 346, phase: 0.45, glow: 0.4 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -61,27 +68,35 @@
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    defaults: { hue: 250, hueB: 278, saturation: 0.16, colorMode: 'gradient', colorA: '#a6a1b8', colorB: '#beb3c6', opacity: 0.88, stroke: 0.9, speed: 0.55 },
+    defaults: { hue: 250, hueB: 278, saturation: 0, colorMode: 'gradient', colorA: '#a6a1b8', colorB: '#beb3c6', opacity: 0.88, stroke: 0.9, speed: 0.55 },
   });
   const currentValues = baked || panel.values;
 
   function drawFrame(dt, elapsed, values) {
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     paths = [];
     const W = canvas.width;
     const H = canvas.height;
-    const cx = W * 0.6;
-    const cy = H * 0.57;
+    const cx = W * 0.5;
+    const cy = H * 0.5;
     const theta = values.angle * Math.PI / 180;
     const ct = Math.cos(theta), st = Math.sin(theta);
     const lanes = Math.max(3, Math.round(12 * Math.sqrt(values.density)));
     const links = Math.max(16, Math.round(72 * Math.sqrt(values.density)));
     const unit = Math.min(W / 1280, H / 800);
+    // One object: the currents span a fixed fraction of the frame, not
+    // edge to edge, so the whole knot sits inside the central square.
+    const L = Math.min(W, H) * (0.36 + 0.28 * values.scale);
+    const FREQ = Math.PI * 1.05; // one shallow crossing of the currents, not several
     const separation = H * (0.1 + values.scale * 0.105);
     travel += dt * values.speed * 0.038;
     evolution += dt * values.motion * 0.12;
+
+    const light = values.invert ? 0.14 : 0.86 - 0.26 * values.saturation;
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
 
     for (let stream = 0; stream < 2; stream++) {
       const side = stream === 0 ? -1 : 1;
@@ -89,14 +104,14 @@
       for (let lane = 0; lane < lanes; lane++) {
         const across = (lane + 0.5) / lanes - 0.5;
         for (let link = 0; link < links; link++) {
-          const u = ((link + lane * 0.37) / links + travel * side + 10) % 1;
-          const a = u * Math.PI * 1.8 + offset - 0.6;
+          const u = (link + lane * 0.37) / links;
+          const a = u * FREQ + offset - 0.5 + travel;
           const sway = Math.sin(evolution + u * 4) * H * 0.035 * values.motion;
-          const x0 = W * (0.03 + u * 0.99);
-          const y0 = H * (0.62 - u * 0.08) + side * Math.sin(a) * separation + sway;
-          const dy = -H * 0.08 + side * Math.cos(a) * Math.PI * 1.8 * separation
+          const x0 = cx + (u - 0.5) * L;
+          const y0 = cy + (u - 0.5) * H * 0.1 + side * Math.sin(a) * separation + sway;
+          const dy = -H * 0.08 + side * Math.cos(a) * FREQ * separation
             + Math.cos(evolution + u * 4) * H * 0.14 * values.motion;
-          const tangent = Math.atan2(dy, W * 0.99);
+          const tangent = Math.atan2(dy, L);
           const ca = Math.cos(tangent), sa = Math.sin(tangent);
           const depth = 0.5 + 0.5 * Math.sin(a + stream * 1.4);
           const spread = H * (0.085 + values.scale * 0.06) * (0.65 + depth * 0.35);
@@ -117,23 +132,37 @@
           }
           points.push(points[0]);
           const fade = Math.pow(Math.sin(u * Math.PI), 1.2);
-          const quiet = Math.min(1, Math.max(0, (px / W - 0.04) / 0.23));
-          const alpha = values.opacity * fade * quiet * (0.32 + depth * 0.68) * (1 - Math.abs(across) * 0.8);
+          const quiet = Math.min(1, Math.max(0, (px / W - 0.02) / 0.31));
+          // Low per-link alpha: overlapping strokes under 'lighter' brighten
+          // on their own where the currents converge, not from lightness.
+          const alpha = 0.42 * values.opacity * fade * quiet * (0.4 + depth * 0.6) * (1 - Math.abs(across) * 0.75);
           const stop = paletteHsl(values, (stream + depth) / 2);
-          const [r, g, b] = hslToRgb(stop.h, stop.s, values.invert ? 0.25 + depth * 0.12 : 0.55 + depth * 0.25);
+          const [r, g, b] = hslToRgb(stop.h, stop.s, light);
           ctx.beginPath();
           ctx.moveTo(...points[0]);
           for (let i = 1; i < points.length; i++) ctx.lineTo(...points[i]);
-          ctx.lineWidth = unit * (0.3 + values.stroke * 0.95) * (0.65 + depth * 0.55);
+          ctx.lineWidth = unit * (0.35 + values.stroke * 0.5) * (0.75 + depth * 0.35);
           ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
-          ctx.shadowColor = `rgb(${r},${g},${b})`;
-          ctx.shadowBlur = values.glow * 5 * unit;
           ctx.stroke();
           paths.push(points);
         }
       }
     }
-    ctx.shadowBlur = 0;
+
+    // One soft glow at the crossing, drawn once instead of per ellipse — a
+    // per-mark shadowBlur here would cost a blur pass per link.
+    if (values.glow > 0) {
+      const stop = paletteHsl(values, 0.5);
+      const [r, g, b] = hslToRgb(stop.h, stop.s, 0.88);
+      const gr = Math.min(W, H) * 0.05 * (0.6 + values.glow * 0.4);
+      ctx.globalCompositeOperation = 'lighter';
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${0.3 * values.glow * values.opacity})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(cx - gr, cy - gr, gr * 2, gr * 2);
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({
