@@ -8,6 +8,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `collections.json` groups the twenty pieces into five named collections
+  — Currents, Volumes, Orbits, Surfaces, Codes — replacing the flat tag
+  chips. `pieces.json` is untouched; `node tools/build.mjs --verify-only`
+  now fails loudly if a piece has no collection, or a collection names a
+  slug that doesn't exist.
+- `node tools/collection-metrics.mjs --check` (`npm run collection-check`)
+  — a conformance gate against `docs/house-look.md`: default saturation
+  ≤ 0.06 and ink coverage within 0.03–0.15 (0.035 ceiling, no floor, for
+  the two home-page hero pieces). Its saturation check treats pixels with
+  chroma ≤ 3 as achromatic, so a faint hairline's anti-aliased edge over
+  the ground colour doesn't register as "coloured" when it isn't — the
+  first thing it was run against would have failed on that alone.
 - Two pieces that introduce new materials (ROADMAP Phase 4.1 and 4.2).
   `dune` is a single wind-cut ridge built from film grain: a heightfield
   shaded by one low raking light, rendered to a half-resolution buffer
@@ -28,6 +40,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Every piece converted to a monochrome house look** (ROADMAP Phase 2):
+  near-white ink on `#0a0a0d` by default (saturation 0; colour stays
+  opt-in through the existing controls, concentrated in each piece's
+  `neon` preset), one legible object per frame with a declared text-safe
+  zone, and hairline strokes (0.4–0.9px at `Stroke: 1`) whose brightness
+  comes from additive (`globalCompositeOperation = 'lighter'`) overlap
+  rather than lower stroke lightness. `node tools/collection-metrics.mjs
+  --check` passes all twenty pieces with zero overrides. Two pieces
+  changed more than their palette, as a deliberate re-differentiation
+  from the reference rather than a restyle: `globe` dropped its longitude
+  lines entirely (latitude slices only, no bright pole); `parallax`'s
+  lines, which previously shared an implicit off-frame vanishing point,
+  are now genuinely parallel. Defaults, presets and `pieces.json` blurbs
+  changed on every converted piece; rendering logic was reworked where the
+  house look required it (not line-for-line on every piece).
+- **Art-first gallery.** Cards are dominated by a square preview; actions
+  (Open, Copy embed, Download) moved into a hover/keyboard-focus overlay,
+  always visible on touch. The repeated "download ships defaults" note is
+  now said once near the top of the grid.
+- **Type system** sourced from the ClassicCottrell design system — Red Hat
+  Display (display and body), Rosarivo italic (editorial accents), a
+  system mono stack (labels) — loaded only on site pages (gallery, home,
+  docs). `pieces/` and `shared/` remain dependency-free; a baked export
+  still runs offline.
+- **The control panel's sliders are restyled as a ruler**: a tick-mark
+  track, a hairline thumb, mono label and value in one row. Same native
+  `<input type=range>`, same names/ids/events/persistence — a chrome-only
+  change.
 - `ROADMAP.md` is restructured around a gap analysis against the reference
   that first inspired the project. The chunk-by-chunk delivery history
   moved intact to `docs/roadmap-history.md`.

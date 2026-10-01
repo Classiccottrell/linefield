@@ -145,24 +145,24 @@ tooling" below and CONTRIBUTING.md.
 
 ## Pieces
 
-- `flow-field` — organic flowing lines following a simplex-noise vector field
-- `contour-grid` — topographic contour bands undulating like breathing terrain
-- `moire` — two concentric ring families crossing to produce moiré
-- `orbitals` — concentric orbital arcs with differential rotation
-- `grain-field` — fine drifting grain, the subtlest piece; good behind text
-- `wireframe-lattice` — rigid 3D wireframe grid rippling in perspective
-- `longwave` — seven long ribbons sweeping the full width
-- `relay` — drifting nodes wired to their neighbours, pulsing
-- `infall` — matter spiralling inward to a bright core
-- `mooring` — heavy cables mooring to a single converging point
-- `funnel` — a polar grid bent inward by a gravity well
-- `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
-- `lacuna` — broken caustic arcs gathering around an off-centre calm zone
-- `parallax` — a rose-to-amber fan parting around an invisible volume, with near strands moving faster than distant lines
-- `cipher-bloom` — irregular glyph fragments gathering around a bright oblique core and dissolving into warm chalk and shadow
-- `driftwork` — alternating violet-grey ellipse marks following two crossing currents, with depth and dissolving edges
-- `pleat` — coral and ivory rectangular marks gathering into two folded surfaces with a clean cut between them
-- `globe` — a lat/long wire sphere spinning in true perspective, tilt and yaw draggable
+- `flow-field` — particles confined to one soft, organic region around a quiet central void, trailing hairlines that brighten only where they cross
+- `contour-grid` — the contour lines of one island, cropped as a single landform with its summit as the brightest point
+- `moire` — two gratings of straight lines in one disc, rocking so broad moiré bands sweep across it
+- `orbitals` — a tilted ring of hairline arcs, each turning at its own rate, whose overlaps gather into one bright crescent that travels slowly round
+- `grain-field` — fine grain gathered into one soft drifting cloud with a long falloff — the quietest piece, and the home-page hero
+- `wireframe-lattice` — one finite lattice sheet with crisp edges, floating tilted in space and flexing, its fold catching the light where it turns edge-on
+- `longwave` — a band of hairlines riding one long wave, pinching together at its nodes
+- `relay` — a canopy of branching hairlines grown from one root, a pulse climbing to the tips
+- `infall` — hairline streamlines spiralling into one small, bright core
+- `mooring` — one rope of twisted hairlines rising into a single loose loop; the crossing glows
+- `funnel` — a funnel seen side-on: stacked hairline ellipses narrowing to one bright tip, slowly twisting
+- `rainfall` — sparse vertical streaks falling at their own speed, gathered in a veil that leaves the left third quiet
+- `lacuna` — broken caustic arcs gather around an off-centre calm zone
+- `parallax` — parallel diagonal lines part around an unseen volume, near strands heavier than the finer distant ones
+- `cipher-bloom` — a compressed oblique band of shifting glyph fragments, drawing a small bright core along its own length
+- `driftwork` — tangent-aligned ellipse links follow two crossing currents, brightening by accumulation where they meet
+- `pleat` — two folded bands of ivory marks, divided by a clean cut of empty space where they don't touch
+- `globe` — a tilted sphere drawn only in parallel latitude slices, with no meridians, crowding and brightening toward one lit limb
 - `dune` — one wind-cut ridge built from film grain, lit by a low raking light, with faint ripples crossing its lit face
 - `swell` — a single ocean swell rising on a diagonal, drawn as a halftone screen whose dot size carries its light
 

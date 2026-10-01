@@ -114,9 +114,19 @@ having.
   its own worktree and leave nothing uncommitted. The owner signed off on
   2026-09-27.
 - [ ] Backfill CHANGELOG for everything merged since 1.5.0, then cut a
-  release.
-- [ ] Settle PR #18. The suggestion is to salvage only the `flow-field`
-  "quiet central void" direction, as Phase 2 input.
+  release. **Partially done:** all of `v2`'s own work (Phase 1 renames,
+  Phase 2 conversion, Phase 3 presentation, Phase 4 materials) now has
+  entries under `[Unreleased]`. Still missing: the original home page and
+  specimen-grid gallery (Chunk 8), Wake's promotion and configuration
+  (Chunk 12), and the pre-`v2` piece refinement passes (Chunks 11/17) —
+  all shipped before this restructure and never changelogged. Cutting the
+  release is the owner's call, not bundled into this backfill.
+- [x] Settle PR #18, by being overtaken rather than merged. Its `flow-field`
+  "quiet central void" direction was independently rebuilt from scratch in
+  Phase 2 (confirmed: the Phase 2 batch read the PR but didn't adopt its
+  parametric-ribbon approach), and its `tether` rework is moot now that no
+  piece is named `tether`. PR #18 can be closed unmerged; nothing in it is
+  still needed.
 
 ## Phase 1 — Originality
 
@@ -213,16 +223,31 @@ needed.
 
 ### Chunks 2.3 onward — Convert the collection, ~3 pieces per chunk
 
-Start with the weakest: the renamed `longwave` and `mooring`, then `relay`,
-`grain-field`, `contour-grid`, `flow-field` and `moire`. Each gets a
-monochrome default, one object in the frame with real negative space, and
-hairline density.
+- [x] Done, in six batches run in parallel worktrees, each independently
+  gated and merged: `funnel`/`mooring`/`relay`; `longwave`/`moire`/`infall`;
+  `globe`/`orbitals`/`wireframe-lattice`; `flow-field`/`contour-grid`/
+  `grain-field`; `rainfall`/`lacuna`/`parallax`;
+  `cipher-bloom`/`driftwork`/`pleat`. Every piece has a monochrome default,
+  one object in the frame with real negative space, and hairline density
+  built by additive (`'lighter'`) accumulation rather than lower lightness.
 
-`rainfall` and `grain-field` are the home-page heroes. Their low ink is
-load-bearing for headline legibility, so keep it.
+`rainfall` and `grain-field` are the home-page heroes. Their low ink stayed
+load-bearing for headline legibility through the conversion (`rainfall`
+ink 0.007, `grain-field` 0.029).
 
-**Finish line:** the conformance check passes, and a side-by-side contact
-sheet reads as one collection.
+**Finish line: met.** `node tools/collection-metrics.mjs --check` passes
+all 20 pieces, zero overrides. The contact sheet below reads as one
+collection, confirmed both by individual-batch square-crop renders and a
+direct side-by-side look.
+
+**Two real bugs caught by the conversion gates, not shipped:**
+`flow-field`'s Stroke control was dead on the default (no-glow) path —
+`ctx.lineWidth` was only ever set inside the `glow > 0` branch. And
+`parallax`'s lane offset grew with `t`, so every line implicitly passed
+through one off-frame point — lines radiating from a single point, the
+exact reference-adjacent shape this collection's originality line forbids.
+Both were caught by the gates (`audit-controls`, and a by-eye preset-sheet
+review) before merge, not after.
 
 ## Phase 3 — Presentation
 
@@ -313,40 +338,48 @@ sheet reads as one collection.
 
 Every row is **generated**, not hand-recorded. Run `npm run collection-metrics`
 and paste its output here. Rebuild thumbnails (`npm run build`) first, because
-it measures the committed PNGs. Refreshed 2026-09-27 on `main` at `6be3d9c`,
-then re-run after Chunk 1.1's renames: the values are identical and only the
-slugs changed.
+it measures the committed PNGs. Refreshed 2026-09-30 on `v2` at `be37c0b`,
+after every piece converted to the house look.
 
-| Hue | Sat | Ink | Piece |
-|---:|---:|---:|---|
-| 7 | 0.20 | 0.122 | `parallax` |
-| 19 | 0.24 | 0.133 | `pleat` |
-| 21 | 0.49 | 0.043 | `infall` |
-| 24 | 0.42 | 0.048 | `contour-grid` |
-| 54 | 0.30 | 0.047 | `relay` |
-| 59 | 0.11 | 0.043 | `cipher-bloom` |
-| 122 | 0.33 | 0.043 | `globe` |
-| 166 | 0.48 | 0.073 | `longwave` |
-| 177 | 0.12 | 0.035 | `grain-field` |
-| 200 | 0.34 | 0.108 | `wireframe-lattice` |
-| 219 | 0.19 | 0.007 | `rainfall` |
-| 220 | 0.25 | 0.028 | `lacuna` |
-| 237 | 0.23 | 0.067 | `mooring` |
-| 247 | 0.51 | 0.195 | `funnel` |
-| 253 | 0.80 | 0.270 | `flow-field` |
-| 253 | 0.17 | 0.120 | `driftwork` |
-| 254 | 0.58 | 0.318 | `moire` |
-| 305 | 0.48 | 0.096 | `orbitals` |
+**Hue is no longer a useful column, and that's success, not a gap.** Every
+piece now reports hue 240 — that's not a real colour, it's the achromatic
+floor (chroma ≤ 3) reading the ground's own faint blue tint, because no
+piece has any real chroma left to measure at its default. The table below
+is sorted by ink instead, which (with saturation) is what Phase 2 said
+would become the differentiating axis once hue stopped being one.
 
-**Phase 2 changes what this table is for.** Up to now, a new piece had to
-find a free hue on a nearly full wheel. Once defaults are monochrome, hue
-stops being a piece's identity, and saturation and ink become the columns
-that matter. Differentiate on **form and density**, which was already the
-advice, since `rainfall` proved it at saturation 0.12.
+| Sat (check) | Ink | Piece |
+|---:|---:|---|
+| 0.13 | 0.006 | `rainfall` |
+| 0.03 | 0.029 | `grain-field` |
+| 0.12 | 0.037 | `lacuna` |
+| 0.08 | 0.037 | `cipher-bloom` |
+| 0.05 | 0.045 | `relay` |
+| 0.11 | 0.044 | `flow-field` |
+| 0.04 | 0.049 | `funnel` |
+| 0.10 | 0.049 | `contour-grid` |
+| 0.08 | 0.049 | `orbitals` |
+| 0.05 | 0.056 | `mooring` |
+| 0.12 | 0.060 | `wireframe-lattice` |
+| 0.03 | 0.059 | `dune` |
+| 0.04 | 0.071 | `swell` |
+| 0.07 | 0.102 | `infall` |
+| 0.12 | 0.082 | `driftwork` |
+| 0.06 | 0.088 | `pleat` |
+| 0.14 | 0.098 | `globe` |
+| 0.08 | 0.116 | `moire` |
+| 0.06 | 0.136 | `longwave` |
+| 0.12 | 0.138 | `parallax` |
 
-**`longwave` and `mooring` remain the weakest pair.** This was found twice,
-by different methods. They're separated only by hue and by crossing-versus-
-parallel structure. Both are also Phase 1 renames and Phase 2 conversions.
+Sat here is the check-mode figure (chroma-floored; see Chunk 2.2) — this is
+what `collection-check` actually gates on, not the raw figure
+`collection-metrics`' plain table prints. Every row is comfortably under
+the §1 ceiling of 0.06 or at it (`longwave` 0.06 is the closest).
+
+**`longwave` and `mooring`, the pair flagged as weakest before conversion,
+now read distinctly.** `longwave` is a wide, flat, fanned band with pinch
+nodes; `mooring` is a narrow twisted rope with one loop. Confirmed by a
+direct side-by-side look at both, not just the metrics.
 
 ---
 
@@ -354,20 +387,34 @@ parallel structure. Both are also Phase 1 renames and Phase 2 conversions.
 
 These are real, understood, and judged not worth the fix today.
 
-**Three residual control couplings.** `contour-grid`'s Speed does nothing
-when Motion is 0, since all its animation lives in the motion-scaled layer.
-`longwave`'s Phase weakens at Sweep 0. `contour-grid`'s Phase is effectively
-a horizontal translate. None of these is dead at default settings.
+**Three residual control couplings — resolved by the Phase 2 rewrites,
+not chased deliberately.** `contour-grid`'s draw loop was reworked for the
+house look (rings around one summit instead of edge-to-edge bands, rotated
+by an explicit per-point transform rather than `ctx.rotate`); its Speed now
+reads `values.speed` directly, with no Motion dependency — verified by
+reading the current source, not just trusting the batch report. `longwave`
+replaced the old piece entirely; its Phase now offsets node position
+directly (`sNode = sAnchor + values.phase * nodeGap * 0.5`), independent of
+Sweep's carrier amplitude — the coupling's mechanism is gone, not just
+quieter. Treat this bullet as closed; if a new coupling surfaces, open a
+fresh one rather than reopening this text.
 
-**SVG export ignores `angle`** for pieces that rotate via a canvas transform
-(`contour-grid`, `longwave`, `mooring`, `rainfall`). Their path points are
-recorded before the rotation is applied, so an exported SVG shows unrotated
-geometry. PNG export is unaffected.
+**SVG export ignores `angle`** for the one piece left that still rotates
+via a canvas transform: `rainfall` (confirmed: `pieces/rainfall/index.html`
+still calls `ctx.rotate`). `contour-grid`, `longwave` and `mooring` were
+rewritten in Phase 2 to compute rotated points directly, so their exports
+already match the canvas — confirmed by grepping all four for `ctx.rotate`
+and finding it only in `rainfall`. Its path points are recorded before the
+rotation is applied, so an exported SVG shows unrotated geometry. PNG
+export is unaffected.
 
-**`rainfall`'s Color A reads as dead in `audit-controls`, but isn't.** It
-measures 0.047% changed pixels against a floor other colour controls clear
-at about 0.06%. The hue link is real. It's just too subtle at the
-collection's lowest ink coverage, which is deliberate for the home-page hero.
+**`rainfall`'s Color A is fixed — no longer dead.** The Phase 2 conversion
+bumped the glint dot's radius/threshold (for an unrelated reason: clearing
+a luminance-variance floor at the new, fainter hairline alphas), which as
+a side effect pushed Color A's diff over `audit-controls`' detection floor.
+Confirmed with a fresh single-piece run: `LIVE, changed=0.181%` — well
+clear of the ~0.06% floor other colour controls pass at, not the old
+0.047%.
 
 **`dune`'s SVG has no grain.** Film grain has no line geometry, so the
 SVG carries the brink and the ripple lines as polylines and nothing else.
