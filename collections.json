@@ -1,0 +1,27 @@
+[
+  {
+    "id": "currents",
+    "title": "Currents",
+    "slugs": ["flow-field", "driftwork", "longwave", "mooring", "rainfall"]
+  },
+  {
+    "id": "volumes",
+    "title": "Volumes",
+    "slugs": ["globe", "funnel", "wireframe-lattice", "parallax", "dune"]
+  },
+  {
+    "id": "orbits",
+    "title": "Orbits",
+    "slugs": ["orbitals", "infall", "lacuna", "moire"]
+  },
+  {
+    "id": "surfaces",
+    "title": "Surfaces",
+    "slugs": ["contour-grid", "pleat", "grain-field", "swell"]
+  },
+  {
+    "id": "codes",
+    "title": "Codes",
+    "slugs": ["cipher-bloom", "relay"]
+  }
+]
