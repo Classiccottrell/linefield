@@ -4,19 +4,28 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — backgrounds that breathe</title>
+<!-- Site page, not a piece — the two Google fonts load only here (and on
+     the gallery/docs). pieces/ and shared/ never take a font dependency,
+     so a baked export still runs offline with zero external requests. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:ital,wght@0,400;0,500;0,700;0,900;1,400&family=Rosarivo:ital@0;1&display=swap" rel="stylesheet" />
 <style>
   :root{
     --bg:#0a0a0d; --ink:#e9e7e1; --muted:#8b8a86; --line:#232228;
-    --accent:#437057; --accent-soft:#437057b3;
+    --accent:#437057; --accent-soft:#7fa88c;
+    --font-body:'Red Hat Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-accent:'Rosarivo',Georgia,'Iowan Old Style',serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink)}
   body{
-    font:17px/1.65 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif;
+    font:17px/1.65 var(--font-body);
     -webkit-font-smoothing:antialiased;
   }
   a{color:var(--ink)}
-  .mono{font:12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .mono{font:12px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 
   /* ---- Hero -------------------------------------------------------- */
   .hero{position:relative;min-height:100svh;display:flex;align-items:center;overflow:hidden;border-bottom:1px solid var(--line)}
@@ -30,19 +39,19 @@
   .kicker{display:block;margin-bottom:22px}
   .kicker::before{content:'';display:inline-block;width:26px;height:1px;background:var(--accent);vertical-align:middle;margin-right:10px}
   h1{
-    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    font-family:var(--font-accent);
     font-weight:400;font-style:italic;
     font-size:clamp(38px,6vw,74px);line-height:1.06;letter-spacing:-.01em;
     margin:0 0 26px;
   }
   h1 em{font-style:normal;color:var(--accent-soft)}
   .lede{font-size:19px;color:#c9c7c0;max-width:52ch;margin:0 0 40px}
-  .lede code{font:14px/1 ui-monospace,Menlo,monospace;background:#16161a;border:1px solid var(--line);padding:2px 7px;border-radius:3px;color:var(--ink)}
+  .lede code{font:14px/1 var(--font-mono);background:#16161a;border:1px solid var(--line);padding:2px 7px;border-radius:3px;color:var(--ink)}
   .cta-row{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
   .btn{
     display:inline-flex;align-items:center;gap:8px;
     padding:13px 22px;border-radius:2px;text-decoration:none;
-    font:500 14px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:.01em;
+    font:500 14px/1 var(--font-body);letter-spacing:.01em;
     border:1px solid var(--accent);color:var(--bg);background:var(--accent);
     transition:background .18s ease, color .18s ease;
   }
@@ -53,7 +62,7 @@
   /* ---- Live control strip on the hero -------------------------------- */
   .knobs{position:relative;z-index:1;margin-top:48px;display:flex;gap:34px;flex-wrap:wrap;align-items:flex-end;max-width:520px}
   .knob{display:flex;flex-direction:column;gap:8px}
-  .knob label{font:11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .knob label{font:11px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
   .knob input[type=range]{
     -webkit-appearance:none;appearance:none;width:150px;height:1px;background:var(--line);outline:0;cursor:pointer;
   }
@@ -62,19 +71,19 @@
     box-shadow:0 0 0 3px rgba(67,112,87,.18);cursor:pointer;margin-top:-5px;
   }
   .knob input[type=range]::-moz-range-thumb{width:11px;height:11px;border:0;border-radius:50%;background:var(--accent)}
-  .knob .val{font:11px/1 ui-monospace,monospace;color:var(--accent-soft)}
+  .knob .val{font:11px/1 var(--font-mono);color:var(--accent-soft)}
   .knob select{
-    font:11px/1 ui-monospace,Menlo,monospace;letter-spacing:.04em;
+    font:11px/1 var(--font-mono);letter-spacing:.04em;
     background:var(--bg);color:var(--ink);border:1px solid var(--line);
     padding:6px 8px;border-radius:2px;cursor:pointer;outline:0;
   }
   .knob select:hover{border-color:var(--accent)}
-  .knob-note{align-self:flex-start;font:12px/1.5 -apple-system,sans-serif;color:var(--muted);max-width:230px;padding-top:4px}
+  .knob-note{align-self:flex-start;font:12px/1.5 var(--font-body);color:var(--muted);max-width:230px;padding-top:4px}
 
   /* ---- Sections ------------------------------------------------------ */
   section{padding:110px 7vw}
   .section-head{max-width:640px;margin:0 0 56px}
-  .section-head h2{font:400 italic clamp(26px,3.4vw,38px)/1.15 'Iowan Old Style','Palatino Linotype',Georgia,serif;margin:0 0 14px}
+  .section-head h2{font:400 italic clamp(26px,3.4vw,38px)/1.15 var(--font-accent);margin:0 0 14px}
   .section-head p{color:var(--muted);margin:0;font-size:16px;max-width:56ch}
 
   /* ---- Gallery sample -------------------------------------------------- */
@@ -83,7 +92,7 @@
   .piece-card img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.92)}
   .piece-card .tag{
     position:absolute;left:14px;bottom:14px;
-    font:12px/1 ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;
+    font:12px/1 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;
     color:#eae8e2;text-shadow:0 1px 6px rgba(0,0,0,.8);
   }
   .piece-card::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg, transparent 55%, rgba(0,0,0,.55) 100%);opacity:0;transition:opacity .2s ease}
@@ -93,8 +102,8 @@
   /* ---- How-to -------------------------------------------------------- */
   .steps{list-style:none;margin:0;padding:0;display:grid;gap:38px;max-width:680px}
   .steps li{display:grid;grid-template-columns:44px 1fr;gap:20px}
-  .steps .n{font:400 italic 26px/1 'Iowan Old Style',Georgia,serif;color:var(--accent-soft)}
-  .steps h3{margin:0 0 8px;font:600 16px/1.3 -apple-system,sans-serif}
+  .steps .n{font:400 italic 26px/1 var(--font-accent);color:var(--accent-soft)}
+  .steps h3{margin:0 0 8px;font:600 16px/1.3 var(--font-body)}
   .steps p{margin:0;color:#b8b6b0;font-size:15.5px;max-width:56ch}
   .steps a{color:var(--accent-soft);text-decoration:underline;text-underline-offset:3px}
   .fine{margin-top:46px;padding-top:28px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px;max-width:60ch}
@@ -107,7 +116,7 @@
   .wake{padding:64px 7vw 0;display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap;border-top:1px solid var(--line)}
   .wake-copy{max-width:52ch}
   .wake .mono{display:block;margin-bottom:14px}
-  .wake h2{font:400 italic clamp(24px,3vw,32px)/1.2 'Iowan Old Style','Palatino Linotype',Georgia,serif;margin:0 0 12px}
+  .wake h2{font:400 italic clamp(24px,3vw,32px)/1.2 var(--font-accent);margin:0 0 12px}
   .wake p{color:var(--muted);margin:0;font-size:15.5px}
   .wake a.btn{flex:none}
 </style>
@@ -180,7 +189,7 @@
 <section id="gallery">
   <div class="section-head">
     <h2>A handful, not the whole shelf.</h2>
-    <p>Eighteen pieces span sparse to dense, cool to warm. Four of them, to get a feel for the range; the rest live in the full gallery.</p>
+    <p>Twenty pieces span sparse to dense, cool to warm. Four of them, to get a feel for the range; the rest live in the full gallery.</p>
   </div>
   <div class="strip">
     <a class="piece-card" href="../../pieces/longwave/">
@@ -200,7 +209,7 @@
       <span class="tag">Flow Field</span>
     </a>
   </div>
-  <p class="strip-foot"><a class="btn ghost" href="../../index.html">See all eighteen →</a></p>
+  <p class="strip-foot"><a class="btn ghost" href="../../index.html">See all twenty →</a></p>
 </section>
 
 <section id="how">

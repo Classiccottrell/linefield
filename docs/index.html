@@ -4,46 +4,57 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Docs — linefield</title>
+<!-- Site page, not a piece — loaded only here (and the gallery/home).
+     pieces/ and shared/ never take a font dependency. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:ital,wght@0,400;0,500;0,700;0,900;1,400&family=Rosarivo:ital@0;1&display=swap" rel="stylesheet" />
 <style>
-  /* Same dark/monospace specimen system as the gallery (tools/templates/gallery.html)
+  /* Same dark specimen system as the gallery (tools/templates/gallery.html)
      and quiet-drift's footer/topbar chrome — see docs/roadmap-history.md, Chunks 15/16.
      Pages in this repo each inline their own copy rather than sharing a
-     stylesheet (same pattern as home/quiet-drift and home/specimen-grid). */
+     stylesheet (same pattern as home/quiet-drift and home/specimen-grid).
+     Type system (docs/house-look.md): Red Hat Display for display+body,
+     the system mono stack for labels/code, --link (not --brand) for
+     readable text on this dark ground — contrast. */
   :root{
     --bg:#0a0a0d; --surface:#131319; --line:#26262f;
     --ink:#e8e8ec; --muted:#7c7c8c;
-    --brand:#437057; --brand-dim:#2d4d3c;
+    --brand:#437057; --brand-dim:#2d4d3c; --link:#7fa88c;
+    --font-display:'Red Hat Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-body:'Red Hat Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
     background:var(--bg);color:var(--ink);
-    font:15px/1.6 ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;
+    font:15px/1.6 var(--font-body);
     -webkit-font-smoothing:antialiased;
   }
-  a{color:var(--brand)}
-  .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  a{color:var(--link)}
+  .label{font:11px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
   .wrap{max-width:860px;margin:0 auto;padding:0 24px 96px}
 
   .topbar{
     position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;
     padding:16px 28px;border-bottom:1px solid var(--line);background:rgba(10,10,13,.88);backdrop-filter:blur(6px);
   }
-  .topbar .mark{font-weight:700;letter-spacing:.04em;font-size:15px;text-decoration:none;color:var(--ink)}
+  .topbar .mark{font:700 15px/1 var(--font-display);letter-spacing:.01em;text-decoration:none;color:var(--ink)}
   .topbar .mark span{color:var(--brand)}
-  .topbar nav{display:flex;gap:24px;font-size:12px}
+  .topbar nav{display:flex;gap:24px;font:12px/1 var(--font-mono)}
   .topbar nav a{text-decoration:none;color:var(--muted)}
   .topbar nav a:hover,.topbar nav a[aria-current]{color:var(--ink)}
 
   header.intro{padding:56px 0 28px}
   header.intro .label{margin-bottom:16px;display:block}
-  h1{font:700 clamp(28px,4.2vw,40px)/1.18 ui-monospace,monospace;letter-spacing:-.01em;margin:0 0 14px}
-  .lede{color:#b9b9be;font-size:15px;margin:0;max-width:64ch}
-  .lede code,p code,li code{font-size:13px;background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
+  h1{font:800 clamp(30px,4.6vw,46px)/1.15 var(--font-display);letter-spacing:-.02em;margin:0 0 16px}
+  .lede{color:#b9b9be;font-size:16px;margin:0;max-width:64ch}
+  .lede code,p code,li code{font:13px/1 var(--font-mono);background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
 
   .toc{display:flex;flex-wrap:wrap;gap:8px;padding:24px 0 32px;border-bottom:1px solid var(--line)}
   .toc a{
-    font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+    font:500 12px/1 var(--font-mono);letter-spacing:.06em;
     color:var(--muted);background:transparent;border:1px solid var(--line);
     padding:8px 13px;text-decoration:none;text-transform:uppercase;
   }
@@ -51,7 +62,7 @@
 
   .doc-section{padding:40px 0;border-top:1px solid var(--line)}
   .doc-section:first-of-type{border-top:none}
-  .doc-section h2{margin:0 0 14px;font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .doc-section h2{margin:0 0 14px;font:700 24px/1.25 var(--font-display);letter-spacing:-.01em}
   .doc-section p{color:#c6c6d0;margin:0 0 14px;max-width:68ch}
   .doc-section p:last-child{margin-bottom:0}
 
@@ -63,7 +74,7 @@
 
   ul.control-list{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0 0 16px;padding:0}
   ul.control-list li{
-    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0;
+    font:12px/1 var(--font-mono);color:#c6c6d0;
     border:1px solid var(--line);padding:6px 10px;background:var(--surface);
   }
 
@@ -77,10 +88,10 @@
     background:var(--bg);border:1px solid var(--line);
     padding:14px 14px 14px 16px;margin:0 0 16px;
   }
-  .snip pre{margin:0;flex:1;min-width:0;overflow-x:auto;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0}
+  .snip pre{margin:0;flex:1;min-width:0;overflow-x:auto;font:12px/1.7 var(--font-mono);color:#c6c6d0}
 
   .btn{
-    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;
+    font:12px/1 var(--font-mono);letter-spacing:.03em;
     color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
     padding:9px 12px;cursor:pointer;text-decoration:none;display:inline-block;
   }
@@ -89,7 +100,7 @@
   .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 
   footer{padding:56px 0 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:40px}
-  footer a{color:var(--brand)}
+  footer a{color:var(--link)}
   footer p{margin:0 0 10px}
 </style>
 </head>
@@ -228,7 +239,9 @@
     <code>drawFrame()</code> with your own rendering logic, pick a distinct
     default hue so the library doesn't look uniform, then verify visually
     in a browser. Adding it to the gallery is a separate step: an entry in
-    <code>pieces.json</code>, a README bullet, and a rebuild.</p>
+    <code>pieces.json</code>, a matching entry in <code>collections.json</code>
+    (the gallery groups pieces by collection, not by tag — an unclaimed
+    slug fails the build loudly), a README bullet, and a rebuild.</p>
   <p>The full steps, the build boundary between pieces and the microsite,
     and the CI gate order all live on the
     <a href="contributing/">Contributing page</a> &mdash; read the skill

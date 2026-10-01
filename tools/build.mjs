@@ -22,6 +22,13 @@ export function loadManifest() {
   return JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8'));
 }
 
+// Presentation-only grouping (ROADMAP Phase 3.4). pieces.json itself stays
+// untouched — collections.json is a second manifest the gallery reads
+// alongside it, ordered array = display order.
+export function loadCollections() {
+  return JSON.parse(readFileSync(join(ROOT, 'collections.json'), 'utf8'));
+}
+
 // Pull the `defaults: { hue: N, hueB: N, saturation: N, ... }` block out of a
 // piece's source. Whitespace-tolerant; returns null if the piece has none.
 // Locked to hue/hueB/saturation appearing FIRST and in that exact order —
@@ -102,6 +109,38 @@ export function verifyManifest() {
   for (const slug of readme) {
     if (!slugs.includes(slug)) {
       errors.push(`README.md lists "${slug}", which is not in pieces.json`);
+    }
+  }
+
+  // Every piece must belong to exactly one collection, and collections.json
+  // must never name a slug that doesn't exist — this fails loudly under
+  // --verify-only, before a browser is ever launched, same tier as the
+  // README/pieces.json agreement checks above.
+  let collections = [];
+  try {
+    collections = loadCollections();
+  } catch (err) {
+    errors.push(`collections.json is missing or invalid JSON: ${err.message}`);
+  }
+  if (collections.length) {
+    const ownerOf = new Map(); // slug -> collection id that already claimed it
+    for (const c of collections) {
+      for (const slug of c.slugs) {
+        if (!slugs.includes(slug)) {
+          errors.push(`collections.json's "${c.id}" names "${slug}", which is not in pieces.json`);
+          continue;
+        }
+        if (ownerOf.has(slug)) {
+          errors.push(`"${slug}" is in two collections: "${ownerOf.get(slug)}" and "${c.id}"`);
+        } else {
+          ownerOf.set(slug, c.id);
+        }
+      }
+    }
+    for (const slug of slugs) {
+      if (!ownerOf.has(slug)) {
+        errors.push(`"${slug}" has no collection in collections.json`);
+      }
     }
   }
 
@@ -319,35 +358,51 @@ function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function cardHtml(p) {
-  const accent = `hsl(${p.hue} ${Math.round(p.saturation * 100)}% 60%)`;
-  const accentB = `hsl(${p.hueB} ${Math.round(p.saturation * 100)}% 60%)`;
-  const tags = p.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
-  return `  <article class="card" data-tags="${escapeHtml(p.tags.join(' '))}" style="--accent:${accent}">
-    <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
-      <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">${Math.round(p.hue)}&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,${accent},${accentB})"></span>
-        ${escapeHtml(p.title)}
-      </h2>
-      <p class="blurb">${escapeHtml(p.blurb)}</p>
-      <div class="tags">${tags}</div>
+// Art-first card (ROADMAP Phase 3.1): the square thumbnail dominates, name
+// plus one small mono collection label sit below it, and Open/Copy embed/
+// Download live in an overlay revealed on hover/focus (CSS only — see
+// tools/templates/gallery.html's .stage/.actions rules). `collectionTitle`
+// is the human-readable label; `collectionId` drives the chip filter via
+// data-collection, same attribute the filter script reads.
+function cardHtml(p, collectionId, collectionTitle) {
+  return `  <article class="card" data-collection="${escapeHtml(collectionId)}">
+    <div class="stage">
+      <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
+        <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="300" height="300" />
+      </a>
       <div class="actions">
         <a class="btn" href="pieces/${p.slug}/">Open</a>
         <button class="btn" type="button" data-embed="pieces/${p.slug}/">Copy embed</button>
         <a class="btn" href="downloads/${p.slug}.html" download>Download</a>
       </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+    <div class="meta">
+      <h2 class="name">${escapeHtml(p.title)}</h2>
+      <p class="collection-label">${escapeHtml(collectionTitle)}</p>
     </div>
   </article>`;
 }
 
 export function buildGallery(manifest) {
   const template = readFileSync(join(ROOT, 'tools', 'templates', 'gallery.html'), 'utf8');
-  const cards = manifest.map(cardHtml).join('\n');
+  const collections = loadCollections();
+
+  // Cards render grouped, in collections.json's own order — a full-width
+  // heading per group, then that group's cards. verifyManifest() already
+  // guarantees every manifest slug has exactly one collection and every
+  // collection slug exists, so every piece lands in exactly one group here.
+  const bySlug = new Map();
+  for (const c of collections) for (const slug of c.slugs) bySlug.set(slug, c);
+  const pieceById = new Map(manifest.map((p) => [p.slug, p]));
+  const cardBlocks = [];
+  for (const c of collections) {
+    const pieces = c.slugs.map((slug) => pieceById.get(slug)).filter(Boolean);
+    if (!pieces.length) continue;
+    cardBlocks.push(`  <h3 class="group-head" data-collection="${escapeHtml(c.id)}">${escapeHtml(c.title)}</h3>`);
+    cardBlocks.push(...pieces.map((p) => cardHtml(p, c.id, c.title)));
+  }
+  const cards = cardBlocks.join('\n');
+
   // Function replacers so a literal `$&`/`$'`/`` $` ``/`$$` in card markup or
   // JSON is never interpreted as a String.replace substitution pattern.
   // `<` is escaped to `<` (same fix as shared/export.js's bakeHtml) so
@@ -355,13 +410,18 @@ export function buildGallery(manifest) {
   // element early.
   // actualDefaults is build-internal scaffolding; shipping it would publish
   // it to every visitor. presets are wanted by the cards.
-  const publicManifest = manifest.map(({ actualDefaults, ...rest }) => rest);
+  const publicManifest = manifest.map(({ actualDefaults, ...rest }) => ({ ...rest, collection: bySlug.get(rest.slug)?.id }));
   const pieceJson = JSON.stringify(publicManifest, null, 2).replace(/</g, '\\u003c');
+  const collectionsJson = JSON.stringify(
+    collections.map(({ id, title }) => ({ id, title })), null, 2
+  ).replace(/</g, '\\u003c');
   const out = template
     .replace('<!--CARDS-->', () => cards)
-    .replace('/*PIECES*/[]', () => pieceJson);
+    .replace('/*PIECES*/[]', () => pieceJson)
+    .replace('/*COLLECTIONS*/[]', () => collectionsJson)
+    .split('{{PIECE_COUNT}}').join(String(manifest.length));
   writeFileSync(join(ROOT, 'index.html'), out);
-  console.log(`  gallery: index.html (${manifest.length} cards)`);
+  console.log(`  gallery: index.html (${manifest.length} cards, ${collections.length} collections)`);
 }
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);

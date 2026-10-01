@@ -258,10 +258,12 @@ npm run collection-check             # NOT run in CI yet, but DOES exit non-zero
 canvas, captured at 1280×800) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
 never reimplemented) for all twenty pieces, then renders `index.html` at
-the repo root from `tools/templates/gallery.html` and the manifest — the
-gallery page itself, with live hover/keyboard previews, tag filtering, and
-per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
-`downloads/`, `index.html`) are committed.
+the repo root from `tools/templates/gallery.html`, the manifest, and
+`collections.json` (presentation-only grouping — `pieces.json` stays
+untouched; the gallery groups/filters cards by collection, not by tag) —
+the gallery page itself, with live hover/keyboard previews and per-piece
+"Copy embed" / "Download" actions revealed on hover or focus. All three
+(`thumbs/`, `downloads/`, `index.html`) are committed.
 
 `tools/audit-controls.mjs` drives every control on every piece between
 points across its full range with a seeded RNG and a manually-stepped

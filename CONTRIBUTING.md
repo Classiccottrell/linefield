@@ -44,9 +44,13 @@ dependency. None of that reaches a user of a piece.
    regex locked to that order. `colorMode`/`colorA`/`colorB` (see "The 14
    shared visual controls" below) may follow after; they are not read by the
    manifest.
-3. Add a bullet to README's Pieces list.
-4. Run `npm run build`.
-5. Run `npm run collection-metrics` and paste its output over ROADMAP's
+3. Add the slug to exactly one collection in `collections.json` — the
+   gallery groups/filters by collection, not by tag. The build's
+   `--verify-only` fails loudly if a manifest slug is unclaimed, or if a
+   collection names a slug that doesn't exist.
+4. Add a bullet to README's Pieces list.
+5. Run `npm run build`.
+6. Run `npm run collection-metrics` and paste its output over ROADMAP's
    "Collection constraints" table, so the collection's hue/saturation/ink
    spread still describes the library someone reads it against. Do this
    after the build — it measures the committed thumbnails, so a piece with

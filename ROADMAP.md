@@ -226,18 +226,25 @@ sheet reads as one collection.
 
 ## Phase 3 — Presentation
 
-- **3.1 Art-first gallery cards.** The preview dominates. Name plus one small
-  label. Buttons and the "download ships defaults" note move to the piece
-  page or to hover.
-- **3.2 Type system.** A display face, a body face and a mono label face,
-  sourced from the ClassicCottrell design system rather than the reference's
-  trio. This is also the natural first step toward Forma alignment.
-- **3.3 A ruler-style slider** in `shared/controls.js`, our own design,
-  covered by `audit-controls`.
-- **3.4 Collections.** Group the pieces into named collections, in our own
-  names, replacing the flat tag chips.
-- **3.5** Bring the home page (`home/quiet-drift`) and the docs pages onto
-  the new look.
+- [x] **3.1 Art-first gallery cards.** The preview dominates. Name plus one
+  small label. Buttons move into a hover/focus overlay on the card; the
+  "download ships defaults" note is said once near the top of the grid
+  instead of on every card.
+- [x] **3.2 Type system.** Red Hat Display (display+body), Rosarivo italic
+  (editorial accents) and the system mono stack (labels), sourced from the
+  ClassicCottrell design system rather than the reference's trio. Loaded
+  only on site pages (gallery, home, docs) — `pieces/` and `shared/` stay
+  dependency-free. This is also the natural first step toward Forma
+  alignment.
+- [x] **3.3 A ruler-style slider** in `shared/controls.js`, our own design
+  (tick-mark track, hairline thumb), covered by `audit-controls` for the
+  write path and `test-presets.mjs`'s DOM-driven check for the real input.
+- [x] **3.4 Collections.** `collections.json` groups the twenty pieces into
+  five named collections (Currents, Volumes, Orbits, Surfaces, Codes),
+  replacing the flat tag chips. `pieces.json` stays untouched; the build's
+  `--verify-only` fails loudly on an unclaimed slug or an unknown one.
+- [x] **3.5** Bring the home page (`home/quiet-drift`) and the docs pages
+  onto the new look.
 
 ## Phase 4 — Materials and range
 

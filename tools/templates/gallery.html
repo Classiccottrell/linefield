@@ -4,26 +4,37 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — generative line-art backgrounds</title>
+<!-- Site pages only — never pieces/ or shared/, which stay dependency-free
+     so a baked export runs offline. ClassicCottrell type system: Red Hat
+     Display for display+body, Rosarivo italic for editorial accents. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:ital,wght@0,400;0,500;0,700;0,900;1,400&family=Rosarivo:ital@0;1&display=swap" rel="stylesheet" />
 <style>
   /* Specimen system ported from home/specimen-grid/ (Chunk 15): dark
-     monospace/technical register, sharp corners (zero radius), a fixed
-     --brand accent for page chrome, and a per-card --accent (hue-tinted)
-     that overrides --brand locally so each card's swatch/focus ring reads
-     as that piece's own measured hue, not a shared UI color. */
+     technical register, sharp corners (zero radius). --brand is the one
+     fixed UI accent (fills, borders, dots) — never text on the dark ground,
+     which reads --link instead (contrast; see docs/house-look.md's type
+     system). Labels/code keep the system mono stack; everything readable
+     is Red Hat Display. */
   :root{
     --bg:#0a0a0d; --surface:#131319; --line:#26262f;
     --ink:#e8e8ec; --muted:#7c7c8c;
-    --brand:#437057; --brand-dim:#2d4d3c;
+    --brand:#437057; --brand-dim:#2d4d3c; --link:#7fa88c;
+    --font-display:'Red Hat Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-body:'Red Hat Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-accent:'Rosarivo',Georgia,'Iowan Old Style',serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
     background:var(--bg);color:var(--ink);
-    font:15px/1.6 ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;
+    font:15px/1.6 var(--font-body);
     -webkit-font-smoothing:antialiased;
   }
-  a{color:var(--brand)}
-  .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  a{color:var(--link)}
+  .label{font:11px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
   .wrap{max-width:1180px;margin:0 auto;padding:0 24px 96px}
 
   /* ---- Sticky topbar, ported from specimen-grid's .topbar ------------- */
@@ -31,22 +42,23 @@
     position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;
     padding:16px 28px;border-bottom:1px solid var(--line);background:rgba(10,10,13,.88);backdrop-filter:blur(6px);
   }
-  .topbar .mark{font-weight:700;letter-spacing:.04em;font-size:15px}
+  .topbar .mark{font:700 15px/1 var(--font-display);letter-spacing:.01em}
   .topbar .mark span{color:var(--brand)}
-  .topbar nav{display:flex;gap:24px;font-size:12px}
+  .topbar nav{display:flex;gap:24px;font:12px/1 var(--font-mono)}
   .topbar nav a{text-decoration:none;color:var(--muted)}
   .topbar nav a:hover{color:var(--ink)}
 
   header.intro{padding:56px 0 32px}
   header.intro .label{margin-bottom:16px;display:block}
-  h1{font:700 clamp(30px,4.4vw,44px)/1.18 ui-monospace,monospace;letter-spacing:-.01em;margin:0 0 14px}
-  h1 .op{color:var(--brand)}
-  .lede{color:#b9b9be;font-size:15px;margin:0;max-width:62ch}
-  .lede code{font-size:13px;background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
+  h1{font:800 clamp(34px,5.2vw,58px)/1.1 var(--font-display);letter-spacing:-.02em;margin:0 0 16px}
+  h1 .op{font-family:var(--font-accent);font-style:italic;font-weight:400;color:var(--link)}
+  .lede{color:#b9b9be;font-size:16px;margin:0 0 4px;max-width:62ch}
+  .lede code{font:13px/1 var(--font-mono);background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
+  .grid-note{color:var(--muted);font-size:13px;margin:10px 0 0;max-width:62ch}
 
   .chips{display:flex;flex-wrap:wrap;gap:8px;padding:24px 0 32px;border-bottom:1px solid var(--line)}
   .chip{
-    font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+    font:500 12px/1 var(--font-mono);letter-spacing:.06em;
     color:var(--muted);background:transparent;border:1px solid var(--line);
     padding:8px 13px;cursor:pointer;text-transform:uppercase;
   }
@@ -58,51 +70,50 @@
      specimen-grid's page carries two different treatments: the one-hero
      `.specimen` (boxed, crosshair-guided) and the `.grid`/`.cell` sample
      mosaic (hairline gutters via gap+background, bottom-gradient meta,
-     hue-degree tag, no crosshair) it uses for its OWN four-piece sample.
-     Eighteen cards is a many-sample case, so this ports the mosaic system,
-     not the crosshair — a literal crosshair on eighteen boxes at once is
-     the visual noise the brief warned about; the hairline grid is the part
-     that actually scales. */
+     no crosshair) it uses for its OWN four-piece sample. Twenty cards is a
+     many-sample case, so this ports the mosaic system, not the crosshair —
+     a literal crosshair on twenty boxes at once is the visual noise the
+     brief warned about; the hairline grid is the part that actually
+     scales. Grouped by collection: a full-width `.group-head` precedes
+     each collection's cards (see JS below for how a chip filter hides
+     them). */
   .grid{
     display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
-    margin:36px 0 0;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    margin:36px 0 0;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
   }
+  .group-head{
+    grid-column:1/-1;margin:0;padding:22px 16px 10px;background:var(--bg);
+    font:600 12px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--link);
+  }
+  .group-head[hidden]{display:none}
   .card{display:flex;flex-direction:column;background:var(--bg)}
   .card[hidden]{display:none}
 
+  /* ---- Art-first card (ROADMAP 3.1): the square preview dominates; the
+     three actions live in a hover/focus overlay INSIDE .stage, never in
+     normal flow, so .meta stays just the name and its collection label. */
+  .stage{position:relative}
   .frame{
-    position:relative;aspect-ratio:16/10;overflow:hidden;
+    position:relative;aspect-ratio:1/1;overflow:hidden;
     background:#000;display:block;text-decoration:none;
   }
-  .frame img,.frame iframe{
-    position:absolute;inset:0;width:100%;height:100%;border:0;display:block;
-  }
-  .frame img{object-fit:cover}
-  /* The iframe sits topmost in the anchor; without this, every click is
-     consumed by the iframe and never reaches the enclosing <a>. */
-  .frame iframe{pointer-events:none}
-  .frame:focus-visible{outline:2px solid var(--accent,var(--brand));outline-offset:2px}
-  /* Hue-degree spec tag, ported from specimen-grid's .cell .meta .tag-hue.
-     Colored via --accent so it reads as this card's own measured value,
-     not a shared UI accent. */
-  .frame-label{
-    position:absolute;top:10px;right:12px;z-index:2;
-    font-size:11px;letter-spacing:.04em;color:var(--accent,var(--brand));
-    text-shadow:0 1px 3px rgba(0,0,0,.85);
-  }
+  .frame img,.frame iframe{position:absolute;border:0;display:block}
+  .frame img{inset:0;width:100%;height:100%;object-fit:cover}
+  /* Sized/positioned from JS (goLive): a fixed 1280x800 box — the viewport
+     every piece actually lays its composition out against — scaled and
+     centred to fill the square frame the same way object-fit:cover crops
+     the still, so hovering never jumps the composition. The iframe sits
+     topmost in the anchor; without pointer-events:none, every click would
+     be consumed by it and never reach the enclosing <a>. */
+  .frame iframe{pointer-events:none;top:50%;left:50%}
+  .frame:focus-visible{outline:2px solid var(--link);outline-offset:-2px}
 
-  .meta{padding:16px 16px 18px;border-top:1px solid var(--line)}
+  .meta{padding:14px 4px 4px}
   .name{
-    display:flex;align-items:baseline;gap:10px;margin:0 0 6px;
-    font-size:16px;font-weight:700;letter-spacing:-.01em;
+    margin:0 0 3px;font:600 16px/1.25 var(--font-display);letter-spacing:-.01em;
   }
-  .swatch{width:20px;height:3px;flex:none}
-  .blurb{color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 12px}
-
-  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
-  .tag{
-    font:11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9a9aa8;
-    border:1px solid var(--line);padding:4px 8px;text-transform:uppercase;letter-spacing:.04em;
+  .collection-label{
+    margin:0;font:11px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
   }
 
   .mechanisms{
@@ -116,30 +127,45 @@
   .mechanism-label{
     color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
   }
-  .mechanism-title{margin:8px 0 4px;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .mechanism-title{margin:8px 0 4px;font:700 20px/1.2 var(--font-display);letter-spacing:-.01em}
   .mechanism-copy{color:var(--muted);font-size:13px;margin:0 0 8px}
   .mechanism-detail{color:var(--muted);font-size:13px;margin:0;max-width:60ch}
   .mechanisms .btn{flex:none;margin-top:2px}
 
-  /* $-prefixed action buttons, ported from specimen-grid's `$ tune` /
-     `$ export` / `$ ship` command-style labels. CSS-only (::before) so the
-     copy-to-clipboard handlers below, which do `btn.textContent = 'Copied'`
-     and restore it after, never lose the glyph to a wiped child node. */
-  .actions{display:flex;flex-wrap:wrap;gap:8px}
+  /* Card actions: an overlay INSIDE .stage, not normal-flow siblings of
+     .meta — the square preview stays the whole story until you hover or
+     focus it. Revealed by opacity (not display/visibility) so the buttons
+     stay in tab order and clickable by automated drivers even while
+     "hidden", and stay permanently visible on touch (no hover to reveal
+     them on). mouseenter/mouseleave/focusin/focusout bind to .stage, not
+     .frame or .actions individually — crossing from the frame into a
+     button inside the same .stage must never look like leaving it (see
+     goLive/clearLive below). $-prefixed, ported from specimen-grid's
+     `$ tune` / `$ export` / `$ ship` command-style labels; CSS-only
+     (::before) so the copy-to-clipboard handlers, which do
+     `btn.textContent = 'Copied'` and restore it after, never lose the
+     glyph to a wiped child node. */
+  .actions{
+    position:absolute;inset:auto 0 0 0;z-index:2;display:flex;flex-wrap:wrap;gap:6px;
+    padding:36px 10px 10px;background:linear-gradient(180deg,transparent,rgba(10,10,13,.92) 60%);
+    opacity:0;transition:opacity .15s ease;pointer-events:none;
+  }
+  .stage:hover .actions,.stage:focus-within .actions{opacity:1;pointer-events:auto}
+  @media (hover:none),(pointer:coarse){
+    .actions{opacity:1;pointer-events:auto;background:linear-gradient(180deg,transparent,rgba(10,10,13,.92) 40%)}
+  }
   .btn{
-    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;
+    font:12px/1 var(--font-mono);letter-spacing:.03em;
     color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
     padding:9px 12px;cursor:pointer;text-decoration:none;display:inline-block;
   }
   .btn::before{content:'$ ';color:var(--brand)}
   .btn:hover{color:var(--ink);border-color:#3a3a46}
-  .btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-
-  .note{color:var(--muted);font-size:12px;margin:10px 0 0}
+  .btn:focus-visible{outline:2px solid var(--link);outline-offset:2px}
 
   .gh{
     display:inline-flex;align-items:center;gap:8px;flex:none;
-    font:500 13px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+    font:500 13px/1 var(--font-mono);
     color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
     padding:9px 13px;text-decoration:none;
   }
@@ -150,7 +176,7 @@
   .skill{
     margin:64px 0 0;padding:28px;border:1px solid var(--line);background:var(--surface);
   }
-  .skill h2{margin:0 0 10px;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .skill h2{margin:0 0 10px;font:700 20px/1.2 var(--font-display);letter-spacing:-.01em}
   .skill p{color:var(--muted);font-size:13px;margin:0 0 18px;max-width:68ch}
   .skill .snip{
     display:flex;align-items:flex-start;gap:12px;
@@ -159,12 +185,12 @@
   }
   .skill pre{
     margin:0;flex:1;min-width:0;overflow-x:auto;
-    font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0;
+    font:12px/1.7 var(--font-mono);color:#c6c6d0;
   }
-  .skill .actions{margin-top:16px}
+  .skill .actions{position:static;padding:0;opacity:1;pointer-events:auto;background:none;margin-top:16px}
 
   footer{padding:72px 0 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:72px}
-  footer a{color:var(--brand)}
+  footer a{color:var(--link)}
 
   @media (prefers-reduced-motion: reduce){
     *{animation:none!important;transition:none!important}
@@ -187,22 +213,23 @@
 <div class="wrap">
 
 <header class="intro">
-  <span class="label">Collection / 18 pieces / live</span>
+  <span class="label">Collection / {{PIECE_COUNT}} pieces / live</span>
   <h1>Generative backgrounds, <span class="op">shipped as one file.</span></h1>
-  <p class="lede">Eighteen self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
+  <p class="lede">{{PIECE_COUNT}} self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
+  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning.</p>
 </header>
 
 <section class="mechanisms" aria-label="Interaction mechanisms">
   <a class="mechanism" href="interactions/wake/">
     <span class="mechanism-label">Interaction mechanism — not a piece</span>
     <h2 class="mechanism-title">Wake</h2>
-    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the eighteen pieces below.</p>
+    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the {{PIECE_COUNT}} pieces below.</p>
     <p class="mechanism-detail">Off by default, opt-in per canvas, never baked into an exported piece. Try it live and tune strength, trail life, strand count, and color.</p>
   </a>
   <a class="btn" href="interactions/wake/">open wake</a>
 </section>
 
-<div class="chips" id="chips" role="group" aria-label="Filter pieces by category"></div>
+<div class="chips" id="chips" role="group" aria-label="Filter pieces by collection"></div>
 
 <div class="grid" id="grid">
 <!--CARDS-->
@@ -231,18 +258,18 @@
 
 <script>
 const PIECES = /*PIECES*/[];
+const COLLECTIONS = /*COLLECTIONS*/[];
 
-/* ---- Filtering ---------------------------------------------------------- */
+/* ---- Filtering, by collection ------------------------------------------- */
 const grid = document.getElementById('grid');
 const chipRow = document.getElementById('chips');
-const allTags = [...new Set(PIECES.flatMap(p => p.tags))].sort();
 let active = null;
 
 function renderChips(){
-  // Built once. apply() only ever toggles aria-pressed on these same
-  // buttons — replacing them on every click would drop keyboard focus
-  // back to <body> on each filter change, which is the same class of
-  // defect as a hover-only preview.
+  // Built once, in collections.json's own order. apply() only ever toggles
+  // aria-pressed on these same buttons — replacing them on every click
+  // would drop keyboard focus back to <body> on each filter change, which
+  // is the same class of defect as a hover-only preview.
   const mk = (label, value) => {
     const b = document.createElement('button');
     b.className = 'chip';
@@ -253,13 +280,18 @@ function renderChips(){
     b.addEventListener('click', () => { active = value; apply(); });
     return b;
   };
-  chipRow.replaceChildren(mk('All', null), ...allTags.map(t => mk(t, t)));
+  chipRow.replaceChildren(mk('All', null), ...COLLECTIONS.map(c => mk(c.title, c.id)));
 }
 
 function apply(){
-  for (const card of grid.children){
-    const tags = card.dataset.tags.split(' ');
-    card.hidden = active !== null && !tags.includes(active);
+  // .card and .group-head are both direct children of #grid — query by
+  // class, not grid.children, so a group heading is never mistaken for a
+  // card. A single collection filtered in never needs its own heading.
+  for (const card of grid.querySelectorAll('.card')){
+    card.hidden = active !== null && card.dataset.collection !== active;
+  }
+  for (const head of grid.querySelectorAll('.group-head')){
+    head.hidden = active !== null;
   }
   for (const chip of chipRow.children){
     const value = chip.dataset.value || null;
@@ -269,12 +301,22 @@ function apply(){
 
 /* ---- Live preview on hover and keyboard focus ---------------------------
    Exactly one iframe exists at a time. A stale iframe keeps its animation
-   loop running, and twelve concurrent loops is the whole reason the grid
+   loop running, and twenty concurrent loops is the whole reason the grid
    uses stills. Touch devices never reach this code — see the media query
    below — so tapping a card just opens the piece.                          */
 const canHover = window.matchMedia('(hover: hover)').matches;
 let liveFrame = null;
 let liveTimer = null;
+
+// Scales+centres the fixed 1280x800 iframe to fill the square .frame the
+// same way object-fit:cover crops the still (scale by height — width==
+// height on a square frame — so the extra width overflows evenly left and
+// right, matching a centred crop, not a squeeze). Re-run on resize so a
+// live preview open across a viewport change stays aligned.
+function sizeLiveFrame(iframe, frame){
+  const h = frame.clientHeight || frame.getBoundingClientRect().height;
+  iframe.style.transform = `translate(-50%,-50%) scale(${h / 800})`;
+}
 
 function goLive(frame){
   if (!canHover || liveFrame === frame) return;
@@ -292,6 +334,10 @@ function goLive(frame){
     iframe.setAttribute('tabindex', '-1');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.setAttribute('loading', 'eager');
+    iframe.style.width = '1280px';
+    iframe.style.height = '800px';
+    iframe.style.transformOrigin = 'center center';
+    sizeLiveFrame(iframe, frame);
     // Kept invisible (inline style, set before append — no window where an
     // unhidden panel could paint) until the panel-hiding style is injected
     // below. The still image sits behind the whole time, so the viewer only
@@ -319,6 +365,9 @@ function goLive(frame){
     });
     frame.appendChild(iframe);
     liveFrame = frame;
+    const onResize = () => { if (liveFrame === frame) sizeLiveFrame(iframe, frame); };
+    window.addEventListener('resize', onResize);
+    iframe.__lfCleanup = () => window.removeEventListener('resize', onResize);
   }, 120);
 }
 
@@ -326,17 +375,26 @@ function clearLive(){
   clearTimeout(liveTimer);
   if (!liveFrame) return;
   const iframe = liveFrame.querySelector('iframe');
-  if (iframe) iframe.remove();
+  if (iframe) { iframe.__lfCleanup?.(); iframe.remove(); }
   liveFrame = null;
 }
 
-for (const frame of grid.querySelectorAll('.frame')){
-  frame.addEventListener('mouseenter', () => goLive(frame));
-  frame.addEventListener('mouseleave', clearLive);
-  // Keyboard users get the same preview. Hover-only interactivity is
-  // invisible to them, and this is one extra event pair.
-  frame.addEventListener('focus', () => goLive(frame));
-  frame.addEventListener('blur', clearLive);
+// mouseenter/mouseleave/focusin/focusout bind to .stage — the wrapper
+// around both .frame and the .actions overlay — never to .frame alone.
+// mouseenter/mouseleave don't bubble, so moving the pointer from the image
+// onto an action button inside the SAME .stage never fires a spurious
+// leave; binding to .frame instead would kill the live preview the instant
+// a visitor reached for "Open" or "Copy embed". focusin/focusout (which do
+// bubble) cover every focusable child the same way, including the buttons
+// mouseenter/mouseleave can't reach via keyboard.
+for (const stage of grid.querySelectorAll('.stage')){
+  const frame = stage.querySelector('.frame');
+  stage.addEventListener('mouseenter', () => goLive(frame));
+  stage.addEventListener('mouseleave', clearLive);
+  stage.addEventListener('focusin', () => goLive(frame));
+  stage.addEventListener('focusout', (e) => {
+    if (!stage.contains(e.relatedTarget)) clearLive();
+  });
 }
 
 /* ---- Copy embed --------------------------------------------------------- */
