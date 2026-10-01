@@ -2,16 +2,20 @@
   {
     "slug": "flow-field",
     "title": "Flow Field",
-    "blurb": "Organic ribbons drifting along a simplex-noise vector field.",
-    "tags": ["flow"],
-    "hue": 200, "hueB": 280, "saturation": 0.6
+    "blurb": "Particles confined to one soft, organic region around a quiet central void, trailing hairlines that brighten only where they cross.",
+    "tags": ["flow", "organic"],
+    "hue": 200, "hueB": 280, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "band's inner edge, upper right"
   },
   {
     "slug": "contour-grid",
     "title": "Contour Grid",
-    "blurb": "Topographic bands undulating like breathing terrain.",
-    "tags": ["geometric"],
-    "hue": 35, "hueB": 15, "saturation": 0.5
+    "blurb": "The contour lines of one island, cropped as a single landform with its summit as the brightest point.",
+    "tags": ["topographic", "organic"],
+    "hue": 35, "hueB": 15, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "summit, right of centre"
   },
   {
     "slug": "moire",
@@ -30,9 +34,11 @@
   {
     "slug": "grain-field",
     "title": "Grain Field",
-    "blurb": "Fine drifting grain — the quietest piece, good behind text.",
-    "tags": ["grain"],
-    "hue": 30, "hueB": 210, "saturation": 0.12
+    "blurb": "Fine grain gathered into one soft drifting cloud with a long falloff — the quietest piece, and the home-page hero.",
+    "tags": ["grain", "hero"],
+    "hue": 30, "hueB": 210, "saturation": 0,
+    "safeZone": "left ~60%, clear of the hero copy",
+    "anchor": "cloud's centre, right of frame-centre"
   },
   {
     "slug": "wireframe-lattice",
