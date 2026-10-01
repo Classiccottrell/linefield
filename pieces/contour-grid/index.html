@@ -34,6 +34,13 @@
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
 
+  // contour-grid — the contour lines of a single landform, one island with
+  // one summit, cropped as one object instead of edge-to-edge bands.
+  //
+  // Text-safe zone: the left third of the frame. The island sits right of
+  // centre, inside the central square.
+  // Anchor: the summit, right of centre — where the rings bunch tightest
+  // and their hairlines overlap into the brightest point.
   const PIECE_ID = 'contour-grid';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -45,17 +52,38 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // Band count is derived per frame from density — no persistent array, so no re-seed.
-  const BASE_BANDS = 26;
-  const STEP_PX = 6;
+  // Ring count is derived per frame from density — no persistent array, so
+  // no re-seed needed.
+  const BASE_RINGS = 26;
+  const RING_POINTS = 96; // polar samples per ring
+  const SUMMIT = { x: 0.60, y: 0.46 }; // normalized; right of centre
+  const R_FRAC = 0.34; // * min(W,H): island diameter ~68% of the shorter side
+  const PERIOD = 10; // seconds for one full base->summit ring migration at speed 1
   let paths = [];
 
+  function smoothstep(a, b, x) {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  }
+
+  // A shared, low-frequency silhouette sampled around the unit circle —
+  // cos/sin keep it seamless at theta=0/2*PI with no stitch. Every ring
+  // reads this same shape (scaled by its own radius), so the stack reads as
+  // contours of ONE coastline, not concentric circles. Wobble grows toward
+  // the base (s near 1) so the summit stays a clean, near-circular cap.
+  function shapeFactor(theta, s, phaseNoise) {
+    const k = 2.15;
+    const n1 = simplex2(Math.cos(theta) * k + phaseNoise, Math.sin(theta) * k + phaseNoise);
+    const n2 = simplex2(Math.cos(theta) * k * 2.3 - phaseNoise, Math.sin(theta) * k * 2.3 + phaseNoise * 0.7);
+    return 1 + (n1 * 0.22 + n2 * 0.08) * (0.35 + 0.65 * s);
+  }
+
   const PRESETS = {
-    whisper: { opacity: 0.3, stroke: 1.1, density: 0.6, saturation: 0.06, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.8, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.95, stroke: 1, density: 1.2, saturation: 0.9, glow: 1 },
-    drift:   { opacity: 0.5, stroke: 0.9, density: 0.7, speed: 0.3, motion: 1.6 },
-    dense:   { opacity: 0.6, stroke: 0.6, density: 2, speed: 0.8, glow: 0 },
+    whisper: { opacity: 1, stroke: 0.9, density: 0.6, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.3, density: 0.85, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 0.9, saturation: 0.85, glow: 1.1 },
+    drift:   { opacity: 0.85, stroke: 0.9, density: 0.7, speed: 0.35, motion: 1.8 },
+    dense:   { opacity: 0.85, stroke: 0.85, density: 1.6, relief: 1.5, glow: 0.5 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -64,72 +92,97 @@
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
+      // Steepness of the terrain: how tightly rings bunch toward the summit.
       { name: 'relief', label: 'Relief', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
     ],
-    defaults: { hue: 35, hueB: 15, saturation: 0.5, colorMode: 'gradient', colorA: '#ff9500', colorB: '#ff4000' },
+    // saturation: 0 per house look §1; colour lives in the neon preset.
+    defaults: { hue: 35, hueB: 15, saturation: 0, colorMode: 'gradient', colorA: '#ff9500', colorB: '#ff4000' },
   });
   const currentValues = baked || panel.values;
 
   function drawFrame(dt, elapsed, values) {
+    const W = canvas.width, H = canvas.height, S = Math.min(W, H);
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
 
     paths = [];
-    const bands = Math.max(2, Math.round(BASE_BANDS * values.density));
-    const noiseScale = 0.0016 * (0.25 + values.scale);
-    // relief sets the static terrain height; motion layers a second,
-    // independently-amplitude'd wobble on top; speed is purely the rate that
-    // wobble evolves at (not its size) — the three no longer collapse to one knob.
-    const baseAmp = 30 * values.relief;
-    const moveAmp = 16 * values.motion;
-    const t = elapsed * values.speed * 0.12;
+    const rings = Math.max(6, Math.round(BASE_RINGS * values.density));
+    const cx = W * SUMMIT.x, cy = H * SUMMIT.y;
+    const R = S * R_FRAC * (0.5 + 0.5 * values.scale);
+    // Relief sets how steeply rings bunch toward the summit (the gamma on
+    // the radius curve), not the overall size — Scale already owns that.
+    const gamma = 1.3 + 0.9 * values.relief;
 
-    const lineWidth = 0.4 + values.stroke * 1.1;
-    ctx.lineWidth = lineWidth;
+    const th = (values.angle * Math.PI) / 180;
+    const cth = Math.cos(th), sth = Math.sin(th);
+    // Points are rotated explicitly, not via a canvas transform, so the
+    // exported SVG (which records these same points) carries Angle too.
+    const rot = (x, y) => [cx + (x - cx) * cth - (y - cy) * sth, cy + (x - cx) * sth + (y - cy) * cth];
 
-    const rcx = canvas.width / 2, rcy = canvas.height / 2;
-    const theta = (values.angle * Math.PI) / 180;
+    // Speed drives a slow migration that exists even at Motion 0: every ring
+    // is born at the summit and grows outward to the coast over PERIOD
+    // seconds, then wraps back to a new ring at the summit. The `rings`
+    // evenly spaced starting offsets (k/rings) mean every level in [0,1] is
+    // always occupied by some ring, so a birth at the summit (sub-pixel
+    // radius) is invisible — but a ring dying at the full-size coastline
+    // isn't, so only that end gets a fade. Motion is purely a wobble
+    // amplitude on the coastline, on its own clock, so it never touches the
+    // migration rate. Phase offsets where in that cycle the rings start,
+    // instead of translating the frame sideways.
+    const cycle = elapsed * values.speed / PERIOD + values.phase * 0.5;
+    const wobbleT = elapsed * 0.18;
+    const phaseNoise = values.phase * 3.1;
 
-    ctx.save();
-    ctx.translate(rcx, rcy);
-    ctx.rotate(theta);
-    ctx.translate(-rcx, -rcy);
+    const light = values.invert ? 0.14 : 0.86 - 0.24 * values.saturation;
+    const lineWidth = 0.45 + values.stroke * 0.35;
+    const baseAlpha = values.opacity * (values.invert ? 0.5 : 0.4);
+    // A floor radius so the innermost rings pile onto a small visible disc
+    // instead of a sub-pixel point — otherwise `lighter` has nothing to
+    // stack and the summit never reads as the brightest anchor.
+    const R0 = 0.05;
 
-    // Overdraw horizontally so rotation never reveals the canvas edge.
-    const margin = Math.max(canvas.width, canvas.height) * 0.4;
-
-    for (let b = 0; b < bands; b++) {
-      const f = b / (bands - 1 || 1);
-      const baseY = -margin + f * (canvas.height + margin * 2);
-
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, bl] = hslToRgb(h, s, values.invert ? 0.35 : 0.6);
-      ctx.strokeStyle = `rgba(${r},${g},${bl},${values.opacity})`;
+    for (let k = 0; k < rings; k++) {
+      let s = (k / rings + cycle) % 1;
+      if (s < 0) s += 1;
+      const radius = R * (R0 + (1 - R0) * Math.pow(s, gamma));
+      const coastFade = 1 - smoothstep(0.85, 1, s);
 
       const pts = [];
+      for (let i = 0; i <= RING_POINTS; i++) {
+        const theta = (i / RING_POINTS) * Math.PI * 2;
+        const wobble = 1 + Math.sin(theta * 3 + wobbleT + k * 0.4) * 0.05 * values.motion;
+        const rad = radius * shapeFactor(theta, s, phaseNoise) * wobble;
+        pts.push(rot(cx + Math.cos(theta) * rad, cy + Math.sin(theta) * rad));
+      }
+
+      const { h, s: sat } = paletteHsl(values, s);
+      const [r, g, bl] = hslToRgb(h, sat, light);
+      ctx.strokeStyle = `rgba(${r},${g},${bl},${Math.min(1, baseAlpha * coastFade)})`;
+      ctx.lineWidth = lineWidth;
       ctx.beginPath();
-      for (let x = -margin; x <= canvas.width + margin; x += STEP_PX) {
-        const n1 = simplex2(x * noiseScale + values.phase, baseY * noiseScale);
-        const n2 = simplex2(x * noiseScale + values.phase + 137, baseY * noiseScale + t);
-        let y = baseY + n1 * baseAmp + n2 * moveAmp;
-        let px = x;
-          if (x === -margin) ctx.moveTo(px, y);
-        else ctx.lineTo(px, y);
-        pts.push([px, y]);
-      }
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
-        ctx.globalAlpha = values.glow * 0.25;
-        ctx.stroke();
-        ctx.lineWidth = lineWidth;
-        ctx.globalAlpha = 1;
-      }
+      pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
       ctx.stroke();
       paths.push(pts);
     }
 
-    ctx.restore();
-
+    // Glow is a fallback for the anchor, off by default: one soft radial
+    // wash at the summit, not a per-ring underlay.
+    if (values.glow > 0) {
+      const [sx, sy] = rot(cx, cy);
+      const { h, s } = paletteHsl(values, 0);
+      const [r, g, bl] = hslToRgb(h, s, light);
+      const gr = (14 + 26 * values.glow) * (0.5 + 0.5 * values.scale);
+      const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${bl},${Math.min(1, 0.35 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${r},${g},${bl},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(sx, sy, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({
