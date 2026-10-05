@@ -115,8 +115,8 @@ having.
   2026-09-27.
 - [ ] Backfill CHANGELOG for everything merged since 1.5.0, then cut a
   release. **Partially done:** all of `v2`'s own work (Phase 1 renames,
-  Phase 2 conversion, Phase 3 presentation, Phase 4 materials) now has
-  entries under `[Unreleased]`. Still missing: the original home page and
+  Phase 2 conversion, Phase 3 presentation, Phase 4 materials, Phase 5
+  packaging) now has entries under `[Unreleased]`. Still missing: the original home page and
   specimen-grid gallery (Chunk 8), Wake's promotion and configuration
   (Chunk 12), and the pre-`v2` piece refinement passes (Chunks 11/17) —
   all shipped before this restructure and never changelogged. Cutting the
@@ -201,6 +201,16 @@ borrow wording.
 **Finish line:** each reads as its own idea, both at card size and in one
 sentence.
 
+**Status (2026-09-30): done, folded into the Phase 2 conversion.** Each
+piece changed its dominant gesture, not just its copy (`5683367`,
+`bc96383`, `e15832f`): `mooring` is one twisted rope rising into a loop,
+with no cables between anchors; `relay` is a branching canopy grown from
+one root, not a sphere; `globe` has latitude slices only, no meridians;
+`infall` is streamlines spiralling into a bright core, not a dark eye;
+`funnel` is seen side-on as narrowing ellipses, not a grid pulled into a
+bowl; `moire` uses straight-line gratings, no ripples. The "Close today"
+list above is the pre-conversion record.
+
 ## Phase 2 — Visual language: monochrome-first
 
 ### Chunk 2.1 — Write the house look
@@ -214,12 +224,18 @@ This is a short spec in `docs/`, not code. It covers:
   count, not stroke weight.
 - One legible object in the frame, with a declared text-safe zone.
 
+**Status (2026-09-27): done.** `docs/house-look.md` (`73d8037`), including
+a one-sentence brief per piece.
+
 ### Chunk 2.2 — A conformance check
 
 Extend `npm run collection-metrics` so defaults that break the house look
 fail loudly. Candidates are a default-saturation ceiling and an ink band.
 Keep it to what the metrics already measure; no new instrument unless
 needed.
+
+**Status (2026-09-27): done.** `npm run collection-check` (`490b777`),
+later made fair to monochrome pieces with a chroma floor (`30f9b50`).
 
 ### Chunks 2.3 onward — Convert the collection, ~3 pieces per chunk
 
@@ -304,14 +320,19 @@ review) before merge, not after.
 
 ## Phase 5 — Packaging
 
-- **5.1 Stills pack.** Square stills of every piece at its defaults,
-  produced by the build and offered as one download.
-- **5.2 `catalogue.md`.** One entry per piece: what it looks like, what it's
+- [x] **5.1 Stills pack.** Square stills of every piece at its defaults,
+  produced by the build and offered as one download. Done (`fa8c513`):
+  `stills/<slug>.png` at 800×800, zipped to `stills.zip`, linked from the
+  gallery intro.
+- [x] **5.2 `catalogue.md`.** One entry per piece: what it looks like, what it's
   for, its text-safe zone and its own controls. It is generated from
   `pieces.json` plus per-piece metadata so it can't drift, and written in
-  our own words.
-- **5.3 PNG export.** Check the size range and whether transparent-
-  background export works. Close any gap.
+  our own words. Done (`fa8c513`): controls come from each running piece's
+  `window.__LF_SPECS__`, not a hand list.
+- [x] **5.3 PNG export.** Check the size range and whether transparent-
+  background export works. Close any gap. Checked (`fa8c513`): 1x/2x/4x is
+  fine. Transparency doesn't work for any piece and isn't cheaply fixable,
+  so it's recorded under Known limitations rather than closed.
 
 ## Later
 
