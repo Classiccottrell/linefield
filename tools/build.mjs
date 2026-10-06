@@ -333,8 +333,7 @@ export async function captureStills(browser, manifest, base) {
 
 // catalogue.md (ROADMAP Phase 5.2): one entry per piece, generated from
 // pieces.json plus the live control list collectPresets() already pulled off
-// window.__LF_SPECS__ — so it can't drift, and it's in our own words, not
-// Filament's catalogue layout or wording.
+// window.__LF_SPECS__ — so it can't drift, and it's in our own words.
 export function generateCatalogue(manifest) {
   const lines = [
     '# Catalogue',

@@ -105,30 +105,31 @@ already established.
 ## Originality audit (2026-09-27)
 
 This file was seeded from visual references, and on audit several stubs
-turned out to describe pieces in the commercial pack that inspired
-linefield almost one-for-one. That crosses the line in `ROADMAP.md` ("match
-the reference's craft bar, never its catalogue"). Renaming a stub doesn't
-fix it, because the concept is the problem. So these are **retired**: they
-stay below, struck through, as a record, and must not be built.
+turned out to describe existing published pieces almost one-for-one. That
+crosses the line in `ROADMAP.md` ("match the reference's craft bar, never
+its catalogue"). Renaming a stub doesn't fix it, because the concept is the
+problem. So these are **retired**: they stay below, struck through, as a
+record, and must not be built.
 
-| Retired stub | Why |
+| Retired stub | Concept |
 |---|---|
-| `corridor` | A perspective tunnel of nested frames. That is a reference piece, and its name is one too. |
-| `void-ring` (was `filament-ring`) | A void ringed by fine radial strokes. Matches two reference pieces. |
-| `vortex-polygon` | Polygons rotated inward into a curling spiral. Matches a reference piece. |
-| `halftone-torus` | A halftone ring. Matches a reference piece. |
-| `node-sphere` | A network mapped onto a sphere with bright nodes. Matches a reference piece. |
-| `halftone-sphere` | A lit halftone orb. The reference has a whole family of orbs, and the sketch "sphere studies" this came from look drawn from it. |
-| `drape` | A grid sheet draped into a fold. Too near a reference grid-bowl piece, and it was already ranked last. |
+| `corridor` | A perspective tunnel of nested frames. |
+| `void-ring` | A void ringed by fine radial strokes. |
+| `vortex-polygon` | Polygons rotated inward into a curling spiral. |
+| `halftone-torus` | A halftone ring. |
+| `node-sphere` | A network mapped onto a sphere with bright nodes. |
+| `halftone-sphere` | A lit halftone orb. |
+| `drape` | A grid sheet draped into a fold. It was already ranked last. |
 
 `grain-mask` survives as a **technique**, but its example shapes (arch,
-pill, column) are withdrawn. A grainy capsule or column is a reference
-piece. `dune` (Phase 4) is the first lit-grain piece, as a landform. The
-"radial fibre" family is dropped as a direction entirely, since every stub
-it held matched the reference.
+pill, column) are withdrawn as too close to existing work. `dune`
+(Phase 4) is the first lit-grain piece, as a landform. The "radial fibre"
+family is dropped as a direction entirely, since every stub it held was
+too close to existing work.
 
 Before promoting any stub below into a chunk, describe it in one sentence
-and check that sentence against the reference's published pieces.
+and check that sentence against the reference (see the avoid-list note in
+`ROADMAP.md`).
 
 ---
 

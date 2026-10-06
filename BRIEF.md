@@ -2,9 +2,9 @@
 
 ## Goal
 Open-source library of self-contained, paste-and-run generative line-art
-HTML pieces usable as interactive website backgrounds. Free alternative to
-Filament. It matches that product's craft bar, not its catalogue: no reused
-piece names, copy, stills or code. See ROADMAP.md.
+HTML pieces usable as interactive website backgrounds. It aims for a high
+craft bar while staying original: no borrowed piece names, copy, stills
+or code. See ROADMAP.md.
 
 ## Non-Goals
 - Framework wrappers, WebGL, community submissions (out of scope for now)

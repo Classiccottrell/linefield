@@ -7,8 +7,8 @@ viewport (1280×800), not a law. A piece may break one rule if its chunk
 says why.
 
 The originality line in `ROADMAP.md` outranks everything here. This look is
-our own. The reference that inspired the project is monochrome and
-fine-lined too, but never open it to copy a composition. Write the piece's
+our own. The reference is monochrome and fine-lined too, but never
+open it to copy a composition. Write the piece's
 one-sentence description first, from the brief below, and build toward
 that sentence.
 

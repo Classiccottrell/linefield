@@ -310,8 +310,8 @@ persists exactly as before.
 ## Roadmap
 
 [ROADMAP.md](ROADMAP.md) is the live plan. It covers the gap analysis
-against the reference that inspired the project, the phases that close it,
-the line between matching that reference's craft and copying its catalogue,
+against a reference collection, the phases that close it, the line between
+matching that reference's craft and copying its catalogue,
 the limitations accepted along the way, and the constraints any new piece
 inherits. The delivery log for earlier work is archived in
 [docs/roadmap-history.md](docs/roadmap-history.md).

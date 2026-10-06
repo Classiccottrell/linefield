@@ -14,11 +14,10 @@ work it describes. Work goes one named chunk at a time (see
 
 ## The reference, and the line we don't cross
 
-linefield started as a free, MIT, self-hostable alternative to
-[Filament](https://vanta.supply/vault/filament) by Vanta Supply, a paid pack
-of 128 interactive line-art pieces in ten collections (see `BRIEF.md`). This
-roadmap sets out to meet that product's **craft bar**: its restraint,
-composition, line quality, and presentation.
+This roadmap measures linefield against an external reference collection,
+deliberately left unnamed in this repo. It sets out to meet that
+collection's **craft bar**: its restraint, composition, line quality, and
+presentation.
 
 It does **not** set out to reproduce its **catalogue**. Concretely:
 
@@ -30,31 +29,25 @@ It does **not** set out to reproduce its **catalogue**. Concretely:
 - Generic concepts are fine. Line art, wireframes, a hue slider, and a
   baked-HTML export are a genre, not a product. Naming and copy are ours.
 
-**Known overlap.** Six linefield pieces shared a name with a reference
-piece, a seventh contained one, and an INSPIRATION stub used the
-reference's product name. Chunk 1.1 renamed all eight (see its table).
-An audit of INSPIRATION then found five stubs, `corridor` among them, that
-describe reference pieces outright. Those were retired rather than renamed
-(see INSPIRATION's originality audit). Several live concepts are close as
-well (see Phase 1).
+**Known overlap.** Seven linefield piece names and one INSPIRATION stub
+name collided with the reference. Chunk 1.1 renamed all eight (see its
+table). An audit of INSPIRATION then retired several stubs that described
+reference pieces outright (see INSPIRATION's originality audit). Several
+live concepts were close as well (see Phase 1).
 
-Reference piece names seen on its product page on 2026-09-27, as a partial
-avoid-list. Sixteen come from its published stills, each with a named file
-and alt text: Meridian, Interference, Accretion, Corridor, Undertow, Signal,
-Richter, Event Horizon, Comma, Iris, Refract, Basin, Tether, Column,
-Synapse, Marble. Cortex is named in its "living orbs" section. Veil appears
-as its example piece file (`veil.html`) in its export section. That is 18 of
-its 128, so check its full published list before naming anything new.
+The avoid-list of reference piece names, and how to check a candidate name
+against it, are kept out of this repo on purpose: in the maintainer's
+untracked `.local/reference-avoid-list.md`. Check every new name there
+before using it.
 
 ---
 
 ## Gap analysis (observed 2026-09-27)
 
-Method: the reference's product page and published stills, compared against
-the live gallery at <https://classiccottrell.github.io/linefield/> and
+Method: the reference's public material, compared against the live
+gallery at <https://classiccottrell.github.io/linefield/> and
 `npm run collection-metrics` on `main` at `6be3d9c`. This only covers what
-was actually observed. Its carousel beyond the first frame and its FAQ
-answers did not load, so nothing here is inferred from them.
+was actually observed; nothing here is inferred.
 
 | | Reference | linefield today |
 |---|---|---|
@@ -62,16 +55,16 @@ answers did not load, so nothing here is inferred from them.
 | **Composition** | One legible object, centred in a square frame, surrounded by a lot of empty space. | Many edge-to-edge fields: `contour-grid`, `longwave`, `relay`, `rainfall`, `grain-field`, `moire`. |
 | **Line craft** | Hundreds of hairlines. Form emerges where they accumulate brightness. | Several pieces draw a few heavier strokes (`longwave`: seven ribbons; `mooring`: a handful of cables). |
 | **Materials** | A second family of soft, film-grain lit volumes alongside the linework. | Line, dot, glyph, ellipse and rectangle marks only. No lit-volume technique. `grain-field` is sparse specks. |
-| **Scale** | 128 pieces in ten named collections. | 18 pieces and a flat list of 15 tags. |
-| **Packaging** | Six exports, including ready-made stills of every piece, plus a `catalogue.md` describing every piece for AI tools. | Five exports (Source, AI prompt, Baked HTML, PNG 2x/4x, SVG). Gallery thumbnails, but no stills pack and no collection-level catalogue. |
-| **Presentation** | Art-first cards with one small monospace label. Tick-mark ruler sliders. A display sans paired with a mono label face. Restrained corner frame marks. | Cards carry a title, blurb, tags, three buttons and the same boilerplate paragraph. Standard range sliders. Monospace throughout. |
+| **Scale** | A much larger catalogue, grouped into named collections. | 18 pieces and a flat list of 15 tags. |
+| **Packaging** | Ready-made stills of every piece, and a per-piece catalogue. | Five exports (Source, AI prompt, Baked HTML, PNG 2x/4x, SVG). Gallery thumbnails, but no stills pack and no collection-level catalogue. |
+| **Presentation** | Art-first cards with one small label. Ruler-style sliders. A display face paired with a label face. | Cards carry a title, blurb, tags, three buttons and the same boilerplate paragraph. Standard range sliders. Monospace throughout. |
 
 **The biggest delta is palette.** Next are composition and line craft.
 All three show up in a single side-by-side glance, and closing them is what
 most of this roadmap is for.
 
-**Where linefield is already ahead, so keep it:** 16 shared controls to the
-reference's 12. Free and MIT. Wake. Drag-to-orbit on the 3D pieces. An
+**Where linefield is already ahead, so keep it:** more shared controls (16).
+Free and MIT. Wake. Drag-to-orbit on the 3D pieces. An
 automated gate suite (control audit, fresh/committed bake, source export,
 interactions, collection metrics) that the reference gives no sign of
 having.
@@ -103,8 +96,8 @@ having.
 - [x] `main` is clean at `6be3d9c`, and all 18 pieces are verified.
 - [x] Codex's uncommitted Sep-24 continuation is preserved on
   `codex-uncommitted-work-sep24` and opened as draft **PR #18** for review.
-  It is not merged: its `tether` (now `mooring`) rework converges on the
-  reference's own Tether, and it rewrites closed history.
+  It is not merged: its `tether` (now `mooring`) rework converges on a
+  reference piece, and it rewrites closed history.
 - [x] The draggable control panel (PR #17, `53dcfe9`) is documented in
   README and CHANGELOG.
 - [x] Chunk history is archived to `docs/roadmap-history.md`, and this
@@ -133,19 +126,18 @@ having.
 ### Chunk 1.1 — Rename the colliding pieces
 
 For each of `meridian`, `interference`, `accretion`, `event-horizon`,
-`tether` and `synapse` (and `orbital-veil`'s "Veil"), choose a new original
-name that isn't on the avoid-list. Check it against the reference's full
-published list. Then carry the new slug through `pieces.json`, the piece
+`tether` and `synapse` (and `orbital-veil`), choose a new original
+name that isn't on the avoid-list (see "The reference, and the line we
+don't cross"). Then carry the new slug through `pieces.json`, the piece
 folder, README, the gallery, downloads, thumbs, both home pages, the docs
-pages, the tests, the `collection-metrics` rows, and INSPIRATION's
-`filament-ring` stub.
+pages, the tests, the `collection-metrics` rows, and the INSPIRATION stub
+that is now `void-ring`.
 
 **Names: decided by the owner on 2026-09-27.** Checked on 2026-09-27
-against the reference's published stills path
-(`/filament/stills/<name>.webp`). All seven new names return 404, and a
-known reference name returns 200 as a control. That's strong evidence
-rather than proof, since not all 128 reference pieces may have public
-stills.
+against the reference's published stills (method in the avoid-list). None
+of the seven new names is there, and a known reference name is, as a
+control. That's strong evidence rather than proof, since not every
+reference piece has a public still.
 
 | Today | Candidate | Why |
 |---|---|---|
@@ -170,7 +162,7 @@ piece. Every internal link, test and doc uses the new slugs. The CHANGELOG
 records the broken URLs.
 
 **Status (2026-09-27): done.** The seven renames are merged into `v2`. The
-`filament-ring` stub became `void-ring`, but an audit of INSPIRATION showed
+stub whose name collided became `void-ring`, but an audit of INSPIRATION showed
 that renaming stubs misses the point. `corridor`, `void-ring`,
 `vortex-polygon`, `halftone-torus` and `node-sphere` each describe a
 reference piece's *concept*, not just its name, and `halftone-sphere` and
@@ -189,10 +181,10 @@ Close today:
 
 - `mooring`: slack cables between anchors.
 - `relay` and `globe`: wire spheres with nodes, and a lat/long sphere.
-  The reference's *Meridian* is itself a longitude globe.
+  A reference piece is itself a longitude globe.
 - `infall`: a concentric disc around a dark eye.
-- `funnel`: a grid pulled into a well. That's nearer the reference's
-  *Basin* ("grid draped into a … bowl") than its Event Horizon.
+- `funnel`: a grid pulled into a well. That's close to a reference
+  piece built from a grid draped into a bowl.
 - `moire`: two ripple families.
 
 Compare against the reference's descriptions to spot overlap, never to
@@ -273,7 +265,7 @@ review) before merge, not after.
   instead of on every card.
 - [x] **3.2 Type system.** Red Hat Display (display+body), Rosarivo italic
   (editorial accents) and the system mono stack (labels), sourced from the
-  ClassicCottrell design system rather than the reference's trio. Loaded
+  ClassicCottrell design system rather than the reference's typefaces. Loaded
   only on site pages (gallery, home, docs) — `pieces/` and `shared/` stay
   dependency-free. This is also the natural first step toward Forma
   alignment.
@@ -315,7 +307,7 @@ review) before merge, not after.
 - **4.3 Masking** (`grain-mask`, with a shape of our own) comes next.
 - **"Radial fibre" is dropped.** Every stub it held matched a reference
   piece (see INSPIRATION's audit).
-- **Growth is by quality, not a count.** There is no 128 target. Every new
+- **Growth is by quality, not a count.** There is no target count. Every new
   piece clears the originality line and the collection constraints.
 
 ## Phase 5 — Packaging
