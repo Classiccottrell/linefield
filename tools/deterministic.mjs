@@ -1,6 +1,7 @@
 // tools/deterministic.mjs
 //
-// Shared by tools/build.mjs (thumbnail capture) and tools/audit-controls.mjs.
+// Shared by tools/build.mjs (thumbnail capture), tools/audit-controls.mjs,
+// tools/test-interactions.mjs and both bake gates (test-baked, test-bake-fresh).
 // Freezes Math.random and the animation clock so two identical-settings
 // renders are pixel-identical: no queue-emptying/backgrounding noise floor,
 // and no per-run PNG churn when nothing actually changed.

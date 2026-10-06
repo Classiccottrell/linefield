@@ -76,11 +76,17 @@
      brief warned about; the hairline grid is the part that actually
      scales. Grouped by collection: a full-width `.group-head` precedes
      each collection's cards (see JS below for how a chip filter hides
-     them). */
+     them).
+     The hairlines are each cell's own 1px outline, not a line-coloured
+     grid background showing through the gap: a collection whose count
+     doesn't fill its last row would otherwise paint its empty cells as a
+     solid line-coloured block. With gap:1px, neighbouring outlines land
+     on the same pixel and read as one hairline. */
   .grid{
-    display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
-    margin:36px 0 0;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+    display:grid;gap:1px;margin:37px 1px 1px;
+    grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
   }
+  .group-head,.card{outline:1px solid var(--line)}
   .group-head{
     grid-column:1/-1;margin:0;padding:22px 16px 10px;background:var(--bg);
     font:600 12px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--link);

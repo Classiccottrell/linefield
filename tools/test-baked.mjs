@@ -7,6 +7,7 @@ import { chromium } from 'playwright';
 import { readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DETERMINISTIC_INIT, stepFrames } from './deterministic.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const VARIANCE_MIN = 4;
@@ -22,6 +23,11 @@ const failures = [];
 try {
   for (const file of files) {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    // Deterministic clock and RNG (tools/deterministic.mjs), stepped to the
+    // same frame the build captures: a live wall-clock wait made sparse
+    // pieces flaky here (rainfall measured 3.91 against the floor of 4 once
+    // in CI, depending on how many drops were on screen at that instant).
+    await ctx.addInitScript(DETERMINISTIC_INIT);
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
@@ -29,7 +35,7 @@ try {
     // Loaded over file:// with no server, from a directory that has no
     // shared/ sibling — the promise a baked export makes.
     await page.goto(`file://${join(ROOT, 'downloads', file)}`, { waitUntil: 'load' });
-    await page.waitForTimeout(2500);
+    await stepFrames(page);
     const variance = await page.evaluate(() => {
       const c = document.querySelector('#canvas');
       if (!c) return -1;
