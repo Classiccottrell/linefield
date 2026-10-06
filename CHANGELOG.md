@@ -98,6 +98,22 @@ That includes the home page, the specimen-grid gallery, the docs pages,
 Wake's configuration, and the piece refinement passes. Backfilling them is
 a Phase 0 item in `ROADMAP.md`.
 
+### Fixed
+
+- The gallery no longer paints empty grid cells as solid grey blocks.
+  Collections whose count doesn't fill their last row (Currents and
+  Volumes have five, Codes has two) showed the grid's line-coloured
+  background through every missing card. Each card and heading now draws
+  its own 1px outline, so the hairlines look the same and empty cells stay
+  page-coloured.
+- `test-baked` and `test-bake-fresh` no longer flake on sparse pieces.
+  Both measured one live frame after a 2.5s wall-clock wait, so
+  `rainfall` passed or failed depending on how many drops happened to be on
+  screen (3.91 against the blank floor of 4, once in CI). They now use the
+  deterministic clock and RNG the build, the control audit and the
+  interaction tests already use, stepped to the frame the build captures;
+  `rainfall` reads 6.4 on every run.
+
 ## [1.5.0] — 2026-09-12
 
 ### Changed

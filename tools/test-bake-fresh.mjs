@@ -34,6 +34,7 @@ import { readFileSync, existsSync, statSync, readdirSync, mkdtempSync, rmSync } 
 import { join, dirname, extname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { DETERMINISTIC_INIT, stepFrames } from './deterministic.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json' };
@@ -112,12 +113,17 @@ try {
     // committed one: over file://, no server, from a directory with no
     // shared/ sibling — the promise a baked export makes.
     const runCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    // Deterministic clock and RNG (tools/deterministic.mjs), stepped to the
+    // same frame the build captures: a live wall-clock wait made sparse
+    // pieces flaky here (rainfall measured 3.91 against the floor of 4 once
+    // in CI, depending on how many drops were on screen at that instant).
+    await runCtx.addInitScript(DETERMINISTIC_INIT);
     const runPage = await runCtx.newPage();
     const runErrors = [];
     runPage.on('pageerror', (e) => runErrors.push(String(e)));
     runPage.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('favicon')) runErrors.push(m.text()); });
     await runPage.goto(`file://${bakedPath}`, { waitUntil: 'load' });
-    await runPage.waitForTimeout(2500);
+    await stepFrames(runPage);
     const variance = await runPage.evaluate(() => {
       const c = document.querySelector('#canvas');
       if (!c) return -1;
