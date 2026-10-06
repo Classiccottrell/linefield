@@ -245,12 +245,15 @@ if (process.argv.includes('--self-test')) {
   if (process.argv.includes('--check')) {
     check(pieces.map((p) => { const m = measure(p.slug); return { ...m, saturation: m.checkSaturation }; }), OVERRIDES);
   } else {
-    const rows = pieces.map((p) => measure(p.slug)).sort((a, b) => a.hue - b.hue);
+    // Sorted by ink: with every default monochrome, hue no longer separates
+    // pieces. Both saturation figures print so the gated one (check) is
+    // never confused with the raw one again.
+    const rows = pieces.map((p) => measure(p.slug)).sort((a, b) => a.ink - b.ink);
 
-    console.log('| Hue | Sat | Ink | Piece |');
-    console.log('|---:|---:|---:|---|');
+    console.log('| Hue | Sat (raw) | Sat (check) | Ink | Piece |');
+    console.log('|---:|---:|---:|---:|---|');
     for (const r of rows) {
-      console.log(`| ${r.hue} | ${r.saturation.toFixed(2)} | ${r.ink.toFixed(3)} | \`${r.slug}\` |`);
+      console.log(`| ${r.hue} | ${r.saturation.toFixed(2)} | ${r.checkSaturation.toFixed(2)} | ${r.ink.toFixed(3)} | \`${r.slug}\` |`);
     }
   }
 }

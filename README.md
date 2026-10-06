@@ -242,6 +242,7 @@ npm run build            # NOT run in CI — verify, then regenerate thumbs/ and
 # blank line below, which do not run in CI. The first two are curation tools
 # with no pass/fail gate — read their output yourself, nothing exits nonzero.
 npm run verify          # check pieces.json / pieces/ / README agree; no generation
+npm run collection-check # house look: default sat ≤ 0.06, ink 0.03–0.15 (heroes ≤ 0.035), from committed thumbs/
 node tools/test-presets.mjs <slug>   # preset mechanism (one piece) + value/enum gate (all pieces, regardless of <slug>)
 npm run test-bake-fresh  # bakes every piece live, rather than reading committed downloads/
 npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
@@ -251,7 +252,6 @@ npm run audit-controls   # empirically check every shared+piece control moves pi
 
 node tools/preset-sheet.mjs <slug>   # NOT run in CI — render a piece's presets for review
 npm run collection-metrics           # NOT run in CI — hue/sat/ink per piece, as ROADMAP's table
-npm run collection-check             # NOT run in CI yet, but DOES exit non-zero — house-look sat ≤ 0.06, ink 0.03–0.15 (heroes ≤ 0.035); CI wiring after Phase 2 converts the pieces
 ```
 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
@@ -287,9 +287,10 @@ and reads `window.__LF_SPECS__`, not DOM position, so it survives whatever
 widget a control renders as.
 
 `tools/collection-metrics.mjs` measures the collection's spread — each
-piece's colourfulness-weighted mean hue, mean saturation, and ink coverage
-(the fraction of the frame it marks) — and prints ROADMAP's "Collection
-constraints" table ready to paste. It decodes the committed
+piece's colourfulness-weighted mean hue, mean saturation (raw, and the
+chroma-floored figure the check gates on), and ink coverage (the fraction
+of the frame it marks) — and prints ROADMAP's "Collection constraints"
+table, sorted by ink, ready to paste. It decodes the committed
 `thumbs/<slug>.png` itself with `node:zlib`, so it needs no browser and no
 dependency, and it measures what was last built: run `npm run build` first
 if a piece changed. There is no pass/fail gate — it answers "where is the

@@ -249,7 +249,7 @@ later made fair to monochrome pieces with a chroma floor (`30f9b50`).
 
 `rainfall` and `grain-field` are the home-page heroes. Their low ink stayed
 load-bearing for headline legibility through the conversion (`rainfall`
-ink 0.007, `grain-field` 0.029).
+ink 0.006, `grain-field` 0.029).
 
 **Finish line: met.** `node tools/collection-metrics.mjs --check` passes
 all 20 pieces, zero overrides. The contact sheet below reads as one
@@ -358,44 +358,45 @@ review) before merge, not after.
 ## Collection constraints
 
 Every row is **generated**, not hand-recorded. Run `npm run collection-metrics`
-and paste its output here. Rebuild thumbnails (`npm run build`) first, because
-it measures the committed PNGs. Refreshed 2026-09-30 on `v2` at `be37c0b`,
-after every piece converted to the house look.
+and paste its output here verbatim; it prints this exact table, already
+sorted by ink. Rebuild thumbnails (`npm run build`) first, because it
+measures the committed PNGs. Refreshed 2026-10-05 on `v2`.
 
 **Hue is no longer a useful column, and that's success, not a gap.** Every
-piece now reports hue 240 — that's not a real colour, it's the achromatic
-floor (chroma ≤ 3) reading the ground's own faint blue tint, because no
-piece has any real chroma left to measure at its default. The table below
-is sorted by ink instead, which (with saturation) is what Phase 2 said
-would become the differentiating axis once hue stopped being one.
+piece now reports hue 240 — that's not a real colour, it's the ground's own
+faint blue tint, because no piece has any real chroma left at its default.
+Ink, not hue, is now the axis that tells pieces apart.
 
-| Sat (check) | Ink | Piece |
-|---:|---:|---|
-| 0.13 | 0.006 | `rainfall` |
-| 0.03 | 0.029 | `grain-field` |
-| 0.12 | 0.037 | `lacuna` |
-| 0.08 | 0.037 | `cipher-bloom` |
-| 0.05 | 0.045 | `relay` |
-| 0.11 | 0.044 | `flow-field` |
-| 0.04 | 0.049 | `funnel` |
-| 0.10 | 0.049 | `contour-grid` |
-| 0.08 | 0.049 | `orbitals` |
-| 0.05 | 0.056 | `mooring` |
-| 0.12 | 0.060 | `wireframe-lattice` |
-| 0.03 | 0.059 | `dune` |
-| 0.04 | 0.071 | `swell` |
-| 0.07 | 0.102 | `infall` |
-| 0.12 | 0.082 | `driftwork` |
-| 0.06 | 0.088 | `pleat` |
-| 0.14 | 0.098 | `globe` |
-| 0.08 | 0.116 | `moire` |
-| 0.06 | 0.136 | `longwave` |
-| 0.12 | 0.138 | `parallax` |
+| Hue | Sat (raw) | Sat (check) | Ink | Piece |
+|---:|---:|---:|---:|---|
+| 240 | 0.13 | 0.00 | 0.006 | `rainfall` |
+| 240 | 0.13 | 0.00 | 0.029 | `grain-field` |
+| 240 | 0.12 | 0.00 | 0.037 | `lacuna` |
+| 240 | 0.08 | 0.00 | 0.037 | `cipher-bloom` |
+| 240 | 0.11 | 0.00 | 0.044 | `flow-field` |
+| 240 | 0.05 | 0.00 | 0.045 | `relay` |
+| 240 | 0.08 | 0.00 | 0.049 | `orbitals` |
+| 240 | 0.06 | 0.00 | 0.049 | `funnel` |
+| 240 | 0.10 | 0.00 | 0.049 | `contour-grid` |
+| 240 | 0.05 | 0.00 | 0.056 | `mooring` |
+| 240 | 0.03 | 0.00 | 0.059 | `dune` |
+| 240 | 0.12 | 0.00 | 0.060 | `wireframe-lattice` |
+| 240 | 0.04 | 0.00 | 0.071 | `swell` |
+| 240 | 0.12 | 0.00 | 0.082 | `driftwork` |
+| 240 | 0.06 | 0.00 | 0.088 | `pleat` |
+| 240 | 0.14 | 0.00 | 0.098 | `globe` |
+| 240 | 0.07 | 0.00 | 0.102 | `infall` |
+| 240 | 0.08 | 0.00 | 0.116 | `moire` |
+| 240 | 0.06 | 0.00 | 0.136 | `longwave` |
+| 240 | 0.12 | 0.00 | 0.138 | `parallax` |
 
-Sat here is the check-mode figure (chroma-floored; see Chunk 2.2) — this is
-what `collection-check` actually gates on, not the raw figure
-`collection-metrics`' plain table prints. Every row is comfortably under
-the §1 ceiling of 0.06 or at it (`longwave` 0.06 is the closest).
+**Sat (check)** is what `collection-check` gates on (chroma-floored; see
+Chunk 2.2), against the §1 ceiling of 0.06. It reads 0.00 for every piece:
+once the floor discounts anti-aliased edges over the ground, no default
+has any colour. **Sat (raw)** is the unfloored figure, kept for comparison
+with older tables. An earlier copy of this table printed the raw figures
+under the "check" label, hand-sorted out of ink order. The tool now prints
+both columns, so the table can be pasted instead of assembled.
 
 **`longwave` and `mooring`, the pair flagged as weakest before conversion,
 now read distinctly.** `longwave` is a wide, flat, fanned band with pinch
@@ -473,6 +474,15 @@ what's actually on the canvas, so there's no transparent region to export.
 Giving every piece a real alpha channel means tracking ink separately from
 background through each one's own compositing — a render-architecture
 change across all 20 pieces, not a Phase 5 packaging fix. Not chased here.
+
+**`flow-field`'s still isn't byte-stable across rebuilds.** Two back-to-back
+builds on 2026-10-05 produced identical thumbnails, downloads, gallery and
+catalogue, and identical stills for 19 pieces. `stills/flow-field.png`
+differed, so `stills.zip` did too. Its half-scale thumbnail is stable, so
+the cause is something in the full-resolution capture, not yet
+diagnosed. The cost is a spurious diff on those two files after a rebuild;
+revert them if `flow-field` wasn't touched. The zip itself is
+deterministic (pinned timestamps, sorted entries).
 
 **`pieces/_template/` has no automated coverage.** It's excluded from
 `pieces.json`, so every manifest-driven gate skips it. Only CONTRIBUTING's

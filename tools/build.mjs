@@ -9,7 +9,7 @@
 //   node tools/build.mjs               verify, then generate everything
 //   node tools/build.mjs --verify-only verify and stop
 
-import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync, rmSync, utimesSync } from 'node:fs';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DETERMINISTIC_INIT, stepFrames } from './deterministic.mjs';
@@ -116,13 +116,16 @@ export function verifyManifest() {
   // must never name a slug that doesn't exist — this fails loudly under
   // --verify-only, before a browser is ever launched, same tier as the
   // README/pieces.json agreement checks above.
-  let collections = [];
+  // null only when the file failed to load. An empty array still runs the
+  // checks below, so `[]` flags every piece as unclaimed instead of
+  // passing and building a gallery with no cards.
+  let collections = null;
   try {
     collections = loadCollections();
   } catch (err) {
     errors.push(`collections.json is missing or invalid JSON: ${err.message}`);
   }
-  if (collections.length) {
+  if (collections) {
     const ownerOf = new Map(); // slug -> collection id that already claimed it
     for (const c of collections) {
       for (const slug of c.slugs) {
@@ -294,6 +297,11 @@ export async function captureThumbnails(browser, manifest, base) {
 // instead of calling it (a pre-existing wart, out of scope here); this new
 // path calls the real helper rather than adding a third copy.
 export async function captureStills(browser, manifest, base) {
+  // Start empty: a renamed or removed piece's old PNG must not survive in
+  // stills/ or in the zip (`zip -r` adds to an existing archive, never
+  // removes from it).
+  rmSync(join(ROOT, 'stills'), { recursive: true, force: true });
+  rmSync(join(ROOT, 'stills.zip'), { force: true });
   mkdirSync(join(ROOT, 'stills'), { recursive: true });
   for (const p of manifest) {
     await withPage(browser, `${base}/pieces/${p.slug}/`, async (page) => {
@@ -310,8 +318,16 @@ export async function captureStills(browser, manifest, base) {
   // One download: zip the stills directory. `zip` is a standard macOS/Linux/CI
   // CLI tool — no archiver dependency added for this. Committed (not built
   // on-demand) because GitHub Pages serves static files only.
-  const { execSync } = await import('node:child_process');
-  execSync(`cd ${join(ROOT, 'stills')} && zip -q -X -r ../stills.zip .`, { stdio: 'inherit' });
+  // Pinned mtimes and a sorted file list keep the zip byte-identical across
+  // rebuilds when no still changed (CONTRIBUTING promises an unrelated
+  // build is a no-op). ponytail: zip stores local-time stamps, so the bytes
+  // match per timezone, which is enough since the build never runs in CI.
+  const { execFileSync } = await import('node:child_process');
+  const dir = join(ROOT, 'stills');
+  const files = readdirSync(dir).sort();
+  const epoch = new Date('2000-01-01T00:00:00Z');
+  for (const f of files) utimesSync(join(dir, f), epoch, epoch);
+  execFileSync('zip', ['-q', '-X', '../stills.zip', ...files], { cwd: dir, stdio: 'inherit' });
   console.log('  stills.zip');
 }
 
