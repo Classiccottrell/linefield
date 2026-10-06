@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — relay</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  // relay — a branching network grown from one root into a single rounded
+  // canopy, with a slow pulse climbing from root to tips and lighting each
+  // branch point as it passes.
+  //
+  // A branch is drawn as a bundle of hairlines, as many as it has tips above
+  // it up to a cap: single threads at the edge of the canopy, a dense bright
+  // trunk gathered into its root.
+  //
+  // Text-safe zone: the left third of the frame. The tree stands right of
+  // centre, inside the central square.
+  // Anchor: the root and lower trunk, bottom centre-right, where every
+  // hairline converges and brightens additively. Glow adds a halo only when
+  // asked for.
+  const PIECE_ID = 'relay';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const PULSE_PERIOD = 10;  // seconds for the pulse to climb root -> tips at speed 1
+  const SWAY_PERIOD = 12;   // seconds per sway cycle (Motion's gesture)
+  const BANDS = 4;          // colour bands, root -> tips
+  const LEVELS = 8;         // brightness levels (pulse x fork squeeze)
+  const GAIN_MIN = 0.3;
+  const GAIN_MAX = 2.2;
+  let paths = [];
+
+  // Own seeded PRNG: the canopy is a designed silhouette, so it grows the
+  // same way on every load instead of depending on Math.random.
+  function mulberry32(a) {
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Grows the topology in unit space (root at 0,0, up is -y, height ~1).
+  // Segments come out parent-before-child; tips are numbered left to right,
+  // and each segment knows the contiguous range of tips it carries.
+  const CANOPY = { cx: 0, cy: -0.6, rx: 0.56, ry: 0.42 };
+  function growTree(maxDepth, spreadDeg) {
+    const rnd = mulberry32(0x7e1a7);
+    const spread = (spreadDeg * Math.PI) / 180;
+    const segs = [];
+    const inCanopy = (x, y) => ((x - CANOPY.cx) / CANOPY.rx) ** 2 + ((y - CANOPY.cy) / CANOPY.ry) ** 2 <= 1;
+    function add(parent, rel, len, depth, x0, y0, absAng, dist) {
+      const ang = absAng + rel;
+      const x1 = x0 + Math.sin(ang) * len;
+      const y1 = y0 - Math.cos(ang) * len;
+      const seg = { parent, rel, len, depth, bend: (rnd() - 0.5) * 0.16, dist0: dist, dist1: dist + len, children: [] };
+      const idx = segs.push(seg) - 1;
+      if (parent >= 0) segs[parent].children.push(idx);
+      const stop = depth >= maxDepth || (depth >= 3 && rnd() < 0.05) || (depth >= 2 && !inCanopy(x1, y1));
+      if (stop) return;
+      // Tropism: children lean back toward vertical, which rounds the crown.
+      const lean = -ang * 0.18;
+      const kids = [];
+      if (depth >= 1 && rnd() < 0.35) {
+        // Leader split: one child carries on, the other peels away.
+        const side = rnd() < 0.5 ? -1 : 1;
+        kids.push([side * spread * (0.2 + 0.25 * rnd()) + lean, 0.84]);
+        kids.push([-side * spread * (1.1 + 0.5 * rnd()) + lean, 0.62]);
+      } else {
+        kids.push([-spread * (0.7 + 0.5 * rnd()) + lean, 0.74 + 0.08 * rnd()]);
+        kids.push([spread * (0.7 + 0.5 * rnd()) + lean, 0.74 + 0.08 * rnd()]);
+      }
+      kids.sort((a, b) => a[0] - b[0]); // left child first, so tips run left to right
+      for (const [r, k] of kids) add(idx, r, len * k * (0.9 + 0.2 * rnd()), depth + 1, x1, y1, ang, dist + len);
+    }
+    add(-1, 0, 0.3, 0, 0, 0, 0, 0);
+    // Tip ranges, walked children-first from the end (children follow parents).
+    const tipsOf = [];
+    let next = 0;
+    (function number(i) {
+      const s = segs[i];
+      s.tip0 = next;
+      if (!s.children.length) { tipsOf.push(i); next++; }
+      for (const c of s.children) number(c);
+      s.tip1 = next;
+    })(0);
+    let maxDist = 0;
+    for (const s of segs) maxDist = Math.max(maxDist, s.dist1);
+    // Root-to-tip segment chain for each tip.
+    const chains = tipsOf.map((i) => {
+      const chain = [];
+      for (let j = i; j >= 0; j = segs[j].parent) chain.push(j);
+      return chain.reverse();
+    });
+    return { segs, chains, maxDist };
+  }
+
+  let tree = null;
+  let treeKey = '';
+
+  const PRESETS = {
+    whisper: { opacity: 0.6, stroke: 0.6, density: 0.55, spread: 22, scale: 0.85 },
+    ink:     { opacity: 1, stroke: 1.3, density: 0.85, glow: 0, spread: 20, motion: 0.4 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.75, stroke: 0.8, density: 0.9, speed: 0.4, motion: 1.8, spread: 34 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.5, glow: 0.5, spread: 22, scale: 1.15 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      { name: 'spread', label: 'Spread', type: 'range', min: 8, max: 45, step: 1, default: 25, category: 'visual' },
+    ],
+    defaults: { hue: 150, hueB: 50, saturation: 0, colorMode: 'gradient', colorA: '#00ff80', colorB: '#ffd500' },
+  });
+  const currentValues = baked || panel.values;
+
+  function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, W, H);
+    // Additive on the dark ground so the bundles brighten where they
+    // gather; plain alpha on the light (inverted) ground.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at a shared point (alpha buckets), and round caps
+    // would overlap there and add up to a bright bead under 'lighter'.
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+
+    // Depth 5..9 from density: 32 to ~500 tips. Grown once per setting,
+    // not per frame (and not in onChange, which a baked export never fires).
+    const maxDepth = Math.max(5, Math.min(9, Math.round(4.5 + 3.5 * values.density)));
+    const key = `${maxDepth}|${values.spread}`;
+    if (key !== treeKey) { tree = growTree(maxDepth, values.spread); treeKey = key; }
+    const { segs, chains, maxDist } = tree;
+
+    paths = [];
+    const S = Math.min(W, H);
+    const size = 0.4 + 0.6 * values.scale;
+    const unit = S * 0.66 * size;           // px per unit of tree height
+    const rootX = W / 2 + 0.12 * S;
+    const rootY = H / 2 + 0.5 * unit;
+    const t = elapsed * values.speed;
+    const phaseOff = values.phase * Math.PI;
+    const swayT = (t / SWAY_PERIOD) * Math.PI * 2;
+    const swayAmp = 0.05 * values.motion;
+    // Angle turns the whole tree about the middle of its canopy.
+    const th = (values.angle * Math.PI) / 180;
+    const pivX = rootX + CANOPY.cx * unit;
+    const pivY = rootY + CANOPY.cy * unit;
+    const cth = Math.cos(th), sth = Math.sin(th);
+    const place = (x, y) => [pivX + (x - pivX) * cth - (y - pivY) * sth, pivY + (x - pivX) * sth + (y - pivY) * cth];
+
+    // Forward kinematics with a slow sway that grows toward the tips.
+    const P = new Array(segs.length);
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      const par = s.parent >= 0 ? P[s.parent] : null;
+      const sway = swayAmp * (s.depth / 6) * Math.sin(swayT - s.depth * 0.5 + phaseOff);
+      const ang = (par ? par.ang : 0) + s.rel + sway;
+      const x0 = par ? par.x1 : rootX;
+      const y0 = par ? par.y1 : rootY;
+      const len = s.len * unit;
+      const x1 = x0 + Math.sin(ang) * len;
+      const y1 = y0 - Math.cos(ang) * len;
+      P[i] = { ang, x0, y0, x1, y1, len, nx: Math.cos(ang), ny: Math.sin(ang) };
+    }
+
+    // The pulse front, as a fraction of root-to-tip distance. It runs a
+    // little past both ends so the root and the outermost tips both light.
+    const pulse = (((t / PULSE_PERIOD + values.phase * 0.5) % 1) + 1) % 1 * 1.3 - 0.12;
+    const litAt = (d) => Math.exp(-(((d / maxDist - pulse) / 0.07) ** 2));
+
+    const light = values.invert ? 0.14 : 0.86 - 0.24 * values.saturation;
+    const lineWidth = 0.45 + values.stroke * 0.35;
+    const baseAlpha = values.opacity * (values.invert ? 0.4 : 0.6);
+    // A branch is a bundle of up to CAP hairlines, as wide as it has
+    // hairlines. Each segment's bundle starts inside its share of the
+    // parent's bundle and eases out to its own width, so bundles part at
+    // every fork and gather toward the trunk.
+    // The cap rides density too, so the top of the slider (where depth has
+    // already reached 9) still thickens the bundles.
+    const CAP = Math.round(6 + 6 * values.density);
+    const gap = 1.1 + values.stroke * 0.3; // px between neighbouring hairlines
+    const widthOf = (s) => Math.min(s.tip1 - s.tip0, CAP) * gap;
+
+    const buckets = Array.from({ length: BANDS }, () => Array.from({ length: LEVELS }, () => []));
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      const p = P[i];
+      const m = Math.min(s.tip1 - s.tip0, CAP);
+      const wEnd = widthOf(s);
+      let lo, hi, snx, sny;
+      if (s.parent >= 0) {
+        const ps = segs[s.parent];
+        const pc = ps.tip1 - ps.tip0;
+        const pw = widthOf(ps);
+        lo = ((s.tip0 - ps.tip0) / pc - 0.5) * pw;
+        hi = ((s.tip1 - ps.tip0) / pc - 0.5) * pw;
+        snx = P[s.parent].nx;
+        sny = P[s.parent].ny;
+      } else {
+        // The root gathers the trunk's hairlines in tight: the anchor.
+        lo = -0.06 * wEnd;
+        hi = 0.06 * wEnd;
+        snx = p.nx;
+        sny = p.ny;
+      }
+      const cx = (p.x0 + p.x1) / 2 + p.nx * s.bend * p.len;
+      const cy = (p.y0 + p.y1) / 2 + p.ny * s.bend * p.len;
+      const n = Math.max(3, Math.ceil(p.len / 7));
+      // A capped bundle leaving a fork starts squeezed into its share of the
+      // parent's width; dim it by the squeeze so forks don't flare brighter
+      // than the root. The root's own squeeze is left bright: it's the anchor.
+      const squeeze = s.parent >= 0 ? Math.max(1, wEnd / Math.max(1e-6, hi - lo)) : 1;
+      for (let k = 0; k < m; k++) {
+        const fr = (k + 0.5) / m;
+        const o0 = lo + (hi - lo) * fr;
+        const o1 = (fr - 0.5) * wEnd;
+        const strand = [];
+        let run = null, runKey = -1;
+        for (let j = 0; j <= n; j++) {
+          const u = j / n;
+          const e = u * u * (3 - 2 * u);
+          const bx = (1 - u) * (1 - u) * p.x0 + 2 * u * (1 - u) * cx + u * u * p.x1;
+          const by = (1 - u) * (1 - u) * p.y0 + 2 * u * (1 - u) * cy + u * u * p.y1;
+          const [x, y] = place(
+            bx + snx * o0 * (1 - e) + p.nx * o1 * e,
+            by + sny * o0 * (1 - e) + p.ny * o1 * e,
+          );
+          strand.push([x, y]);
+          const d = s.dist0 + (s.dist1 - s.dist0) * u;
+          const band = Math.min(BANDS - 1, Math.floor((d / maxDist) * BANDS));
+          const gain = (1 + 0.6 * litAt(d)) * (1 / squeeze + (1 - 1 / squeeze) * e);
+          const level = Math.max(0, Math.min(LEVELS - 1, Math.floor(((gain - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)) * LEVELS)));
+          const bk = band * LEVELS + level;
+          if (!run || bk !== runKey) {
+            const last = run ? run[run.length - 1] : null;
+            if (run && run.length >= 2) buckets[Math.floor(runKey / LEVELS)][runKey % LEVELS].push(run);
+            run = last ? [last] : [];
+            runKey = bk;
+          }
+          run.push([x, y]);
+        }
+        if (run && run.length >= 2) buckets[Math.floor(runKey / LEVELS)][runKey % LEVELS].push(run);
+        paths.push(strand);
+      }
+    }
+
+    for (let b = 0; b < BANDS; b++) {
+      const { h, s } = paletteHsl(values, b / (BANDS - 1));
+      const [cr, cg, cb] = hslToRgb(h, s, light);
+      for (let lv = 0; lv < LEVELS; lv++) {
+        const runs = buckets[b][lv];
+        if (!runs.length) continue;
+        ctx.beginPath();
+        for (const run of runs) {
+          ctx.moveTo(run[0][0], run[0][1]);
+          for (let i = 1; i < run.length; i++) ctx.lineTo(run[i][0], run[i][1]);
+        }
+        const a = baseAlpha * (GAIN_MIN + ((lv + 0.5) / LEVELS) * (GAIN_MAX - GAIN_MIN));
+        if (values.glow > 0) {
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, a * values.glow * 0.15)})`;
+          ctx.lineWidth = lineWidth + values.glow * 2.2;
+          ctx.stroke();
+        }
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, a)})`;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+    }
+
+    // Branch points the pulse is passing: a small lit ring at each fork.
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      const lit = litAt(s.dist1);
+      if (lit < 0.05) continue;
+      const [x, y] = place(P[i].x1, P[i].y1);
+      const { h, s: sat } = paletteHsl(values, s.dist1 / maxDist);
+      const [cr, cg, cb] = hslToRgb(h, sat, light);
+      const r = (1.4 + 2.4 * lit + values.glow * 3 * lit) * (s.children.length ? 1 : 0.6);
+      ctx.fillStyle = `rgba(${cr},${cg},${cb},${Math.min(1, lit * values.opacity * 0.4)})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Glow is a fallback for the anchor, off by default.
+    if (values.glow > 0) {
+      const [x, y] = place(rootX, rootY - 0.08 * unit);
+      const { h, s } = paletteHsl(values, 0);
+      const [cr, cg, cb] = hslToRgb(h, s, light);
+      const gr = (16 + 30 * values.glow) * size;
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, gr);
+      grad.addColorStop(0, `rgba(${cr},${cg},${cb},${Math.min(1, 0.35 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

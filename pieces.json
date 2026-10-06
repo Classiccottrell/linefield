@@ -2,127 +2,181 @@
   {
     "slug": "flow-field",
     "title": "Flow Field",
-    "blurb": "Organic ribbons drifting along a simplex-noise vector field.",
-    "tags": ["flow"],
-    "hue": 200, "hueB": 280, "saturation": 0.6
+    "blurb": "Particles confined to one soft, organic region around a quiet central void, trailing hairlines that brighten only where they cross.",
+    "tags": ["flow", "organic"],
+    "hue": 200, "hueB": 280, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "band's inner edge, upper right"
   },
   {
     "slug": "contour-grid",
     "title": "Contour Grid",
-    "blurb": "Topographic bands undulating like breathing terrain.",
-    "tags": ["geometric"],
-    "hue": 35, "hueB": 15, "saturation": 0.5
+    "blurb": "The contour lines of one island, cropped as a single landform with its summit as the brightest point.",
+    "tags": ["topographic", "organic"],
+    "hue": 35, "hueB": 15, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "summit, right of centre"
   },
   {
-    "slug": "interference",
-    "title": "Interference",
-    "blurb": "Two concentric ring families crossing into moiré.",
-    "tags": ["optical"],
-    "hue": 185, "hueB": 320, "saturation": 0.75
+    "slug": "moire",
+    "title": "Moiré",
+    "blurb": "Two gratings of straight lines in one disc, rocking so broad moiré bands sweep across it.",
+    "tags": ["optical", "geometric"],
+    "safeZone": "outside the disc, widest on the left",
+    "anchor": "pinned band at the pivot, left of the disc's centre",
+    "hue": 185, "hueB": 320, "saturation": 0
   },
   {
-    "slug": "orbital-veil",
-    "title": "Orbital Veil",
-    "blurb": "Concentric arcs turning at different rates around one centre.",
-    "tags": ["orb"],
-    "hue": 265, "hueB": 330, "saturation": 0.55
+    "slug": "orbitals",
+    "title": "Orbitals",
+    "blurb": "A tilted ring of hairline arcs, each turning at its own rate, whose overlaps gather into one bright crescent that travels slowly round.",
+    "tags": ["orb", "kinetic"],
+    "hue": 265, "hueB": 330, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "crescent on the ring's near side, lower centre, travelling slowly round"
   },
   {
     "slug": "grain-field",
     "title": "Grain Field",
-    "blurb": "Fine drifting grain — the quietest piece, good behind text.",
-    "tags": ["grain"],
-    "hue": 30, "hueB": 210, "saturation": 0.12
+    "blurb": "Fine grain gathered into one soft drifting cloud with a long falloff — the quietest piece, and the home-page hero.",
+    "tags": ["grain", "hero"],
+    "hue": 30, "hueB": 210, "saturation": 0,
+    "safeZone": "left ~60%, clear of the hero copy",
+    "anchor": "cloud's centre, right of frame-centre"
   },
   {
     "slug": "wireframe-lattice",
     "title": "Wireframe Lattice",
-    "blurb": "A rigid 3D grid rippling in perspective.",
+    "blurb": "One finite lattice sheet with crisp edges, floating tilted in space and flexing, its fold catching the light where it turns edge-on.",
     "tags": ["geometric", "3d"],
-    "hue": 190, "hueB": 205, "saturation": 0.35
+    "hue": 190, "hueB": 205, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "fold crest, upper right, travelling across the sheet"
   },
   {
-    "slug": "meridian",
-    "title": "Meridian",
-    "blurb": "Seven long ribbons sweeping the full width.",
-    "tags": ["flow", "sparse"],
-    "hue": 150, "hueB": 180, "saturation": 0.5
+    "slug": "longwave",
+    "title": "Longwave",
+    "blurb": "A band of hairlines riding one long wave, pinching together at its nodes.",
+    "tags": ["flow"],
+    "safeZone": "upper left, above the band",
+    "anchor": "tightest node, just right of centre",
+    "hue": 150, "hueB": 180, "saturation": 0
   },
   {
-    "slug": "synapse",
-    "title": "Synapse",
-    "blurb": "Drifting nodes wired to their neighbours, pulsing.",
-    "tags": ["network", "dense"],
-    "hue": 75, "hueB": 45, "saturation": 0.7
+    "slug": "relay",
+    "title": "Relay",
+    "blurb": "A canopy of branching hairlines grown from one root, a pulse climbing to the tips.",
+    "tags": ["network", "organic"],
+    "hue": 150, "hueB": 50, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "root, bottom centre-right"
   },
   {
-    "slug": "accretion",
-    "title": "Accretion",
-    "blurb": "Matter spiralling inward to a bright core.",
-    "tags": ["orb", "dense"],
-    "hue": 10, "hueB": 40, "saturation": 0.8
+    "slug": "infall",
+    "title": "Infall",
+    "blurb": "Hairline streamlines spiralling into one small, bright core.",
+    "tags": ["orb", "flow"],
+    "safeZone": "left third",
+    "anchor": "core, right of centre",
+    "hue": 10, "hueB": 40, "saturation": 0
   },
   {
-    "slug": "tether",
-    "title": "Tether",
-    "blurb": "Heavy cables mooring to a single converging point.",
-    "tags": ["sparse"],
-    "hue": 220, "hueB": 250, "saturation": 0.25
+    "slug": "mooring",
+    "title": "Mooring",
+    "blurb": "One rope of twisted hairlines rising into a single loose loop; the crossing glows.",
+    "tags": ["organic", "flow"],
+    "hue": 12, "hueB": 48, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "loop crossing, lower centre-right"
   },
   {
-    "slug": "event-horizon",
-    "title": "Event Horizon",
-    "blurb": "A polar grid bent inward by a gravity well.",
-    "tags": ["3d", "orb"],
-    "hue": 285, "hueB": 230, "saturation": 0.6
+    "slug": "funnel",
+    "title": "Funnel",
+    "blurb": "A funnel seen side-on: stacked hairline ellipses narrowing to one bright tip, slowly twisting.",
+    "tags": ["3d", "geometric"],
+    "hue": 290, "hueB": 190, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "tip and lower stem, centre"
   },
   {
     "slug": "rainfall",
     "title": "Rainfall",
-    "blurb": "Sparse vertical streaks falling at their own speed, each with a brighter head.",
+    "blurb": "Sparse vertical streaks falling at their own speed, gathered in a veil that leaves the left third quiet.",
     "tags": ["sparse"],
-    "hue": 205, "hueB": 195, "saturation": 0.18
+    "safeZone": "left third",
+    "anchor": "brightest heads, right of centre",
+    "hue": 205, "hueB": 195, "saturation": 0
   },
   {
     "slug": "lacuna",
     "title": "Lacuna",
     "blurb": "Broken caustic arcs gather around an off-centre calm zone.",
     "tags": ["optical", "organic", "sparse"],
-    "hue": 198, "hueB": 224, "saturation": 0.24
+    "safeZone": "left third",
+    "anchor": "outermost arc's densest crossing, right of centre",
+    "hue": 198, "hueB": 224, "saturation": 0
   },
   {
     "slug": "parallax",
     "title": "Parallax",
-    "blurb": "A rose-to-amber fan parts around an unseen volume, with near strands slipping past finer distant lines.",
-    "tags": ["depth", "optical", "sparse"],
-    "hue": 344, "hueB": 24, "saturation": 0.3
+    "blurb": "Parallel diagonal lines part around an unseen volume, near strands heavier than the finer distant ones.",
+    "tags": ["depth", "optical"],
+    "safeZone": "upper-left corner",
+    "anchor": "near lines bending tightest around the invisible volume",
+    "hue": 344, "hueB": 24, "saturation": 0
   },
   {
     "slug": "cipher-bloom",
     "title": "Cipher Bloom",
-    "blurb": "Irregular glyphs gather into a bright oblique core, then dissolve into warm chalk and shadow.",
+    "blurb": "A compressed oblique band of shifting glyph fragments, drawing a small bright core along its own length.",
     "tags": ["glyph", "organic", "sparse"],
-    "hue": 42, "hueB": 76, "saturation": 0.22
+    "safeZone": "top and bottom thirds, clear of the band",
+    "anchor": "core, drifting along the band's centre",
+    "hue": 42, "hueB": 76, "saturation": 0
   },
   {
     "slug": "driftwork",
     "title": "Driftwork",
-    "blurb": "Violet-grey ellipse marks drift through two crossing currents, gathering and dissolving like woven air.",
+    "blurb": "Tangent-aligned ellipse links follow two crossing currents, brightening by accumulation where they meet.",
     "tags": ["organic", "depth", "kinetic"],
-    "hue": 250, "hueB": 278, "saturation": 0.16
+    "safeZone": "left third",
+    "anchor": "crossing, centre of the frame",
+    "hue": 250, "hueB": 278, "saturation": 0
   },
   {
     "slug": "pleat",
     "title": "Pleat",
-    "blurb": "Coral and ivory marks gather into two folded surfaces, divided by a clean cut of space.",
+    "blurb": "Two folded bands of ivory marks, divided by a clean cut of empty space where they don't touch.",
     "tags": ["geometric", "organic", "editorial"],
-    "hue": 12, "hueB": 38, "saturation": 0.3
+    "safeZone": "top, above the folded bands",
+    "anchor": "crease, where the two bands meet",
+    "hue": 46, "hueB": 54, "saturation": 0
   },
   {
     "slug": "globe",
     "title": "Globe",
-    "blurb": "A lat/long wire sphere spinning in true perspective, tilt and yaw draggable.",
+    "blurb": "A tilted sphere drawn only in parallel latitude slices, with no meridians, crowding and brightening toward one lit limb.",
     "tags": ["3d", "geometric"],
-    "hue": 105, "hueB": 130, "saturation": 0.4
+    "hue": 105, "hueB": 130, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "limb arc, upper right"
+  },
+  {
+    "slug": "dune",
+    "title": "Dune",
+    "blurb": "One wind-cut ridge built from film grain, its face caught by a low raking light and crossed by faint ripples.",
+    "tags": ["grain", "organic", "depth"],
+    "hue": 45, "hueB": 0, "saturation": 0,
+    "safeZone": "top band and upper right",
+    "anchor": "lit brink, centre"
+  },
+  {
+    "slug": "swell",
+    "title": "Swell",
+    "blurb": "A single ocean swell rising on a diagonal, drawn in halftone dots whose size carries the light on its face.",
+    "tags": ["geometric", "optical", "editorial"],
+    "hue": 185, "hueB": 250, "saturation": 0,
+    "safeZone": "lower left",
+    "anchor": "lip, upper right"
   }
 ]

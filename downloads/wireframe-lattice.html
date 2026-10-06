@@ -52,7 +52,7 @@
 .lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .lf-row:last-child { margin-bottom: 0; }
 .lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.lf-row label { font-size: 11px; color: #8a8a9a; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
 .lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
 .lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
 .lf-row-checkbox label { order: -1; }
@@ -62,18 +62,43 @@
   color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
   padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
 
-.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-  border-radius: 999px; background-color: #26262e;
-  background-image: linear-gradient(90deg,#2a4637,#437057 50%,#93bea6);
-  background-repeat: no-repeat; background-size: var(--lf-pct, 0%) 100%; cursor: pointer; }
-.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
-  border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6);
-  cursor: pointer; margin-top: 0; }
-.lf-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6); cursor: pointer; }
-.lf-row input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: transparent; }
-.lf-ticks { display: flex; justify-content: space-between; padding: 0 1px; margin-top: -1px; }
-.lf-ticks span { width: 2px; height: 2px; border-radius: 50%; background: #3a3a46; }
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
 
 .lf-color-row { display: flex; align-items: center; gap: 8px; }
 .lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
@@ -129,7 +154,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.35,"colorMode":"gradient","colorA":"#00d4ff","colorB":"#0095ff","hue":190,"hueB":205,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":32,"rotY":0};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#00d4ff","colorB":"#0095ff","hue":190,"hueB":205,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":36,"rotY":-28};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -222,7 +247,9 @@ const SHARED_CONTROLS = [
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1, category: 'color' },
-  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, category: 'color' },
+  // House look default is 0 (docs/house-look.md #1 — monochrome first); a
+  // piece pins its own saturation in its `defaults` block regardless.
+  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0, category: 'color' },
   // Solid/gradient palette. `colorA`/`colorB` are the authored controls a
   // user actually sees and drags; `hue`/`hueB` are hidden (no panel row) —
   // the exact numeric degrees every piece's render math still reads. Picking
@@ -292,7 +319,7 @@ const PANEL_CSS = `
 .lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .lf-row:last-child { margin-bottom: 0; }
 .lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.lf-row label { font-size: 11px; color: #8a8a9a; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
 .lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
 .lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
 .lf-row-checkbox label { order: -1; }
@@ -302,18 +329,43 @@ const PANEL_CSS = `
   color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
   padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
 
-.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-  border-radius: 999px; background-color: #26262e;
-  background-image: linear-gradient(90deg,#2a4637,#437057 50%,#93bea6);
-  background-repeat: no-repeat; background-size: var(--lf-pct, 0%) 100%; cursor: pointer; }
-.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
-  border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6);
-  cursor: pointer; margin-top: 0; }
-.lf-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6); cursor: pointer; }
-.lf-row input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: transparent; }
-.lf-ticks { display: flex; justify-content: space-between; padding: 0 1px; margin-top: -1px; }
-.lf-ticks span { width: 2px; height: 2px; border-radius: 50%; background: #3a3a46; }
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
 
 .lf-color-row { display: flex; align-items: center; gap: 8px; }
 .lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
@@ -745,10 +797,6 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
         input.value = values[spec.name];
         row.append(head, input);
         setRangeFill(input, spec, values[spec.name]);
-        const ticks = document.createElement('div');
-        ticks.className = 'lf-ticks';
-        for (let i = 0; i < 9; i++) ticks.appendChild(document.createElement('span'));
-        row.appendChild(ticks);
       }
     }
 
@@ -1003,82 +1051,6 @@ function createLoop({ onFrame, speed = 1 }) {
 }
 
 
-// --- inlined: ../../shared/noise.js ---
-// shared/noise.js
-// Minimal 2D simplex noise, no dependencies. Adapted from the public-domain
-// reference algorithm (Stefan Gustavson).
-
-const GRAD = [
-  [1, 1], [-1, 1], [1, -1], [-1, -1],
-  [1, 0], [-1, 0], [1, 0], [-1, 0],
-  [0, 1], [0, -1], [0, 1], [0, -1],
-];
-
-function buildPermutation(seed = 1337) {
-  const p = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) p[i] = i;
-  let s = seed;
-  const rand = () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-  for (let i = 255; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [p[i], p[j]] = [p[j], p[i]];
-  }
-  const perm = new Uint8Array(512);
-  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
-  return perm;
-}
-
-const perm = buildPermutation();
-
-function dot(g, x, y) {
-  return g[0] * x + g[1] * y;
-}
-
-const F2 = 0.5 * (Math.sqrt(3) - 1);
-const G2 = (3 - Math.sqrt(3)) / 6;
-
-function simplex2(xin, yin) {
-  const s = (xin + yin) * F2;
-  const i = Math.floor(xin + s);
-  const j = Math.floor(yin + s);
-  const t = (i + j) * G2;
-  const X0 = i - t;
-  const Y0 = j - t;
-  const x0 = xin - X0;
-  const y0 = yin - Y0;
-
-  let i1, j1;
-  if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
-
-  const x1 = x0 - i1 + G2;
-  const y1 = y0 - j1 + G2;
-  const x2 = x0 - 1 + 2 * G2;
-  const y2 = y0 - 1 + 2 * G2;
-
-  const ii = i & 255;
-  const jj = j & 255;
-  const gi0 = perm[ii + perm[jj]] % 12;
-  const gi1 = perm[ii + i1 + perm[jj + j1]] % 12;
-  const gi2 = perm[ii + 1 + perm[jj + 1]] % 12;
-
-  let n0 = 0, n1 = 0, n2 = 0;
-
-  let t0 = 0.5 - x0 * x0 - y0 * y0;
-  if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(GRAD[gi0], x0, y0); }
-
-  let t1 = 0.5 - x1 * x1 - y1 * y1;
-  if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(GRAD[gi1], x1, y1); }
-
-  let t2 = 0.5 - x2 * x2 - y2 * y2;
-  if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(GRAD[gi2], x2, y2); }
-
-  return 70 * (n0 + n1 + n2);
-}
-
-
 // --- inlined: ../../shared/project.js ---
 // shared/project.js
 // 3D -> 2D projection for pieces that want perspective geometry.
@@ -1125,7 +1097,7 @@ function createCamera({ tilt = 0, yaw = 0, roll = 0, fov = 600, cx = 0, cy = 0 }
     // the geometry) is the degenerate exception where a dropped point can
     // still be near-frame, and dropping it can visibly change the render.
     // 0.2 was picked empirically: the lowest cap (searched in 0.01*fov
-    // steps) at which event-horizon's SVG export at Scale 2, an angle
+    // steps) at which funnel's SVG export at Scale 2, an angle
     // exposing the near plane, has no coordinate over magnitude 5000. At
     // or beyond the near plane there is no meaningful projection; scale 0
     // is the caller's signal to skip this point.
@@ -1179,7 +1151,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [], circles = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -1205,7 +1177,14 @@ function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = []
     const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
     return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
   }).join('\n');
-  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  // Halftone pieces pass filled dots as circles. Every other caller leaves
+  // this empty, so its serialization is byte-identical to before.
+  const circleEls = circles.map(({ cx, cy, r, fill = 'black', opacity = 1 }) => {
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls, circleEls].filter(Boolean).join('\n');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
@@ -1477,7 +1456,17 @@ function createOrbit({
 
 
 
-
+  // wireframe-lattice — one finite lattice sheet with crisp edges, floating
+  // tilted in space and flexing slowly, brightest along its fold's crest.
+  //
+  // The sheet is a square of hairline rows and columns, not a plane running
+  // to the horizon: its four edges draw brighter so it reads as one object.
+  //
+  // Text-safe zone: the left third of the frame. The sheet sits in the
+  // central square, nudged right of centre.
+  // Anchor: the travelling fold where it turns most nearly edge-on, centre
+  // right. Its lines close up in projection and brighten with the grazing
+  // angle, so it emerges from line density, not from a drawn glow.
   const PIECE_ID = 'wireframe-lattice';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -1489,17 +1478,20 @@ function createOrbit({
   window.addEventListener('resize', resize);
   resize();
 
-  // Grid resolution is derived per frame from density — no persistent array.
-  const BASE_STEPS = 24;
-  const SPAN = 900; // world-space width/depth of the sheet
+  // Line counts derive per frame from density — no persistent array.
+  const BASE_LINES = 56;     // lines each way, edges included
+  const SEG = 72;            // segments per line
+  const FLEX_PERIOD = 12;    // seconds per flex-wave cycle at speed 1
+  const FLOAT_PERIOD = 17;   // seconds per rocking cycle at speed 1
+  const BUCKETS = 6;
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.3, stroke: 1.1, density: 0.6, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.7, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.95, glow: 1.1 },
-    drift:   { opacity: 0.5, stroke: 0.8, density: 0.7, speed: 0.35, motion: 1.8 },
-    dense:   { opacity: 0.6, stroke: 0.6, density: 1.8, speed: 0.8, glow: 0 },
+    whisper: { opacity: 1, stroke: 0.75, density: 0.5, motion: 0.9, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.5, density: 0.7, glow: 0, rotX: 30 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.05, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.85, stroke: 0.8, density: 0.8, speed: 0.4, motion: 1.8, phase: 0.7 },
+    dense:   { opacity: 0.9, stroke: 0.85, density: 1.6, glow: 0.4, motion: 1.3 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1508,10 +1500,12 @@ function createOrbit({
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 32, category: 'interaction' },
-      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 36, category: 'interaction' },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: -28, category: 'interaction' },
     ],
-    defaults: { hue: 190, hueB: 205, saturation: 0.35, colorMode: 'gradient', colorA: '#00d4ff', colorB: '#0095ff' },
+    // Monochrome by default (house look §1). The hue pair is what the neon
+    // preset and the colour pickers light up.
+    defaults: { hue: 190, hueB: 205, saturation: 0, colorMode: 'gradient', colorA: '#00d4ff', colorB: '#0095ff' },
   });
   const currentValues = baked || panel.values;
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -1540,87 +1534,167 @@ function createOrbit({
     },
   });
 
-  const camera = createCamera({ fov: 620 });
-  function strokePath(pts, values, lineWidth, rgb) {
-    // pts: array of {x, y, scale}. Walk in order and break the run at any
-    // point behind the camera (scale <= 0) instead of filtering — a skipped
-    // interior point must start a new subpath, not get bridged over.
-    let anyRun = false;
-    ctx.beginPath();
-    let run = [];
-    const flushRun = () => {
-      if (run.length >= 2) {
-        anyRun = true;
-        ctx.moveTo(run[0].x, run[0].y);
-        for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
-        paths.push(run.map((p) => [p.x, p.y]));
-      }
-      run = [];
-    };
-    for (const p of pts) {
-      if (p.scale > 0) run.push(p);
-      else flushRun();
-    }
-    flushRun();
-    if (!anyRun) return;
+  const camera = createCamera({ fov: 1200 });
 
-    const [r, g, b] = rgb;
-    ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-    if (values.glow > 0) {
-      ctx.lineWidth = lineWidth + values.glow * 3;
-      ctx.globalAlpha = values.glow * 0.25;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+  function strokeRuns(runs, alpha, lineWidth, rgb) {
+    if (!runs.length || alpha <= 0) return;
+    ctx.beginPath();
+    for (const run of runs) {
+      ctx.moveTo(run[0].x, run[0].y);
+      for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
     }
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.min(1, alpha)})`;
     ctx.lineWidth = lineWidth;
     ctx.stroke();
   }
 
   function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, W, H);
+    // Additive on the dark ground, so wherever the sheet folds away and its
+    // lines close up the image brightens on its own. On the light ground
+    // `lighter` would clip to white, so dark ink layers with plain alpha.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at shared points (alpha buckets), and round caps
+    // would overlap there and add up to beads under 'lighter'.
+    ctx.lineCap = 'butt';
 
     paths = [];
-    const steps = Math.max(4, Math.round(BASE_STEPS * values.density));
-    const t = elapsed * values.speed * 0.5;
-    const noiseScale = 0.0035 * (0.3 + values.scale);
-    const amp = 45 * values.motion;
-    const light = values.invert ? 0.35 : 0.62;
+    const S = Math.min(W, H);
+    const size = 0.5 + 0.5 * values.scale;
+    const half = S * 0.25 * size;
+    // fov tracks the frame so the perspective reads the same at any size.
+    // The sheet's half-diagonal plus its flex stays under 0.8 * fov even at
+    // Scale 2, so no pitch ever reaches shared/project.js's near plane.
+    const fov = S * 1.6;
+    const lines = Math.max(10, Math.round(BASE_LINES * values.density));
+    const light = values.invert ? 0.14 : 0.88 - 0.26 * values.saturation;
+    const lineWidth = 0.5 + values.stroke * 0.4;
+    const peak = values.opacity * (values.invert ? 0.5 : 0.38);
+    const edgeAlpha = values.opacity * (values.invert ? 0.7 : 0.45);
 
-    camera.set({
-      tilt: (values.rotX * Math.PI) / 180,
-      yaw: (values.rotY * Math.PI) / 180,
+    // Speed is the tempo of everything (Speed 0 is a still frame): the flex
+    // wave travels across the sheet once per FLEX_PERIOD, and the sheet
+    // floats, rocking slowly once per FLOAT_PERIOD. Motion is the depth of
+    // the flex, so Motion 0 leaves a flat sheet that still floats. Phase
+    // moves where the fold sits.
+    const t = elapsed * values.speed;
+    const wave = (t / FLEX_PERIOD) * Math.PI * 2 + values.phase * Math.PI + 3.2;
+    const fl = (t / FLOAT_PERIOD) * Math.PI * 2;
+    const amp = half * 0.42 * values.motion;
+    const bob = S * 0.018 * Math.sin(fl);
+
+    const view = {
+      tilt: (values.rotX * Math.PI) / 180 + 0.06 * Math.sin(fl * 0.7),
+      yaw: (values.rotY * Math.PI) / 180 + 0.14 * Math.sin(fl),
       roll: (values.angle * Math.PI) / 180,
-      cx: canvas.width / 2,
-      cy: canvas.height / 2,
-    });
+    };
+    camera.set({ ...view, fov, cx: W / 2 + 0.11 * S, cy: H / 2 });
 
-    const heightAt = (x, z) => {
-      return simplex2(x * noiseScale + values.phase, z * noiseScale + t) * amp;
+    // Height of the sheet at normalised (u, v) in [-1, 1]: one broad fold
+    // travelling diagonally, plus a slower cross-bend, so the sheet flexes
+    // like a held card rather than rippling like water.
+    const heightAt = (u, v) => {
+      const fold = Math.sin(0.9 * u + 2.2 * v + wave);
+      const cross = Math.cos(1.5 * u - 0.5 * v - wave * 0.6);
+      return amp * (0.75 * fold + 0.35 * cross * (0.5 + 0.5 * u));
     };
 
-    const half = SPAN / 2;
-    const step = SPAN / steps;
-    const baseWidth = 0.3 + values.stroke * 1.0;
+    let bestW = -1;
+    let anchor = null;
+    // Rows (constant v), then columns (constant u). The first and last of
+    // each are the sheet's edges.
+    for (let dir = 0; dir < 2; dir++) {
+      for (let i = 0; i < lines; i++) {
+        const f = i / (lines - 1);
+        const a = -1 + 2 * f;
+        const edge = i === 0 || i === lines - 1;
+        const model = [];
+        const weights = [];
+        for (let j = 0; j <= SEG; j++) {
+          const b = -1 + (2 * j) / SEG;
+          const u = dir === 0 ? b : a;
+          const v = dir === 0 ? a : b;
+          const h = heightAt(u, v);
+          const x = u * half, y = h - bob, z = v * half;
+          model.push([x, y, z]);
+          // Where the fold turns the sheet edge-on to the eye, its lines
+          // close up in projection; they brighten there too, so the fold
+          // reads as a sheen. Measured against the true eye at z = -fov.
+          const dx = (heightAt(u + 0.02, v) - heightAt(u - 0.02, v)) / (0.04 * half);
+          const dz = (heightAt(u, v + 0.02) - heightAt(u, v - 0.02)) / (0.04 * half);
+          const n = rotatePoint(-dx, 1, -dz, view);
+          const q = rotatePoint(x, y, z, view);
+          const vz = q.z + fov;
+          const facing = (n.x * q.x + n.y * q.y + n.z * vz)
+            / (Math.hypot(n.x, n.y, n.z) * Math.hypot(q.x, q.y, vz));
+          const graze = 1 - Math.abs(facing);
+          weights.push(0.28 + 0.72 * graze * graze * graze * graze);
+        }
+        const pts = camera.projectPath(model);
+        for (let j = 0; j <= SEG; j++) {
+          if (weights[j] > bestW && pts[j].scale > 0) { bestW = weights[j]; anchor = pts[j]; }
+        }
+        const { h, s } = paletteHsl(values, f);
+        const rgb = hslToRgb(h, s, light);
 
-    // Rows (constant z), then columns (constant x).
-    for (let i = 0; i <= steps; i++) {
-      const f = i / steps;
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, b] = hslToRgb(h, s, light);
+        // Runs break at any point at or behind the near plane rather than
+        // bridging it; buckets group runs by alpha.
+        const buckets = Array.from({ length: BUCKETS }, () => []);
+        let run = [];
+        let svgRun = [];
+        let runB = -1;
+        const flushSvg = () => { if (svgRun.length >= 2) paths.push(svgRun); svgRun = []; };
+        for (let j = 0; j < SEG; j++) {
+          const p = pts[j], q = pts[j + 1];
+          if (p.scale <= 0 || q.scale <= 0) {
+            if (run.length >= 2) buckets[runB].push(run);
+            run = []; runB = -1; flushSvg();
+            continue;
+          }
+          const w = edge ? 1 : (weights[j] + weights[j + 1]) / 2;
+          const bk = Math.min(BUCKETS - 1, Math.floor(w * BUCKETS));
+          if (bk !== runB) {
+            if (run.length >= 2) buckets[runB].push(run);
+            run = [p];
+            runB = bk;
+          }
+          run.push(q);
+          if (!svgRun.length) svgRun.push([p.x, p.y]);
+          svgRun.push([q.x, q.y]);
+        }
+        if (run.length >= 2) buckets[runB].push(run);
+        flushSvg();
 
-      const rowPts = [];
-      const colPts = [];
-      const a = -half + i * step;
-      for (let j = 0; j <= steps; j++) {
-        const c = -half + j * step;
-        rowPts.push([c, heightAt(c, a), a]);
-        colPts.push([a, heightAt(a, c), c]);
+        for (let bk = 0; bk < BUCKETS; bk++) {
+          const alpha = edge ? edgeAlpha : peak * ((bk + 0.5) / BUCKETS);
+          if (values.glow > 0 && (edge || bk >= BUCKETS - 2)) {
+            strokeRuns(buckets[bk], alpha * values.glow * 0.3, lineWidth + values.glow * 2.2, rgb);
+          }
+          strokeRuns(buckets[bk], alpha, lineWidth, rgb);
+        }
       }
-      strokePath(camera.projectPath(rowPts), values, baseWidth, [r, g, b]);
-      strokePath(camera.projectPath(colPts), values, baseWidth, [r, g, b]);
     }
 
+    // Glow is a fallback for the anchor, off by default: the fold is
+    // already the brightest place from its lines closing up. It sits on the
+    // most nearly edge-on point of the sheet.
+    if (values.glow > 0 && anchor) {
+      const { h, s } = paletteHsl(values, 0.5);
+      const [r, g, b] = hslToRgb(h, s, light);
+      const gr = (16 + 36 * values.glow) * size;
+      const grad = ctx.createRadialGradient(anchor.x, anchor.y, 0, anchor.x, anchor.y, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${Math.min(1, 0.3 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(anchor.x, anchor.y, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({

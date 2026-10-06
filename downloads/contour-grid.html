@@ -52,7 +52,7 @@
 .lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .lf-row:last-child { margin-bottom: 0; }
 .lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.lf-row label { font-size: 11px; color: #8a8a9a; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
 .lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
 .lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
 .lf-row-checkbox label { order: -1; }
@@ -62,18 +62,43 @@
   color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
   padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
 
-.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-  border-radius: 999px; background-color: #26262e;
-  background-image: linear-gradient(90deg,#2a4637,#437057 50%,#93bea6);
-  background-repeat: no-repeat; background-size: var(--lf-pct, 0%) 100%; cursor: pointer; }
-.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
-  border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6);
-  cursor: pointer; margin-top: 0; }
-.lf-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6); cursor: pointer; }
-.lf-row input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: transparent; }
-.lf-ticks { display: flex; justify-content: space-between; padding: 0 1px; margin-top: -1px; }
-.lf-ticks span { width: 2px; height: 2px; border-radius: 50%; background: #3a3a46; }
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
 
 .lf-color-row { display: flex; align-items: center; gap: 8px; }
 .lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
@@ -129,7 +154,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.5,"colorMode":"gradient","colorA":"#ff9500","colorB":"#ff4000","hue":35,"hueB":15,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"relief":1};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#ff9500","colorB":"#ff4000","hue":35,"hueB":15,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"relief":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -222,7 +247,9 @@ const SHARED_CONTROLS = [
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1, category: 'color' },
-  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, category: 'color' },
+  // House look default is 0 (docs/house-look.md #1 — monochrome first); a
+  // piece pins its own saturation in its `defaults` block regardless.
+  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0, category: 'color' },
   // Solid/gradient palette. `colorA`/`colorB` are the authored controls a
   // user actually sees and drags; `hue`/`hueB` are hidden (no panel row) —
   // the exact numeric degrees every piece's render math still reads. Picking
@@ -292,7 +319,7 @@ const PANEL_CSS = `
 .lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .lf-row:last-child { margin-bottom: 0; }
 .lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.lf-row label { font-size: 11px; color: #8a8a9a; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
 .lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
 .lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
 .lf-row-checkbox label { order: -1; }
@@ -302,18 +329,43 @@ const PANEL_CSS = `
   color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
   padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
 
-.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-  border-radius: 999px; background-color: #26262e;
-  background-image: linear-gradient(90deg,#2a4637,#437057 50%,#93bea6);
-  background-repeat: no-repeat; background-size: var(--lf-pct, 0%) 100%; cursor: pointer; }
-.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
-  border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6);
-  cursor: pointer; margin-top: 0; }
-.lf-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6); cursor: pointer; }
-.lf-row input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: transparent; }
-.lf-ticks { display: flex; justify-content: space-between; padding: 0 1px; margin-top: -1px; }
-.lf-ticks span { width: 2px; height: 2px; border-radius: 50%; background: #3a3a46; }
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
 
 .lf-color-row { display: flex; align-items: center; gap: 8px; }
 .lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
@@ -745,10 +797,6 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
         input.value = values[spec.name];
         row.append(head, input);
         setRangeFill(input, spec, values[spec.name]);
-        const ticks = document.createElement('div');
-        ticks.className = 'lf-ticks';
-        for (let i = 0; i < 9; i++) ticks.appendChild(document.createElement('span'));
-        row.appendChild(ticks);
       }
     }
 
@@ -1111,7 +1159,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [], circles = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -1137,7 +1185,14 @@ function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = []
     const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
     return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
   }).join('\n');
-  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  // Halftone pieces pass filled dots as circles. Every other caller leaves
+  // this empty, so its serialization is byte-identical to before.
+  const circleEls = circles.map(({ cx, cy, r, fill = 'black', opacity = 1 }) => {
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls, circleEls].filter(Boolean).join('\n');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
@@ -1275,6 +1330,13 @@ function describeForAI({ pieceName, values }) {
 
 
 
+  // contour-grid — the contour lines of a single landform, one island with
+  // one summit, cropped as one object instead of edge-to-edge bands.
+  //
+  // Text-safe zone: the left third of the frame. The island sits right of
+  // centre, inside the central square.
+  // Anchor: the summit, right of centre — where the rings bunch tightest
+  // and their hairlines overlap into the brightest point.
   const PIECE_ID = 'contour-grid';
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -1286,17 +1348,38 @@ function describeForAI({ pieceName, values }) {
   window.addEventListener('resize', resize);
   resize();
 
-  // Band count is derived per frame from density — no persistent array, so no re-seed.
-  const BASE_BANDS = 26;
-  const STEP_PX = 6;
+  // Ring count is derived per frame from density — no persistent array, so
+  // no re-seed needed.
+  const BASE_RINGS = 26;
+  const RING_POINTS = 96; // polar samples per ring
+  const SUMMIT = { x: 0.60, y: 0.46 }; // normalized; right of centre
+  const R_FRAC = 0.34; // * min(W,H): island diameter ~68% of the shorter side
+  const PERIOD = 10; // seconds for one full base->summit ring migration at speed 1
   let paths = [];
 
+  function smoothstep(a, b, x) {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  }
+
+  // A shared, low-frequency silhouette sampled around the unit circle —
+  // cos/sin keep it seamless at theta=0/2*PI with no stitch. Every ring
+  // reads this same shape (scaled by its own radius), so the stack reads as
+  // contours of ONE coastline, not concentric circles. Wobble grows toward
+  // the base (s near 1) so the summit stays a clean, near-circular cap.
+  function shapeFactor(theta, s, phaseNoise) {
+    const k = 2.15;
+    const n1 = simplex2(Math.cos(theta) * k + phaseNoise, Math.sin(theta) * k + phaseNoise);
+    const n2 = simplex2(Math.cos(theta) * k * 2.3 - phaseNoise, Math.sin(theta) * k * 2.3 + phaseNoise * 0.7);
+    return 1 + (n1 * 0.22 + n2 * 0.08) * (0.35 + 0.65 * s);
+  }
+
   const PRESETS = {
-    whisper: { opacity: 0.3, stroke: 1.1, density: 0.6, saturation: 0.06, glow: 0 },
-    ink:     { opacity: 1, stroke: 1.8, density: 0.8, saturation: 0, glow: 0 },
-    neon:    { opacity: 0.95, stroke: 1, density: 1.2, saturation: 0.9, glow: 1 },
-    drift:   { opacity: 0.5, stroke: 0.9, density: 0.7, speed: 0.3, motion: 1.6 },
-    dense:   { opacity: 0.6, stroke: 0.6, density: 2, speed: 0.8, glow: 0 },
+    whisper: { opacity: 1, stroke: 0.9, density: 0.6, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.3, density: 0.85, glow: 0 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 0.9, saturation: 0.85, glow: 1.1 },
+    drift:   { opacity: 0.85, stroke: 0.9, density: 0.7, speed: 0.35, motion: 1.8 },
+    dense:   { opacity: 0.85, stroke: 0.85, density: 1.6, relief: 1.5, glow: 0.5 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1305,72 +1388,97 @@ function describeForAI({ pieceName, values }) {
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
+      // Steepness of the terrain: how tightly rings bunch toward the summit.
       { name: 'relief', label: 'Relief', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
     ],
-    defaults: { hue: 35, hueB: 15, saturation: 0.5, colorMode: 'gradient', colorA: '#ff9500', colorB: '#ff4000' },
+    // saturation: 0 per house look §1; colour lives in the neon preset.
+    defaults: { hue: 35, hueB: 15, saturation: 0, colorMode: 'gradient', colorA: '#ff9500', colorB: '#ff4000' },
   });
   const currentValues = baked || panel.values;
 
   function drawFrame(dt, elapsed, values) {
+    const W = canvas.width, H = canvas.height, S = Math.min(W, H);
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
 
     paths = [];
-    const bands = Math.max(2, Math.round(BASE_BANDS * values.density));
-    const noiseScale = 0.0016 * (0.25 + values.scale);
-    // relief sets the static terrain height; motion layers a second,
-    // independently-amplitude'd wobble on top; speed is purely the rate that
-    // wobble evolves at (not its size) — the three no longer collapse to one knob.
-    const baseAmp = 30 * values.relief;
-    const moveAmp = 16 * values.motion;
-    const t = elapsed * values.speed * 0.12;
+    const rings = Math.max(6, Math.round(BASE_RINGS * values.density));
+    const cx = W * SUMMIT.x, cy = H * SUMMIT.y;
+    const R = S * R_FRAC * (0.5 + 0.5 * values.scale);
+    // Relief sets how steeply rings bunch toward the summit (the gamma on
+    // the radius curve), not the overall size — Scale already owns that.
+    const gamma = 1.3 + 0.9 * values.relief;
 
-    const lineWidth = 0.4 + values.stroke * 1.1;
-    ctx.lineWidth = lineWidth;
+    const th = (values.angle * Math.PI) / 180;
+    const cth = Math.cos(th), sth = Math.sin(th);
+    // Points are rotated explicitly, not via a canvas transform, so the
+    // exported SVG (which records these same points) carries Angle too.
+    const rot = (x, y) => [cx + (x - cx) * cth - (y - cy) * sth, cy + (x - cx) * sth + (y - cy) * cth];
 
-    const rcx = canvas.width / 2, rcy = canvas.height / 2;
-    const theta = (values.angle * Math.PI) / 180;
+    // Speed drives a slow migration that exists even at Motion 0: every ring
+    // is born at the summit and grows outward to the coast over PERIOD
+    // seconds, then wraps back to a new ring at the summit. The `rings`
+    // evenly spaced starting offsets (k/rings) mean every level in [0,1] is
+    // always occupied by some ring, so a birth at the summit (sub-pixel
+    // radius) is invisible — but a ring dying at the full-size coastline
+    // isn't, so only that end gets a fade. Motion is purely a wobble
+    // amplitude on the coastline, on its own clock, so it never touches the
+    // migration rate. Phase offsets where in that cycle the rings start,
+    // instead of translating the frame sideways.
+    const cycle = elapsed * values.speed / PERIOD + values.phase * 0.5;
+    const wobbleT = elapsed * 0.18;
+    const phaseNoise = values.phase * 3.1;
 
-    ctx.save();
-    ctx.translate(rcx, rcy);
-    ctx.rotate(theta);
-    ctx.translate(-rcx, -rcy);
+    const light = values.invert ? 0.14 : 0.86 - 0.24 * values.saturation;
+    const lineWidth = 0.45 + values.stroke * 0.35;
+    const baseAlpha = values.opacity * (values.invert ? 0.5 : 0.4);
+    // A floor radius so the innermost rings pile onto a small visible disc
+    // instead of a sub-pixel point — otherwise `lighter` has nothing to
+    // stack and the summit never reads as the brightest anchor.
+    const R0 = 0.05;
 
-    // Overdraw horizontally so rotation never reveals the canvas edge.
-    const margin = Math.max(canvas.width, canvas.height) * 0.4;
-
-    for (let b = 0; b < bands; b++) {
-      const f = b / (bands - 1 || 1);
-      const baseY = -margin + f * (canvas.height + margin * 2);
-
-      const { h, s } = paletteHsl(values, f);
-      const [r, g, bl] = hslToRgb(h, s, values.invert ? 0.35 : 0.6);
-      ctx.strokeStyle = `rgba(${r},${g},${bl},${values.opacity})`;
+    for (let k = 0; k < rings; k++) {
+      let s = (k / rings + cycle) % 1;
+      if (s < 0) s += 1;
+      const radius = R * (R0 + (1 - R0) * Math.pow(s, gamma));
+      const coastFade = 1 - smoothstep(0.85, 1, s);
 
       const pts = [];
+      for (let i = 0; i <= RING_POINTS; i++) {
+        const theta = (i / RING_POINTS) * Math.PI * 2;
+        const wobble = 1 + Math.sin(theta * 3 + wobbleT + k * 0.4) * 0.05 * values.motion;
+        const rad = radius * shapeFactor(theta, s, phaseNoise) * wobble;
+        pts.push(rot(cx + Math.cos(theta) * rad, cy + Math.sin(theta) * rad));
+      }
+
+      const { h, s: sat } = paletteHsl(values, s);
+      const [r, g, bl] = hslToRgb(h, sat, light);
+      ctx.strokeStyle = `rgba(${r},${g},${bl},${Math.min(1, baseAlpha * coastFade)})`;
+      ctx.lineWidth = lineWidth;
       ctx.beginPath();
-      for (let x = -margin; x <= canvas.width + margin; x += STEP_PX) {
-        const n1 = simplex2(x * noiseScale + values.phase, baseY * noiseScale);
-        const n2 = simplex2(x * noiseScale + values.phase + 137, baseY * noiseScale + t);
-        let y = baseY + n1 * baseAmp + n2 * moveAmp;
-        let px = x;
-          if (x === -margin) ctx.moveTo(px, y);
-        else ctx.lineTo(px, y);
-        pts.push([px, y]);
-      }
-      if (values.glow > 0) {
-        ctx.lineWidth = lineWidth + values.glow * 3;
-        ctx.globalAlpha = values.glow * 0.25;
-        ctx.stroke();
-        ctx.lineWidth = lineWidth;
-        ctx.globalAlpha = 1;
-      }
+      pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
       ctx.stroke();
       paths.push(pts);
     }
 
-    ctx.restore();
-
+    // Glow is a fallback for the anchor, off by default: one soft radial
+    // wash at the summit, not a per-ring underlay.
+    if (values.glow > 0) {
+      const [sx, sy] = rot(cx, cy);
+      const { h, s } = paletteHsl(values, 0);
+      const [r, g, bl] = hslToRgb(h, s, light);
+      const gr = (14 + 26 * values.glow) * (0.5 + 0.5 * values.scale);
+      const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${bl},${Math.min(1, 0.35 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${r},${g},${bl},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(sx, sy, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({

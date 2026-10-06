@@ -173,8 +173,8 @@ async function open(query = '', targetSlug = slug) {
 // the mechanism is shared code. This check instead validates each piece's
 // own preset DATA, which is piece-specific and not exercised at all by
 // running only `slug`; CI invokes this file with one slug argument
-// (`node tools/test-presets.mjs synapse`), so without sweeping here this
-// check would only ever validate synapse's own five presets. It's cheap to
+// (`node tools/test-presets.mjs relay`), so without sweeping here this
+// check would only ever validate relay's own five presets. It's cheap to
 // sweep — a page.evaluate reading two already-declared globals per piece,
 // no chip clicks, no waitForTimeout — unlike checks 3/4/5/7 above, which is
 // why only this one sweeps all twelve while the rest stay pinned to one.

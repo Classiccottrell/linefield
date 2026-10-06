@@ -27,11 +27,18 @@ jobs:
       - name: Verify manifest
         run: npm run verify
 
+      # The house look (docs/house-look.md): default saturation and ink
+      # coverage, measured from the committed thumbs/. No browser, so it
+      # runs early. Like the baked-export gate, it judges what's committed:
+      # a piece retuned without `npm run build` isn't caught here.
+      - name: Check collection conformance
+        run: npm run collection-check
+
       # Presets are a piece-declared vocabulary; this exercises the
       # mechanism end to end for one piece. `npm run verify` never runs
       # this because --verify-only exits before launching a browser.
       - name: Verify preset mechanism
-        run: node tools/test-presets.mjs synapse
+        run: node tools/test-presets.mjs relay
 
       # Bakes each piece live (clicks its real "Baked HTML" button,
       # exercising today's shared/export.js) and validates that output. This

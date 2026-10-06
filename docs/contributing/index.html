@@ -10,42 +10,53 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Contributing — linefield</title>
+<!-- Site page, not a piece — loaded only here (and the gallery/home).
+     pieces/ and shared/ never take a font dependency. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:ital,wght@0,400;0,500;0,700;0,900;1,400&family=Rosarivo:ital@0;1&display=swap" rel="stylesheet" />
 <style>
+  /* Type system (docs/house-look.md): Red Hat Display for display+body,
+     the system mono stack for labels/code, --link (not --brand) for
+     readable text on this dark ground — contrast. */
   :root{
     --bg:#0a0a0d; --surface:#131319; --line:#26262f;
     --ink:#e8e8ec; --muted:#7c7c8c;
-    --brand:#437057; --brand-dim:#2d4d3c;
+    --brand:#437057; --brand-dim:#2d4d3c; --link:#7fa88c;
+    --font-display:'Red Hat Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-body:'Red Hat Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
     background:var(--bg);color:var(--ink);
-    font:15px/1.6 ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;
+    font:15px/1.6 var(--font-body);
     -webkit-font-smoothing:antialiased;
   }
-  a{color:var(--brand)}
-  .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  a{color:var(--link)}
+  .label{font:11px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
   .wrap{max-width:860px;margin:0 auto;padding:0 24px 96px}
 
   .topbar{
     position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;
     padding:16px 28px;border-bottom:1px solid var(--line);background:rgba(10,10,13,.88);backdrop-filter:blur(6px);
   }
-  .topbar .mark{font-weight:700;letter-spacing:.04em;font-size:15px;text-decoration:none;color:var(--ink)}
+  .topbar .mark{font:700 15px/1 var(--font-display);letter-spacing:.01em;text-decoration:none;color:var(--ink)}
   .topbar .mark span{color:var(--brand)}
-  .topbar nav{display:flex;gap:24px;font-size:12px}
+  .topbar nav{display:flex;gap:24px;font:12px/1 var(--font-mono)}
   .topbar nav a{text-decoration:none;color:var(--muted)}
   .topbar nav a:hover,.topbar nav a[aria-current]{color:var(--ink)}
 
   header.intro{padding:56px 0 28px}
   header.intro .label{margin-bottom:16px;display:block}
-  h1{font:700 clamp(28px,4.2vw,40px)/1.18 ui-monospace,monospace;letter-spacing:-.01em;margin:0 0 14px}
-  .lede{color:#b9b9be;font-size:15px;margin:0;max-width:64ch}
-  .lede code,p code,li code{font-size:13px;background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
+  h1{font:800 clamp(30px,4.6vw,46px)/1.15 var(--font-display);letter-spacing:-.02em;margin:0 0 16px}
+  .lede{color:#b9b9be;font-size:16px;margin:0;max-width:64ch}
+  .lede code,p code,li code{font:13px/1 var(--font-mono);background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
 
   .toc{display:flex;flex-wrap:wrap;gap:8px;padding:24px 0 32px;border-bottom:1px solid var(--line)}
   .toc a{
-    font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+    font:500 12px/1 var(--font-mono);letter-spacing:.06em;
     color:var(--muted);background:transparent;border:1px solid var(--line);
     padding:8px 13px;text-decoration:none;text-transform:uppercase;
   }
@@ -53,8 +64,8 @@
 
   .doc-section{padding:36px 0;border-top:1px solid var(--line)}
   .doc-section:first-of-type{border-top:none}
-  .doc-section h2{margin:0 0 14px;font-size:22px;font-weight:700;letter-spacing:-.01em}
-  .doc-section h3{margin:20px 0 10px;font-size:15px;font-weight:700;color:var(--ink)}
+  .doc-section h2{margin:0 0 14px;font:700 24px/1.25 var(--font-display);letter-spacing:-.01em}
+  .doc-section h3{margin:20px 0 10px;font:700 15px/1.3 var(--font-display);color:var(--ink)}
   .doc-section p{color:#c6c6d0;margin:0 0 14px;max-width:68ch}
   .doc-section p:last-child{margin-bottom:0}
 
@@ -72,7 +83,7 @@
 
   ul.control-list{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0 0 16px;padding:0}
   ul.control-list li{
-    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0;
+    font:12px/1 var(--font-mono);color:#c6c6d0;
     border:1px solid var(--line);padding:6px 10px;background:var(--surface);
   }
 
@@ -90,10 +101,10 @@
     background:var(--bg);border:1px solid var(--line);
     padding:14px 14px 14px 16px;margin:0 0 16px;
   }
-  .snip pre{margin:0;flex:1;min-width:0;overflow-x:auto;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0}
+  .snip pre{margin:0;flex:1;min-width:0;overflow-x:auto;font:12px/1.7 var(--font-mono);color:#c6c6d0}
 
   .btn{
-    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;
+    font:12px/1 var(--font-mono);letter-spacing:.03em;
     color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
     padding:9px 12px;cursor:pointer;text-decoration:none;display:inline-block;
   }
@@ -102,7 +113,7 @@
   .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 
   footer{padding:56px 0 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:40px}
-  footer a{color:var(--brand)}
+  footer a{color:var(--link)}
   footer p{margin:0 0 10px}
 </style>
 </head>
@@ -196,6 +207,10 @@
       the verifier's parser is a regex locked to that order.
       <code>colorMode</code>/<code>colorA</code>/<code>colorB</code> may
       follow after; they aren't read by the manifest.</div></li>
+    <li><div>Add the slug to exactly one collection in <code>collections.json</code>
+      &mdash; the gallery groups/filters by collection, not by tag. The
+      build's <code>--verify-only</code> fails loudly if a manifest slug is
+      unclaimed, or if a collection names a slug that doesn't exist.</div></li>
     <li><div>Add a bullet to README's Pieces list.</div></li>
     <li><div>Run <code>npm run build</code>.</div></li>
     <li><div>Run <code>npm run collection-metrics</code> and paste its
@@ -219,7 +234,7 @@
   <h3>CI gates, in order (.github/workflows/checks.yml)</h3>
   <ol class="gates">
     <li><code>npm run verify</code><span>manifest vs. pieces vs. README agreement</span></li>
-    <li><code>node tools/test-presets.mjs synapse</code><span>preset mechanism on one piece; preset value/enum data on all pieces</span></li>
+    <li><code>node tools/test-presets.mjs relay</code><span>preset mechanism on one piece; preset value/enum data on all pieces</span></li>
     <li><code>npm run test-bake-fresh</code><span>bakes every piece live against today's source and validates the output</span></li>
     <li><code>npm run test-baked</code><span>every committed <code>downloads/*.html</code> renders standalone over <code>file://</code></span></li>
     <li><code>npm run test-source</code><span>Source buttons download exact unbaked piece files</span></li>

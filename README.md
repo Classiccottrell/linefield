@@ -121,7 +121,7 @@ the previous one's value. This is deliberately the opposite of
 `window.__LF_BAKED_VALUES__`, which is used exactly as given.
 
 Open a piece at a preset directly with `?preset=<name>`, for example
-`pieces/meridian/?preset=ink`. An unknown name is ignored and the piece opens
+`pieces/longwave/?preset=ink`. An unknown name is ignored and the piece opens
 normally, so a stale link still works. Moving any slider clears the active
 chip, since the configuration is no longer that preset. Picking a preset
 persists like any manual tuning, and "Reset to defaults" still returns to the
@@ -133,7 +133,7 @@ inventory than invitation.
 
 ## Gallery
 
-`index.html` at the repo root shows all eighteen pieces with live previews,
+`index.html` at the repo root shows all twenty pieces with live previews,
 filtering, and per-piece downloads. Serve the repo and open `/`:
 
 ```bash
@@ -145,24 +145,26 @@ tooling" below and CONTRIBUTING.md.
 
 ## Pieces
 
-- `flow-field` — organic flowing lines following a simplex-noise vector field
-- `contour-grid` — topographic contour bands undulating like breathing terrain
-- `interference` — two concentric ring families crossing to produce moiré
-- `orbital-veil` — concentric orbital arcs with differential rotation
-- `grain-field` — fine drifting grain, the subtlest piece; good behind text
-- `wireframe-lattice` — rigid 3D wireframe grid rippling in perspective
-- `meridian` — seven long ribbons sweeping the full width
-- `synapse` — drifting nodes wired to their neighbours, pulsing
-- `accretion` — matter spiralling inward to a bright core
-- `tether` — heavy cables mooring to a single converging point
-- `event-horizon` — a polar grid bent inward by a gravity well
-- `rainfall` — sparse vertical streaks falling at varying speeds, each with a brighter head
-- `lacuna` — broken caustic arcs gathering around an off-centre calm zone
-- `parallax` — a rose-to-amber fan parting around an invisible volume, with near strands moving faster than distant lines
-- `cipher-bloom` — irregular glyph fragments gathering around a bright oblique core and dissolving into warm chalk and shadow
-- `driftwork` — alternating violet-grey ellipse marks following two crossing currents, with depth and dissolving edges
-- `pleat` — coral and ivory rectangular marks gathering into two folded surfaces with a clean cut between them
-- `globe` — a lat/long wire sphere spinning in true perspective, tilt and yaw draggable
+- `flow-field` — particles confined to one soft, organic region around a quiet central void, trailing hairlines that brighten only where they cross
+- `contour-grid` — the contour lines of one island, cropped as a single landform with its summit as the brightest point
+- `moire` — two gratings of straight lines in one disc, rocking so broad moiré bands sweep across it
+- `orbitals` — a tilted ring of hairline arcs, each turning at its own rate, whose overlaps gather into one bright crescent that travels slowly round
+- `grain-field` — fine grain gathered into one soft drifting cloud with a long falloff — the quietest piece, and the home-page hero
+- `wireframe-lattice` — one finite lattice sheet with crisp edges, floating tilted in space and flexing, its fold catching the light where it turns edge-on
+- `longwave` — a band of hairlines riding one long wave, pinching together at its nodes
+- `relay` — a canopy of branching hairlines grown from one root, a pulse climbing to the tips
+- `infall` — hairline streamlines spiralling into one small, bright core
+- `mooring` — one rope of twisted hairlines rising into a single loose loop; the crossing glows
+- `funnel` — a funnel seen side-on: stacked hairline ellipses narrowing to one bright tip, slowly twisting
+- `rainfall` — sparse vertical streaks falling at their own speed, gathered in a veil that leaves the left third quiet
+- `lacuna` — broken caustic arcs gather around an off-centre calm zone
+- `parallax` — parallel diagonal lines part around an unseen volume, near strands heavier than the finer distant ones
+- `cipher-bloom` — a compressed oblique band of shifting glyph fragments, drawing a small bright core along its own length
+- `driftwork` — tangent-aligned ellipse links follow two crossing currents, brightening by accumulation where they meet
+- `pleat` — two folded bands of ivory marks, divided by a clean cut of empty space where they don't touch
+- `globe` — a tilted sphere drawn only in parallel latitude slices, with no meridians, crowding and brightening toward one lit limb
+- `dune` — one wind-cut ridge built from film grain, lit by a low raking light, with faint ripples crossing its lit face
+- `swell` — a single ocean swell rising on a diagonal, drawn as a halftone screen whose dot size carries its light
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,
@@ -170,7 +172,7 @@ invert, density) plus its own piece-specific control. Color
 mode switches between a single hue (Solid) and a two-stop blend (Gradient,
 the default — every piece's own look); Color A/B are hex pickers, B shown
 only in Gradient mode. `density` multiplies the piece's base element count.
-`wireframe-lattice`, `event-horizon`, and `globe` also provide Pitch and Yaw
+`wireframe-lattice`, `funnel`, and `globe` also provide Pitch and Yaw
 controls; Angle is roll, and
 dragging the canvas orbits the camera on direct piece pages. Gallery
 previews disable drag-to-orbit.
@@ -182,6 +184,12 @@ Interactions opens by default; Color and Visual start closed, so the panel
 fits on screen at rest. Reset is a sticky footer, always visible at the
 panel's bottom edge regardless of scroll position. Below ~640px the panel
 docks as a bottom sheet, collapsed to a handle by default.
+
+On wider screens the panel can be dragged by its header to anywhere in the
+viewport. A move of under 4px still counts as a click, so the header keeps
+its collapse toggle. The panel stays clamped inside the window and is
+re-clamped on resize. Its position is saved per piece, alongside the tuned
+values. The mobile bottom sheet can't be dragged.
 
 Wake is a separate, opt-in pointer-trail overlay for any canvas — not a
 piece, and not baked into piece exports. It's promoted to the top of the
@@ -230,10 +238,11 @@ npm run build            # NOT run in CI — verify, then regenerate thumbs/ and
 # Below this line, every command runs in CI (.github/workflows/checks.yml),
 # in EXACTLY this order (see that file's own comments for why — the last
 # one is deliberately last, slowest and broadest, so it can never hide a
-# faster/narrower step's failure behind itself), except the last three
-# below, which are curation tools with no pass/fail gate — read their output
-# yourself, nothing exits nonzero.
+# faster/narrower step's failure behind itself), except the ones after the
+# blank line below, which do not run in CI. The first two are curation tools
+# with no pass/fail gate — read their output yourself, nothing exits nonzero.
 npm run verify          # check pieces.json / pieces/ / README agree; no generation
+npm run collection-check # house look: default sat ≤ 0.06, ink 0.03–0.15 (heroes ≤ 0.035), from committed thumbs/
 node tools/test-presets.mjs <slug>   # preset mechanism (one piece) + value/enum gate (all pieces, regardless of <slug>)
 npm run test-bake-fresh  # bakes every piece live, rather than reading committed downloads/
 npm run test-baked       # every downloads/*.html renders standalone, no shared/ present
@@ -248,11 +257,21 @@ npm run collection-metrics           # NOT run in CI — hue/sat/ink per piece, 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
 canvas, captured at 1280×800) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
-never reimplemented) for all eighteen pieces, then renders `index.html` at
-the repo root from `tools/templates/gallery.html` and the manifest — the
-gallery page itself, with live hover/keyboard previews, tag filtering, and
-per-piece "Copy embed" / "Download" actions. All three (`thumbs/`,
-`downloads/`, `index.html`) are committed.
+never reimplemented) for all twenty pieces, then renders `index.html` at
+the repo root from `tools/templates/gallery.html`, the manifest, and
+`collections.json` (presentation-only grouping — `pieces.json` stays
+untouched; the gallery groups/filters cards by collection, not by tag) —
+the gallery page itself, with live hover/keyboard previews and per-piece
+"Copy embed" / "Download" actions revealed on hover or focus. All three
+(`thumbs/`, `downloads/`, `index.html`) are committed.
+
+It also produces `stills/<slug>.png` (an 800×800 square crop of the same
+capture, full resolution rather than the thumbnail's half-scale) zipped into
+`stills.zip` and linked from the gallery's intro copy, and `catalogue.md` —
+generated from `pieces.json` plus the live control list already exposed on
+`window.__LF_SPECS__`, one entry per piece (blurb, tags, text-safe zone,
+anchor, controls), so it can't drift. Both are committed alongside the
+other three.
 
 `tools/audit-controls.mjs` drives every control on every piece between
 points across its full range with a seeded RNG and a manually-stepped
@@ -261,21 +280,25 @@ floor to reason about), then diffs sampled canvas pixels. It flags a
 control DEAD if no pair of test points produces a visible change, and
 exits non-zero if any control is DEAD, so CI actually fails on a
 regression. Two pieces have shipped a control that read a value but
-changed nothing (`tether` and `synapse`'s Scale) — both passed per-piece
+changed nothing (`mooring` and `relay`'s Scale) — both passed per-piece
 review by inspection alone, which is why this exists as a script instead
 of a one-off check. It drives controls via `window.__LF_PANEL__.setValue`
 and reads `window.__LF_SPECS__`, not DOM position, so it survives whatever
 widget a control renders as.
 
 `tools/collection-metrics.mjs` measures the collection's spread — each
-piece's colourfulness-weighted mean hue, mean saturation, and ink coverage
-(the fraction of the frame it marks) — and prints ROADMAP's "Collection
-constraints" table ready to paste. It decodes the committed
+piece's colourfulness-weighted mean hue, mean saturation (raw, and the
+chroma-floored figure the check gates on), and ink coverage (the fraction
+of the frame it marks) — and prints ROADMAP's "Collection constraints"
+table, sorted by ink, ready to paste. It decodes the committed
 `thumbs/<slug>.png` itself with `node:zlib`, so it needs no browser and no
 dependency, and it measures what was last built: run `npm run build` first
 if a piece changed. There is no pass/fail gate — it answers "where is the
 hue wheel open, and which density is under-served", which is a judgement a
-human makes.
+human makes. The exception is `--check` (`npm run collection-check`), which
+holds the same numbers against `docs/house-look.md` and exits non-zero on
+any piece that breaks it, printing each failure and any recorded per-piece
+override with its reason.
 
 The gallery's live hover/keyboard preview loads pieces with `?preview=1`.
 `shared/controls.js` checks for that flag and, when present, skips both
@@ -286,15 +309,18 @@ persists exactly as before.
 
 ## Roadmap
 
-[ROADMAP.md](ROADMAP.md) records what is deliberately not built yet and why,
+[ROADMAP.md](ROADMAP.md) is the live plan. It covers the gap analysis
+against a reference collection, the phases that close it, the line between
+matching that reference's craft and copying its catalogue,
 the limitations accepted along the way, and the constraints any new piece
-inherits.
+inherits. The delivery log for earlier work is archived in
+[docs/roadmap-history.md](docs/roadmap-history.md).
 
 ## Performance
 
 All pieces hold 60fps at their default settings on ordinary hardware. The
-two heaviest were measured at their worst case — `synapse` at density 2.0
-with reach 200, and `accretion` at density 2.0 — and both held 60fps.
+two heaviest were measured at their worst case — `relay` at density 2.0
+with reach 200, and `infall` at density 2.0 — and both held 60fps.
 
 What costs the most, in order:
 
@@ -304,13 +330,13 @@ What costs the most, in order:
   which costs a blur pass per draw call and took `grain-field` from 60fps to
   2.7fps; it is now a wider, dimmer underlay stroke instead, which is
   cheap enough to leave on.
-- **Connection-based pieces** — `synapse` links each node to its neighbours.
+- **Connection-based pieces** — `relay` links each node to its neighbours.
   It uses a uniform spatial grid rather than checking every pair, without
   which it would degrade quadratically as density rises.
 
 One thing that is not a performance problem but looks like one: browsers
 throttle animation in background tabs, so pieces that build their image from
-accumulated trails — `flow-field`, `accretion` — look wrong if you switch
+accumulated trails — `flow-field`, `infall` — look wrong if you switch
 away and back. They recover within a second.
 
 ## Browser support
@@ -355,11 +381,23 @@ Two things to know:
   versions, but a saved localStorage value always outranks the piece's
   default. If a piece looks different from its documented palette, click
   "Reset to defaults" in its control panel to pick up the current default.
-- SVG export doesn't reflect the Angle control for pieces that rotate the
-  whole scene via a canvas transform (`contour-grid`, `meridian`, `tether`):
-  their path points are recorded before that rotation is applied, so the
-  exported SVG shows the unrotated geometry. Use PNG export if you need the
-  rotated view.
+- SVG export doesn't reflect the Angle control for `rainfall`, the one
+  piece left that still rotates the whole scene via a canvas transform
+  (`ctx.rotate`): its path points are recorded before that rotation is
+  applied, so the exported SVG shows the unrotated geometry. `contour-grid`,
+  `longwave` and `mooring` were rewritten in Phase 2 to compute rotated
+  points directly, so their exports already match the canvas. Use PNG
+  export if you need `rainfall`'s rotated view.
+- `dune`'s SVG export carries its line geometry only: the brink and the
+  ripple lines, as polylines. Its film grain is raster by nature and is not
+  in the SVG, embedded or otherwise. Use PNG export for the grain.
+  `swell` exports every dot as a `<circle>`.
+- PNG export has no transparent background, for any piece. Every piece
+  repaints the full canvas opaque each frame — it's how the accumulation
+  trail (and the grain technique) works at all — so there's no transparent
+  region for `canvas.toBlob('image/png')` to export. Checked for ROADMAP
+  Phase 5.3; giving every piece a real alpha channel would mean a
+  render-architecture change across all twenty, not a packaging fix.
 
 ## License
 

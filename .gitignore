@@ -10,3 +10,6 @@ linefield-*.zip
 
 # impeccable design-review hook scratch
 .impeccable/
+
+# Private notes kept out of the public repo
+.local/

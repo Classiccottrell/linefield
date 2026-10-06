@@ -70,4 +70,4 @@ panel.
 
 This is a recommendation only — the choice of which direction gets the
 further "make it super sexy" polish pass belongs to the user, per
-`ROADMAP.md`'s Chunk 8 scope.
+`docs/roadmap-history.md`'s Chunk 8 scope.

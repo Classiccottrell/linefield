@@ -18,6 +18,14 @@
 <body>
 <canvas id="canvas"></canvas>
 
+<!--
+  lacuna — broken caustic arcs around an off-centre calm zone.
+  Text-safe zone: the left third of the frame (the quiet() falloff below
+  dims every arc there, and the interior hole around the calm zone itself
+  is quiet too, but off-centre right so it isn't a reliable third).
+  Anchor: the outermost arc's brightest, densest crossing, right of centre.
+-->
+
 <div class="lf-export-row" data-lf-panel>
   <button id="btn-baked">Baked HTML</button>
   <button id="btn-source">Source</button>
@@ -44,16 +52,16 @@
   window.addEventListener('resize', resize);
   resize();
 
-  const BASE_FRONTS = 18;
+  const BASE_FRONTS = 24;
   const SEG = 88;
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.18, stroke: 0.45, density: 0.55, saturation: 0.05, glow: 0 },
+    whisper: { opacity: 1, stroke: 0.85, density: 0.85, glow: 0 },
     ink:     { opacity: 0.88, stroke: 1.25, density: 0.72, saturation: 0, angle: 18 },
-    neon:    { opacity: 0.72, stroke: 0.72, density: 1.12, saturation: 0.68, glow: 1.05 },
-    drift:   { opacity: 0.34, stroke: 0.55, density: 0.68, speed: 0.28, motion: 1.55, phase: 0.7 },
-    dense:   { opacity: 0.58, stroke: 0.48, density: 1.65, speed: 0.62, angle: 338 },
+    neon:    { opacity: 0.9, stroke: 0.85, density: 1.12, saturation: 0.68, glow: 1.05 },
+    drift:   { opacity: 1, stroke: 0.85, density: 1, speed: 0.28, motion: 1.55, phase: 0.7 },
+    dense:   { opacity: 0.85, stroke: 0.6, density: 1.65, speed: 0.62, angle: 338 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -61,11 +69,13 @@
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    defaults: { hue: 198, hueB: 224, saturation: 0.24, colorMode: 'gradient', colorA: '#7aa8b8', colorB: '#b7d4d7' },
+    defaults: { hue: 198, hueB: 224, saturation: 0, colorMode: 'gradient', colorA: '#7aa8b8', colorB: '#b7d4d7' },
   });
   const currentValues = baked || panel.values;
 
   function drawFrame(dt, elapsed, values) {
+    // Reset first: 'lighter' (set below) must never touch this clear.
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -76,8 +86,13 @@
     const cy = H * 0.48;
     const theta = values.angle * Math.PI / 180;
     const fronts = Math.max(4, Math.round(BASE_FRONTS * values.density));
-    const light = values.invert ? 0.35 : 0.62;
-    const baseWidth = 0.35 + values.stroke * 0.9;
+    // Stroke lightness fixed in the 0.82-0.90 band (house-look §1/§3);
+    // brightness variation comes from alpha below, not from lightness.
+    const light = values.invert ? 0.12 : 0.86 - 0.26 * values.saturation;
+    // Hairline floor: 0.4-0.9px at Stroke 1 (house-look §3).
+    const baseWidth = 0.4 + values.stroke * 0.5;
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    let bestAlpha = -1, bestX = cx, bestY = cy;
 
     for (let front = 0; front < fronts; front++) {
       const segments = [];
@@ -87,7 +102,9 @@
         const u = s / SEG;
         const a = (-0.9 + u * 1.8) * Math.PI;
         const drift = elapsed * values.motion * 0.08;
-        const wave = Math.sin(a * 3 + phase - elapsed * values.speed * 0.9 + values.phase * Math.PI * 2);
+        // 0.75 rad/s keeps the wave's period at/above the 8s-at-Speed-1
+        // floor (house-look §5): 2*PI/0.75 = ~8.4s.
+        const wave = Math.sin(a * 3 + phase - elapsed * values.speed * 0.75 + values.phase * Math.PI * 2);
         const radius = (70 + front * 15) * values.scale + wave * (5 + front * 0.12);
         const keep = Math.sin(a * 2.3 + front * 0.8 + drift) > -0.18;
         if (!keep) {
@@ -105,28 +122,43 @@
 
       const stop = paletteHsl(values, fronts === 1 ? 0.5 : front / (fronts - 1));
       const [r, g, b] = hslToRgb(stop.h, stop.s, light);
-      const frontAlpha = values.opacity * (0.42 + 0.58 * (front / fronts));
+      // Per-line alpha in the additive accumulation band (house-look §3).
+      const frontAlpha = values.opacity * (0.1 + 0.25 * (front / fronts));
       for (const segment of segments) {
         const meanX = segment.reduce((sum, point) => sum + point[0], 0) / segment.length;
         const quiet = Math.max(0.16, Math.min(1, (meanX / W + 0.08) / 0.92));
         const alpha = frontAlpha * quiet;
+        if (alpha > bestAlpha) {
+          // The midpoint of the path itself, not the segment's centroid —
+          // an arc's centroid sits inside its curvature, off the stroke.
+          const mid = segment[(segment.length / 2) | 0];
+          bestAlpha = alpha; bestX = mid[0]; bestY = mid[1];
+        }
         ctx.beginPath();
         ctx.moveTo(segment[0][0], segment[0][1]);
         for (let i = 1; i < segment.length; i++) ctx.lineTo(segment[i][0], segment[i][1]);
         ctx.lineCap = 'round';
         ctx.lineWidth = baseWidth;
         ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
-        if (values.glow > 0 && alpha > values.opacity * 0.46) {
-          ctx.globalAlpha = values.glow * 0.18;
-          ctx.lineWidth = baseWidth + values.glow * 2.4;
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
         ctx.stroke();
         paths.push(segment);
       }
     }
 
+    // One luminous anchor (house-look §4): a soft bloom at the densest,
+    // brightest crossing found above — off by default, since that
+    // crossing already brightens on its own from additive accumulation.
+    if (values.glow > 0) {
+      const { h, s } = paletteHsl(values, 1);
+      const [gr2, gg2, gb2] = hslToRgb(h, s, light);
+      const gr = Math.min(W, H) * 0.05 * (0.6 + values.glow * 0.4);
+      const grad = ctx.createRadialGradient(bestX, bestY, 0, bestX, bestY, gr);
+      grad.addColorStop(0, `rgba(${gr2},${gg2},${gb2},${0.3 * values.glow * values.opacity})`);
+      grad.addColorStop(1, `rgba(${gr2},${gg2},${gb2},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(bestX - gr, bestY - gr, gr * 2, gr * 2);
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({

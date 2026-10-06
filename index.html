@@ -4,26 +4,37 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>linefield — generative line-art backgrounds</title>
+<!-- Site pages only — never pieces/ or shared/, which stay dependency-free
+     so a baked export runs offline. ClassicCottrell type system: Red Hat
+     Display for display+body, Rosarivo italic for editorial accents. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:ital,wght@0,400;0,500;0,700;0,900;1,400&family=Rosarivo:ital@0;1&display=swap" rel="stylesheet" />
 <style>
   /* Specimen system ported from home/specimen-grid/ (Chunk 15): dark
-     monospace/technical register, sharp corners (zero radius), a fixed
-     --brand accent for page chrome, and a per-card --accent (hue-tinted)
-     that overrides --brand locally so each card's swatch/focus ring reads
-     as that piece's own measured hue, not a shared UI color. */
+     technical register, sharp corners (zero radius). --brand is the one
+     fixed UI accent (fills, borders, dots) — never text on the dark ground,
+     which reads --link instead (contrast; see docs/house-look.md's type
+     system). Labels/code keep the system mono stack; everything readable
+     is Red Hat Display. */
   :root{
     --bg:#0a0a0d; --surface:#131319; --line:#26262f;
     --ink:#e8e8ec; --muted:#7c7c8c;
-    --brand:#437057; --brand-dim:#2d4d3c;
+    --brand:#437057; --brand-dim:#2d4d3c; --link:#7fa88c;
+    --font-display:'Red Hat Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-body:'Red Hat Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-accent:'Rosarivo',Georgia,'Iowan Old Style',serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
     background:var(--bg);color:var(--ink);
-    font:15px/1.6 ui-monospace,SFMono-Regular,'JetBrains Mono',Menlo,Consolas,monospace;
+    font:15px/1.6 var(--font-body);
     -webkit-font-smoothing:antialiased;
   }
-  a{color:var(--brand)}
-  .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  a{color:var(--link)}
+  .label{font:11px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
   .wrap{max-width:1180px;margin:0 auto;padding:0 24px 96px}
 
   /* ---- Sticky topbar, ported from specimen-grid's .topbar ------------- */
@@ -31,22 +42,23 @@
     position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;
     padding:16px 28px;border-bottom:1px solid var(--line);background:rgba(10,10,13,.88);backdrop-filter:blur(6px);
   }
-  .topbar .mark{font-weight:700;letter-spacing:.04em;font-size:15px}
+  .topbar .mark{font:700 15px/1 var(--font-display);letter-spacing:.01em}
   .topbar .mark span{color:var(--brand)}
-  .topbar nav{display:flex;gap:24px;font-size:12px}
+  .topbar nav{display:flex;gap:24px;font:12px/1 var(--font-mono)}
   .topbar nav a{text-decoration:none;color:var(--muted)}
   .topbar nav a:hover{color:var(--ink)}
 
   header.intro{padding:56px 0 32px}
   header.intro .label{margin-bottom:16px;display:block}
-  h1{font:700 clamp(30px,4.4vw,44px)/1.18 ui-monospace,monospace;letter-spacing:-.01em;margin:0 0 14px}
-  h1 .op{color:var(--brand)}
-  .lede{color:#b9b9be;font-size:15px;margin:0;max-width:62ch}
-  .lede code{font-size:13px;background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
+  h1{font:800 clamp(34px,5.2vw,58px)/1.1 var(--font-display);letter-spacing:-.02em;margin:0 0 16px}
+  h1 .op{font-family:var(--font-accent);font-style:italic;font-weight:400;color:var(--link)}
+  .lede{color:#b9b9be;font-size:16px;margin:0 0 4px;max-width:62ch}
+  .lede code{font:13px/1 var(--font-mono);background:var(--surface);border:1px solid var(--line);padding:1px 6px;color:var(--ink)}
+  .grid-note{color:var(--muted);font-size:13px;margin:10px 0 0;max-width:62ch}
 
   .chips{display:flex;flex-wrap:wrap;gap:8px;padding:24px 0 32px;border-bottom:1px solid var(--line)}
   .chip{
-    font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+    font:500 12px/1 var(--font-mono);letter-spacing:.06em;
     color:var(--muted);background:transparent;border:1px solid var(--line);
     padding:8px 13px;cursor:pointer;text-transform:uppercase;
   }
@@ -58,51 +70,50 @@
      specimen-grid's page carries two different treatments: the one-hero
      `.specimen` (boxed, crosshair-guided) and the `.grid`/`.cell` sample
      mosaic (hairline gutters via gap+background, bottom-gradient meta,
-     hue-degree tag, no crosshair) it uses for its OWN four-piece sample.
-     Eighteen cards is a many-sample case, so this ports the mosaic system,
-     not the crosshair — a literal crosshair on eighteen boxes at once is
-     the visual noise the brief warned about; the hairline grid is the part
-     that actually scales. */
+     no crosshair) it uses for its OWN four-piece sample. Twenty cards is a
+     many-sample case, so this ports the mosaic system, not the crosshair —
+     a literal crosshair on twenty boxes at once is the visual noise the
+     brief warned about; the hairline grid is the part that actually
+     scales. Grouped by collection: a full-width `.group-head` precedes
+     each collection's cards (see JS below for how a chip filter hides
+     them). */
   .grid{
     display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
-    margin:36px 0 0;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    margin:36px 0 0;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
   }
+  .group-head{
+    grid-column:1/-1;margin:0;padding:22px 16px 10px;background:var(--bg);
+    font:600 12px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--link);
+  }
+  .group-head[hidden]{display:none}
   .card{display:flex;flex-direction:column;background:var(--bg)}
   .card[hidden]{display:none}
 
+  /* ---- Art-first card (ROADMAP 3.1): the square preview dominates; the
+     three actions live in a hover/focus overlay INSIDE .stage, never in
+     normal flow, so .meta stays just the name and its collection label. */
+  .stage{position:relative}
   .frame{
-    position:relative;aspect-ratio:16/10;overflow:hidden;
+    position:relative;aspect-ratio:1/1;overflow:hidden;
     background:#000;display:block;text-decoration:none;
   }
-  .frame img,.frame iframe{
-    position:absolute;inset:0;width:100%;height:100%;border:0;display:block;
-  }
-  .frame img{object-fit:cover}
-  /* The iframe sits topmost in the anchor; without this, every click is
-     consumed by the iframe and never reaches the enclosing <a>. */
-  .frame iframe{pointer-events:none}
-  .frame:focus-visible{outline:2px solid var(--accent,var(--brand));outline-offset:2px}
-  /* Hue-degree spec tag, ported from specimen-grid's .cell .meta .tag-hue.
-     Colored via --accent so it reads as this card's own measured value,
-     not a shared UI accent. */
-  .frame-label{
-    position:absolute;top:10px;right:12px;z-index:2;
-    font-size:11px;letter-spacing:.04em;color:var(--accent,var(--brand));
-    text-shadow:0 1px 3px rgba(0,0,0,.85);
-  }
+  .frame img,.frame iframe{position:absolute;border:0;display:block}
+  .frame img{inset:0;width:100%;height:100%;object-fit:cover}
+  /* Sized/positioned from JS (goLive): a fixed 1280x800 box — the viewport
+     every piece actually lays its composition out against — scaled and
+     centred to fill the square frame the same way object-fit:cover crops
+     the still, so hovering never jumps the composition. The iframe sits
+     topmost in the anchor; without pointer-events:none, every click would
+     be consumed by it and never reach the enclosing <a>. */
+  .frame iframe{pointer-events:none;top:50%;left:50%}
+  .frame:focus-visible{outline:2px solid var(--link);outline-offset:-2px}
 
-  .meta{padding:16px 16px 18px;border-top:1px solid var(--line)}
+  .meta{padding:14px 4px 4px}
   .name{
-    display:flex;align-items:baseline;gap:10px;margin:0 0 6px;
-    font-size:16px;font-weight:700;letter-spacing:-.01em;
+    margin:0 0 3px;font:600 16px/1.25 var(--font-display);letter-spacing:-.01em;
   }
-  .swatch{width:20px;height:3px;flex:none}
-  .blurb{color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 12px}
-
-  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
-  .tag{
-    font:11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9a9aa8;
-    border:1px solid var(--line);padding:4px 8px;text-transform:uppercase;letter-spacing:.04em;
+  .collection-label{
+    margin:0;font:11px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
   }
 
   .mechanisms{
@@ -116,30 +127,45 @@
   .mechanism-label{
     color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
   }
-  .mechanism-title{margin:8px 0 4px;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .mechanism-title{margin:8px 0 4px;font:700 20px/1.2 var(--font-display);letter-spacing:-.01em}
   .mechanism-copy{color:var(--muted);font-size:13px;margin:0 0 8px}
   .mechanism-detail{color:var(--muted);font-size:13px;margin:0;max-width:60ch}
   .mechanisms .btn{flex:none;margin-top:2px}
 
-  /* $-prefixed action buttons, ported from specimen-grid's `$ tune` /
-     `$ export` / `$ ship` command-style labels. CSS-only (::before) so the
-     copy-to-clipboard handlers below, which do `btn.textContent = 'Copied'`
-     and restore it after, never lose the glyph to a wiped child node. */
-  .actions{display:flex;flex-wrap:wrap;gap:8px}
+  /* Card actions: an overlay INSIDE .stage, not normal-flow siblings of
+     .meta — the square preview stays the whole story until you hover or
+     focus it. Revealed by opacity (not display/visibility) so the buttons
+     stay in tab order and clickable by automated drivers even while
+     "hidden", and stay permanently visible on touch (no hover to reveal
+     them on). mouseenter/mouseleave/focusin/focusout bind to .stage, not
+     .frame or .actions individually — crossing from the frame into a
+     button inside the same .stage must never look like leaving it (see
+     goLive/clearLive below). $-prefixed, ported from specimen-grid's
+     `$ tune` / `$ export` / `$ ship` command-style labels; CSS-only
+     (::before) so the copy-to-clipboard handlers, which do
+     `btn.textContent = 'Copied'` and restore it after, never lose the
+     glyph to a wiped child node. */
+  .actions{
+    position:absolute;inset:auto 0 0 0;z-index:2;display:flex;flex-wrap:wrap;gap:6px;
+    padding:36px 10px 10px;background:linear-gradient(180deg,transparent,rgba(10,10,13,.92) 60%);
+    opacity:0;transition:opacity .15s ease;pointer-events:none;
+  }
+  .stage:hover .actions,.stage:focus-within .actions{opacity:1;pointer-events:auto}
+  @media (hover:none),(pointer:coarse){
+    .actions{opacity:1;pointer-events:auto;background:linear-gradient(180deg,transparent,rgba(10,10,13,.92) 40%)}
+  }
   .btn{
-    font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;
+    font:12px/1 var(--font-mono);letter-spacing:.03em;
     color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
     padding:9px 12px;cursor:pointer;text-decoration:none;display:inline-block;
   }
   .btn::before{content:'$ ';color:var(--brand)}
   .btn:hover{color:var(--ink);border-color:#3a3a46}
-  .btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-
-  .note{color:var(--muted);font-size:12px;margin:10px 0 0}
+  .btn:focus-visible{outline:2px solid var(--link);outline-offset:2px}
 
   .gh{
     display:inline-flex;align-items:center;gap:8px;flex:none;
-    font:500 13px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+    font:500 13px/1 var(--font-mono);
     color:#c6c6d0;background:var(--surface);border:1px solid var(--line);
     padding:9px 13px;text-decoration:none;
   }
@@ -150,7 +176,7 @@
   .skill{
     margin:64px 0 0;padding:28px;border:1px solid var(--line);background:var(--surface);
   }
-  .skill h2{margin:0 0 10px;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .skill h2{margin:0 0 10px;font:700 20px/1.2 var(--font-display);letter-spacing:-.01em}
   .skill p{color:var(--muted);font-size:13px;margin:0 0 18px;max-width:68ch}
   .skill .snip{
     display:flex;align-items:flex-start;gap:12px;
@@ -159,12 +185,12 @@
   }
   .skill pre{
     margin:0;flex:1;min-width:0;overflow-x:auto;
-    font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c6c6d0;
+    font:12px/1.7 var(--font-mono);color:#c6c6d0;
   }
-  .skill .actions{margin-top:16px}
+  .skill .actions{position:static;padding:0;opacity:1;pointer-events:auto;background:none;margin-top:16px}
 
   footer{padding:72px 0 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:72px}
-  footer a{color:var(--brand)}
+  footer a{color:var(--link)}
 
   @media (prefers-reduced-motion: reduce){
     *{animation:none!important;transition:none!important}
@@ -187,382 +213,348 @@
 <div class="wrap">
 
 <header class="intro">
-  <span class="label">Collection / 18 pieces / live</span>
+  <span class="label">Collection / 20 pieces / live</span>
   <h1>Generative backgrounds, <span class="op">shipped as one file.</span></h1>
-  <p class="lede">Eighteen self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
+  <p class="lede">20 self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
+  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning. Want stills instead of code? <a href="stills.zip">Download all 20 as square PNGs</a>.</p>
 </header>
 
 <section class="mechanisms" aria-label="Interaction mechanisms">
   <a class="mechanism" href="interactions/wake/">
     <span class="mechanism-label">Interaction mechanism — not a piece</span>
     <h2 class="mechanism-title">Wake</h2>
-    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the eighteen pieces below.</p>
+    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the 20 pieces below.</p>
     <p class="mechanism-detail">Off by default, opt-in per canvas, never baked into an exported piece. Try it live and tune strength, trail life, strand count, and color.</p>
   </a>
   <a class="btn" href="interactions/wake/">open wake</a>
 </section>
 
-<div class="chips" id="chips" role="group" aria-label="Filter pieces by category"></div>
+<div class="chips" id="chips" role="group" aria-label="Filter pieces by collection"></div>
 
 <div class="grid" id="grid">
-  <article class="card" data-tags="flow" style="--accent:hsl(200 60% 60%)">
-    <a class="frame" href="pieces/flow-field/" data-src="pieces/flow-field/" aria-label="Open Flow Field">
-      <img src="thumbs/flow-field.png" alt="Flow Field preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">200&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(200 60% 60%),hsl(280 60% 60%))"></span>
-        Flow Field
-      </h2>
-      <p class="blurb">Organic ribbons drifting along a simplex-noise vector field.</p>
-      <div class="tags"><span class="tag">flow</span></div>
+  <h3 class="group-head" data-collection="currents">Currents</h3>
+  <article class="card" data-collection="currents">
+    <div class="stage">
+      <a class="frame" href="pieces/flow-field/" data-src="pieces/flow-field/" aria-label="Open Flow Field">
+        <img src="thumbs/flow-field.png" alt="Flow Field preview" loading="lazy" width="300" height="300" />
+      </a>
       <div class="actions">
         <a class="btn" href="pieces/flow-field/">Open</a>
         <button class="btn" type="button" data-embed="pieces/flow-field/">Copy embed</button>
         <a class="btn" href="downloads/flow-field.html" download>Download</a>
       </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+    <div class="meta">
+      <h2 class="name">Flow Field</h2>
+      <p class="collection-label">Currents</p>
     </div>
   </article>
-  <article class="card" data-tags="geometric" style="--accent:hsl(35 50% 60%)">
-    <a class="frame" href="pieces/contour-grid/" data-src="pieces/contour-grid/" aria-label="Open Contour Grid">
-      <img src="thumbs/contour-grid.png" alt="Contour Grid preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">35&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(35 50% 60%),hsl(15 50% 60%))"></span>
-        Contour Grid
-      </h2>
-      <p class="blurb">Topographic bands undulating like breathing terrain.</p>
-      <div class="tags"><span class="tag">geometric</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/contour-grid/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/contour-grid/">Copy embed</button>
-        <a class="btn" href="downloads/contour-grid.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="optical" style="--accent:hsl(185 75% 60%)">
-    <a class="frame" href="pieces/interference/" data-src="pieces/interference/" aria-label="Open Interference">
-      <img src="thumbs/interference.png" alt="Interference preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">185&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(185 75% 60%),hsl(320 75% 60%))"></span>
-        Interference
-      </h2>
-      <p class="blurb">Two concentric ring families crossing into moiré.</p>
-      <div class="tags"><span class="tag">optical</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/interference/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/interference/">Copy embed</button>
-        <a class="btn" href="downloads/interference.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="orb" style="--accent:hsl(265 55% 60%)">
-    <a class="frame" href="pieces/orbital-veil/" data-src="pieces/orbital-veil/" aria-label="Open Orbital Veil">
-      <img src="thumbs/orbital-veil.png" alt="Orbital Veil preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">265&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(265 55% 60%),hsl(330 55% 60%))"></span>
-        Orbital Veil
-      </h2>
-      <p class="blurb">Concentric arcs turning at different rates around one centre.</p>
-      <div class="tags"><span class="tag">orb</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/orbital-veil/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/orbital-veil/">Copy embed</button>
-        <a class="btn" href="downloads/orbital-veil.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="grain" style="--accent:hsl(30 12% 60%)">
-    <a class="frame" href="pieces/grain-field/" data-src="pieces/grain-field/" aria-label="Open Grain Field">
-      <img src="thumbs/grain-field.png" alt="Grain Field preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">30&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(30 12% 60%),hsl(210 12% 60%))"></span>
-        Grain Field
-      </h2>
-      <p class="blurb">Fine drifting grain — the quietest piece, good behind text.</p>
-      <div class="tags"><span class="tag">grain</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/grain-field/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/grain-field/">Copy embed</button>
-        <a class="btn" href="downloads/grain-field.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="geometric 3d" style="--accent:hsl(190 35% 60%)">
-    <a class="frame" href="pieces/wireframe-lattice/" data-src="pieces/wireframe-lattice/" aria-label="Open Wireframe Lattice">
-      <img src="thumbs/wireframe-lattice.png" alt="Wireframe Lattice preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">190&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(190 35% 60%),hsl(205 35% 60%))"></span>
-        Wireframe Lattice
-      </h2>
-      <p class="blurb">A rigid 3D grid rippling in perspective.</p>
-      <div class="tags"><span class="tag">geometric</span><span class="tag">3d</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/wireframe-lattice/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/wireframe-lattice/">Copy embed</button>
-        <a class="btn" href="downloads/wireframe-lattice.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="flow sparse" style="--accent:hsl(150 50% 60%)">
-    <a class="frame" href="pieces/meridian/" data-src="pieces/meridian/" aria-label="Open Meridian">
-      <img src="thumbs/meridian.png" alt="Meridian preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">150&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(150 50% 60%),hsl(180 50% 60%))"></span>
-        Meridian
-      </h2>
-      <p class="blurb">Seven long ribbons sweeping the full width.</p>
-      <div class="tags"><span class="tag">flow</span><span class="tag">sparse</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/meridian/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/meridian/">Copy embed</button>
-        <a class="btn" href="downloads/meridian.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="network dense" style="--accent:hsl(75 70% 60%)">
-    <a class="frame" href="pieces/synapse/" data-src="pieces/synapse/" aria-label="Open Synapse">
-      <img src="thumbs/synapse.png" alt="Synapse preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">75&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(75 70% 60%),hsl(45 70% 60%))"></span>
-        Synapse
-      </h2>
-      <p class="blurb">Drifting nodes wired to their neighbours, pulsing.</p>
-      <div class="tags"><span class="tag">network</span><span class="tag">dense</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/synapse/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/synapse/">Copy embed</button>
-        <a class="btn" href="downloads/synapse.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="orb dense" style="--accent:hsl(10 80% 60%)">
-    <a class="frame" href="pieces/accretion/" data-src="pieces/accretion/" aria-label="Open Accretion">
-      <img src="thumbs/accretion.png" alt="Accretion preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">10&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(10 80% 60%),hsl(40 80% 60%))"></span>
-        Accretion
-      </h2>
-      <p class="blurb">Matter spiralling inward to a bright core.</p>
-      <div class="tags"><span class="tag">orb</span><span class="tag">dense</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/accretion/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/accretion/">Copy embed</button>
-        <a class="btn" href="downloads/accretion.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="sparse" style="--accent:hsl(220 25% 60%)">
-    <a class="frame" href="pieces/tether/" data-src="pieces/tether/" aria-label="Open Tether">
-      <img src="thumbs/tether.png" alt="Tether preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">220&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(220 25% 60%),hsl(250 25% 60%))"></span>
-        Tether
-      </h2>
-      <p class="blurb">Heavy cables mooring to a single converging point.</p>
-      <div class="tags"><span class="tag">sparse</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/tether/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/tether/">Copy embed</button>
-        <a class="btn" href="downloads/tether.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="3d orb" style="--accent:hsl(285 60% 60%)">
-    <a class="frame" href="pieces/event-horizon/" data-src="pieces/event-horizon/" aria-label="Open Event Horizon">
-      <img src="thumbs/event-horizon.png" alt="Event Horizon preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">285&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(285 60% 60%),hsl(230 60% 60%))"></span>
-        Event Horizon
-      </h2>
-      <p class="blurb">A polar grid bent inward by a gravity well.</p>
-      <div class="tags"><span class="tag">3d</span><span class="tag">orb</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/event-horizon/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/event-horizon/">Copy embed</button>
-        <a class="btn" href="downloads/event-horizon.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="sparse" style="--accent:hsl(205 18% 60%)">
-    <a class="frame" href="pieces/rainfall/" data-src="pieces/rainfall/" aria-label="Open Rainfall">
-      <img src="thumbs/rainfall.png" alt="Rainfall preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">205&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(205 18% 60%),hsl(195 18% 60%))"></span>
-        Rainfall
-      </h2>
-      <p class="blurb">Sparse vertical streaks falling at their own speed, each with a brighter head.</p>
-      <div class="tags"><span class="tag">sparse</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/rainfall/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/rainfall/">Copy embed</button>
-        <a class="btn" href="downloads/rainfall.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="optical organic sparse" style="--accent:hsl(198 24% 60%)">
-    <a class="frame" href="pieces/lacuna/" data-src="pieces/lacuna/" aria-label="Open Lacuna">
-      <img src="thumbs/lacuna.png" alt="Lacuna preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">198&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(198 24% 60%),hsl(224 24% 60%))"></span>
-        Lacuna
-      </h2>
-      <p class="blurb">Broken caustic arcs gather around an off-centre calm zone.</p>
-      <div class="tags"><span class="tag">optical</span><span class="tag">organic</span><span class="tag">sparse</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/lacuna/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/lacuna/">Copy embed</button>
-        <a class="btn" href="downloads/lacuna.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="depth optical sparse" style="--accent:hsl(344 30% 60%)">
-    <a class="frame" href="pieces/parallax/" data-src="pieces/parallax/" aria-label="Open Parallax">
-      <img src="thumbs/parallax.png" alt="Parallax preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">344&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(344 30% 60%),hsl(24 30% 60%))"></span>
-        Parallax
-      </h2>
-      <p class="blurb">A rose-to-amber fan parts around an unseen volume, with near strands slipping past finer distant lines.</p>
-      <div class="tags"><span class="tag">depth</span><span class="tag">optical</span><span class="tag">sparse</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/parallax/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/parallax/">Copy embed</button>
-        <a class="btn" href="downloads/parallax.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="glyph organic sparse" style="--accent:hsl(42 22% 60%)">
-    <a class="frame" href="pieces/cipher-bloom/" data-src="pieces/cipher-bloom/" aria-label="Open Cipher Bloom">
-      <img src="thumbs/cipher-bloom.png" alt="Cipher Bloom preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">42&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(42 22% 60%),hsl(76 22% 60%))"></span>
-        Cipher Bloom
-      </h2>
-      <p class="blurb">Irregular glyphs gather into a bright oblique core, then dissolve into warm chalk and shadow.</p>
-      <div class="tags"><span class="tag">glyph</span><span class="tag">organic</span><span class="tag">sparse</span></div>
-      <div class="actions">
-        <a class="btn" href="pieces/cipher-bloom/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/cipher-bloom/">Copy embed</button>
-        <a class="btn" href="downloads/cipher-bloom.html" download>Download</a>
-      </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
-    </div>
-  </article>
-  <article class="card" data-tags="organic depth kinetic" style="--accent:hsl(250 16% 60%)">
-    <a class="frame" href="pieces/driftwork/" data-src="pieces/driftwork/" aria-label="Open Driftwork">
-      <img src="thumbs/driftwork.png" alt="Driftwork preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">250&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(250 16% 60%),hsl(278 16% 60%))"></span>
-        Driftwork
-      </h2>
-      <p class="blurb">Violet-grey ellipse marks drift through two crossing currents, gathering and dissolving like woven air.</p>
-      <div class="tags"><span class="tag">organic</span><span class="tag">depth</span><span class="tag">kinetic</span></div>
+  <article class="card" data-collection="currents">
+    <div class="stage">
+      <a class="frame" href="pieces/driftwork/" data-src="pieces/driftwork/" aria-label="Open Driftwork">
+        <img src="thumbs/driftwork.png" alt="Driftwork preview" loading="lazy" width="300" height="300" />
+      </a>
       <div class="actions">
         <a class="btn" href="pieces/driftwork/">Open</a>
         <button class="btn" type="button" data-embed="pieces/driftwork/">Copy embed</button>
         <a class="btn" href="downloads/driftwork.html" download>Download</a>
       </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+    <div class="meta">
+      <h2 class="name">Driftwork</h2>
+      <p class="collection-label">Currents</p>
     </div>
   </article>
-  <article class="card" data-tags="geometric organic editorial" style="--accent:hsl(12 30% 60%)">
-    <a class="frame" href="pieces/pleat/" data-src="pieces/pleat/" aria-label="Open Pleat">
-      <img src="thumbs/pleat.png" alt="Pleat preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">12&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(12 30% 60%),hsl(38 30% 60%))"></span>
-        Pleat
-      </h2>
-      <p class="blurb">Coral and ivory marks gather into two folded surfaces, divided by a clean cut of space.</p>
-      <div class="tags"><span class="tag">geometric</span><span class="tag">organic</span><span class="tag">editorial</span></div>
+  <article class="card" data-collection="currents">
+    <div class="stage">
+      <a class="frame" href="pieces/longwave/" data-src="pieces/longwave/" aria-label="Open Longwave">
+        <img src="thumbs/longwave.png" alt="Longwave preview" loading="lazy" width="300" height="300" />
+      </a>
       <div class="actions">
-        <a class="btn" href="pieces/pleat/">Open</a>
-        <button class="btn" type="button" data-embed="pieces/pleat/">Copy embed</button>
-        <a class="btn" href="downloads/pleat.html" download>Download</a>
+        <a class="btn" href="pieces/longwave/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/longwave/">Copy embed</button>
+        <a class="btn" href="downloads/longwave.html" download>Download</a>
       </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+    <div class="meta">
+      <h2 class="name">Longwave</h2>
+      <p class="collection-label">Currents</p>
     </div>
   </article>
-  <article class="card" data-tags="3d geometric" style="--accent:hsl(105 40% 60%)">
-    <a class="frame" href="pieces/globe/" data-src="pieces/globe/" aria-label="Open Globe">
-      <img src="thumbs/globe.png" alt="Globe preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">105&deg;</span>
-    </a>
+  <article class="card" data-collection="currents">
+    <div class="stage">
+      <a class="frame" href="pieces/mooring/" data-src="pieces/mooring/" aria-label="Open Mooring">
+        <img src="thumbs/mooring.png" alt="Mooring preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/mooring/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/mooring/">Copy embed</button>
+        <a class="btn" href="downloads/mooring.html" download>Download</a>
+      </div>
+    </div>
     <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,hsl(105 40% 60%),hsl(130 40% 60%))"></span>
-        Globe
-      </h2>
-      <p class="blurb">A lat/long wire sphere spinning in true perspective, tilt and yaw draggable.</p>
-      <div class="tags"><span class="tag">3d</span><span class="tag">geometric</span></div>
+      <h2 class="name">Mooring</h2>
+      <p class="collection-label">Currents</p>
+    </div>
+  </article>
+  <article class="card" data-collection="currents">
+    <div class="stage">
+      <a class="frame" href="pieces/rainfall/" data-src="pieces/rainfall/" aria-label="Open Rainfall">
+        <img src="thumbs/rainfall.png" alt="Rainfall preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/rainfall/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/rainfall/">Copy embed</button>
+        <a class="btn" href="downloads/rainfall.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Rainfall</h2>
+      <p class="collection-label">Currents</p>
+    </div>
+  </article>
+  <h3 class="group-head" data-collection="volumes">Volumes</h3>
+  <article class="card" data-collection="volumes">
+    <div class="stage">
+      <a class="frame" href="pieces/globe/" data-src="pieces/globe/" aria-label="Open Globe">
+        <img src="thumbs/globe.png" alt="Globe preview" loading="lazy" width="300" height="300" />
+      </a>
       <div class="actions">
         <a class="btn" href="pieces/globe/">Open</a>
         <button class="btn" type="button" data-embed="pieces/globe/">Copy embed</button>
         <a class="btn" href="downloads/globe.html" download>Download</a>
       </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+    <div class="meta">
+      <h2 class="name">Globe</h2>
+      <p class="collection-label">Volumes</p>
+    </div>
+  </article>
+  <article class="card" data-collection="volumes">
+    <div class="stage">
+      <a class="frame" href="pieces/funnel/" data-src="pieces/funnel/" aria-label="Open Funnel">
+        <img src="thumbs/funnel.png" alt="Funnel preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/funnel/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/funnel/">Copy embed</button>
+        <a class="btn" href="downloads/funnel.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Funnel</h2>
+      <p class="collection-label">Volumes</p>
+    </div>
+  </article>
+  <article class="card" data-collection="volumes">
+    <div class="stage">
+      <a class="frame" href="pieces/wireframe-lattice/" data-src="pieces/wireframe-lattice/" aria-label="Open Wireframe Lattice">
+        <img src="thumbs/wireframe-lattice.png" alt="Wireframe Lattice preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/wireframe-lattice/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/wireframe-lattice/">Copy embed</button>
+        <a class="btn" href="downloads/wireframe-lattice.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Wireframe Lattice</h2>
+      <p class="collection-label">Volumes</p>
+    </div>
+  </article>
+  <article class="card" data-collection="volumes">
+    <div class="stage">
+      <a class="frame" href="pieces/parallax/" data-src="pieces/parallax/" aria-label="Open Parallax">
+        <img src="thumbs/parallax.png" alt="Parallax preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/parallax/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/parallax/">Copy embed</button>
+        <a class="btn" href="downloads/parallax.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Parallax</h2>
+      <p class="collection-label">Volumes</p>
+    </div>
+  </article>
+  <article class="card" data-collection="volumes">
+    <div class="stage">
+      <a class="frame" href="pieces/dune/" data-src="pieces/dune/" aria-label="Open Dune">
+        <img src="thumbs/dune.png" alt="Dune preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/dune/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/dune/">Copy embed</button>
+        <a class="btn" href="downloads/dune.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Dune</h2>
+      <p class="collection-label">Volumes</p>
+    </div>
+  </article>
+  <h3 class="group-head" data-collection="orbits">Orbits</h3>
+  <article class="card" data-collection="orbits">
+    <div class="stage">
+      <a class="frame" href="pieces/orbitals/" data-src="pieces/orbitals/" aria-label="Open Orbitals">
+        <img src="thumbs/orbitals.png" alt="Orbitals preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/orbitals/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/orbitals/">Copy embed</button>
+        <a class="btn" href="downloads/orbitals.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Orbitals</h2>
+      <p class="collection-label">Orbits</p>
+    </div>
+  </article>
+  <article class="card" data-collection="orbits">
+    <div class="stage">
+      <a class="frame" href="pieces/infall/" data-src="pieces/infall/" aria-label="Open Infall">
+        <img src="thumbs/infall.png" alt="Infall preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/infall/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/infall/">Copy embed</button>
+        <a class="btn" href="downloads/infall.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Infall</h2>
+      <p class="collection-label">Orbits</p>
+    </div>
+  </article>
+  <article class="card" data-collection="orbits">
+    <div class="stage">
+      <a class="frame" href="pieces/lacuna/" data-src="pieces/lacuna/" aria-label="Open Lacuna">
+        <img src="thumbs/lacuna.png" alt="Lacuna preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/lacuna/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/lacuna/">Copy embed</button>
+        <a class="btn" href="downloads/lacuna.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Lacuna</h2>
+      <p class="collection-label">Orbits</p>
+    </div>
+  </article>
+  <article class="card" data-collection="orbits">
+    <div class="stage">
+      <a class="frame" href="pieces/moire/" data-src="pieces/moire/" aria-label="Open Moiré">
+        <img src="thumbs/moire.png" alt="Moiré preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/moire/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/moire/">Copy embed</button>
+        <a class="btn" href="downloads/moire.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Moiré</h2>
+      <p class="collection-label">Orbits</p>
+    </div>
+  </article>
+  <h3 class="group-head" data-collection="surfaces">Surfaces</h3>
+  <article class="card" data-collection="surfaces">
+    <div class="stage">
+      <a class="frame" href="pieces/contour-grid/" data-src="pieces/contour-grid/" aria-label="Open Contour Grid">
+        <img src="thumbs/contour-grid.png" alt="Contour Grid preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/contour-grid/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/contour-grid/">Copy embed</button>
+        <a class="btn" href="downloads/contour-grid.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Contour Grid</h2>
+      <p class="collection-label">Surfaces</p>
+    </div>
+  </article>
+  <article class="card" data-collection="surfaces">
+    <div class="stage">
+      <a class="frame" href="pieces/pleat/" data-src="pieces/pleat/" aria-label="Open Pleat">
+        <img src="thumbs/pleat.png" alt="Pleat preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/pleat/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/pleat/">Copy embed</button>
+        <a class="btn" href="downloads/pleat.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Pleat</h2>
+      <p class="collection-label">Surfaces</p>
+    </div>
+  </article>
+  <article class="card" data-collection="surfaces">
+    <div class="stage">
+      <a class="frame" href="pieces/grain-field/" data-src="pieces/grain-field/" aria-label="Open Grain Field">
+        <img src="thumbs/grain-field.png" alt="Grain Field preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/grain-field/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/grain-field/">Copy embed</button>
+        <a class="btn" href="downloads/grain-field.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Grain Field</h2>
+      <p class="collection-label">Surfaces</p>
+    </div>
+  </article>
+  <article class="card" data-collection="surfaces">
+    <div class="stage">
+      <a class="frame" href="pieces/swell/" data-src="pieces/swell/" aria-label="Open Swell">
+        <img src="thumbs/swell.png" alt="Swell preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/swell/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/swell/">Copy embed</button>
+        <a class="btn" href="downloads/swell.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Swell</h2>
+      <p class="collection-label">Surfaces</p>
+    </div>
+  </article>
+  <h3 class="group-head" data-collection="codes">Codes</h3>
+  <article class="card" data-collection="codes">
+    <div class="stage">
+      <a class="frame" href="pieces/cipher-bloom/" data-src="pieces/cipher-bloom/" aria-label="Open Cipher Bloom">
+        <img src="thumbs/cipher-bloom.png" alt="Cipher Bloom preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/cipher-bloom/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/cipher-bloom/">Copy embed</button>
+        <a class="btn" href="downloads/cipher-bloom.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Cipher Bloom</h2>
+      <p class="collection-label">Codes</p>
+    </div>
+  </article>
+  <article class="card" data-collection="codes">
+    <div class="stage">
+      <a class="frame" href="pieces/relay/" data-src="pieces/relay/" aria-label="Open Relay">
+        <img src="thumbs/relay.png" alt="Relay preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/relay/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/relay/">Copy embed</button>
+        <a class="btn" href="downloads/relay.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Relay</h2>
+      <p class="collection-label">Codes</p>
     </div>
   </article>
 </div>
@@ -593,223 +585,264 @@ const PIECES = [
   {
     "slug": "flow-field",
     "title": "Flow Field",
-    "blurb": "Organic ribbons drifting along a simplex-noise vector field.",
+    "blurb": "Particles confined to one soft, organic region around a quiet central void, trailing hairlines that brighten only where they cross.",
     "tags": [
-      "flow"
+      "flow",
+      "organic"
     ],
     "hue": 200,
     "hueB": 280,
-    "saturation": 0.6,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "band's inner edge, upper right",
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "currents"
   },
   {
     "slug": "contour-grid",
     "title": "Contour Grid",
-    "blurb": "Topographic bands undulating like breathing terrain.",
+    "blurb": "The contour lines of one island, cropped as a single landform with its summit as the brightest point.",
     "tags": [
-      "geometric"
+      "topographic",
+      "organic"
     ],
     "hue": 35,
     "hueB": 15,
-    "saturation": 0.5,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "summit, right of centre",
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "surfaces"
   },
   {
-    "slug": "interference",
-    "title": "Interference",
-    "blurb": "Two concentric ring families crossing into moiré.",
+    "slug": "moire",
+    "title": "Moiré",
+    "blurb": "Two gratings of straight lines in one disc, rocking so broad moiré bands sweep across it.",
     "tags": [
-      "optical"
+      "optical",
+      "geometric"
     ],
+    "safeZone": "outside the disc, widest on the left",
+    "anchor": "pinned band at the pivot, left of the disc's centre",
     "hue": 185,
     "hueB": 320,
-    "saturation": 0.75,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "orbits"
   },
   {
-    "slug": "orbital-veil",
-    "title": "Orbital Veil",
-    "blurb": "Concentric arcs turning at different rates around one centre.",
+    "slug": "orbitals",
+    "title": "Orbitals",
+    "blurb": "A tilted ring of hairline arcs, each turning at its own rate, whose overlaps gather into one bright crescent that travels slowly round.",
     "tags": [
-      "orb"
+      "orb",
+      "kinetic"
     ],
     "hue": 265,
     "hueB": 330,
-    "saturation": 0.55,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "crescent on the ring's near side, lower centre, travelling slowly round",
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "orbits"
   },
   {
     "slug": "grain-field",
     "title": "Grain Field",
-    "blurb": "Fine drifting grain — the quietest piece, good behind text.",
+    "blurb": "Fine grain gathered into one soft drifting cloud with a long falloff — the quietest piece, and the home-page hero.",
     "tags": [
-      "grain"
+      "grain",
+      "hero"
     ],
     "hue": 30,
     "hueB": 210,
-    "saturation": 0.12,
+    "saturation": 0,
+    "safeZone": "left ~60%, clear of the hero copy",
+    "anchor": "cloud's centre, right of frame-centre",
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "surfaces"
   },
   {
     "slug": "wireframe-lattice",
     "title": "Wireframe Lattice",
-    "blurb": "A rigid 3D grid rippling in perspective.",
+    "blurb": "One finite lattice sheet with crisp edges, floating tilted in space and flexing, its fold catching the light where it turns edge-on.",
     "tags": [
       "geometric",
       "3d"
     ],
     "hue": 190,
     "hueB": 205,
-    "saturation": 0.35,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "fold crest, upper right, travelling across the sheet",
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "volumes"
   },
   {
-    "slug": "meridian",
-    "title": "Meridian",
-    "blurb": "Seven long ribbons sweeping the full width.",
+    "slug": "longwave",
+    "title": "Longwave",
+    "blurb": "A band of hairlines riding one long wave, pinching together at its nodes.",
     "tags": [
-      "flow",
-      "sparse"
+      "flow"
     ],
+    "safeZone": "upper left, above the band",
+    "anchor": "tightest node, just right of centre",
     "hue": 150,
     "hueB": 180,
-    "saturation": 0.5,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "currents"
   },
   {
-    "slug": "synapse",
-    "title": "Synapse",
-    "blurb": "Drifting nodes wired to their neighbours, pulsing.",
+    "slug": "relay",
+    "title": "Relay",
+    "blurb": "A canopy of branching hairlines grown from one root, a pulse climbing to the tips.",
     "tags": [
       "network",
-      "dense"
+      "organic"
     ],
-    "hue": 75,
-    "hueB": 45,
-    "saturation": 0.7,
+    "hue": 150,
+    "hueB": 50,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "root, bottom centre-right",
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "codes"
   },
   {
-    "slug": "accretion",
-    "title": "Accretion",
-    "blurb": "Matter spiralling inward to a bright core.",
+    "slug": "infall",
+    "title": "Infall",
+    "blurb": "Hairline streamlines spiralling into one small, bright core.",
     "tags": [
       "orb",
-      "dense"
+      "flow"
     ],
+    "safeZone": "left third",
+    "anchor": "core, right of centre",
     "hue": 10,
     "hueB": 40,
-    "saturation": 0.8,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
-  },
-  {
-    "slug": "tether",
-    "title": "Tether",
-    "blurb": "Heavy cables mooring to a single converging point.",
-    "tags": [
-      "sparse"
     ],
-    "hue": 220,
-    "hueB": 250,
-    "saturation": 0.25,
+    "collection": "orbits"
+  },
+  {
+    "slug": "mooring",
+    "title": "Mooring",
+    "blurb": "One rope of twisted hairlines rising into a single loose loop; the crossing glows.",
+    "tags": [
+      "organic",
+      "flow"
+    ],
+    "hue": 12,
+    "hueB": 48,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "loop crossing, lower centre-right",
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "currents"
   },
   {
-    "slug": "event-horizon",
-    "title": "Event Horizon",
-    "blurb": "A polar grid bent inward by a gravity well.",
+    "slug": "funnel",
+    "title": "Funnel",
+    "blurb": "A funnel seen side-on: stacked hairline ellipses narrowing to one bright tip, slowly twisting.",
     "tags": [
       "3d",
-      "orb"
+      "geometric"
     ],
-    "hue": 285,
-    "hueB": 230,
-    "saturation": 0.6,
+    "hue": 290,
+    "hueB": 190,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "tip and lower stem, centre",
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "volumes"
   },
   {
     "slug": "rainfall",
     "title": "Rainfall",
-    "blurb": "Sparse vertical streaks falling at their own speed, each with a brighter head.",
+    "blurb": "Sparse vertical streaks falling at their own speed, gathered in a veil that leaves the left third quiet.",
     "tags": [
       "sparse"
     ],
+    "safeZone": "left third",
+    "anchor": "brightest heads, right of centre",
     "hue": 205,
     "hueB": 195,
-    "saturation": 0.18,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "currents"
   },
   {
     "slug": "lacuna",
@@ -820,129 +853,213 @@ const PIECES = [
       "organic",
       "sparse"
     ],
+    "safeZone": "left third",
+    "anchor": "outermost arc's densest crossing, right of centre",
     "hue": 198,
     "hueB": 224,
-    "saturation": 0.24,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "orbits"
   },
   {
     "slug": "parallax",
     "title": "Parallax",
-    "blurb": "A rose-to-amber fan parts around an unseen volume, with near strands slipping past finer distant lines.",
+    "blurb": "Parallel diagonal lines part around an unseen volume, near strands heavier than the finer distant ones.",
     "tags": [
       "depth",
-      "optical",
-      "sparse"
+      "optical"
     ],
+    "safeZone": "upper-left corner",
+    "anchor": "near lines bending tightest around the invisible volume",
     "hue": 344,
     "hueB": 24,
-    "saturation": 0.3,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "volumes"
   },
   {
     "slug": "cipher-bloom",
     "title": "Cipher Bloom",
-    "blurb": "Irregular glyphs gather into a bright oblique core, then dissolve into warm chalk and shadow.",
+    "blurb": "A compressed oblique band of shifting glyph fragments, drawing a small bright core along its own length.",
     "tags": [
       "glyph",
       "organic",
       "sparse"
     ],
+    "safeZone": "top and bottom thirds, clear of the band",
+    "anchor": "core, drifting along the band's centre",
     "hue": 42,
     "hueB": 76,
-    "saturation": 0.22,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "codes"
   },
   {
     "slug": "driftwork",
     "title": "Driftwork",
-    "blurb": "Violet-grey ellipse marks drift through two crossing currents, gathering and dissolving like woven air.",
+    "blurb": "Tangent-aligned ellipse links follow two crossing currents, brightening by accumulation where they meet.",
     "tags": [
       "organic",
       "depth",
       "kinetic"
     ],
+    "safeZone": "left third",
+    "anchor": "crossing, centre of the frame",
     "hue": 250,
     "hueB": 278,
-    "saturation": 0.16,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "currents"
   },
   {
     "slug": "pleat",
     "title": "Pleat",
-    "blurb": "Coral and ivory marks gather into two folded surfaces, divided by a clean cut of space.",
+    "blurb": "Two folded bands of ivory marks, divided by a clean cut of empty space where they don't touch.",
     "tags": [
       "geometric",
       "organic",
       "editorial"
     ],
-    "hue": 12,
-    "hueB": 38,
-    "saturation": 0.3,
+    "safeZone": "top, above the folded bands",
+    "anchor": "crease, where the two bands meet",
+    "hue": 46,
+    "hueB": 54,
+    "saturation": 0,
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "surfaces"
   },
   {
     "slug": "globe",
     "title": "Globe",
-    "blurb": "A lat/long wire sphere spinning in true perspective, tilt and yaw draggable.",
+    "blurb": "A tilted sphere drawn only in parallel latitude slices, with no meridians, crowding and brightening toward one lit limb.",
     "tags": [
       "3d",
       "geometric"
     ],
     "hue": 105,
     "hueB": 130,
-    "saturation": 0.4,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "limb arc, upper right",
     "presets": [
       "whisper",
       "ink",
       "neon",
       "drift",
       "dense"
-    ]
+    ],
+    "collection": "volumes"
+  },
+  {
+    "slug": "dune",
+    "title": "Dune",
+    "blurb": "One wind-cut ridge built from film grain, its face caught by a low raking light and crossed by faint ripples.",
+    "tags": [
+      "grain",
+      "organic",
+      "depth"
+    ],
+    "hue": 45,
+    "hueB": 0,
+    "saturation": 0,
+    "safeZone": "top band and upper right",
+    "anchor": "lit brink, centre",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "volumes"
+  },
+  {
+    "slug": "swell",
+    "title": "Swell",
+    "blurb": "A single ocean swell rising on a diagonal, drawn in halftone dots whose size carries the light on its face.",
+    "tags": [
+      "geometric",
+      "optical",
+      "editorial"
+    ],
+    "hue": 185,
+    "hueB": 250,
+    "saturation": 0,
+    "safeZone": "lower left",
+    "anchor": "lip, upper right",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "surfaces"
+  }
+];
+const COLLECTIONS = [
+  {
+    "id": "currents",
+    "title": "Currents"
+  },
+  {
+    "id": "volumes",
+    "title": "Volumes"
+  },
+  {
+    "id": "orbits",
+    "title": "Orbits"
+  },
+  {
+    "id": "surfaces",
+    "title": "Surfaces"
+  },
+  {
+    "id": "codes",
+    "title": "Codes"
   }
 ];
 
-/* ---- Filtering ---------------------------------------------------------- */
+/* ---- Filtering, by collection ------------------------------------------- */
 const grid = document.getElementById('grid');
 const chipRow = document.getElementById('chips');
-const allTags = [...new Set(PIECES.flatMap(p => p.tags))].sort();
 let active = null;
 
 function renderChips(){
-  // Built once. apply() only ever toggles aria-pressed on these same
-  // buttons — replacing them on every click would drop keyboard focus
-  // back to <body> on each filter change, which is the same class of
-  // defect as a hover-only preview.
+  // Built once, in collections.json's own order. apply() only ever toggles
+  // aria-pressed on these same buttons — replacing them on every click
+  // would drop keyboard focus back to <body> on each filter change, which
+  // is the same class of defect as a hover-only preview.
   const mk = (label, value) => {
     const b = document.createElement('button');
     b.className = 'chip';
@@ -953,13 +1070,18 @@ function renderChips(){
     b.addEventListener('click', () => { active = value; apply(); });
     return b;
   };
-  chipRow.replaceChildren(mk('All', null), ...allTags.map(t => mk(t, t)));
+  chipRow.replaceChildren(mk('All', null), ...COLLECTIONS.map(c => mk(c.title, c.id)));
 }
 
 function apply(){
-  for (const card of grid.children){
-    const tags = card.dataset.tags.split(' ');
-    card.hidden = active !== null && !tags.includes(active);
+  // .card and .group-head are both direct children of #grid — query by
+  // class, not grid.children, so a group heading is never mistaken for a
+  // card. A single collection filtered in never needs its own heading.
+  for (const card of grid.querySelectorAll('.card')){
+    card.hidden = active !== null && card.dataset.collection !== active;
+  }
+  for (const head of grid.querySelectorAll('.group-head')){
+    head.hidden = active !== null;
   }
   for (const chip of chipRow.children){
     const value = chip.dataset.value || null;
@@ -969,12 +1091,22 @@ function apply(){
 
 /* ---- Live preview on hover and keyboard focus ---------------------------
    Exactly one iframe exists at a time. A stale iframe keeps its animation
-   loop running, and twelve concurrent loops is the whole reason the grid
+   loop running, and twenty concurrent loops is the whole reason the grid
    uses stills. Touch devices never reach this code — see the media query
    below — so tapping a card just opens the piece.                          */
 const canHover = window.matchMedia('(hover: hover)').matches;
 let liveFrame = null;
 let liveTimer = null;
+
+// Scales+centres the fixed 1280x800 iframe to fill the square .frame the
+// same way object-fit:cover crops the still (scale by height — width==
+// height on a square frame — so the extra width overflows evenly left and
+// right, matching a centred crop, not a squeeze). Re-run on resize so a
+// live preview open across a viewport change stays aligned.
+function sizeLiveFrame(iframe, frame){
+  const h = frame.clientHeight || frame.getBoundingClientRect().height;
+  iframe.style.transform = `translate(-50%,-50%) scale(${h / 800})`;
+}
 
 function goLive(frame){
   if (!canHover || liveFrame === frame) return;
@@ -992,6 +1124,10 @@ function goLive(frame){
     iframe.setAttribute('tabindex', '-1');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.setAttribute('loading', 'eager');
+    iframe.style.width = '1280px';
+    iframe.style.height = '800px';
+    iframe.style.transformOrigin = 'center center';
+    sizeLiveFrame(iframe, frame);
     // Kept invisible (inline style, set before append — no window where an
     // unhidden panel could paint) until the panel-hiding style is injected
     // below. The still image sits behind the whole time, so the viewer only
@@ -1019,6 +1155,9 @@ function goLive(frame){
     });
     frame.appendChild(iframe);
     liveFrame = frame;
+    const onResize = () => { if (liveFrame === frame) sizeLiveFrame(iframe, frame); };
+    window.addEventListener('resize', onResize);
+    iframe.__lfCleanup = () => window.removeEventListener('resize', onResize);
   }, 120);
 }
 
@@ -1026,17 +1165,26 @@ function clearLive(){
   clearTimeout(liveTimer);
   if (!liveFrame) return;
   const iframe = liveFrame.querySelector('iframe');
-  if (iframe) iframe.remove();
+  if (iframe) { iframe.__lfCleanup?.(); iframe.remove(); }
   liveFrame = null;
 }
 
-for (const frame of grid.querySelectorAll('.frame')){
-  frame.addEventListener('mouseenter', () => goLive(frame));
-  frame.addEventListener('mouseleave', clearLive);
-  // Keyboard users get the same preview. Hover-only interactivity is
-  // invisible to them, and this is one extra event pair.
-  frame.addEventListener('focus', () => goLive(frame));
-  frame.addEventListener('blur', clearLive);
+// mouseenter/mouseleave/focusin/focusout bind to .stage — the wrapper
+// around both .frame and the .actions overlay — never to .frame alone.
+// mouseenter/mouseleave don't bubble, so moving the pointer from the image
+// onto an action button inside the SAME .stage never fires a spurious
+// leave; binding to .frame instead would kill the live preview the instant
+// a visitor reached for "Open" or "Copy embed". focusin/focusout (which do
+// bubble) cover every focusable child the same way, including the buttons
+// mouseenter/mouseleave can't reach via keyboard.
+for (const stage of grid.querySelectorAll('.stage')){
+  const frame = stage.querySelector('.frame');
+  stage.addEventListener('mouseenter', () => goLive(frame));
+  stage.addEventListener('mouseleave', clearLive);
+  stage.addEventListener('focusin', () => goLive(frame));
+  stage.addEventListener('focusout', (e) => {
+    if (!stage.contains(e.relatedTarget)) clearLive();
+  });
 }
 
 /* ---- Copy embed --------------------------------------------------------- */

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — infall</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  infall — logarithmic-spiral streamlines of hairlines winding into a
+  small, off-centre bright core, brightening by accumulation as they
+  converge.
+  Text-safe zone: the left third of the frame (the spiral sits right of it).
+  Anchor: the core, right of centre — lit by line convergence, not a glow.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'infall';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Every streamline shares one pitch, so no two ever cross: a log spiral
+  // turned about its own pole is a scaled copy of itself. That is also why
+  // a slow rigid rotation reads as matter flowing inward, not as spinning.
+  const BASE_LINES = 140;
+  const MAX_LINES = BASE_LINES * 2; // density max, so no reseed is needed
+  const R_MIN = 1.5; // lines run into the core: no dark eye
+  const CHUNKS = 14; // alpha/colour steps along a line (pulses, gradient)
+  let paths = [];
+
+  // Seeded, so the composition (and its anchor) is the same on every load.
+  function mulberry32(a) {
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const rand = mulberry32(0x1f4a11);
+  // Outer radius varies per line so the outer ends never line up into a rim.
+  const pool = Array.from({ length: MAX_LINES }, () => ({
+    jitter: rand() - 0.5,
+    reach: 0.55 + 0.45 * Math.pow(rand(), 0.7),
+    pulse: rand() * Math.PI * 2,
+  }));
+
+  const PRESETS = {
+    whisper: { opacity: 0.7, stroke: 0.7, density: 0.45, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.3, density: 0.8, saturation: 0, glow: 0, motion: 0.4 },
+    neon:    { opacity: 0.9, stroke: 1, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.8, density: 0.7, speed: 0.35, motion: 1.8, spin: 0.55, scale: 1.2 },
+    dense:   { opacity: 0.85, stroke: 0.8, density: 1.9, spin: 1.35, glow: 0.5 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // How tightly the streamlines wind on their way in (their pitch).
+      { name: 'spin', label: 'Spin', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'form' },
+    ],
+    defaults: { hue: 10, hueB: 40, saturation: 0, colorMode: 'gradient', colorA: '#ff2b00', colorB: '#ffaa00' },
+  });
+  const currentValues = baked || panel.values;
+
+  let clock = 0;
+
+  function drawFrame(dt, elapsed, values) {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    clock += dt * values.speed;
+
+    paths = [];
+    const W = canvas.width, H = canvas.height;
+    const cx = W * 0.57, cy = H * 0.5;
+    const rMax = Math.min(W, H) * 0.34 * (0.45 + 0.55 * values.scale);
+    const count = Math.max(10, Math.round(BASE_LINES * values.density));
+    // Pitch angle: 60deg (almost radial) at Spin 0 down to 15deg at Spin 2.
+    const pitch = (24 / (0.4 + 0.6 * values.spin)) * Math.PI / 180;
+    const k = Math.tan(pitch);
+    const slant = Math.sqrt(1 + k * k);
+    // One slow turn every ~20s at Speed 1; negative so the pattern flows in.
+    const turn = -clock * (Math.PI * 2 / 20) + (values.angle * Math.PI) / 180;
+    // Phase gathers the evenly spread streamlines into two arms.
+    const bunch = values.phase * 0.24;
+    const pulseAmp = Math.min(0.85, values.motion * 0.45);
+
+    const light = values.invert ? 0.12 : 0.86 - 0.26 * values.saturation;
+    const alpha = 0.3 * values.opacity;
+    ctx.lineWidth = 0.4 + values.stroke * 0.5;
+    ctx.lineCap = 'round';
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+
+    for (let i = 0; i < count; i++) {
+      const p = pool[i];
+      const base = ((i + 0.5 + p.jitter * 0.8) / count) * Math.PI * 2;
+      const theta0 = base - bunch * Math.sin(2 * base) + turn;
+      const rOut = rMax * p.reach;
+      const span = Math.log(rOut / R_MIN) / k; // total winding, radians
+      const pts = [];
+      let phi = 0;
+      while (true) {
+        const r = rOut * Math.exp(-k * phi);
+        pts.push([cx + Math.cos(theta0 + phi) * r, cy + Math.sin(theta0 + phi) * r, phi, r]);
+        if (phi >= span) break;
+        // ~5px arc steps, so the outer turns stay smooth.
+        phi = Math.min(span, phi + Math.min(0.3, 5 / (r * slant)));
+      }
+
+      // Chunked strokes: colour runs rim (stop A) -> core (stop B), and
+      // Motion's bright pulses travel inward along each line.
+      const per = Math.ceil(pts.length / CHUNKS);
+      for (let c = 0; c < pts.length - 1; c += per) {
+        const end = Math.min(pts.length - 1, c + per);
+        const mid = pts[(c + end) >> 1];
+        const f = 1 - Math.min(1, mid[3] / rMax);
+        const wave = 0.5 + 0.5 * Math.sin(mid[2] * 1.3 - clock * 0.9 + p.pulse);
+        const a = Math.min(1, alpha * (1 + 1.4 * pulseAmp * wave ** 4));
+        const { h, s } = paletteHsl(values, f);
+        const [r, g, b] = hslToRgb(h, s, light);
+        ctx.strokeStyle = `rgba(${r},${g},${b},${a})`;
+        ctx.beginPath();
+        ctx.moveTo(pts[c][0], pts[c][1]);
+        for (let j = c + 1; j <= end; j++) ctx.lineTo(pts[j][0], pts[j][1]);
+        ctx.stroke();
+      }
+      paths.push(pts.map((q) => [q[0], q[1]]));
+    }
+
+    // Optional soft bloom on the core. Off by default: the core already
+    // brightens from the lines converging on it.
+    if (values.glow > 0) {
+      const { h, s } = paletteHsl(values, 1);
+      const [r, g, b] = hslToRgb(h, s, light);
+      const gr = rMax * 0.22 * (0.6 + values.glow * 0.4);
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${0.32 * values.glow * values.opacity})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(cx - gr, cy - gr, gr * 2, gr * 2);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

@@ -4,6 +4,100 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Stills pack and `catalogue.md`** (ROADMAP Phase 5). `node tools/build.mjs`
+  now also captures an 800×800 square PNG of every piece at its defaults
+  into `stills/`, zips them into `stills.zip`, and links that zip from the
+  gallery's intro copy. It generates `catalogue.md` from `pieces.json` plus
+  the live control list each piece already exposes on `window.__LF_SPECS__`
+  — one entry per piece: blurb, tags, text-safe zone, anchor, and controls
+  — so it can't drift from the pieces themselves, and it's written in our
+  own words. Checked PNG export's size range (1x/2x/4x,
+  unchanged, no gap) and whether transparent-background export works — it
+  doesn't, for any piece, and can't be added without a render-architecture
+  change across all 20; recorded as a known limitation rather than chased.
+
+- `collections.json` groups the twenty pieces into five named collections
+  — Currents, Volumes, Orbits, Surfaces, Codes — replacing the flat tag
+  chips. `pieces.json` is untouched; `node tools/build.mjs --verify-only`
+  now fails loudly if a piece has no collection, or a collection names a
+  slug that doesn't exist.
+- `node tools/collection-metrics.mjs --check` (`npm run collection-check`)
+  — a conformance gate against `docs/house-look.md`: default saturation
+  ≤ 0.06 and ink coverage within 0.03–0.15 (0.035 ceiling, no floor, for
+  the two home-page hero pieces). Its saturation check treats pixels with
+  chroma ≤ 3 as achromatic, so a faint hairline's anti-aliased edge over
+  the ground colour doesn't register as "coloured" when it isn't — the
+  first thing it was run against would have failed on that alone.
+- Two pieces that introduce new materials (ROADMAP Phase 4.1 and 4.2).
+  `dune` is a single wind-cut ridge built from film grain: a heightfield
+  shaded by one low raking light, rendered to a half-resolution buffer
+  through ImageData, grained per pixel from a deterministic hash, and
+  upscaled. `swell` is one ocean swell drawn as a halftone screen whose dot
+  area carries the light. Both default to the monochrome house look and
+  carry `safeZone` and `anchor` in `pieces.json`.
+- `exportSvg()` in `shared/export.js` takes an additive `circles` option
+  for filled dots (`swell`). Callers that don't pass it get byte-identical
+  output; `tools/test-svg-circles.mjs` checks both.
+
+- The control panel can be dragged by its header on screens wider than
+  640px. It is clamped to the viewport, re-clamped on resize, and its
+  position is persisted per piece in localStorage next to the tuned values.
+  The header's click-to-collapse still works, since a move under 4px counts
+  as a click. The mobile bottom sheet is unchanged. This shipped in PR #17
+  (`53dcfe9`) without an entry, so it is recorded here.
+
+### Changed
+
+- **Every piece converted to a monochrome house look** (ROADMAP Phase 2):
+  near-white ink on `#0a0a0d` by default (saturation 0; colour stays
+  opt-in through the existing controls, concentrated in each piece's
+  `neon` preset), one legible object per frame with a declared text-safe
+  zone, and hairline strokes (0.4–0.9px at `Stroke: 1`) whose brightness
+  comes from additive (`globalCompositeOperation = 'lighter'`) overlap
+  rather than lower stroke lightness. `node tools/collection-metrics.mjs
+  --check` passes all twenty pieces with zero overrides. Two pieces
+  changed more than their palette, as a deliberate re-differentiation
+  from the reference rather than a restyle: `globe` dropped its longitude
+  lines entirely (latitude slices only, no bright pole); `parallax`'s
+  lines, which previously shared an implicit off-frame vanishing point,
+  are now genuinely parallel. Defaults, presets and `pieces.json` blurbs
+  changed on every converted piece; rendering logic was reworked where the
+  house look required it (not line-for-line on every piece).
+- **Art-first gallery.** Cards are dominated by a square preview; actions
+  (Open, Copy embed, Download) moved into a hover/keyboard-focus overlay,
+  always visible on touch. The repeated "download ships defaults" note is
+  now said once near the top of the grid.
+- **Type system** sourced from the ClassicCottrell design system — Red Hat
+  Display (display and body), Rosarivo italic (editorial accents), a
+  system mono stack (labels) — loaded only on site pages (gallery, home,
+  docs). `pieces/` and `shared/` remain dependency-free; a baked export
+  still runs offline.
+- **The control panel's sliders are restyled as a ruler**: a tick-mark
+  track, a hairline thumb, mono label and value in one row. Same native
+  `<input type=range>`, same names/ids/events/persistence — a chrome-only
+  change.
+- `ROADMAP.md` is restructured around a gap analysis against an external
+  reference collection. The chunk-by-chunk delivery history
+  moved intact to `docs/roadmap-history.md`.
+- Renamed seven pieces (ROADMAP Chunk 1.1). Rendering, defaults and presets are
+  unchanged. `meridian` → `longwave`, `interference` → `moire` (titled
+  Moiré), `accretion` → `infall`, `event-horizon` → `funnel`, `tether` →
+  `mooring`, `synapse` → `relay`, `orbital-veil` → `orbitals`.
+  **The old URLs break.** `pieces/<old>/` and `downloads/<old>.html` now
+  return 404 for all seven, with no redirects or aliases, so update any
+  copied link or embed to the new slug. Saved panel settings are stored in
+  localStorage keyed by piece id, so any tuning saved for a renamed piece
+  resets to that piece's defaults.
+
+Entries for the work merged between 1.5.0 and this point are incomplete.
+That includes the home page, the specimen-grid gallery, the docs pages,
+Wake's configuration, and the piece refinement passes. Backfilling them is
+a Phase 0 item in `ROADMAP.md`.
+
 ## [1.5.0] — 2026-09-12
 
 ### Changed

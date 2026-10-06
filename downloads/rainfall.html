@@ -52,7 +52,7 @@
 .lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .lf-row:last-child { margin-bottom: 0; }
 .lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.lf-row label { font-size: 11px; color: #8a8a9a; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
 .lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
 .lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
 .lf-row-checkbox label { order: -1; }
@@ -62,18 +62,43 @@
   color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
   padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
 
-.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-  border-radius: 999px; background-color: #26262e;
-  background-image: linear-gradient(90deg,#2a4637,#437057 50%,#93bea6);
-  background-repeat: no-repeat; background-size: var(--lf-pct, 0%) 100%; cursor: pointer; }
-.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
-  border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6);
-  cursor: pointer; margin-top: 0; }
-.lf-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6); cursor: pointer; }
-.lf-row input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: transparent; }
-.lf-ticks { display: flex; justify-content: space-between; padding: 0 1px; margin-top: -1px; }
-.lf-ticks span { width: 2px; height: 2px; border-radius: 50%; background: #3a3a46; }
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
 
 .lf-color-row { display: flex; align-items: center; gap: 8px; }
 .lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
@@ -124,12 +149,21 @@
 <body>
 <canvas id="canvas" width="1280" height="800"></canvas>
 
+<!--
+  rainfall — sparse vertical streaks with brighter heads, gathered in a
+  veil that leaves the left third quiet.
+  Text-safe zone: the left third of the frame (the veil's envelope is
+  dimmest there by construction — see envelopeAt/DRIFT_LEFT_GUARD below).
+  Anchor: the brightest streak heads, right of centre, where the veil's
+  envelope peaks.
+-->
 
 
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0.18,"colorMode":"gradient","colorA":"#0095ff","colorB":"#00bfff","hue":205,"hueB":195,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"glint":true};
+
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#0095ff","colorB":"#00bfff","hue":205,"hueB":195,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"glint":true};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -222,7 +256,9 @@ const SHARED_CONTROLS = [
   { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
   { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1, category: 'color' },
-  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, category: 'color' },
+  // House look default is 0 (docs/house-look.md #1 — monochrome first); a
+  // piece pins its own saturation in its `defaults` block regardless.
+  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0, category: 'color' },
   // Solid/gradient palette. `colorA`/`colorB` are the authored controls a
   // user actually sees and drags; `hue`/`hueB` are hidden (no panel row) —
   // the exact numeric degrees every piece's render math still reads. Picking
@@ -292,7 +328,7 @@ const PANEL_CSS = `
 .lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .lf-row:last-child { margin-bottom: 0; }
 .lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.lf-row label { font-size: 11px; color: #8a8a9a; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
 .lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
 .lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
 .lf-row-checkbox label { order: -1; }
@@ -302,18 +338,43 @@ const PANEL_CSS = `
   color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
   padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
 
-.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-  border-radius: 999px; background-color: #26262e;
-  background-image: linear-gradient(90deg,#2a4637,#437057 50%,#93bea6);
-  background-repeat: no-repeat; background-size: var(--lf-pct, 0%) 100%; cursor: pointer; }
-.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
-  border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6);
-  cursor: pointer; margin-top: 0; }
-.lf-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 0 8px rgba(255,255,255,0.6); cursor: pointer; }
-.lf-row input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: transparent; }
-.lf-ticks { display: flex; justify-content: space-between; padding: 0 1px; margin-top: -1px; }
-.lf-ticks span { width: 2px; height: 2px; border-radius: 50%; background: #3a3a46; }
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
 
 .lf-color-row { display: flex; align-items: center; gap: 8px; }
 .lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
@@ -745,10 +806,6 @@ function createControlPanel({ pieceId, onChange, extraControls = [], defaults: d
         input.value = values[spec.name];
         row.append(head, input);
         setRangeFill(input, spec, values[spec.name]);
-        const ticks = document.createElement('div');
-        ticks.className = 'lf-ticks';
-        for (let i = 0; i < 9; i++) ticks.appendChild(document.createElement('span'));
-        row.appendChild(ticks);
       }
     }
 
@@ -1111,7 +1168,7 @@ function exportPng(canvas, { multiplier = 1 } = {}) {
 // SVG native <text> elements instead of polylines, since a glyph has no
 // meaningful line-segment geometry to export. Stroke-path pieces never pass
 // it, so their output is byte-identical to before this option existed.
-function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [] } = {}) {
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [], circles = [] } = {}) {
   const polylines = paths
     .map((pts) => {
       const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
@@ -1137,7 +1194,14 @@ function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = []
     const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
     return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
   }).join('\n');
-  const marks = [polylines, textEls, polygonEls].filter(Boolean).join('\n');
+  // Halftone pieces pass filled dots as circles. Every other caller leaves
+  // this empty, so its serialization is byte-identical to before.
+  const circleEls = circles.map(({ cx, cy, r, fill = 'black', opacity = 1 }) => {
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls, circleEls].filter(Boolean).join('\n');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   download('linefield.svg', blob);
@@ -1287,7 +1351,7 @@ function describeForAI({ pieceName, values }) {
   resize();
 
   // Deliberately a sparse piece — quiet rain, not a downpour. Sits between
-  // tether (6, the sparsest) and meridian (7 long ribbons) in the library.
+  // mooring (6, the sparsest) and longwave (7 long ribbons) in the library.
   // Fewer drops leave room for longer, more coordinated streaks while the
   // hero stays at or below its 0.008 ink baseline.
   const BASE_COUNT = 20;
@@ -1366,10 +1430,10 @@ function describeForAI({ pieceName, values }) {
   // Sparsest piece in the library at ink coverage 0.011, so `whisper` barely
   // moves off the default and `dense` is what gives the piece its range.
   const PRESETS = {
-    whisper: { opacity: 0.42, stroke: 1.35, density: 0.75, saturation: 0.04, glow: 0 },
+    whisper: { opacity: 0.85, stroke: 1.8, density: 0.85, glow: 0 },
     ink:     { opacity: 1, stroke: 1.9, density: 1, saturation: 0, glow: 0 },
     neon:    { opacity: 0.95, stroke: 1.1, density: 1.4, saturation: 0.9, glow: 1.2 },
-    drift:   { opacity: 0.5, stroke: 1.5, density: 0.85, speed: 0.3, motion: 1.6 },
+    drift:   { opacity: 0.75, stroke: 1.75, density: 0.9, speed: 0.3, motion: 1.6 },
     dense:   { opacity: 0.7, stroke: 0.7, density: 1.9, speed: 1.2 },
   };
 
@@ -1386,8 +1450,8 @@ function describeForAI({ pieceName, values }) {
       { name: 'glint', label: 'Head glint', type: 'checkbox', default: true, category: 'ink' },
     ],
     // Cool, desaturated blue-grey — reads as overcast/rain, distinct from
-    // tether's indigo (220/250) and wireframe-lattice's cyan (190/205).
-    defaults: { hue: 205, hueB: 195, saturation: 0.18, colorMode: 'gradient', colorA: '#0095ff', colorB: '#00bfff' },
+    // mooring's indigo (220/250) and wireframe-lattice's cyan (190/205).
+    defaults: { hue: 205, hueB: 195, saturation: 0, colorMode: 'gradient', colorA: '#0095ff', colorB: '#00bfff' },
   });
   const currentValues = baked || panel.values;
 
@@ -1395,7 +1459,10 @@ function describeForAI({ pieceName, values }) {
 
   function drawFrame(dt, elapsed, values) {
     // Full repaint each frame — streaks are drawn whole every frame, not
-    // accumulated as trails, so there's nothing to fade out.
+    // accumulated as trails, so there's nothing to fade out. Reset first:
+    // 'lighter' (set below, per-streak) must never touch this clear, or
+    // last frame's brightness would add into this one instead of clearing.
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -1403,9 +1470,27 @@ function describeForAI({ pieceName, values }) {
     const W = canvas.width;
     const H = canvas.height;
     const t = elapsed * values.speed * BASE_FALL;
-    const lineWidth = 0.6 + values.stroke * 1.8;
+    // Slightly above the hairline floor (house-look §3 exception): at only
+    // ~15-38 streaks — the sparsest piece in the library, by brief — a pure
+    // 0.4-0.9px line drops whisper/drift below the minimum legible
+    // luminance variance. Depth alone (below) still narrows it for
+    // distant drops.
+    const lineWidth = 0.5 + values.stroke * 0.85;
     const baseLen = H * 0.07 * (0.4 + values.scale);
     const theta = (values.angle * Math.PI) / 180;
+    // Stroke lightness is fixed in the 0.82-0.90 band (house-look §1/§3);
+    // "brighter head" comes from the alpha gradient below, not from
+    // lightening the head or darkening the tail.
+    const light = values.invert ? 0.12 : 0.86 - 0.26 * values.saturation;
+    const stopB = paletteHsl(values, 1);
+    const [hr, hg, hb] = hslToRgb(stopB.h, stopB.s, light);
+    const stopA = paletteHsl(values, 0);
+    const [tr, tg, tb] = hslToRgb(stopA.h, stopA.s, light);
+    const mid = paletteHsl(values, 0.65);
+    const [mr, mg, mb] = hslToRgb(mid.h, mid.s, light);
+    // Additive accumulation where streaks cross (house-look §3). Off under
+    // invert: dark ink on a light ground must not brighten toward white.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
     // Veil breathing, independent of fall speed too, and gated by Motion
     // (near-static at motion=0, full pace at motion=1) so the shared
     // control has a second, composition-level effect on this piece rather
@@ -1432,16 +1517,6 @@ function describeForAI({ pieceName, values }) {
       const xHead = d.x * W;
       const xTail = xHead;
       const lw = lineWidth * (0.55 + d.depth * 0.75);
-
-      const lightBase = values.invert ? 0.3 : 0.68;
-      const headLight = Math.min(0.95, lightBase + 0.22);
-      const tailLight = Math.max(0.10, lightBase - 0.3);
-      const stopB = paletteHsl(values, 1);
-      const [hr, hg, hb] = hslToRgb(stopB.h, stopB.s, headLight);
-      const stopA = paletteHsl(values, 0);
-      const [tr, tg, tb] = hslToRgb(stopA.h, stopA.s, tailLight);
-      const mid = paletteHsl(values, 0.65);
-      const [mr, mg, mb] = hslToRgb(mid.h, mid.s, (tailLight + headLight) * 0.5);
 
       // Envelope shapes brightness, not count or width — a drop in a thin
       // stretch of the veil still falls at full speed, just paler, so the
@@ -1474,11 +1549,11 @@ function describeForAI({ pieceName, values }) {
       ctx.lineTo(xHead, headY);
       ctx.stroke();
 
-      if (values.glint && d.depth > 0.68) {
+      if (values.glint && d.depth > 0.55) {
         // Soft radial highlight at the head — bigger than the stroke itself
         // so "brighter head" reads clearly even at a glance, still small
         // enough relative to the canvas to stay calm rather than blobby.
-        const r = lw * 2.2;
+        const r = lw * 3.4;
         const glintGrad = ctx.createRadialGradient(xHead, headY, 0, xHead, headY, r);
         glintGrad.addColorStop(0, `rgba(${hr},${hg},${hb},${op})`);
         glintGrad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
@@ -1492,7 +1567,7 @@ function describeForAI({ pieceName, values }) {
     }
 
     ctx.restore();
-
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   const loop = createLoop({

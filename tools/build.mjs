@@ -9,7 +9,7 @@
 //   node tools/build.mjs               verify, then generate everything
 //   node tools/build.mjs --verify-only verify and stop
 
-import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync, rmSync, utimesSync } from 'node:fs';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DETERMINISTIC_INIT, stepFrames } from './deterministic.mjs';
@@ -20,6 +20,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 export function loadManifest() {
   return JSON.parse(readFileSync(join(ROOT, 'pieces.json'), 'utf8'));
+}
+
+// Presentation-only grouping (ROADMAP Phase 3.4). pieces.json itself stays
+// untouched — collections.json is a second manifest the gallery reads
+// alongside it, ordered array = display order.
+export function loadCollections() {
+  return JSON.parse(readFileSync(join(ROOT, 'collections.json'), 'utf8'));
 }
 
 // Pull the `defaults: { hue: N, hueB: N, saturation: N, ... }` block out of a
@@ -39,7 +46,7 @@ export function readPieceDefaults(slug) {
 }
 
 // Slugs the README's Pieces list claims, from lines like:
-//   - `synapse` — drifting nodes ...
+//   - `relay` — drifting nodes ...
 export function readReadmeSlugs() {
   const src = readFileSync(join(ROOT, 'README.md'), 'utf8');
   return [...src.matchAll(/^- `([a-z0-9-]+)`/gm)].map((m) => m[1]);
@@ -105,6 +112,41 @@ export function verifyManifest() {
     }
   }
 
+  // Every piece must belong to exactly one collection, and collections.json
+  // must never name a slug that doesn't exist — this fails loudly under
+  // --verify-only, before a browser is ever launched, same tier as the
+  // README/pieces.json agreement checks above.
+  // null only when the file failed to load. An empty array still runs the
+  // checks below, so `[]` flags every piece as unclaimed instead of
+  // passing and building a gallery with no cards.
+  let collections = null;
+  try {
+    collections = loadCollections();
+  } catch (err) {
+    errors.push(`collections.json is missing or invalid JSON: ${err.message}`);
+  }
+  if (collections) {
+    const ownerOf = new Map(); // slug -> collection id that already claimed it
+    for (const c of collections) {
+      for (const slug of c.slugs) {
+        if (!slugs.includes(slug)) {
+          errors.push(`collections.json's "${c.id}" names "${slug}", which is not in pieces.json`);
+          continue;
+        }
+        if (ownerOf.has(slug)) {
+          errors.push(`"${slug}" is in two collections: "${ownerOf.get(slug)}" and "${c.id}"`);
+        } else {
+          ownerOf.set(slug, c.id);
+        }
+      }
+    }
+    for (const slug of slugs) {
+      if (!ownerOf.has(slug)) {
+        errors.push(`"${slug}" has no collection in collections.json`);
+      }
+    }
+  }
+
   if (errors.length) {
     console.error(`\nManifest verification failed (${errors.length}):\n`);
     for (const e of errors) console.error(`  - ${e}`);
@@ -116,7 +158,7 @@ export function verifyManifest() {
   return manifest;
 }
 
-// Several pieces build their look over many frames — accretion's spiral arms
+// Several pieces build their look over many frames — infall's spiral arms
 // and flow-field's ribbons are trail-accumulated — so a first-frame capture
 // misrepresents them. Wait long enough for the image to establish.
 const SETTLE_MS = 4000;
@@ -248,6 +290,73 @@ export async function captureThumbnails(browser, manifest, base) {
   }
 }
 
+// Square stills pack (ROADMAP Phase 5.1): one square PNG per piece at its
+// defaults, cropped from the center of the 1280x800 capture viewport
+// (1280-800=480, so x=240 centers an 800x800 square). Reuses
+// assertCanvasRendered — captureThumbnails duplicates that check inline
+// instead of calling it (a pre-existing wart, out of scope here); this new
+// path calls the real helper rather than adding a third copy.
+export async function captureStills(browser, manifest, base) {
+  // Start empty: a renamed or removed piece's old PNG must not survive in
+  // stills/ or in the zip (`zip -r` adds to an existing archive, never
+  // removes from it).
+  rmSync(join(ROOT, 'stills'), { recursive: true, force: true });
+  rmSync(join(ROOT, 'stills.zip'), { force: true });
+  mkdirSync(join(ROOT, 'stills'), { recursive: true });
+  for (const p of manifest) {
+    await withPage(browser, `${base}/pieces/${p.slug}/`, async (page) => {
+      await page.addStyleTag({ content: '[data-lf-panel] { visibility: hidden; }' });
+      await page.waitForTimeout(100);
+      await assertCanvasRendered(page, `${p.slug} still`);
+      const buf = await page.screenshot({ clip: { x: 240, y: 0, width: 800, height: 800 } });
+      return { commit: () => writeFileSync(join(ROOT, 'stills', `${p.slug}.png`), buf) };
+    // scale: 1, not withPage's thumbnail-oriented 0.5 default — a real
+    // 800x800 deliverable, not a thumbnail-resolution crop.
+    }, { deterministic: true, scale: 1 });
+    console.log(`  still: ${p.slug}`);
+  }
+  // One download: zip the stills directory. `zip` is a standard macOS/Linux/CI
+  // CLI tool — no archiver dependency added for this. Committed (not built
+  // on-demand) because GitHub Pages serves static files only.
+  // Pinned mtimes and a sorted file list keep the zip byte-identical across
+  // rebuilds when no still changed (CONTRIBUTING promises an unrelated
+  // build is a no-op). ponytail: zip stores local-time stamps, so the bytes
+  // match per timezone, which is enough since the build never runs in CI.
+  const { execFileSync } = await import('node:child_process');
+  const dir = join(ROOT, 'stills');
+  const files = readdirSync(dir).sort();
+  const epoch = new Date('2000-01-01T00:00:00Z');
+  for (const f of files) utimesSync(join(dir, f), epoch, epoch);
+  execFileSync('zip', ['-q', '-X', '../stills.zip', ...files], { cwd: dir, stdio: 'inherit' });
+  console.log('  stills.zip');
+}
+
+// catalogue.md (ROADMAP Phase 5.2): one entry per piece, generated from
+// pieces.json plus the live control list collectPresets() already pulled off
+// window.__LF_SPECS__ — so it can't drift, and it's in our own words.
+export function generateCatalogue(manifest) {
+  const lines = [
+    '# Catalogue',
+    '',
+    'Generated by `tools/build.mjs` from `pieces.json` — do not hand-edit.',
+    '',
+  ];
+  for (const p of manifest) {
+    lines.push(`## ${p.title}`);
+    lines.push('');
+    lines.push(p.blurb);
+    lines.push('');
+    lines.push(`- **Tags:** ${p.tags.join(', ')}`);
+    lines.push(`- **Text-safe zone:** ${p.safeZone}`);
+    lines.push(`- **Anchor:** ${p.anchor}`);
+    const controlNames = (p.controlSpecs || []).map((s) => s.label).join(', ');
+    lines.push(`- **Controls:** ${controlNames}`);
+    lines.push('');
+  }
+  writeFileSync(join(ROOT, 'catalogue.md'), lines.join('\n'));
+  console.log(`  catalogue.md (${manifest.length} entries)`);
+}
+
 // Read each piece's declared presets and its live default palette off the
 // running page. Deliberately NOT parsed out of the HTML: readPieceDefaults is
 // a regex locked to key order, ROADMAP records it as a known fragility, and
@@ -260,6 +369,10 @@ export async function collectPresets(browser, manifest, base) {
       const info = await page.evaluate(() => ({
         presets: Object.keys(window.__LF_PRESETS__ || {}),
         values: window.__LF_VALUES__ ? { ...window.__LF_VALUES__ } : null,
+        // Full control set (shared + piece-specific), for catalogue.mjs —
+        // __LF_SPECS__ already exists for shared/controls.js's own tests,
+        // this just reads it rather than re-deriving it.
+        specs: (window.__LF_SPECS__ || []).map((s) => ({ name: s.name, label: s.label })),
       }));
       if (!info.presets.length) throw new Error(`${p.slug}: declares no presets`);
       p.presets = info.presets;
@@ -268,6 +381,7 @@ export async function collectPresets(browser, manifest, base) {
           hue: info.values.hue, hueB: info.values.hueB, saturation: info.values.saturation,
         };
       }
+      p.controlSpecs = info.specs;
       return null;
     });
   }
@@ -319,49 +433,71 @@ function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function cardHtml(p) {
-  const accent = `hsl(${p.hue} ${Math.round(p.saturation * 100)}% 60%)`;
-  const accentB = `hsl(${p.hueB} ${Math.round(p.saturation * 100)}% 60%)`;
-  const tags = p.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
-  return `  <article class="card" data-tags="${escapeHtml(p.tags.join(' '))}" style="--accent:${accent}">
-    <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
-      <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="240" height="150" />
-      <span class="frame-label">${Math.round(p.hue)}&deg;</span>
-    </a>
-    <div class="meta">
-      <h2 class="name">
-        <span class="swatch" style="background:linear-gradient(90deg,${accent},${accentB})"></span>
-        ${escapeHtml(p.title)}
-      </h2>
-      <p class="blurb">${escapeHtml(p.blurb)}</p>
-      <div class="tags">${tags}</div>
+// Art-first card (ROADMAP Phase 3.1): the square thumbnail dominates, name
+// plus one small mono collection label sit below it, and Open/Copy embed/
+// Download live in an overlay revealed on hover/focus (CSS only — see
+// tools/templates/gallery.html's .stage/.actions rules). `collectionTitle`
+// is the human-readable label; `collectionId` drives the chip filter via
+// data-collection, same attribute the filter script reads.
+function cardHtml(p, collectionId, collectionTitle) {
+  return `  <article class="card" data-collection="${escapeHtml(collectionId)}">
+    <div class="stage">
+      <a class="frame" href="pieces/${p.slug}/" data-src="pieces/${p.slug}/" aria-label="Open ${escapeHtml(p.title)}">
+        <img src="thumbs/${p.slug}.png" alt="${escapeHtml(p.title)} preview" loading="lazy" width="300" height="300" />
+      </a>
       <div class="actions">
         <a class="btn" href="pieces/${p.slug}/">Open</a>
         <button class="btn" type="button" data-embed="pieces/${p.slug}/">Copy embed</button>
         <a class="btn" href="downloads/${p.slug}.html" download>Download</a>
       </div>
-      <p class="note">Download ships this piece's default settings. Baking from inside the piece captures your own.</p>
+    </div>
+    <div class="meta">
+      <h2 class="name">${escapeHtml(p.title)}</h2>
+      <p class="collection-label">${escapeHtml(collectionTitle)}</p>
     </div>
   </article>`;
 }
 
 export function buildGallery(manifest) {
   const template = readFileSync(join(ROOT, 'tools', 'templates', 'gallery.html'), 'utf8');
-  const cards = manifest.map(cardHtml).join('\n');
+  const collections = loadCollections();
+
+  // Cards render grouped, in collections.json's own order — a full-width
+  // heading per group, then that group's cards. verifyManifest() already
+  // guarantees every manifest slug has exactly one collection and every
+  // collection slug exists, so every piece lands in exactly one group here.
+  const bySlug = new Map();
+  for (const c of collections) for (const slug of c.slugs) bySlug.set(slug, c);
+  const pieceById = new Map(manifest.map((p) => [p.slug, p]));
+  const cardBlocks = [];
+  for (const c of collections) {
+    const pieces = c.slugs.map((slug) => pieceById.get(slug)).filter(Boolean);
+    if (!pieces.length) continue;
+    cardBlocks.push(`  <h3 class="group-head" data-collection="${escapeHtml(c.id)}">${escapeHtml(c.title)}</h3>`);
+    cardBlocks.push(...pieces.map((p) => cardHtml(p, c.id, c.title)));
+  }
+  const cards = cardBlocks.join('\n');
+
   // Function replacers so a literal `$&`/`$'`/`` $` ``/`$$` in card markup or
   // JSON is never interpreted as a String.replace substitution pattern.
   // `<` is escaped to `<` (same fix as shared/export.js's bakeHtml) so
   // a title/blurb containing `</script>` can't close the injected script
   // element early.
-  // actualDefaults is build-internal scaffolding; shipping it would publish
-  // it to every visitor. presets are wanted by the cards.
-  const publicManifest = manifest.map(({ actualDefaults, ...rest }) => rest);
+  // actualDefaults and controlSpecs are build-internal scaffolding (the
+  // latter only for generateCatalogue()); shipping either would publish
+  // dead weight to every visitor. presets are wanted by the cards.
+  const publicManifest = manifest.map(({ actualDefaults, controlSpecs, ...rest }) => ({ ...rest, collection: bySlug.get(rest.slug)?.id }));
   const pieceJson = JSON.stringify(publicManifest, null, 2).replace(/</g, '\\u003c');
+  const collectionsJson = JSON.stringify(
+    collections.map(({ id, title }) => ({ id, title })), null, 2
+  ).replace(/</g, '\\u003c');
   const out = template
     .replace('<!--CARDS-->', () => cards)
-    .replace('/*PIECES*/[]', () => pieceJson);
+    .replace('/*PIECES*/[]', () => pieceJson)
+    .replace('/*COLLECTIONS*/[]', () => collectionsJson)
+    .split('{{PIECE_COUNT}}').join(String(manifest.length));
   writeFileSync(join(ROOT, 'index.html'), out);
-  console.log(`  gallery: index.html (${manifest.length} cards)`);
+  console.log(`  gallery: index.html (${manifest.length} cards, ${collections.length} collections)`);
 }
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
@@ -373,7 +509,7 @@ if (isMain) {
   // LF_BUILD_PORT pins an explicit port (CI, or a human who wants a stable
   // URL); unset, the default 5799 is tried first and falls back to an
   // OS-assigned ephemeral port on collision (multiple agents sharing a
-  // worktree — see ROADMAP.md).
+  // worktree — see docs/roadmap-history.md, Chunk 11).
   const pinned = process.env.LF_BUILD_PORT != null;
   const requestedPort = pinned ? Number(process.env.LF_BUILD_PORT) : 5799;
   const { server, port, base } = await serveRepo(ROOT, requestedPort, { pinned });
@@ -385,10 +521,14 @@ if (isMain) {
     verifyPresets(manifest);
     console.log('Capturing thumbnails...');
     await captureThumbnails(browser, manifest, base);
+    console.log('Capturing stills...');
+    await captureStills(browser, manifest, base);
     console.log('Baking downloads...');
     await captureDownloads(browser, manifest, base);
     console.log('Building gallery...');
     buildGallery(manifest);
+    console.log('Writing catalogue...');
+    generateCatalogue(manifest);
   } finally {
     await browser.close();
     server.close();

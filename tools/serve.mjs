@@ -4,7 +4,7 @@
 // tools/audit-controls.mjs. Both tools serve the repo root to a headless
 // browser and previously bound a hardcoded port with no collision handling
 // — a real problem when multiple coder agents run the gate suite
-// concurrently in a shared worktree (see ROADMAP.md). This centralizes the
+// concurrently in a shared worktree (see docs/roadmap-history.md, Chunk 11). This centralizes the
 // fallback so the two tools can't drift out of sync on it.
 
 import { readFileSync, existsSync } from 'node:fs';

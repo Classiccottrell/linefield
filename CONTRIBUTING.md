@@ -44,9 +44,13 @@ dependency. None of that reaches a user of a piece.
    regex locked to that order. `colorMode`/`colorA`/`colorB` (see "The 14
    shared visual controls" below) may follow after; they are not read by the
    manifest.
-3. Add a bullet to README's Pieces list.
-4. Run `npm run build`.
-5. Run `npm run collection-metrics` and paste its output over ROADMAP's
+3. Add the slug to exactly one collection in `collections.json` — the
+   gallery groups/filters by collection, not by tag. The build's
+   `--verify-only` fails loudly if a manifest slug is unclaimed, or if a
+   collection names a slug that doesn't exist.
+4. Add a bullet to README's Pieces list.
+5. Run `npm run build`.
+6. Run `npm run collection-metrics` and paste its output over ROADMAP's
    "Collection constraints" table, so the collection's hue/saturation/ink
    spread still describes the library someone reads it against. Do this
    after the build — it measures the committed thumbnails, so a piece with
@@ -66,8 +70,9 @@ actually touched will show a diff in `thumbs/`.
 
 **CI will not catch a forgotten rebuild.** CI (`.github/workflows/checks.yml`)
 runs, in order: `npm run verify` (manifest vs. pieces vs. README
-agreement), `node tools/test-presets.mjs synapse` (preset mechanism on one
-piece, preset value/enum data on all seventeen — see "Presets" below),
+agreement), `npm run collection-check` (house-look saturation and ink,
+from the committed thumbnails), `node tools/test-presets.mjs relay` (preset mechanism on one
+piece, preset value/enum data on every piece — see "Presets" below),
 `npm run test-bake-fresh` (bakes every piece live — the real `bakeHtml()`
 in `shared/export.js`, against today's source — and validates that
 output), `npm run test-baked` (every *committed* `downloads/*.html`

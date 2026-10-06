@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — funnel</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { createCamera } from '../../shared/project.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+  import { createOrbit } from '../../shared/pointer.js';
+
+  // funnel — a funnel seen from the side: ninety stacked hairline
+  // ellipses narrowing down to a point, slowly twisting, with the tip as the
+  // one bright anchor.
+  //
+  // Text-safe zone: the left third of the frame. The funnel stands in the
+  // central square, a little right of centre, mouth up, tip down.
+  // Anchor: the tip, lower centre. It is not drawn as a glow: the smallest
+  // rings stack on top of each other there and brighten additively.
+  //
+  // Each ring is an ellipse (not a circle) in its own cross-section, and the
+  // ellipse's long axis turns with depth (Twist) and with time, so the
+  // silhouette reads as a twisting column rather than a solid of revolution.
+  // The asymmetry is also what keeps Yaw and Phase visible: a circular
+  // stack would look identical from every yaw.
+  const PIECE_ID = 'funnel';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Ring count derives per frame from density — no persistent array.
+  const BASE_RINGS = 90;
+  const SEG = 120;          // segments per ring
+  const ECC = 0.72;         // cross-section minor/major axis ratio
+  const SPIN_PERIOD = 14;   // seconds per full turn of the twist at speed 1
+  const SWAY_PERIOD = 11;   // seconds per sway cycle (Motion's gesture)
+  let paths = [];
+
+  const PRESETS = {
+    whisper: { opacity: 0.55, stroke: 0.6, density: 0.5, flare: 0.8, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.35, density: 0.85, twist: 0.6, glow: 0, rotX: 12 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.7, stroke: 0.8, density: 0.8, speed: 0.4, motion: 1.8, twist: 1.6, flare: 1.4 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.7, glow: 0.5, flare: 1.3, rotX: 24 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      { name: 'flare', label: 'Flare', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'twist', label: 'Twist', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
+      { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 24, category: 'interaction' },
+      { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
+    ],
+    defaults: { hue: 290, hueB: 190, saturation: 0, colorMode: 'gradient', colorA: '#aa00ff', colorB: '#00aaff' },
+  });
+  const currentValues = baked || panel.values;
+  const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));
+  // In panel mode the drag writes straight into rotX/rotY through setValue —
+  // the only write path — so the Pitch/Yaw sliders and the rendered camera
+  // never disagree. A baked export has no panel to write through, so it
+  // mutates currentValues directly, clamped to the same ranges the panel
+  // would have enforced.
+  const orbit = createOrbit({
+    canvas,
+    onOrbit: (dPitch, dYaw) => {
+      const dPitchDeg = (dPitch * 180) / Math.PI;
+      const dYawDeg = (dYaw * 180) / Math.PI;
+      if (panel) {
+        panel.setValue('rotX', panel.values.rotX + dPitchDeg, { persist: false });
+        panel.setValue('rotY', panel.values.rotY + dYawDeg, { persist: false });
+      } else {
+        currentValues.rotX = clampDeg(currentValues.rotX + dPitchDeg, -90, 90);
+        currentValues.rotY = clampDeg(currentValues.rotY + dYawDeg, -180, 180);
+      }
+    },
+    onSettle: () => {
+      if (!panel) return;
+      panel.setValue('rotX', panel.values.rotX, { persist: true });
+      panel.setValue('rotY', panel.values.rotY, { persist: true });
+    },
+  });
+
+  const camera = createCamera({ fov: 900 });
+
+  // Splits one projected ring into front and back runs. A point is "front"
+  // when its perspective scale beats the ring centre's, so the near half of
+  // every ellipse can draw brighter than the far half and the stack reads
+  // as a solid. Runs also break at any point at or behind the near plane
+  // (scale <= 0) instead of bridging it with a straight line.
+  function ringRuns(pts, centreScale) {
+    const front = [];
+    const back = [];
+    let run = [];
+    let runFront = null;
+    const flush = () => {
+      if (run.length >= 2) (runFront ? front : back).push(run);
+      run = [];
+    };
+    for (const p of pts) {
+      if (p.scale <= 0) { flush(); runFront = null; continue; }
+      const isFront = p.scale >= centreScale;
+      if (runFront !== null && isFront !== runFront) {
+        const seam = run[run.length - 1];
+        flush();
+        run.push(seam); // the next run starts where this one ended
+      }
+      runFront = isFront;
+      run.push(p);
+    }
+    flush();
+    return { front, back };
+  }
+
+  function strokeRuns(runs, alpha, lineWidth, rgb) {
+    if (!runs.length || alpha <= 0) return;
+    ctx.beginPath();
+    for (const run of runs) {
+      ctx.moveTo(run[0].x, run[0].y);
+      for (let i = 1; i < run.length; i++) ctx.lineTo(run[i].x, run[i].y);
+    }
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.min(1, alpha)})`;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
+
+  function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, W, H);
+    // Additive on the dark ground, so wherever rings stack the image
+    // brightens on its own. On the light (inverted) ground `lighter` would
+    // clip everything to white, so dark ink layers with plain alpha there.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at a shared point (alpha buckets), and round caps
+    // would overlap there and add up to a bright bead under 'lighter'.
+    ctx.lineCap = 'butt';
+
+    paths = [];
+    const S = Math.min(W, H);
+    const size = 0.35 + 0.65 * values.scale;
+    const height = S * 0.62 * size;
+    const mouth = S * 0.3 * size;
+    const rings = Math.max(10, Math.round(BASE_RINGS * values.density));
+    // Silhouette exponent: below 1 the wall bulges like a bowl, 1 is a cone,
+    // above 1 it pinches into a trumpet.
+    const flareExp = 0.8 + values.flare * 0.9;
+    const t = elapsed * values.speed;
+    const spin = (t / SPIN_PERIOD) * Math.PI * 2;
+    const twistTotal = values.twist * Math.PI * 1.25;
+    const phaseOff = values.phase * Math.PI * 0.8;
+    const swayAmp = S * 0.045 * values.motion * size;
+    const swayT = (t / SWAY_PERIOD) * Math.PI * 2;
+    const lean = S * 0.05 * size; // a fixed lean of the tip, so the form has a heading Yaw can turn
+    const light = values.invert ? 0.14 : 0.9 - 0.28 * values.saturation;
+    const lineWidth = 0.5 + values.stroke * 0.4;
+    const baseAlpha = values.opacity * (values.invert ? 0.55 : 1);
+
+    camera.set({
+      tilt: (values.rotX * Math.PI) / 180,
+      yaw: (values.rotY * Math.PI) / 180,
+      roll: (values.angle * Math.PI) / 180,
+      // Nudged right of centre so the mouth stays clear of the left third.
+      cx: W / 2 + 0.06 * S,
+      cy: H / 2,
+    });
+
+    // Axis centre at depth u (0 = mouth, 1 = tip): the fixed lean plus a
+    // slow wave that travels down the column, growing toward the tip.
+    const axisAt = (u) => {
+      const w = u * u;
+      return [
+        lean * w + swayAmp * w * Math.sin(swayT - u * 2.2 + phaseOff),
+        -height / 2 + height * u,
+        swayAmp * 0.8 * w * Math.cos(swayT * 0.8 - u * 1.7 + phaseOff),
+      ];
+    };
+
+    let tip = null;
+    for (let i = 0; i < rings; i++) {
+      const x = i / (rings - 1);
+      // Rings pile up toward the tip (spacing -> 0), which is what makes the
+      // tip the brightest point without drawing a glow.
+      const u = 1 - Math.pow(1 - x, 1.8);
+      const R = mouth * Math.pow(1 - u, flareExp) + S * 0.0015 * size;
+      // Differential spin: the lower rings turn faster, so the twist keeps
+      // tightening and loosening instead of rotating as one rigid stack.
+      const theta = spin * (0.6 + 0.8 * u) + twistTotal * u + phaseOff;
+      const ct = Math.cos(theta);
+      const st = Math.sin(theta);
+      const [ax, ay, az] = axisAt(u);
+
+      const pts = [];
+      for (let s = 0; s <= SEG; s++) {
+        const a = (s / SEG) * Math.PI * 2;
+        const ex = Math.cos(a) * R;
+        const ez = Math.sin(a) * R * ECC;
+        pts.push([ax + ex * ct - ez * st, ay, az + ex * st + ez * ct]);
+      }
+      const centre = camera.project(ax, ay, az);
+      if (i === rings - 1) tip = centre;
+      const { front, back } = ringRuns(camera.projectPath(pts), centre.scale);
+      for (const run of front) paths.push(run.map((p) => [p.x, p.y]));
+      for (const run of back) paths.push(run.map((p) => [p.x, p.y]));
+
+      const { h, s } = paletteHsl(values, u);
+      const rgb = hslToRgb(h, s, light);
+      const alphaFront = baseAlpha * (0.7 + 0.3 * u);
+      if (values.glow > 0) {
+        strokeRuns(front, alphaFront * values.glow * 0.2, lineWidth + values.glow * 2.2, rgb);
+      }
+      strokeRuns(back, alphaFront * 0.7, lineWidth, rgb);
+      strokeRuns(front, alphaFront, lineWidth, rgb);
+    }
+
+    // Glow is a fallback for the anchor, off by default: the tip is already
+    // the brightest point from the stacked rings alone.
+    if (values.glow > 0 && tip && tip.scale > 0) {
+      const { h, s } = paletteHsl(values, 1);
+      const [r, g, b] = hslToRgb(h, s, light);
+      const gr = (10 + 26 * values.glow) * size;
+      const grad = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, gr);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${Math.min(1, 0.5 * values.glow * values.opacity)})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

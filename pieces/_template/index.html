@@ -30,8 +30,8 @@
      you need to add one after the panel is already constructed. Tag every
      extra control with an explicit `category`: 'interaction' (Pitch/Yaw on
      the two 3D pieces), 'color', or the piece's own
-     sub-tag ('motion', 'form', 'ink' — see the real pieces; e.g. meridian's
-     `sweep` is motion, orbital-veil's `sweep` is form) — anything other than
+     sub-tag ('motion', 'form', 'ink' — see the real pieces; e.g. longwave's
+     `sweep` is motion, orbitals's `sweep` is form) — anything other than
      'interaction'/'color' renders in the Visual section. It defaults to
      Visual if omitted, but every piece in this library sets it explicitly
      rather than relying on that default. For colour,
@@ -41,8 +41,18 @@
   4. Rebuild `paths` each frame if you want SVG export to work (array of
      point-arrays); otherwise SVG export will just produce an empty file.
   5. Pass a `defaults` palette to createControlPanel() (see below) so your
-     piece doesn't silently clone flow-field's hue — include colorA/colorB
-     hex too, so the picker's initial swatch matches the piece's own look.
+     piece doesn't silently clone this scaffold's hue — include colorA/
+     colorB hex too, so the picker's initial swatch matches the piece's own
+     look. House look (docs/house-look.md) pins saturation: 0 — colour is
+     opt-in via the panel, never the default.
+  6. Fill in safeZone/anchor below once the composition is real (house-look
+     §7) — where text can sit, and where the piece's one bright region is.
+     safeZone: ""   e.g. "left third", "top band"
+     anchor:   ""   e.g. "core, lower right"
+  7. Add both to this piece's pieces.json entry when you add it to the
+     gallery (CONTRIBUTING.md's "Adding a piece to the gallery" — that step
+     also needs a collections.json entry, or the build's --verify-only
+     fails loudly).
 -->
 
 <div class="lf-export-row" data-lf-panel>
@@ -91,10 +101,11 @@
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    // Every piece must pick its own palette here. shared/controls.js's own
-    // fallback defaults (hue 200 / hueB 280) belong to flow-field — a piece
-    // that omits this block silently clones the flagship's look.
-    defaults: { hue: 130, hueB: 20, saturation: 0.5, colorMode: 'gradient', colorA: '#00ff2b', colorB: '#ff5500' },
+    // Every piece must pick its own hue here (house look keeps saturation
+    // at 0 by default — colour is opt-in, never removed). shared/
+    // controls.js's own fallback defaults (hue 200 / hueB 280) belong to
+    // flow-field — a piece that omits this block silently clones its look.
+    defaults: { hue: 130, hueB: 20, saturation: 0, colorMode: 'gradient', colorA: '#00ff2b', colorB: '#ff5500' },
   });
   const currentValues = baked || panel.values;
 
@@ -106,8 +117,14 @@
 
   function drawFrame(dt, elapsed, values) {
     const { h, s } = paletteHsl(values, 0);
-    const [r, g, b] = hslToRgb(h, s, 0.5);
+    // House look (docs/house-look.md §1): near-white ink, lightness
+    // 0.82-0.90, saturation opt-in via the panel — never lower lightness
+    // for "shade", brightness comes from alpha + accumulation (§3) instead.
+    const [r, g, b] = hslToRgb(h, s, 0.86);
 
+    // Trail fade — always source-over, always BEFORE any 'lighter' pass
+    // below, so the clear itself never accumulates.
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = 'rgba(10,10,13,0.15)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -120,11 +137,27 @@
     // particle array must instead re-seed it in the panel's onChange (see
     // pieces/flow-field/index.html); a derived count like this needs no re-seed.
     // Floor it so density's low end (0.1) can't thin the piece to nothing.
+    // House look wants ~80+ marks building form by count, not stroke
+    // weight — this scaffold's 12 spokes is a placeholder, not a target.
     const BASE_SPOKES = 12;
     const count = Math.max(4, Math.round(BASE_SPOKES * values.density));
 
+    // Hairline floor (house-look §3): at stroke 1 a line is ~0.6px, well
+    // under the old `1 + stroke*3` (1-4px) constant every pre-Phase-2
+    // piece used. Weight comes from how many lines overlap, not how thick
+    // one line is.
     ctx.strokeStyle = `rgba(${r},${g},${b},${values.opacity})`;
-    ctx.lineWidth = 1 + values.stroke * 3;
+    ctx.lineWidth = 0.6 * values.stroke;
+
+    // Additive accumulation (house-look §3), commented off by default: swap
+    // the two lines above for these, at a low per-line alpha, so wherever
+    // lines converge the image brightens on its own — that convergence is
+    // the piece's one luminous anchor (§4). Reset to 'source-over' before
+    // the next frame's fillRect clear above, and before any non-additive
+    // pass (text glyphs, usually) — never leave the context in 'lighter'.
+    //
+    //   ctx.globalCompositeOperation = 'lighter';
+    //   ctx.strokeStyle = `rgba(${r},${g},${b},${0.06 + 0.29 * values.opacity})`;
 
     for (let i = 0; i < count; i++) {
       let angle =

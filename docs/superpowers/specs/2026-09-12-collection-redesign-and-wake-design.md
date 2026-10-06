@@ -39,7 +39,7 @@ The default palette is subordinate to form. Exact hues are tuned against the ful
 
 ### Reference lessons
 
-The [Filament presentation](https://vanta.supply/vault/filament) reinforces four useful qualities without supplying designs to reproduce:
+An external reference collection reinforces four useful qualities without supplying designs to reproduce:
 
 - a piece is understood first by its silhouette, not its algorithm or name;
 - mostly monochrome fields gain depth from one controlled luminous anchor;
