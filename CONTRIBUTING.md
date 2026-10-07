@@ -13,9 +13,9 @@ looked fine on paper and wrong on screen.
 2. Update the `<title>` and `PIECE_ID` in the new `index.html`.
 3. Replace the `drawFrame()` body with your own rendering logic, following
    the comments left in the template.
-4. Pick a distinct default palette for your piece (see "Defaults" below) so
-   the library doesn't look uniform — check the other pieces' `defaults`
-   blocks before choosing hues.
+4. Set your piece's defaults to the house look in `docs/house-look.md`
+   (saturation 0, so it reads monochrome out of the box), give it the five
+   presets, and declare its text-safe zone and anchor (see "Defaults" below).
 5. Verify visually in a browser (see "No automated tests for pieces" below).
 
 A piece itself has no build step, no dependencies, no bundler — see "The
@@ -153,13 +153,15 @@ panel exists with `panel.addControl({ ... })`.
 ## Defaults (`defaults`)
 
 Pass a `defaults` object to `createControlPanel({ ... defaults })` to set
-your piece's own default values: `hue`/`hueB` (exact degrees — most
-important, so each piece in the library reads as visually distinct out of
-the box) and `colorA`/`colorB` (the hex the picker shows for those same two
-hues on first load — a display value only, never decoded back for
-rendering, so it doesn't need to round-trip exactly). Check the existing
-pieces' `defaults` blocks before picking colors to avoid duplicating another
-piece's palette.
+your piece's own default values: `saturation` (0 for every piece, per the
+house look in `docs/house-look.md`), `hue`/`hueB` (exact degrees) and
+`colorA`/`colorB` (the hex the picker shows for those same two hues on first
+load — a display value only, never decoded back for rendering, so it doesn't
+need to round-trip exactly). At saturation 0 the hues don't show until
+someone raises saturation or picks the `neon` preset, so they no longer have
+to make a piece distinct out of the box: composition does that. Mirror
+`hue`, `hueB` and `saturation` in `pieces.json` exactly; the build checks
+them against the running piece.
 
 Note a saved `localStorage` value always outranks a piece's `defaults` for
 a returning visitor — that's expected; "Reset to defaults" in the panel
