@@ -309,6 +309,12 @@ review) before merge, not after.
   piece (see INSPIRATION's audit).
 - **Growth is by quality, not a count.** There is no target count. Every new
   piece clears the originality line and the collection constraints.
+- [x] **Sketchbook round (2026-10-07).** Eleven throwaway composition
+  studies, judged side by side; the strongest four became pieces, each
+  built in its own worktree from its own brief: `contrail` and `bristle`
+  (Currents), `louvre` (Volumes), `fracture` (Surfaces). A fifth study
+  was dropped at the originality check rather than reworked. The other six
+  stay unbuilt; none was strong enough as drawn.
 
 ## Phase 5 — Packaging
 
@@ -352,7 +358,7 @@ review) before merge, not after.
 Every row is **generated**, not hand-recorded. Run `npm run collection-metrics`
 and paste its output here verbatim; it prints this exact table, already
 sorted by ink. Rebuild thumbnails (`npm run build`) first, because it
-measures the committed PNGs. Refreshed 2026-10-05 on `v2`.
+measures the committed PNGs. Refreshed 2026-10-07, with the four sketchbook pieces.
 
 **Hue is no longer a useful column, and that's success, not a gap.** Every
 piece now reports hue 240 — that's not a real colour, it's the ground's own
@@ -370,13 +376,17 @@ Ink, not hue, is now the axis that tells pieces apart.
 | 240 | 0.08 | 0.00 | 0.049 | `orbitals` |
 | 240 | 0.06 | 0.00 | 0.049 | `funnel` |
 | 240 | 0.10 | 0.00 | 0.049 | `contour-grid` |
+| 240 | 0.06 | 0.00 | 0.053 | `bristle` |
 | 240 | 0.05 | 0.00 | 0.056 | `mooring` |
 | 240 | 0.03 | 0.00 | 0.059 | `dune` |
 | 240 | 0.12 | 0.00 | 0.060 | `wireframe-lattice` |
+| 240 | 0.10 | 0.00 | 0.064 | `contrail` |
 | 240 | 0.04 | 0.00 | 0.071 | `swell` |
+| 240 | 0.12 | 0.00 | 0.073 | `louvre` |
 | 240 | 0.12 | 0.00 | 0.082 | `driftwork` |
 | 240 | 0.06 | 0.00 | 0.088 | `pleat` |
 | 240 | 0.14 | 0.00 | 0.098 | `globe` |
+| 240 | 0.09 | 0.00 | 0.100 | `fracture` |
 | 240 | 0.07 | 0.00 | 0.102 | `infall` |
 | 240 | 0.08 | 0.00 | 0.116 | `moire` |
 | 240 | 0.06 | 0.00 | 0.136 | `longwave` |
@@ -465,7 +475,7 @@ trail instead of fading it. `canvas.toBlob('image/png')` faithfully exports
 what's actually on the canvas, so there's no transparent region to export.
 Giving every piece a real alpha channel means tracking ink separately from
 background through each one's own compositing — a render-architecture
-change across all 20 pieces, not a Phase 5 packaging fix. Not chased here.
+change across every piece, not a Phase 5 packaging fix. Not chased here.
 
 **`flow-field`'s still isn't byte-stable across rebuilds.** Two back-to-back
 builds on 2026-10-05 produced identical thumbnails, downloads, gallery and

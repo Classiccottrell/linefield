@@ -133,7 +133,7 @@ inventory than invitation.
 
 ## Gallery
 
-`index.html` at the repo root shows all twenty pieces with live previews,
+`index.html` at the repo root shows every piece with live previews,
 filtering, and per-piece downloads. Serve the repo and open `/`:
 
 ```bash
@@ -165,6 +165,10 @@ tooling" below and CONTRIBUTING.md.
 - `globe` — a tilted sphere drawn only in parallel latitude slices, with no meridians, crowding and brightening toward one lit limb
 - `dune` — one wind-cut ridge built from film grain, lit by a low raking light, with faint ripples crossing its lit face
 - `swell` — a single ocean swell rising on a diagonal, drawn as a halftone screen whose dot size carries its light
+- `contrail` — one trail of hairlines, tight and bright at its head, loosening and breaking up as it ages along a long arc back to the frame's edge
+- `bristle` — one S-shaped brush swipe of about 300 hairline bristles, thin at both ends and breaking into dry streaks toward its end
+- `louvre` — a flat window of tilted hairline slats, crossed by one slow beam of light that brightens the slats it passes and carries a few drifting motes
+- `fracture` — a pane of diagonal hairlines broken into slowly drifting shards, its cracks lit where the lines break and misalign
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,
@@ -257,7 +261,7 @@ npm run collection-metrics           # NOT run in CI — hue/sat/ink per piece, 
 `npm run build` produces `thumbs/<slug>.png` (a screenshot of each piece's
 canvas, captured at 1280×800) and `downloads/<slug>.html` (each piece's own
 "Baked HTML" output, captured by clicking that piece's real export button,
-never reimplemented) for all twenty pieces, then renders `index.html` at
+never reimplemented) for every piece, then renders `index.html` at
 the repo root from `tools/templates/gallery.html`, the manifest, and
 `collections.json` (presentation-only grouping — `pieces.json` stays
 untouched; the gallery groups/filters cards by collection, not by tag) —
@@ -397,7 +401,7 @@ Two things to know:
   trail (and the grain technique) works at all — so there's no transparent
   region for `canvas.toBlob('image/png')` to export. Checked for ROADMAP
   Phase 5.3; giving every piece a real alpha channel would mean a
-  render-architecture change across all twenty, not a packaging fix.
+  render-architecture change across every piece, not a packaging fix.
 
 ## License
 

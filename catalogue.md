@@ -181,3 +181,39 @@ A single ocean swell rising on a diagonal, drawn in halftone dots whose size car
 - **Text-safe zone:** lower left
 - **Anchor:** lip, upper right
 - **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density
+
+## Contrail
+
+One trail of hairlines, tight and bright at its head, loosening and breaking up as it ages along a long arc back to the frame's edge.
+
+- **Tags:** flow, sparse
+- **Text-safe zone:** right half and bottom
+- **Anchor:** the head, upper right of centre
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Dispersion
+
+## Bristle
+
+One S-shaped brush swipe of hairline bristles, running dry in streaks toward its end.
+
+- **Tags:** organic, flow
+- **Text-safe zone:** top-left third
+- **Anchor:** mid-stroke, where the bristles bunch
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Dryness
+
+## Louvre
+
+A flat window of tilted hairline slats, crossed by one slow diagonal beam of light that brightens the slats it passes and carries a few drifting motes.
+
+- **Tags:** geometric, kinetic, editorial
+- **Text-safe zone:** left half
+- **Anchor:** where the beam crosses the slats
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Beam width
+
+## Fracture
+
+A pane of diagonal hairlines broken into slowly drifting shards, its cracks lit where the lines break and misalign.
+
+- **Tags:** geometric, optical
+- **Text-safe zone:** left third
+- **Anchor:** the widest crack
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Shards

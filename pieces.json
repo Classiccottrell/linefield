@@ -178,5 +178,41 @@
     "hue": 185, "hueB": 250, "saturation": 0,
     "safeZone": "lower left",
     "anchor": "lip, upper right"
+  },
+  {
+    "slug": "contrail",
+    "title": "Contrail",
+    "blurb": "One trail of hairlines, tight and bright at its head, loosening and breaking up as it ages along a long arc back to the frame's edge.",
+    "tags": ["flow", "sparse"],
+    "hue": 350, "hueB": 275, "saturation": 0,
+    "safeZone": "right half and bottom",
+    "anchor": "the head, upper right of centre"
+  },
+  {
+    "slug": "bristle",
+    "title": "Bristle",
+    "blurb": "One S-shaped brush swipe of hairline bristles, running dry in streaks toward its end.",
+    "tags": ["organic", "flow"],
+    "hue": 228, "hueB": 172, "saturation": 0,
+    "safeZone": "top-left third",
+    "anchor": "mid-stroke, where the bristles bunch"
+  },
+  {
+    "slug": "louvre",
+    "title": "Louvre",
+    "blurb": "A flat window of tilted hairline slats, crossed by one slow diagonal beam of light that brightens the slats it passes and carries a few drifting motes.",
+    "tags": ["geometric", "kinetic", "editorial"],
+    "hue": 18, "hueB": 52, "saturation": 0,
+    "safeZone": "left half",
+    "anchor": "where the beam crosses the slats"
+  },
+  {
+    "slug": "fracture",
+    "title": "Fracture",
+    "blurb": "A pane of diagonal hairlines broken into slowly drifting shards, its cracks lit where the lines break and misalign.",
+    "tags": ["geometric", "optical"],
+    "hue": 168, "hueB": 312, "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "the widest crack"
   }
 ]

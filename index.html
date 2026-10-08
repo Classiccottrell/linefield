@@ -219,17 +219,17 @@
 <div class="wrap">
 
 <header class="intro">
-  <span class="label">Collection / 20 pieces / live</span>
+  <span class="label">Collection / 24 pieces / live</span>
   <h1>Generative backgrounds, <span class="op">shipped as one file.</span></h1>
-  <p class="lede">20 self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
-  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning. Want stills instead of code? <a href="stills.zip">Download all 20 as square PNGs</a>.</p>
+  <p class="lede">24 self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
+  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning. Want stills instead of code? <a href="stills.zip">Download all 24 as square PNGs</a>.</p>
 </header>
 
 <section class="mechanisms" aria-label="Interaction mechanisms">
   <a class="mechanism" href="interactions/wake/">
     <span class="mechanism-label">Interaction mechanism — not a piece</span>
     <h2 class="mechanism-title">Wake</h2>
-    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the 20 pieces below.</p>
+    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the 24 pieces below.</p>
     <p class="mechanism-detail">Off by default, opt-in per canvas, never baked into an exported piece. Try it live and tune strength, trail life, strand count, and color.</p>
   </a>
   <a class="btn" href="interactions/wake/">open wake</a>
@@ -319,6 +319,38 @@
       <p class="collection-label">Currents</p>
     </div>
   </article>
+  <article class="card" data-collection="currents">
+    <div class="stage">
+      <a class="frame" href="pieces/contrail/" data-src="pieces/contrail/" aria-label="Open Contrail">
+        <img src="thumbs/contrail.png" alt="Contrail preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/contrail/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/contrail/">Copy embed</button>
+        <a class="btn" href="downloads/contrail.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Contrail</h2>
+      <p class="collection-label">Currents</p>
+    </div>
+  </article>
+  <article class="card" data-collection="currents">
+    <div class="stage">
+      <a class="frame" href="pieces/bristle/" data-src="pieces/bristle/" aria-label="Open Bristle">
+        <img src="thumbs/bristle.png" alt="Bristle preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/bristle/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/bristle/">Copy embed</button>
+        <a class="btn" href="downloads/bristle.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Bristle</h2>
+      <p class="collection-label">Currents</p>
+    </div>
+  </article>
   <h3 class="group-head" data-collection="volumes">Volumes</h3>
   <article class="card" data-collection="volumes">
     <div class="stage">
@@ -397,6 +429,22 @@
     </div>
     <div class="meta">
       <h2 class="name">Dune</h2>
+      <p class="collection-label">Volumes</p>
+    </div>
+  </article>
+  <article class="card" data-collection="volumes">
+    <div class="stage">
+      <a class="frame" href="pieces/louvre/" data-src="pieces/louvre/" aria-label="Open Louvre">
+        <img src="thumbs/louvre.png" alt="Louvre preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/louvre/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/louvre/">Copy embed</button>
+        <a class="btn" href="downloads/louvre.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Louvre</h2>
       <p class="collection-label">Volumes</p>
     </div>
   </article>
@@ -527,6 +575,22 @@
     </div>
     <div class="meta">
       <h2 class="name">Swell</h2>
+      <p class="collection-label">Surfaces</p>
+    </div>
+  </article>
+  <article class="card" data-collection="surfaces">
+    <div class="stage">
+      <a class="frame" href="pieces/fracture/" data-src="pieces/fracture/" aria-label="Open Fracture">
+        <img src="thumbs/fracture.png" alt="Fracture preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/fracture/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/fracture/">Copy embed</button>
+        <a class="btn" href="downloads/fracture.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Fracture</h2>
       <p class="collection-label">Surfaces</p>
     </div>
   </article>
@@ -1023,6 +1087,95 @@ const PIECES = [
     "saturation": 0,
     "safeZone": "lower left",
     "anchor": "lip, upper right",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "surfaces"
+  },
+  {
+    "slug": "contrail",
+    "title": "Contrail",
+    "blurb": "One trail of hairlines, tight and bright at its head, loosening and breaking up as it ages along a long arc back to the frame's edge.",
+    "tags": [
+      "flow",
+      "sparse"
+    ],
+    "hue": 350,
+    "hueB": 275,
+    "saturation": 0,
+    "safeZone": "right half and bottom",
+    "anchor": "the head, upper right of centre",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "currents"
+  },
+  {
+    "slug": "bristle",
+    "title": "Bristle",
+    "blurb": "One S-shaped brush swipe of hairline bristles, running dry in streaks toward its end.",
+    "tags": [
+      "organic",
+      "flow"
+    ],
+    "hue": 228,
+    "hueB": 172,
+    "saturation": 0,
+    "safeZone": "top-left third",
+    "anchor": "mid-stroke, where the bristles bunch",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "currents"
+  },
+  {
+    "slug": "louvre",
+    "title": "Louvre",
+    "blurb": "A flat window of tilted hairline slats, crossed by one slow diagonal beam of light that brightens the slats it passes and carries a few drifting motes.",
+    "tags": [
+      "geometric",
+      "kinetic",
+      "editorial"
+    ],
+    "hue": 18,
+    "hueB": 52,
+    "saturation": 0,
+    "safeZone": "left half",
+    "anchor": "where the beam crosses the slats",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "volumes"
+  },
+  {
+    "slug": "fracture",
+    "title": "Fracture",
+    "blurb": "A pane of diagonal hairlines broken into slowly drifting shards, its cracks lit where the lines break and misalign.",
+    "tags": [
+      "geometric",
+      "optical"
+    ],
+    "hue": 168,
+    "hueB": 312,
+    "saturation": 0,
+    "safeZone": "left third",
+    "anchor": "the widest crack",
     "presets": [
       "whisper",
       "ink",

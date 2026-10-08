@@ -8,6 +8,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Four new pieces, bringing the collection to twenty-four, each from its
+  own brief and each in the house look. `contrail` is one trail of
+  hairlines, tight and bright at its head, loosening as it ages back to the
+  frame's edge (Currents, extra control Dispersion). `bristle` is one
+  S-shaped brush swipe of hairline bristles running dry in streaks
+  (Currents, Dryness). `louvre` is a window of slats crossed by one slowly
+  sweeping beam of light (Volumes, Beam width). `fracture` is a pane of
+  diagonal hairlines broken into drifting shards whose cracks carry the
+  light (Surfaces, Shards); its shatter differs on every page load. All
+  four pass `collection-check` and `audit-controls` with every control
+  live.
+
 - **Stills pack and `catalogue.md`** (ROADMAP Phase 5). `node tools/build.mjs`
   now also captures an 800×800 square PNG of every piece at its defaults
   into `stills/`, zips them into `stills.zip`, and links that zip from the
@@ -52,6 +64,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `CONTRIBUTING.md` and the docs contributing page no longer tell
+  contributors to give each piece a distinct default palette, which
+  predates the monochrome house look.
 - **Every piece converted to a monochrome house look** (ROADMAP Phase 2):
   near-white ink on `#0a0a0d` by default (saturation 0; colour stays
   opt-in through the existing controls, concentrated in each piece's
