@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — contrail</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  contrail — one trail of hairlines, tight and bright at its newest end,
+  loosening, breaking up and fading as it ages along a long, gentle arc
+  back to the left edge.
+  Text-safe zone: the right half and the bottom of the frame.
+  Anchor: the head, upper right of centre.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'contrail';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // The trail is described by age `e`: arc distance behind the head as a
+  // fraction of the whole arc. Every strand's lateral offset is a function
+  // of age (how loose it has become) and of travelling waves that drift
+  // tail-ward, so the fine structure is laid down at the head and loosens
+  // as it recedes while the envelope, and so the shape, holds still.
+  // Every time term turns a whole number of times per PERIOD, so the loop
+  // closes exactly.
+  const BASE_STRANDS = 240;
+  const POOL = BASE_STRANDS * 2;  // Density tops out at 2; the first N are used
+  const STEP = 4;                 // px between samples along the arc
+  const PERIOD = 14;              // seconds per loop at speed 1
+  const FLOW_K = 5;               // a wave of k cycles per arc turns ~k/FLOW_K times per loop
+  const LEVELS = 10;              // alpha buckets
+  const BANDS = 4;                // colour stops along the trail
+  const TAU = Math.PI * 2;
+
+  // Centreline: a quadratic arc in frame fractions, from the head back past
+  // the left edge. It rises gently toward the head and flattens there,
+  // so the dispersed tail stays clear of the bottom.
+  const HEAD = [0.6, 0.32];
+  const BEND = [0.25, 0.38];
+  const TAIL = [-0.06, 0.58];
+
+  const turns = (k) => Math.max(1, Math.round(k / FLOW_K));
+  const smooth = (a, b, x) => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+
+  // Per-strand constants, drawn once so Density only chooses how many.
+  const strands = Array.from({ length: POOL }, () => {
+    // -1..1, crowded toward the core, and reaching further up than down so
+    // the spread tail keeps off the bottom of the frame.
+    const r = Math.random() + Math.random() - 1;
+    const c = r > 0 ? r * 1.25 : r * 0.75;
+    const k = 3 + 2 * Math.random();
+    const kd = 6 + 5 * Math.random();
+    return {
+      c,
+      // Just behind the head the strands ride as two close lines, which
+      // merge into one bundle within the first fifth of the trail.
+      tw: (r < 0 ? -1 : 1) * (0.5 + 0.5 * Math.abs(r)),
+      // Shared fields are offset by a smooth function of c, so neighbours
+      // drift together: the aged trail clumps and parts instead of hashing.
+      cc: Math.cos(c * 1.6), sc: Math.sin(c * 1.6),
+      cd: Math.cos(c * 2.6), sd: Math.sin(c * 2.6),
+      cz: Math.cos(c * 4), sz: Math.sin(c * 4),
+      cq: Math.cos(c * 1.3), sq: Math.sin(c * 1.3),
+      lag: 0.003 + 0.05 * Math.random() * (0.25 + Math.abs(c)), // staggered starts taper the tip
+      k, mk: turns(k), ph: TAU * Math.random(),
+      kb: 1.5 + Math.random(), pb: TAU * Math.random(),
+      kd, md: turns(kd), pd: TAU * Math.random(),
+      bright: 0.55 + 0.45 * Math.random(),
+    };
+  });
+  let paths = [];
+
+  const PRESETS = {
+    whisper: { opacity: 0.6, stroke: 0.7, density: 0.6, dispersion: 0.8 },
+    ink:     { opacity: 1, stroke: 1.3, density: 1, saturation: 0, glow: 0, dispersion: 0.7 },
+    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.9, glow: 1 },
+    drift:   { opacity: 0.8, density: 0.85, speed: 0.45, motion: 1.8, dispersion: 1.6 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.8, dispersion: 1.2 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // How far the aged trail spreads, wanders and breaks up.
+      { name: 'dispersion', label: 'Dispersion', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'form' },
+    ],
+    defaults: { hue: 350, hueB: 275, saturation: 0, colorMode: 'gradient', colorA: '#ff002b', colorB: '#9500ff' },
+  });
+  const currentValues = baked || panel.values;
+
+  // Quadratic Bezier sampled finely, then resampled to even arc spacing.
+  function centreline(p0, p1, p2) {
+    const fine = [];
+    for (let i = 0; i <= 240; i++) {
+      const u = i / 240, v = 1 - u;
+      fine.push([
+        v * v * p0[0] + 2 * u * v * p1[0] + u * u * p2[0],
+        v * v * p0[1] + 2 * u * v * p1[1] + u * u * p2[1],
+      ]);
+    }
+    const out = [fine[0]];
+    let carry = 0;
+    for (let i = 1; i < fine.length; i++) {
+      const [ax, ay] = fine[i - 1];
+      const [bx, by] = fine[i];
+      const len = Math.hypot(bx - ax, by - ay);
+      let d = STEP - carry;
+      while (d <= len) {
+        out.push([ax + ((bx - ax) * d) / len, ay + ((by - ay) * d) / len]);
+        d += STEP;
+      }
+      carry = len - (d - STEP);
+    }
+    return out;
+  }
+
+  let clock = 0;
+
+  function drawFrame(dt, elapsed, values) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, W, H);
+    clock += dt * values.speed;
+
+    paths = [];
+    const S = Math.min(W, H);
+    const z = 0.4 + 0.6 * values.scale;
+    const disp = values.dispersion;
+    const motion = values.motion;
+    const tt = clock / PERIOD + values.phase * 0.5; // loop cycles; Phase 0..2 spans one loop
+    const hx = HEAD[0] * W, hy = HEAD[1] * H;
+
+    // Scale about the head, then Angle as a screen-space rotation about the
+    // head, so the canvas and the SVG export share every point.
+    const at = (p) => [hx + (p[0] * W - hx) * z, hy + (p[1] * H - hy) * z];
+    const line = centreline([hx, hy], at(BEND), at(TAIL));
+    const th = (values.angle * Math.PI) / 180;
+    const cth = Math.cos(th), sth = Math.sin(th);
+    const n = line.length;
+    const cx = new Float32Array(n), cy = new Float32Array(n);
+    for (let j = 0; j < n; j++) {
+      const dx = line[j][0] - hx, dy = line[j][1] - hy;
+      cx[j] = hx + dx * cth - dy * sth;
+      cy[j] = hy + dx * sth + dy * cth;
+    }
+
+    // The head creeps forward along its arc and settles back once a loop;
+    // the trail behind it always recedes faster, so it reads as advancing.
+    const aHead = 0.012 * motion * (0.5 + 0.5 * Math.cos(TAU * tt));
+
+    // Per-sample fields shared by every strand.
+    const nx = new Float32Array(n), ny = new Float32Array(n);
+    const ea = new Float32Array(n), aa = new Float32Array(n);
+    const hw = new Float32Array(n), lobe = new Float32Array(n), loose = new Float32Array(n);
+    const merge = new Float32Array(n);
+    const s1 = new Float32Array(n), c1 = new Float32Array(n);
+    const s2 = new Float32Array(n), c2 = new Float32Array(n);
+    const sZ = new Float32Array(n), cZ = new Float32Array(n);
+    const sQ = new Float32Array(n), cQ = new Float32Array(n);
+    const bw = new Float32Array(n), fade = new Float32Array(n), thr = new Float32Array(n);
+    const band = new Uint8Array(n);
+    const breakup = Math.min(1.3, disp);
+    for (let j = 0; j < n; j++) {
+      const p = cx[Math.max(0, j - 1)], q = cx[Math.min(n - 1, j + 1)];
+      const r = cy[Math.max(0, j - 1)], s = cy[Math.min(n - 1, j + 1)];
+      const len = Math.hypot(q - p, s - r) || 1;
+      nx[j] = -(s - r) / len;
+      ny[j] = (q - p) / len;
+      const a = j / (n - 1);
+      const e = a - aHead;
+      aa[j] = a;
+      ea[j] = e;
+      // Tight for the first stretch, then widening faster with age, so the
+      // silhouette flares like a trumpet rather than opening as a cone.
+      const env = Math.pow(Math.min(1, Math.max(0, e - 0.04) / 0.8), 1.4);
+      // The tip narrows to a fine point over its first few percent.
+      const tip = 0.3 + 0.7 * smooth(0, 0.05, e);
+      hw[j] = S * z * (0.0065 * tip + 0.13 * disp * env);
+      merge[j] = smooth(0.02, 0.15, e);
+      loose[j] = smooth(0.06, 0.7, e);
+      lobe[j] = 1 + 0.28 * env * (
+        0.6 * Math.sin(TAU * (1.9 * a - turns(1.9) * tt) + 1.1) +
+        0.4 * Math.sin(TAU * (3.1 * a - turns(3.1) * tt) + 2.3));
+      const X = TAU * (1.6 * a - turns(1.6) * tt) + 0.7;
+      const Y = TAU * (2.7 * a - turns(2.7) * tt) + 2.9;
+      const Z = TAU * (5.1 * a - turns(5.1) * tt) + 0.3;
+      s1[j] = Math.sin(X); c1[j] = Math.cos(X);
+      s2[j] = Math.sin(Y); c2[j] = Math.cos(Y);
+      sZ[j] = Math.sin(Z); cZ[j] = Math.cos(Z);
+      const Q = TAU * (3.4 * a - turns(3.4) * tt) + 1.7;
+      sQ[j] = Math.sin(Q); cQ[j] = Math.cos(Q);
+      // The whole aged trail sways as one, gently.
+      bw[j] = S * z * 0.02 * disp * env * Math.sin(TAU * (2.2 * a - turns(2.2) * tt) + 0.4);
+      fade[j] = (0.38 + 0.62 * Math.exp(-e / 0.08)) * (1 - smooth(0.9, 1, a));
+      thr[j] = -1.5 + 1.45 * breakup * smooth(0.2, 0.9, e);
+      band[j] = Math.min(BANDS - 1, Math.max(0, Math.floor(e * BANDS)));
+    }
+
+    const count = Math.max(12, Math.round(BASE_STRANDS * values.density));
+    const light = values.invert ? 0.12 : 0.86 - 0.24 * values.saturation;
+    const lineWidth = 0.3 + values.stroke * 0.5;
+    const baseAlpha = 0.3 * values.opacity;
+    const margin = 20;
+    const inFrame = (x, y) => x > -margin && y > -margin && x < W + margin && y < H + margin;
+
+    // buckets[band * LEVELS + level] collects runs at one colour and alpha,
+    // so a frame costs BANDS * LEVELS strokes however many strands feed it.
+    const buckets = Array.from({ length: BANDS * LEVELS }, () => []);
+    for (let k = 0; k < count; k++) {
+      const st = strands[k];
+      const boil = 0.22 * motion * Math.sin(TAU * tt + st.pb);
+      let run = null;
+      let runKey = -1;
+      let svg = null;
+      const flush = () => {
+        if (run && run.length >= 2) buckets[runKey].push(run);
+        run = null;
+        runKey = -1;
+      };
+      const cut = () => {
+        flush();
+        if (svg && svg.length >= 2) paths.push(svg);
+        svg = null;
+      };
+      for (let j = 0; j < n; j++) {
+        const e = ea[j];
+        if (e < st.lag) continue;
+        const a = aa[j];
+        // Breakup: gaps open with age, partly shared with neighbours so the
+        // trail comes apart in fragments rather than as dotted lines.
+        const brk = 0.6 * Math.sin(TAU * (st.kd * a - st.md * tt) + st.pd) +
+          0.25 * (sZ[j] * st.cz + cZ[j] * st.sz) + 0.45 * (sQ[j] * st.cq + cQ[j] * st.sq);
+        if (brk < thr[j]) { cut(); continue; }
+        const d1 = s1[j] * st.cc + c1[j] * st.sc;
+        const d2 = s2[j] * st.cd - c2[j] * st.sd;
+        const own = Math.sin(TAU * (st.k * a - st.mk * tt) + st.ph);
+        const b = Math.sin(TAU * st.kb * a + st.pb) * boil;
+        const rank = st.tw + (st.c - st.tw) * merge[j];
+        const off = hw[j] * (rank * lobe[j] + loose[j] * (0.45 * d1 + 0.3 * d2 + 0.12 * own + b)) + bw[j];
+        const x = cx[j] + nx[j] * off;
+        const y = cy[j] + ny[j] * off;
+        if (!inFrame(x, y)) { cut(); continue; }
+        const pt = [x, y];
+        if (!svg) svg = [];
+        svg.push(pt);
+        const level = Math.min(LEVELS - 1, Math.floor(st.bright * fade[j] * LEVELS));
+        const key = band[j] * LEVELS + level;
+        if (key !== runKey) {
+          const last = run ? run[run.length - 1] : null;
+          flush();
+          run = last ? [last] : [];
+          runKey = key;
+        }
+        run.push(pt);
+      }
+      cut();
+    }
+
+    // Additive on the dark ground so the bundled head brightens on its own;
+    // plain alpha on the light (inverted) ground, where `lighter` would clip.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: runs split at a shared point, and round caps would overlap
+    // there into bright beads under 'lighter'.
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+    for (let bd = 0; bd < BANDS; bd++) {
+      const { h, s } = paletteHsl(values, (bd + 0.5) / BANDS);
+      const [cr, cg, cb] = hslToRgb(h, s, light);
+      for (let lv = 0; lv < LEVELS; lv++) {
+        const runs = buckets[bd * LEVELS + lv];
+        if (!runs.length) continue;
+        ctx.beginPath();
+        for (const run of runs) {
+          ctx.moveTo(run[0][0], run[0][1]);
+          for (let i = 1; i < run.length; i++) ctx.lineTo(run[i][0], run[i][1]);
+        }
+        const alpha = baseAlpha * ((lv + 0.5) / LEVELS);
+        // Glow is a wider, dimmer underlay along the strands, never a halo
+        // at the head. Off by default.
+        if (values.glow > 0) {
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, alpha * values.glow * 0.16)})`;
+          ctx.lineWidth = lineWidth + values.glow * 2.4;
+          ctx.stroke();
+        }
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${Math.min(1, alpha)})`;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
