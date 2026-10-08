@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — bristle</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  bristle — one S-shaped brush swipe of about 300 parallel hairlines,
+  crossing the frame from lower left to upper right, thin at both ends and
+  breaking into dry streaks as the paint runs out toward its end.
+  Text-safe zone: the top-left third of the frame, above the swipe.
+  Anchor: mid-stroke, where the bristles bunch and overlap.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  // The swipe is a centreline plus a brush footprint. Every bristle keeps a
+  // fixed place across the brush, so the hairlines run parallel; a bristle
+  // only marks where the brush is pressed wide enough to reach it, so the
+  // tapers come from bristles lifting off, not from lines converging into a
+  // bright tip. Mid-stroke the bristles pull into clumps that weave across
+  // each other, and that overlap under additive blending is the anchor.
+  //
+  // Geometry is computed in screen space and Angle is applied to the points
+  // themselves, never via a canvas transform, so the SVG matches the canvas.
+  const PIECE_ID = 'bristle';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const BASE_BRISTLES = 300;
+  const MAX_BRISTLES = 600;  // density 2; per-bristle seeds are drawn for all of them
+  const CLUMP = 10;          // bristles per clump
+  const STEP = 4;            // px between centreline samples
+  const LEVELS = 6;          // alpha buckets per colour group
+  const GROUPS = 5;          // colour groups across the brush (gradient mode)
+  const STRAIGHT = 0.13;     // fraction of the stroke at each end with no bend at all
+  // One cycle, in seconds at speed 1: paint on, hold, fade while the next
+  // stroke starts. The clock starts just after a stroke has finished
+  // painting, so a still frame, or Speed 0, always shows a whole stroke.
+  const PAINT = 3.4;
+  const FADE_IN = 8.6;
+  const FADE_OUT = 11.2;
+  const PERIOD = 10.4;
+  const START = 3.5;
+  const SWAY = 13;           // seconds per breath of the bend (Motion)
+  const SEED = Math.floor(Math.random() * 1e9);
+  let paths = [];
+
+  const PRESETS = {
+    whisper: { opacity: 0.55, stroke: 0.7, density: 0.55, dryness: 1.3, scale: 0.85 },
+    ink:     { opacity: 1, stroke: 1.3, density: 1, saturation: 0, glow: 0, dryness: 0.5 },
+    neon:    { opacity: 0.9, stroke: 1, density: 1.1, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.8, stroke: 0.9, density: 0.8, speed: 0.4, motion: 1.8, dryness: 1.6, scale: 1.1 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.8, dryness: 0.7, scale: 0.9 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // How much the paint runs dry: the share of bristles that break into
+      // gaps, rising toward the end of the stroke.
+      { name: 'dryness', label: 'Dryness', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'ink' },
+    ],
+    defaults: { hue: 228, hueB: 172, saturation: 0, colorMode: 'gradient', colorA: '#0033ff', colorB: '#00ffdd' },
+  });
+  const currentValues = baked || panel.values;
+
+  // Small seeded generator, so one cycle's stroke is the same on every frame
+  // it is visible. Its only entropy is SEED, which comes from Math.random.
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Everything random about one stroke: its small shape differences and
+  // its bristles' seeds. Cached, since at most two cycles are ever visible.
+  const cycles = new Map();
+  function cycle(k) {
+    let c = cycles.get(k);
+    if (c) return c;
+    const r = rng(SEED + k * 9973);
+    const table = new Float32Array(256);
+    for (let i = 0; i < 256; i++) table[i] = r();
+    const shape = [r() * 2 - 1, r() * 2 - 1, r() * 2 - 1, r() * 2 - 1];
+    const bristles = [];
+    for (let i = 0; i < MAX_BRISTLES; i++) {
+      bristles.push({
+        jit: r() - 0.5,          // place across the brush, in bristle spacings
+        load: 0.55 + 0.45 * r(), // how much paint it carries
+        off: r() * 200,          // its own dryness noise offset
+        lead: r(),               // how far ahead of the brush front it reaches
+        wob: r() * Math.PI * 2,  // phase of its slight wander
+      });
+    }
+    const clumps = [];
+    for (let i = 0; i < Math.ceil(MAX_BRISTLES / CLUMP); i++) {
+      clumps.push({ jit: r() - 0.5, off: r() * 200, ph: r() * Math.PI * 2, fq: 1.5 + 1.5 * r() });
+    }
+    c = { table, shape, bristles, clumps };
+    cycles.set(k, c);
+    if (cycles.size > 4) cycles.delete(cycles.keys().next().value);
+    return c;
+  }
+
+  // 1D value noise from a cycle's table, 0..1.
+  function noise(t, x) {
+    const i = Math.floor(x);
+    const f = x - i;
+    const a = t[i & 255], b = t[(i + 1) & 255];
+    return a + (b - a) * f * f * (3 - 2 * f);
+  }
+
+  const smooth = (e0, e1, x) => {
+    const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+    return t * t * (3 - 2 * t);
+  };
+
+  // Brush pressure along the stroke: zero at both tips, full through the
+  // middle. Both ramps are close to linear at the tip, so the ends taper to
+  // a straight point.
+  function pressure(s) {
+    // r + r^2 - r^3: slope 1 at the tip (a straight wedge), flat at full.
+    const ease = (r) => (r >= 1 ? 1 : r + r * r - r * r * r);
+    return ease(Math.min(1, s / 0.3)) * ease(Math.min(1, (1 - s) / 0.45));
+  }
+
+  let clock = 0;
+
+  // Build one stroke's centreline in screen space. The heading is bent only
+  // inside the middle of the stroke and stays constant over both end runs,
+  // so the tapered ends are straight by construction, at any Motion.
+  function centreline(values, c, ox, oy, S, size) {
+    const m = values.motion;
+    const swayT = (clock / SWAY) * Math.PI * 2;
+    const bend = 0.6 * (1 + 0.14 * m * c.shape[0]);
+    const half = Math.hypot(0.37, 0.28) * S * size * (1 + 0.035 * m * c.shape[1]);
+    const theta = Math.atan2(-0.28, 0.37) + (values.angle * Math.PI) / 180 + 0.035 * m * c.shape[2];
+    const nudge = 0.012 * m * c.shape[3] * S * size;
+    const n = Math.max(40, Math.ceil((2 * half * 1.08) / STEP));
+    const raw = [[0, 0]];
+    let x = 0, y = 0;
+    for (let j = 1; j <= n; j++) {
+      const s = (j - 0.5) / n;
+      const q = Math.min(1, Math.max(0, (s - STRAIGHT) / (1 - 2 * STRAIGHT)));
+      const bump = Math.sin(Math.PI * q) ** 2;
+      // Motion: the bend breathes, phased along the stroke so the two
+      // lobes never move in lockstep.
+      const sway = 0.09 * m * Math.sin(swayT + values.phase * 0.6 + s * 3.2);
+      const h = bump * (bend + sway);
+      x += Math.cos(h);
+      y += Math.sin(h);
+      raw.push([x, y]);
+    }
+    // Map the raw curve's chord onto the swipe's chord, centred on the
+    // frame anchor: rotation and scale only, so nothing new can bend.
+    const rawAng = Math.atan2(y, x);
+    const rawLen = Math.hypot(x, y);
+    const k = (2 * half) / rawLen;
+    const rc = Math.cos(theta - rawAng) * k, rs = Math.sin(theta - rawAng) * k;
+    const nx0 = -Math.sin(theta), ny0 = Math.cos(theta);
+    const pts = raw.map(([px, py]) => {
+      const cx = px - x / 2, cy = py - y / 2;
+      return [ox + cx * rc - cy * rs + nx0 * nudge, oy + cx * rs + cy * rc + ny0 * nudge];
+    });
+    // Normals (pointing to the stroke's left).
+    const normals = pts.map((p, j) => {
+      const a = pts[Math.max(0, j - 1)], b = pts[Math.min(n, j + 1)];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      return [(b[1] - a[1]) / len, -(b[0] - a[0]) / len];
+    });
+    return { pts, normals, n };
+  }
+
+  function drawStroke(values, k, u, ox, oy, S, size, rgb) {
+    const c = cycle(k);
+    const fade = 1 - smooth(FADE_IN, FADE_OUT, u);
+    if (fade <= 0.001) return;
+    const x = Math.min(1, u / PAINT);
+    const head = x >= 1 ? 1.05 : 0.5 - 0.5 * Math.cos(Math.PI * x);
+    const { pts, normals, n } = centreline(values, c, ox, oy, S, size);
+
+    const count = Math.max(24, Math.round(BASE_BRISTLES * Math.max(0.1, values.density)));
+    const clumpCount = Math.ceil(count / CLUMP);
+    const hw = 0.075 * S * size; // half-width at full pressure
+    const dry = values.dryness;
+    const phaseShift = values.phase * 3;
+    const T = c.table;
+
+    // Per-sample quantities shared by every bristle.
+    const P = new Float32Array(n + 1), B = new Float32Array(n + 1);
+    const W = new Float32Array(n + 1), TH = new Float32Array(n + 1);
+    for (let j = 0; j <= n; j++) {
+      const s = j / n;
+      P[j] = pressure(s);
+      const d = (s - 0.5) / 0.085;
+      W[j] = Math.exp(-d * d);           // the mid-stroke bunching zone
+      B[j] = 0.4 + 0.45 * W[j];          // how tightly bristles gather into clumps
+      // The paint runs dry toward the end of the stroke; the landing is wet.
+      TH[j] = dry * (0.04 + 0.62 * smooth(0.35, 1, s) + 0.14 * smooth(0.82, 1, s));
+    }
+
+    // Clump centres across the brush, and how far each weaves mid-stroke.
+    const centres = new Float32Array(clumpCount);
+    for (let g = 0; g < clumpCount; g++) {
+      const lo = g * CLUMP, hi = Math.min(count, lo + CLUMP);
+      centres[g] = -1 + ((lo + hi) / count) + c.clumps[g].jit * (0.6 / clumpCount);
+    }
+    const weave = 1.3 / clumpCount;
+
+    const buckets = Array.from({ length: GROUPS }, () => Array.from({ length: LEVELS }, () => []));
+    for (let i = 0; i < count; i++) {
+      const b = c.bristles[i];
+      const g = Math.floor(i / CLUMP);
+      const cl = c.clumps[g];
+      const rest = -1 + (2 * (i + 0.5 + b.jit * 0.8)) / count;
+      const absRest = Math.abs(rest);
+      const group = Math.min(GROUPS - 1, Math.floor(((rest + 1) / 2) * GROUPS));
+      const front = head + 0.02 * (b.lead - 0.5);
+      const edge = 0.18 * absRest * absRest; // outer bristles run dry sooner
+      let run = null, runLevel = -1, line = null;
+      const flush = () => {
+        if (run && run.length >= 2) buckets[group][runLevel].push(run);
+        run = null;
+      };
+      const endLine = () => {
+        if (line && line.length >= 2) paths.push(line);
+        line = null;
+      };
+      for (let j = 0; j <= n; j++) {
+        const s = j / n;
+        // Footprint: the bristle marks only where the brush is pressed wide
+        // enough to reach it; a soft edge so the outline isn't a staircase.
+        const reach = smooth(absRest - 0.06, absRest + 0.02, P[j]);
+        const load = 0.75 * noise(T, s * 12 + cl.off + phaseShift) + 0.25 * noise(T, s * 26 + b.off + phaseShift * 2.3);
+        const wet = smooth(0, 0.02, load - TH[j] - edge * dry);
+        // The brush front is soft: fresh paint thins over a short run ahead.
+        const f = Math.min(1, Math.max(0, (front - s) / 0.035)) * reach * wet * b.load * (0.45 + 0.25 * P[j] + 0.3 * W[j]);
+        if (f < 0.05) { flush(); endLine(); continue; }
+        const centre = centres[g] + weave * W[j] * Math.sin(cl.ph + s * cl.fq * Math.PI * 2 + phaseShift);
+        let a = rest + (centre - rest) * B[j] + 0.004 * Math.sin(b.wob + s * 9);
+        // Mid-stroke the inner bristles crowd toward the belly of the brush
+        // while the outer ones hold the edge, so the outline stays full and
+        // the overlap gathers light in the middle.
+        a = Math.sign(a) * Math.abs(a) ** (1 + 0.8 * W[j]);
+        const off = a * hw;
+        const px = pts[j][0] + normals[j][0] * off;
+        const py = pts[j][1] + normals[j][1] * off;
+        const level = Math.min(LEVELS - 1, Math.floor(f * LEVELS));
+        if (!run || level !== runLevel) {
+          const last = run ? run[run.length - 1] : null;
+          flush();
+          run = last ? [last] : [];
+          runLevel = level;
+        }
+        run.push([px, py]);
+        if (!line) line = [];
+        line.push([px, py]);
+      }
+      flush();
+      endLine();
+    }
+
+    const baseAlpha = values.opacity * fade * (values.invert ? 0.24 : 0.32);
+    const lineWidth = 0.25 + 0.45 * Math.max(0, values.stroke);
+    for (let g = 0; g < GROUPS; g++) {
+      const [r, gg, bb] = rgb[g];
+      for (let lv = 0; lv < LEVELS; lv++) {
+        const runs = buckets[g][lv];
+        if (!runs.length) continue;
+        ctx.beginPath();
+        for (const run of runs) {
+          ctx.moveTo(run[0][0], run[0][1]);
+          for (let i = 1; i < run.length; i++) ctx.lineTo(run[i][0], run[i][1]);
+        }
+        const a = baseAlpha * ((lv + 0.5) / LEVELS);
+        // Glow: a wider, dimmer underlay rather than shadowBlur.
+        if (values.glow > 0) {
+          ctx.strokeStyle = `rgba(${r},${gg},${bb},${Math.min(1, a * values.glow * 0.16)})`;
+          ctx.lineWidth = lineWidth + values.glow * 2.2;
+          ctx.stroke();
+        }
+        ctx.strokeStyle = `rgba(${r},${gg},${bb},${Math.min(1, a)})`;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+    }
+
+    // Glow's soft halo on the anchor, easing in as the brush passes it.
+    const lit = smooth(0.45, 0.65, head);
+    if (values.glow > 0 && lit > 0) {
+      const mid = pts[Math.round(n / 2)];
+      const [r, gg, bb] = rgb[Math.floor(GROUPS / 2)];
+      const gr = (20 + 34 * values.glow) * size;
+      const grad = ctx.createRadialGradient(mid[0], mid[1], 0, mid[0], mid[1], gr);
+      grad.addColorStop(0, `rgba(${r},${gg},${bb},${Math.min(1, 0.32 * values.glow * values.opacity * fade * lit)})`);
+      grad.addColorStop(1, `rgba(${r},${gg},${bb},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(mid[0], mid[1], gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawFrame(dt, elapsed, values) {
+    const W = canvas.width, H = canvas.height;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = values.invert ? '#f2f2f4' : '#0a0a0d';
+    ctx.fillRect(0, 0, W, H);
+    clock += dt * values.speed;
+
+    // Additive on the dark ground so overlapping bristles brighten on their
+    // own; plain alpha on the inverted ground, where 'lighter' would clip.
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    // Butt caps: dry gaps split every bristle into runs, and round caps
+    // would add up to a bright bead at each break.
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+
+    paths = [];
+    const S = Math.min(W, H);
+    const size = 0.35 + 0.65 * Math.max(0, values.scale);
+    // Mid-stroke sits a little right of and below centre, leaving the
+    // top-left third clear.
+    const ox = W / 2 + 0.03 * S;
+    const oy = H / 2 + 0.03 * S;
+    const light = values.invert ? 0.13 : 0.86 - 0.24 * values.saturation;
+    const rgb = [];
+    for (let g = 0; g < GROUPS; g++) {
+      const { h, s } = paletteHsl(values, g / (GROUPS - 1));
+      rgb.push(hslToRgb(h, s, light));
+    }
+
+    const t = clock + START;
+    const k = Math.floor(t / PERIOD);
+    const u = t - k * PERIOD;
+    // The previous stroke is still fading out while this one starts.
+    if (u + PERIOD < FADE_OUT) drawStroke(values, k - 1, u + PERIOD, ox, oy, S, size, rgb);
+    drawStroke(values, k, u, ox, oy, S, size, rgb);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg(paths, { width: canvas.width, height: canvas.height }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values })
+      .catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
