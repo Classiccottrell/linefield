@@ -1265,8 +1265,11 @@ function describeForAI({ pieceName, values }) {
   // fixed place across the brush, so the hairlines run parallel; a bristle
   // only marks where the brush is pressed wide enough to reach it, so the
   // tapers come from bristles lifting off, not from lines converging into a
-  // bright tip. Mid-stroke the bristles pull into clumps that weave across
-  // each other, and that overlap under additive blending is the anchor.
+  // bright tip. The bristles are bound into streaks of uneven width that
+  // run straight along the stroke with dark channels between them; the paint
+  // runs out streak by streak toward the tail. Mid-stroke, where the brush
+  // carries the most paint, every bristle is down and the streaks pack
+  // tightest, and that overlap under additive blending is the anchor.
   //
   // Geometry is computed in screen space and Angle is applied to the points
   // themselves, never via a canvas transform, so the SVG matches the canvas.
@@ -1283,7 +1286,9 @@ function describeForAI({ pieceName, values }) {
 
   const BASE_BRISTLES = 300;
   const MAX_BRISTLES = 600;  // density 2; per-bristle seeds are drawn for all of them
-  const CLUMP = 10;          // bristles per clump
+  const STREAK_MIN = 10;     // bristles per streak at density 1, narrowest...
+  const STREAK_MAX = 30;     // ...and widest
+  const SUB = 4;             // bristles per sub-streak (density 1), which dry out on their own
   const STEP = 4;            // px between centreline samples
   const LEVELS = 6;          // alpha buckets per colour group
   const GROUPS = 5;          // colour groups across the brush (gradient mode)
@@ -1355,11 +1360,20 @@ function describeForAI({ pieceName, values }) {
         wob: r() * Math.PI * 2,  // phase of its slight wander
       });
     }
-    const clumps = [];
-    for (let i = 0; i < Math.ceil(MAX_BRISTLES / CLUMP); i++) {
-      clumps.push({ jit: r() - 0.5, off: r() * 200, ph: r() * Math.PI * 2, fq: 1.5 + 1.5 * r() });
+    // Streaks: groups of bristles bound together by the paint. Width, how
+    // tightly they bind, and where they run dry differ per streak.
+    const streaks = [];
+    for (let i = 0; i < 64; i++) {
+      streaks.push({
+        size: STREAK_MIN + (STREAK_MAX - STREAK_MIN) * r(),
+        tight: 0.5 * r() * r(),  // most streaks lie close; a few part wide
+        paint: 0.65 + 0.35 * r(),
+        off: r() * 200,
+      });
     }
-    c = { table, shape, bristles, clumps };
+    const subs = new Float32Array(1024);
+    for (let i = 0; i < subs.length; i++) subs[i] = r() * 200;
+    c = { table, shape, bristles, streaks, subs };
     cycles.set(k, c);
     if (cycles.size > 4) cycles.delete(cycles.keys().next().value);
     return c;
@@ -1443,43 +1457,53 @@ function describeForAI({ pieceName, values }) {
     const { pts, normals, n } = centreline(values, c, ox, oy, S, size);
 
     const count = Math.max(24, Math.round(BASE_BRISTLES * Math.max(0.1, values.density)));
-    const clumpCount = Math.ceil(count / CLUMP);
     const hw = 0.075 * S * size; // half-width at full pressure
     const dry = values.dryness;
     const phaseShift = values.phase * 3;
     const T = c.table;
 
     // Per-sample quantities shared by every bristle.
-    const P = new Float32Array(n + 1), B = new Float32Array(n + 1);
-    const W = new Float32Array(n + 1), TH = new Float32Array(n + 1);
+    const P = new Float32Array(n + 1), W = new Float32Array(n + 1);
+    const TH = new Float32Array(n + 1), SPLAY = new Float32Array(n + 1);
     for (let j = 0; j <= n; j++) {
       const s = j / n;
       P[j] = pressure(s);
-      const d = (s - 0.5) / 0.085;
-      W[j] = Math.exp(-d * d);           // the mid-stroke bunching zone
-      B[j] = 0.4 + 0.45 * W[j];          // how tightly bristles gather into clumps
-      // The paint runs dry toward the end of the stroke; the landing is wet.
-      TH[j] = dry * (0.04 + 0.62 * smooth(0.35, 1, s) + 0.14 * smooth(0.82, 1, s));
+      const d = (s - 0.5) / 0.1;
+      W[j] = Math.exp(-d * d); // mid-stroke, where the brush carries the most paint
+      // The paint runs dry toward the tail; the landing is wet. Capped below
+      // the load's top so a few broken streaks still reach the tip.
+      TH[j] = dry * (0.04 + 0.64 * smooth(0.35, 0.95, s) ** 0.8);
+      // Wet, the streaks lie close and the band reads solid; as the paint
+      // runs out they part into separate streaks with dark channels between.
+      // Mid-stroke they also pack tighter, where the bristles bunch.
+      SPLAY[j] = 0.3 + 0.7 * smooth(0.3, 0.85, s);
     }
 
-    // Clump centres across the brush, and how far each weaves mid-stroke.
-    const centres = new Float32Array(clumpCount);
-    for (let g = 0; g < clumpCount; g++) {
-      const lo = g * CLUMP, hi = Math.min(count, lo + CLUMP);
-      centres[g] = -1 + ((lo + hi) / count) + c.clumps[g].jit * (0.6 / clumpCount);
+    // Bind consecutive bristles into streaks. Widths are set in density-1
+    // bristles and scaled, so the streaks keep their size at any Density.
+    const per = count / BASE_BRISTLES;
+    const sub = Math.max(2, Math.round(SUB * per));
+    const sOf = new Int16Array(count), lo = [], hi = [];
+    for (let i = 0, g = 0; i < count; g++) {
+      const w = Math.max(2, Math.round(c.streaks[g % 64].size * per));
+      lo.push(i);
+      hi.push(Math.min(count, i + w));
+      for (let m = i; m < Math.min(count, i + w); m++) sOf[m] = g;
+      i += w;
     }
-    const weave = 1.3 / clumpCount;
 
     const buckets = Array.from({ length: GROUPS }, () => Array.from({ length: LEVELS }, () => []));
     for (let i = 0; i < count; i++) {
       const b = c.bristles[i];
-      const g = Math.floor(i / CLUMP);
-      const cl = c.clumps[g];
-      const rest = -1 + (2 * (i + 0.5 + b.jit * 0.8)) / count;
+      const g = sOf[i];
+      const st = c.streaks[g % 64];
+      const subOff = c.subs[(g * 37 + Math.floor((i - lo[g]) / sub)) & 1023];
+      const rest = -1 + (2 * (i + 0.5 + b.jit * 0.6)) / count;
+      const centre = -1 + (lo[g] + hi[g]) / count;
       const absRest = Math.abs(rest);
       const group = Math.min(GROUPS - 1, Math.floor(((rest + 1) / 2) * GROUPS));
       const front = head + 0.02 * (b.lead - 0.5);
-      const edge = 0.18 * absRest * absRest; // outer bristles run dry sooner
+      const edge = 0.3 * absRest * absRest; // outer bristles run dry sooner
       let run = null, runLevel = -1, line = null;
       const flush = () => {
         if (run && run.length >= 2) buckets[group][runLevel].push(run);
@@ -1494,17 +1518,24 @@ function describeForAI({ pieceName, values }) {
         // Footprint: the bristle marks only where the brush is pressed wide
         // enough to reach it; a soft edge so the outline isn't a staircase.
         const reach = smooth(absRest - 0.06, absRest + 0.02, P[j]);
-        const load = 0.75 * noise(T, s * 12 + cl.off + phaseShift) + 0.25 * noise(T, s * 26 + b.off + phaseShift * 2.3);
+        // Paint left on this bristle: mostly its streak's, then its
+        // sub-streak's, then its own. Long, low-frequency along the stroke,
+        // so the gaps are drawn out into streaks, not spots.
+        const load = 0.55 * noise(T, s * 5 + st.off + phaseShift)
+          + 0.3 * noise(T, s * 11 + subOff + phaseShift * 1.7)
+          + 0.15 * noise(T, s * 28 + b.off + phaseShift * 2.3);
         const wet = smooth(0, 0.02, load - TH[j] - edge * dry);
         // The brush front is soft: fresh paint thins over a short run ahead.
-        const f = Math.min(1, Math.max(0, (front - s) / 0.035)) * reach * wet * b.load * (0.45 + 0.25 * P[j] + 0.3 * W[j]);
+        // Paint left also sets how bright a bristle lays down: full and
+        // heaviest mid-stroke, thinner where it is scraping dry.
+        const thin = 1 - 0.3 * Math.min(1, dry) * smooth(0.5, 1, s);
+        const f = Math.min(1, Math.max(0, (front - s) / 0.035)) * reach * wet * b.load * st.paint * thin * (0.4 + 0.15 * P[j] + 0.55 * W[j]);
         if (f < 0.05) { flush(); endLine(); continue; }
-        const centre = centres[g] + weave * W[j] * Math.sin(cl.ph + s * cl.fq * Math.PI * 2 + phaseShift);
-        let a = rest + (centre - rest) * B[j] + 0.004 * Math.sin(b.wob + s * 9);
-        // Mid-stroke the inner bristles crowd toward the belly of the brush
-        // while the outer ones hold the edge, so the outline stays full and
-        // the overlap gathers light in the middle.
-        a = Math.sign(a) * Math.abs(a) ** (1 + 0.8 * W[j]);
+        // Each streak binds its bristles toward its own centre line. The
+        // binding changes only slowly along the stroke and moves a bristle
+        // a pixel or so, so the streaks stay straight.
+        const bind = Math.min(0.85, (0.08 + st.tight) * SPLAY[j] + 0.45 * W[j]);
+        const a = rest + (centre - rest) * bind + 0.002 * Math.sin(b.wob + s * 9);
         const off = a * hw;
         const px = pts[j][0] + normals[j][0] * off;
         const py = pts[j][1] + normals[j][1] * off;
@@ -1523,7 +1554,7 @@ function describeForAI({ pieceName, values }) {
       endLine();
     }
 
-    const baseAlpha = values.opacity * fade * (values.invert ? 0.24 : 0.32);
+    const baseAlpha = values.opacity * fade * (values.invert ? 0.36 : 0.5);
     const lineWidth = 0.25 + 0.45 * Math.max(0, values.stroke);
     for (let g = 0; g < GROUPS; g++) {
       const [r, gg, bb] = rgb[g];

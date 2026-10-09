@@ -373,10 +373,10 @@ Ink, not hue, is now the axis that tells pieces apart.
 | 240 | 0.08 | 0.00 | 0.037 | `cipher-bloom` |
 | 240 | 0.11 | 0.00 | 0.044 | `flow-field` |
 | 240 | 0.05 | 0.00 | 0.045 | `relay` |
+| 240 | 0.06 | 0.00 | 0.046 | `bristle` |
 | 240 | 0.08 | 0.00 | 0.049 | `orbitals` |
 | 240 | 0.06 | 0.00 | 0.049 | `funnel` |
 | 240 | 0.10 | 0.00 | 0.049 | `contour-grid` |
-| 240 | 0.06 | 0.00 | 0.053 | `bristle` |
 | 240 | 0.05 | 0.00 | 0.056 | `mooring` |
 | 240 | 0.03 | 0.00 | 0.059 | `dune` |
 | 240 | 0.12 | 0.00 | 0.060 | `wireframe-lattice` |
