@@ -19,12 +19,11 @@
 <canvas id="canvas"></canvas>
 
 <!--
-  fracture — a pane of sparse diagonal hairlines, right of centre, broken
-  into irregular shards that drift slowly apart and back, so the lines break
-  and misalign at every crack and brighten as each crack opens.
-  Text-safe zone: the left third of the frame. The pane never enters it.
-  Anchor: the widest crack, a wedge of light just above the pane's centre,
-  brightest at its open mouth.
+  fracture — a full-bleed field of faint diagonal hairlines split by one long
+  jagged crack, whose two plates breathe slowly apart and back so the lines
+  misalign across it and brighten as they near the light inside it.
+  Text-safe zone: the upper left, above the crack; only the faint field reaches it.
+  Anchor: the crack's widest opening, just right of centre.
 -->
 
 <div class="lf-export-row" data-lf-panel>
@@ -53,76 +52,74 @@
   window.addEventListener('resize', resize);
   resize();
 
-  const MAX_SHARDS = 24;
+  const MAX_SPLINTERS = 24;
   const BREATH_PERIOD = 13;   // seconds per open-and-close at speed 1
-  const HATCH_TILT = -52;     // degrees; lines rise to the right
-  const LEVELS = 16;          // alpha buckets, so a frame is a few dozen strokes
-  const BANDS = 5;            // colour bands across the pane (gradient mode)
-  const A_TOP = 1.0;          // alpha of the top bucket, before Opacity
+  const CRACK_TILT = -14;     // degrees; the crack rises gently to the right
+  const HATCH_REL = 66;       // degrees between the crack and the hatch
+  const DU = 4;               // px between samples along the crack
+  const LEVELS = 32;          // alpha buckets, so a frame is a few dozen strokes
+  const BANDS = 5;            // colour bands along the crack (gradient mode)
+  const A_TOP = 1;            // alpha of the top bucket, before Opacity
   let paths = [];
 
-  // The shard seeds and each shard's own drift, drawn once at load. The
-  // seeds are best-candidate samples, so any prefix of the list is still
-  // evenly spread: Shards N uses the first N and the rest stay put.
-  const POOL = [];
-  for (let i = 0; i < MAX_SHARDS; i++) {
-    let best = null;
+  // The crack's centreline, drawn once at load: straight runs of uneven
+  // length joined by sharp kinks, with a pull back toward its baseline so it
+  // crosses the canvas on one heading. Knots are (u, v) in units of the
+  // shorter side, from well past one edge to well past the other.
+  const CRACK = [];
+  {
+    let u = -3.2, v = (Math.random() - 0.5) * 0.04;
+    CRACK.push([u, v]);
+    while (u < 3.2) {
+      const jog = Math.random() < 0.18;
+      const len = jog ? 0.008 + 0.014 * Math.random() : 0.03 + 0.1 * Math.random();
+      const turn = jog ? (Math.random() < 0.5 ? -1 : 1) * (0.7 + 0.5 * Math.random()) : (Math.random() * 2 - 1) * 0.5;
+      const th = Math.max(-1.3, Math.min(1.3, turn - 2.2 * v));
+      u += len * Math.cos(th);
+      v += len * Math.sin(th);
+      CRACK.push([u, v]);
+    }
+  }
+
+  // Splinters that break off along the crack, also drawn once. Their places
+  // along it are best-candidate samples, so Shards N takes the first N and
+  // they stay spread out at any count. Each is a sliver cut from one plate's
+  // edge: `cut` is its depth profile at five points along its length.
+  const SPLINTERS = [];
+  for (let k = 0; k < MAX_SPLINTERS; k++) {
+    let at = 0;
     let bestD = -1;
-    const tries = i === 0 ? 1 : 4; // few candidates keep the cells irregular
-    for (let k = 0; k < tries; k++) {
-      const u = 0.04 + 0.92 * Math.random();
-      const v = 0.04 + 0.92 * Math.random();
+    for (let c = 0; c < 5; c++) {
+      const u = -0.88 + 1.76 * Math.random();
       let d = Infinity;
-      for (const p of POOL) d = Math.min(d, (u - p.u) ** 2 * 1.7 + (v - p.v) ** 2);
-      if (d > bestD) { bestD = d; best = { u, v }; }
+      for (const p of SPLINTERS) d = Math.min(d, Math.abs(u - p.u));
+      if (d > bestD) { bestD = d; at = u; }
     }
-    const a = Math.random() * Math.PI * 2;
-    best.rot = (Math.random() < 0.5 ? -1 : 1) * (0.35 + 0.65 * Math.random());
-    best.jx = Math.cos(a);
-    best.jy = Math.sin(a);
-    best.ph = Math.random() * Math.PI * 2;
-    POOL.push(best);
+    // A chip: a rough triangle whose deepest point sits off-centre.
+    const pk = 0.3 + 0.4 * Math.random();
+    const t1 = pk * (0.35 + 0.3 * Math.random()), t3 = pk + (1 - pk) * (0.35 + 0.3 * Math.random());
+    SPLINTERS.push({
+      u: at,
+      side: Math.random() < 0.5 ? -1 : 1,
+      len: 0.035 + 0.05 * Math.random(),
+      depth: 0.016 + 0.02 * Math.random(),
+      cut: [[0, 0], [t1, (t1 / pk) * (0.7 + 0.35 * Math.random())], [pk, 1], [t3, ((1 - t3) / (1 - pk)) * (0.7 + 0.35 * Math.random())], [1, 0]],
+      rot: (Math.random() < 0.5 ? -1 : 1) * (2 + 3 * Math.random()),
+      ph: Math.random() * Math.PI * 2,
+    });
   }
 
-  // Clip a convex polygon to the half-plane nx*x + ny*y <= c. Each edge
-  // carries a label: the shard on its far side, or -1 for the pane's own
-  // border. Only labelled edges are cracks, and only cracks light up.
-  function clipHalf(pts, labs, nx, ny, c, lab) {
-    const out = [];
-    const ol = [];
-    const n = pts.length;
-    for (let k = 0; k < n; k++) {
-      const a = pts[k];
-      const b = pts[(k + 1) % n];
-      const fa = a[0] * nx + a[1] * ny - c;
-      const fb = b[0] * nx + b[1] * ny - c;
-      if (fa <= 0) { out.push(a); ol.push(labs[k]); }
-      if ((fa <= 0) !== (fb <= 0)) {
-        const t = fa / (fa - fb);
-        out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
-        ol.push(fa <= 0 ? lab : labs[k]);
-      }
-    }
-    return [out, ol];
-  }
-
-  function centroid(pts) {
-    let a = 0, x = 0, y = 0;
-    for (let k = 0; k < pts.length; k++) {
-      const p = pts[k], q = pts[(k + 1) % pts.length];
-      const cr = p[0] * q[1] - q[0] * p[1];
-      a += cr; x += (p[0] + q[0]) * cr; y += (p[1] + q[1]) * cr;
-    }
-    if (Math.abs(a) < 1e-9) return pts[0];
-    return [x / (3 * a), y / (3 * a)];
-  }
+  const smooth = (a, b, x) => {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
 
   const PRESETS = {
-    whisper: { opacity: 0.6, stroke: 0.7, density: 0.7, motion: 0.6 },
-    ink:     { opacity: 1, stroke: 1.4, density: 1.05, shards: 11 },
+    whisper: { opacity: 0.6, stroke: 0.7, density: 0.8, motion: 0.6, scale: 1.35 },
+    ink:     { opacity: 1, stroke: 1.4, density: 1, shards: 6 },
     neon:    { opacity: 0.9, stroke: 1, density: 1.1, saturation: 0.9, glow: 1.1 },
-    drift:   { opacity: 0.85, density: 0.8, speed: 0.4, motion: 1.8, shards: 9, scale: 1.1 },
-    dense:   { opacity: 1, stroke: 0.8, density: 1.55, shards: 19, motion: 1.3 },
+    drift:   { opacity: 0.9, density: 0.85, speed: 0.4, motion: 1.8, phase: 0.6, shards: 14, scale: 2 },
+    dense:   { opacity: 1, stroke: 0.7, density: 1.9, shards: 24, scale: 1.85 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -131,10 +128,10 @@
     presets: PRESETS,
     onChange: () => {},
     extraControls: [
-      // How many pieces the pane is broken into.
-      { name: 'shards', label: 'Shards', type: 'range', min: 6, max: 24, step: 1, default: 13, category: 'form' },
+      // How much splintering runs along the crack.
+      { name: 'shards', label: 'Shards', type: 'range', min: 0, max: 24, step: 1, default: 10, category: 'form' },
     ],
-    defaults: { hue: 168, hueB: 312, saturation: 0, colorMode: 'gradient', colorA: '#00ffd5', colorB: '#ff00e6' },
+    defaults: { hue: 168, hueB: 312, saturation: 0, scale: 1.8, colorMode: 'gradient', colorA: '#00ffd5', colorB: '#ff00e6' },
   });
   const currentValues = baked || panel.values;
 
@@ -150,262 +147,361 @@
 
     paths = [];
     const unit = Math.min(W, H);
-    const zoom = 0.55 + 0.45 * values.scale;
-    // The pane, in pane-local px about its centre. Screen = local + (cx, cy).
-    const cx = W * 0.66;
-    const cy = H * 0.5;
-    const hw = W * 0.26 * zoom;
-    const hh = H * 0.32 * zoom;
-    const n = Math.max(2, Math.min(MAX_SHARDS, Math.round(values.shards)));
-    const seeds = POOL.slice(0, n).map((p) => [-hw + 2 * hw * p.u, -hh + 2 * hh * p.v]);
 
-    // Voronoi cells by half-plane clipping, edges labelled by neighbour.
-    const cells = seeds.map((s, i) => {
-      let pts = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
-      let labs = [-1, -1, -1, -1];
-      for (let j = 0; j < n && pts.length > 2; j++) {
-        if (j === i) continue;
-        const t = seeds[j];
-        const nx = t[0] - s[0], ny = t[1] - s[1];
-        const c = (t[0] * t[0] + t[1] * t[1] - s[0] * s[0] - s[1] * s[1]) / 2;
-        [pts, labs] = clipHalf(pts, labs, nx, ny, c, j);
-      }
-      return { pts, labs, c: centroid(pts) };
+    // Everything is built in the crack's own frame (u along it, v across it,
+    // v growing toward the lower plate) and mapped to the screen here, so
+    // Angle turns the whole composition and the SVG export matches the canvas.
+    const phi = ((CRACK_TILT + values.angle) * Math.PI) / 180;
+    const ux = Math.cos(phi), uy = Math.sin(phi);
+    const ox = W / 2, oy = H / 2;
+    const toScreen = (u, v) => [ox + u * ux - v * uy, oy + u * uy + v * ux];
+    const hr = (HATCH_REL * Math.PI) / 180;
+    const hu = Math.cos(hr), hv = Math.sin(hr);  // along the hatch
+    const ku = -hv, kv = hu;                      // across the hatch
+
+    // Scale frames the field: at 2 it fills the canvas edge to edge; lower,
+    // it fades out softly toward the edges, never with a hard border.
+    const rIn = 0.2 + 0.62 * values.scale;
+    const env = (x, y) => {
+      const r = Math.hypot((x - ox) / (W / 2), (y - oy) / (H / 2));
+      return 1 - smooth(rIn, rIn + 0.5, r);
+    };
+
+    // The canvas in crack coordinates, and the stretch of crack it shows.
+    const corners = [[0, 0], [W, 0], [W, H], [0, H]].map(([x, y]) => {
+      const dx = x - ox, dy = y - oy;
+      return [dx * ux + dy * uy, -dx * uy + dy * ux];
     });
+    const clipQuad = [[-8, -8], [W + 8, -8], [W + 8, H + 8], [-8, H + 8]].map(([x, y]) => {
+      const dx = x - ox, dy = y - oy;
+      return [dx * ux + dy * uy, -dx * uy + dy * ux];
+    });
+    let visLo = Infinity, visHi = -Infinity;
+    for (const c of corners) { visLo = Math.min(visLo, c[0]); visHi = Math.max(visHi, c[0]); }
+    const uLo = visLo - 60, uHi = visHi + 60;
+    const N = Math.ceil((uHi - uLo) / DU) + 1;
 
-    // The anchor crack is chosen on purpose, not left to the layout: a long
-    // interior edge near a point left of and above the pane's centre, clear
-    // of the pane's border and crossing the hatch steeply.
-    // Angle turns the hatch itself. Every point is computed in screen space
-    // (no canvas transform), so the SVG export matches the canvas.
-    const th = ((HATCH_TILT + values.angle) * Math.PI) / 180;
-    const hx = Math.cos(th), hy = Math.sin(th);   // along the hatch
-    const kx = -hy, ky = hx;                       // across the hatch
-    const tx = -0.23 * hw, ty = -0.1 * hh;
-    const minLen = 0.16 * Math.min(hw, hh);
-    let anchor = null;
-    let fallback = null;
-    let bestD = Infinity, bestF = Infinity;
-    for (let i = 0; i < n; i++) {
-      const { pts, labs } = cells[i];
-      for (let k = 0; k < pts.length; k++) {
-        const j = labs[k];
-        if (j <= i) continue;
-        const a = pts[k], b = pts[(k + 1) % pts.length];
-        const ex = b[0] - a[0], ey = b[1] - a[1];
-        const len = Math.hypot(ex, ey);
-        if (len < 1e-6) continue;
-        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-        const d = Math.hypot(mx - tx, my - ty) - 0.25 * len; // near, and long
-        const e = { i, j, mx, my, ex: ex / len, ey: ey / len, len, ax: a[0], ay: a[1], bx: b[0], by: b[1] };
-        if (d < bestF) { bestF = d; fallback = e; }
-        const steep = Math.abs(ex * hy - ey * hx) / len;
-        // Off the pane's border, and inside the frame's central square (the
-        // square crop gallery cards and stills use), clear of the left third.
-        const sx = cx + mx;
-        const inner = Math.abs(mx) < 0.7 * hw && Math.abs(my) < 0.7 * hh
-          && sx <= W / 2 + H / 2 - unit * 0.06 && sx >= W / 3 + W * 0.08;
-        if (inner && len >= minLen && steep > 0.5 && d < bestD) { bestD = d; anchor = e; }
-      }
-    }
-    anchor = anchor || fallback;
-
-    // Displacement. Every shard rides one shared breath. The base field is
-    // a symmetric positive-definite stretch of the seeds about the pane's
-    // centre (stronger along one diagonal), which opens every crack and
-    // never closes one, without reading as a burst from a point. On top,
-    // the shards either side of the anchor crack part along its normal,
-    // tapering along the fault, so that one crack is clearly the widest.
+    // Breathing: one shared slow open-and-close. Plates part across the
+    // crack (g) and slide a little along it (sh), so the lines misalign.
     const breath = 0.5 - 0.5 * Math.cos((clock / BREATH_PERIOD) * Math.PI * 2 + values.phase * Math.PI);
     const amt = 0.25 + 0.75 * values.motion * breath;
-    const e1 = 0.022, e2 = 0.012;
-    const ca = Math.cos(0.6), sa = Math.sin(0.6);
-    let nax = 0, nay = 0;
-    if (anchor) {
-      const si = seeds[anchor.i], sj = seeds[anchor.j];
-      const l = Math.hypot(sj[0] - si[0], sj[1] - si[1]) || 1;
-      nax = (sj[0] - si[0]) / l; nay = (sj[1] - si[1]) / l;
-    }
-    // Scaled by the typical shard, so more shards don't widen more cracks.
-    const cell = Math.sqrt((4 * hw * hh) / n);
-    const push = Math.min(unit * 0.015, Math.max(cell * 0.07, unit * 0.011));
-    const tau = cell * 0.4;
-    const lam = cell * 0.8;
-    // The anchor's two shards also turn against each other, so the crack is
-    // a wedge whose mouth (the end nearer the anchor's target point) opens
-    // widest.
-    let wedgeI = 0, wedgeJ = 0;
-    if (anchor) {
-      const toB = (anchor.bx - tx) ** 2 + (anchor.by - ty) ** 2 < (anchor.ax - tx) ** 2 + (anchor.ay - ty) ** 2 ? 1 : -1;
-      const sigma = anchor.ex * nay - anchor.ey * nax;
-      const delta = Math.min(0.035, (0.55 * 2 * push * 0.9) / anchor.len);
-      wedgeI = -delta * sigma * toB;
-      wedgeJ = delta * sigma * toB;
-    }
-    const xf = cells.map((cell, i) => {
-      const [sx, sy] = seeds[i];
-      const pa = sx * ca + sy * sa;
-      const pb = -sx * sa + sy * ca;
-      let dx = (pa * e1) * ca - (pb * e2) * sa;
-      let dy = (pa * e1) * sa + (pb * e2) * ca;
-      if (anchor) {
-        const rx = sx - anchor.mx, ry = sy - anchor.my;
-        const across = rx * nax + ry * nay;
-        const along = rx * anchor.ex + ry * anchor.ey;
-        const f = push * Math.tanh(across / tau) * Math.exp(-((along / lam) ** 2));
-        dx += f * nax; dy += f * nay;
-      }
-      const p = POOL[i];
-      // A little life of its own: a small wander and a slight turn.
-      const wob = Math.sin((clock / BREATH_PERIOD) * Math.PI * 2 * 0.6 + p.ph);
-      const jit = unit * 0.0016 * values.motion * wob;
-      let rot = (p.rot * (0.6 * amt + 0.2 * values.motion * wob) * Math.PI) / 180;
-      if (anchor && i === anchor.i) rot += wedgeI * amt;
-      if (anchor && i === anchor.j) rot += wedgeJ * amt;
-      return {
-        cx: cell.c[0], cy: cell.c[1],
-        cos: Math.cos(rot), sin: Math.sin(rot),
-        dx: dx * amt + p.jx * jit, dy: dy * amt + p.jy * jit,
-      };
-    });
-    const T = (t, x, y) => [
-      t.cx + t.cos * (x - t.cx) - t.sin * (y - t.cy) + t.dx,
-      t.cy + t.sin * (x - t.cx) + t.cos * (y - t.cy) + t.dy,
-    ];
+    const g = unit * 0.012 * amt;
+    const sh = unit * 0.006 * amt;
+    // The plates part most around the anchor and less toward the canvas
+    // edges, so the crack tapers to a hairline as it leaves the frame. The
+    // shift varies by a few px over the whole canvas, so the lines stay
+    // visibly straight.
+    const uAnc = W * 0.07;
+    const spread = (u) => 0.4 + 0.6 * Math.exp(-(((u - uAnc) / (unit * 0.55)) ** 2));
+    const tA = (u) => { const k = spread(u); return [(sh / 2) * k, (-g / 2) * k]; };
+    const tB = (u) => { const k = spread(u); return [(-sh / 2) * k, (g / 2) * k]; };
 
-    // How far apart two shards have drifted at a point of their shared edge,
-    // measured across that edge. Negative (a touch of overlap) reads as shut.
-    const opening = (i, j, x, y) => {
-      const a = T(xf[i], x, y), b = T(xf[j], x, y);
-      const si = seeds[i], sj = seeds[j];
-      const l = Math.hypot(sj[0] - si[0], sj[1] - si[1]) || 1;
-      return Math.max(0, ((b[0] - a[0]) * (sj[0] - si[0]) + (b[1] - a[1]) * (sj[1] - si[1])) / l);
+    // The anchor: a lens where both plates are chipped back, so the crack is
+    // widest there. It sits just right of centre and opens with the breath.
+    const sig = unit * 0.11;
+    const lensK = 0.6 + 0.4 * amt;
+    const lensAt = (u, c, h) => {
+      const x = (u - c) / sig;
+      return x * x < 1 ? h * (1 - x * x) ** 2 * lensK : 0;
     };
+
+    // Sampled boundaries. OA/OB: each plate's outer edge
+    // (centreline less the lens). BA/BB: the same less any splinter cut.
+    const OA = new Float32Array(N), OB = new Float32Array(N);
+    const BA = new Float32Array(N), BB = new Float32Array(N);
+    let kn = 0;
+    for (let i = 0; i < N; i++) {
+      const u = uLo + i * DU;
+      const un = u / unit;
+      while (kn < CRACK.length - 2 && CRACK[kn + 1][0] < un) kn++;
+      const [ua, va] = CRACK[kn], [ub, vb] = CRACK[kn + 1];
+      const f = (va + (vb - va) * Math.max(0, Math.min(1, (un - ua) / (ub - ua || 1)))) * unit;
+      OA[i] = f - lensAt(u, uAnc, unit * 0.012);
+      OB[i] = f + lensAt(u, uAnc + sig * 0.3, unit * 0.009);
+      BA[i] = OA[i];
+      BB[i] = OB[i];
+    }
+    const at = (arr, u) => {
+      const q = Math.max(0, Math.min(N - 1.001, (u - uLo) / DU));
+      const k = Math.floor(q);
+      return arr[k] + (arr[k + 1] - arr[k]) * (q - k);
+    };
+
+    // Splinters in play: the first `shards`, skipping any that would overlap
+    // one already cut from the same plate.
+    const nSpl = Math.max(0, Math.min(MAX_SPLINTERS, Math.round(values.shards)));
+    const spl = [];
+    for (let k = 0; k < nSpl; k++) {
+      const p = SPLINTERS[k];
+      const uc = p.u * (visHi - visLo) * 0.5 + (visHi + visLo) * 0.5;
+      const len = p.len * unit;
+      const u0 = uc - len / 2, u1 = uc + len / 2;
+      if (spl.some((s) => s.side === p.side && u0 < s.u1 + 6 && u1 > s.u0 - 6)) continue;
+      spl.push({ p, side: p.side, u0, u1, depth: p.depth * unit });
+    }
+    const cutAt = (s, u) => {
+      const t = (u - s.u0) / (s.u1 - s.u0);
+      if (t <= 0 || t >= 1) return 0;
+      const c = s.p.cut;
+      let j = 0;
+      while (j < c.length - 2 && t > c[j + 1][0]) j++;
+      const w = (t - c[j][0]) / (c[j + 1][0] - c[j][0]);
+      return (c[j][1] + (c[j + 1][1] - c[j][1]) * w) * s.depth;
+    };
+    for (const s of spl) {
+      const i0 = Math.max(0, Math.floor((s.u0 - uLo) / DU)), i1 = Math.min(N - 1, Math.ceil((s.u1 - uLo) / DU));
+      for (let i = i0; i <= i1; i++) {
+        const d = cutAt(s, uLo + i * DU);
+        if (s.side < 0) BA[i] = OA[i] - d;
+        else BB[i] = OB[i] + d;
+      }
+    }
+
+    // The opening at screen position u: between the plates' outer edges
+    // (splinters only sit inside it, they don't widen it).
+    const edgeA = (u) => { const t = tA(u); return at(OA, u - t[0]) + t[1]; };
+    const edgeB = (u) => { const t = tB(u); return at(OB, u - t[0]) + t[1]; };
+    const gapAt = (u) => Math.max(0, edgeB(u) - edgeA(u));
     const oRef = unit * 0.01;
     const lit = (o) => 1 - Math.exp(-o / oRef);
-    // Seam light keeps growing past `lit`'s knee, so the widest crack is
-    // also the brightest one rather than tying with every open crack.
-    const gain = (o) => Math.min(1.7, (o / (oRef * 1.2)) ** 0.8);
+    const gain = (o) => Math.min(1.7, (o / (oRef * 1.5)) ** 1.3);
+    const anchorGain = gain(gapAt(uAnc + sig * 0.12));
 
-    // buckets[band * LEVELS + level] collects segments drawn at that alpha
-    // and colour, so each costs one stroke however many feed it.
+    // Colour runs along the crack in gradient mode.
+    const bandOf = (u) => Math.max(0, Math.min(BANDS - 1, Math.floor(((u - visLo) / (visHi - visLo)) * BANDS)));
+
+    // buckets[band * LEVELS + level] collects screen segments at that alpha
+    // and colour, so each costs one stroke however many feed it. Alpha past
+    // the top bucket is laid down again, so under `lighter` it keeps adding.
     const buckets = Array.from({ length: BANDS * LEVELS }, () => []);
-    const seams = [];
-    // Alpha past the top bucket is laid down again, so under `lighter` it
-    // keeps adding light instead of clipping at one stroke's worth.
-    const put = (alpha, band, x0, y0, x1, y1) => {
+    const put = (alpha, band, a, b) => {
+      let drew = false;
       while (alpha > 0) {
         const lv = Math.min(LEVELS, Math.round((Math.min(alpha, A_TOP) / A_TOP) * LEVELS));
-        if (lv <= 0) return;
-        buckets[band * LEVELS + lv - 1].push(x0, y0, x1, y1);
+        if (lv <= 0) break;
+        buckets[band * LEVELS + lv - 1].push(a[0], a[1], b[0], b[1]);
         alpha -= A_TOP;
+        drew = true;
       }
+      return drew;
     };
-    const bandOf = (x) => Math.max(0, Math.min(BANDS - 1, Math.floor(((x + hw) / (2 * hw)) * BANDS)));
 
-    const spacing = Math.max(5, Math.min(34, (unit * 0.0135) / values.density));
+    // Field light: faint everywhere, rising toward the crack, plus a tighter
+    // glint at each line's broken end that grows as the crack opens there.
+    const spacing = Math.max(6, Math.min(80, (unit * 0.03) / values.density));
     const offset = 0.37 * spacing;
-    const BASE = 0.5;   // a line's alpha away from any crack
-    const RAMP = 0.5;   // each of the three stacked layers at a crack
-    const SEAM = 1;      // a seam line at the middle of a fully open crack
+    const A_FAR = 0.05, A_NEAR = 0.3, D_NEAR = unit * 0.1, GLINT = 1.2;
 
-    for (let i = 0; i < n; i++) {
-      const { pts, labs } = cells[i];
-      if (pts.length < 3) continue;
-      const t = xf[i];
+    function drawPlate(sign, T, B) {
+      // Plate-local lattice, clipped to the canvas (shifted into the plate's
+      // rest frame) and to the plate's side of its edge.
+      const T0 = T(uAnc);
       let lo = Infinity, hi = -Infinity;
-      for (const p of pts) {
-        const q = p[0] * kx + p[1] * ky;
+      for (const c of clipQuad) {
+        const q = (c[0] - T0[0]) * ku + (c[1] - T0[1]) * kv;
         lo = Math.min(lo, q); hi = Math.max(hi, q);
       }
-      const m0 = Math.ceil((lo - offset) / spacing);
-      const m1 = Math.floor((hi - offset) / spacing);
+      const m0 = Math.ceil((lo - offset) / spacing), m1 = Math.floor((hi - offset) / spacing);
+      // Side of the edge: negative inside the plate.
+      const G = (u, v) => (sign < 0 ? v - at(B, u) : at(B, u) - v);
       for (let m = m0; m <= m1; m++) {
         const o = offset + m * spacing;
-        const hits = [];
-        for (let k = 0; k < pts.length; k++) {
-          const a = pts[k], b = pts[(k + 1) % pts.length];
-          const fa = a[0] * kx + a[1] * ky - o;
-          const fb = b[0] * kx + b[1] * ky - o;
-          if ((fa < 0) === (fb < 0)) continue;
-          const u = fa / (fa - fb);
-          const x = a[0] + (b[0] - a[0]) * u, y = a[1] + (b[1] - a[1]) * u;
+        const bu = o * ku, bv = o * kv;
+        // Canvas clip (convex quad), in the plate's rest frame.
+        let t0 = -Infinity, t1 = Infinity;
+        for (let e = 0; e < 4; e++) {
+          const a = clipQuad[e], b = clipQuad[(e + 1) % 4];
+          const ax = a[0] - T0[0], ay = a[1] - T0[1];
           const ex = b[0] - a[0], ey = b[1] - a[1];
-          const steep = Math.abs(ex * hy - ey * hx) / (Math.hypot(ex, ey) || 1);
-          hits.push({ x, y, s: x * hx + y * hy, lab: labs[k], steep });
+          // Inward normal for a clockwise-in-screen quad, checked by sign.
+          let nx = -ey, ny = ex;
+          const mx = (clipQuad[0][0] + clipQuad[2][0]) / 2 - T0[0] - ax, my = (clipQuad[0][1] + clipQuad[2][1]) / 2 - T0[1] - ay;
+          if (nx * mx + ny * my < 0) { nx = -nx; ny = -ny; }
+          const den = hu * nx + hv * ny;
+          const num = (bu - ax) * nx + (bv - ay) * ny;
+          if (Math.abs(den) < 1e-9) { if (num < 0) { t0 = 1; t1 = 0; } continue; }
+          const t = -num / den;
+          if (den > 0) t0 = Math.max(t0, t); else t1 = Math.min(t1, t);
         }
-        if (hits.length < 2) continue;
-        hits.sort((p, q) => p.s - q.s);
-        const h0 = hits[0], h1 = hits[hits.length - 1];
-        const len = h1.s - h0.s;
-        if (len < 0.5) continue;
-        const [x0, y0] = T(t, h0.x, h0.y);
-        const [x1, y1] = T(t, h1.x, h1.y);
-        const band = bandOf((h0.x + h1.x) / 2);
-        put(BASE, band, x0, y0, x1, y1);
-        paths.push([[cx + x0, cy + y0], [cx + x1, cy + y1]]);
-
-        // Brighten toward each end that meets a crack, by how far that crack
-        // has opened there: three stacked layers at lengths L, L/2, L/4.
-        for (const [h, sx, sy, ex, ey] of [[h0, x0, y0, x1, y1], [h1, x1, y1, x0, y0]]) {
-          if (h.lab < 0) continue;
-          const op = opening(i, h.lab, h.x, h.y);
-          const b = 0.3 + 0.7 * lit(op);
-          const D = unit * 0.014 + 1.2 * op;
-          let L = Math.min(len, D / Math.max(0.5, h.steep));
-          for (let r = 0; r < 3; r++, L *= 0.5) {
-            const f = L / len;
-            put(RAMP * b, band, sx, sy, sx + (ex - sx) * f, sy + (ey - sy) * f);
+        if (!(t1 > t0)) continue;
+        // Crossings of the plate edge, sample interval by sample interval.
+        const cross = [];
+        const uAt = (t) => bu + t * hu;
+        const vAt = (t) => bv + t * hv;
+        let tPrev = t0, gPrev = G(uAt(t0), vAt(t0));
+        const inside0 = gPrev < 0;
+        const iStart = Math.floor((uAt(t0) - uLo) / DU) + 1;
+        const iEnd = Math.ceil((uAt(t1) - uLo) / DU);
+        for (let i = iStart; i <= iEnd + 1; i++) {
+          const tN = Math.min(t1, (uLo + i * DU - bu) / hu);
+          if (tN <= tPrev) continue;
+          const gN = G(uAt(tN), vAt(tN));
+          if ((gPrev < 0) !== (gN < 0)) {
+            const tc = tPrev + (tN - tPrev) * (gPrev / (gPrev - gN));
+            cross.push(tc);
           }
+          tPrev = tN; gPrev = gN;
+          if (tN >= t1) break;
+        }
+        // Walk the inside intervals.
+        const marks = [t0, ...cross, t1];
+        for (let j = 0; j < marks.length - 1; j++) {
+          if ((j % 2 === 0) !== inside0) continue;
+          const ta = marks[j], tb = marks[j + 1];
+          if (tb - ta < 0.5) continue;
+          const ends = [];
+          if (j > 0) ends.push(ta);
+          if (j + 1 < marks.length - 1) ends.push(tb);
+          const endB = ends.map((t) => {
+            const u = uAt(t);
+            const op = gapAt(u + T(u)[0]);
+            return { t, b: 0.25 + 0.75 * lit(op), L: unit * 0.016 + 0.9 * op };
+          });
+          let first = null, last = null;
+          let t = ta;
+          while (t < tb) {
+            let near = Infinity;
+            for (const e of endB) near = Math.min(near, Math.abs(t - e.t));
+            const step = Math.min(16, 2.5 + 0.12 * near);
+            const tn = Math.min(tb, t + step);
+            const tm = (t + tn) / 2;
+            const um = uAt(tm), vm = vAt(tm);
+            const d = Math.abs(G(um, vm));
+            let alpha = A_FAR + A_NEAR * Math.exp(-d / D_NEAR);
+            for (const e of endB) alpha += GLINT * e.b * Math.exp(-Math.abs(tm - e.t) / e.L);
+            const place = (tt) => { const u = uAt(tt), d = T(u); return toScreen(u + d[0], vAt(tt) + d[1]); };
+            const a = place(t);
+            const b = place(tn);
+            const ev = env((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+            if (put(alpha * ev, bandOf(um), a, b)) {
+              if (!first) first = a;
+              last = b;
+            }
+            t = tn;
+          }
+          if (first) paths.push([first, last]);
         }
       }
     }
+    drawPlate(-1, tA, BA);
+    drawPlate(1, tB, BB);
 
-    // The cracks themselves: hairlines laid along the gap between the two
-    // facing edges, packed tighter than a line's width so they add up into a
-    // seam of light, brightest at its middle and where the crack has opened
-    // widest. Each runs in short pieces so its alpha can follow the gap,
-    // which is how the anchor's wedge is bright at its mouth, not its tip.
-    const SUB = 10;
-    // No other crack may outshine the anchor, whatever the layout.
-    let cap = Infinity;
-    if (anchor) {
-      const g = Math.max(opening(anchor.i, anchor.j, anchor.ax, anchor.ay), opening(anchor.i, anchor.j, anchor.bx, anchor.by));
-      cap = 0.6 * gain(g);
+    // The light in the crack: hairlines laid along the gap between the two
+    // plates, packed tighter than a line's width so they add into a seam,
+    // brightest at its middle and where the crack has opened widest. They
+    // run in short pieces so their alpha can follow the opening.
+    const SEAM = 1;
+    const seamGlow = [];
+    const iLo = Math.max(0, Math.floor((visLo - 8 - uLo) / DU));
+    const iHi = Math.min(N - 1, Math.ceil((visHi + 8 - uLo) / DU));
+    const top = [], bot = [], open = [];
+    let gMax = 0;
+    for (let i = iLo; i <= iHi; i++) {
+      const u = uLo + i * DU;
+      const yA = edgeA(u);
+      const yB = edgeB(u);
+      top.push(yA); bot.push(Math.max(yA, yB));
+      const op = gapAt(u);
+      open.push(op);
+      gMax = Math.max(gMax, op);
     }
-    for (let i = 0; i < n; i++) {
-      const { pts, labs } = cells[i];
-      for (let k = 0; k < pts.length; k++) {
-        const j = labs[k];
-        if (j <= i) continue;
-        const a = pts[k], b = pts[(k + 1) % pts.length];
-        if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 2) continue;
-        const g0 = opening(i, j, a[0], a[1]);
-        const g1 = opening(i, j, b[0], b[1]);
-        const gMax = Math.max(g0, g1);
-        if (lit(gMax) < 0.03) continue;
-        const isAnchor = anchor && anchor.i === i && anchor.j === j;
-        const A0 = T(xf[i], a[0], a[1]), A1 = T(xf[i], b[0], b[1]);
-        const B0 = T(xf[j], a[0], a[1]), B1 = T(xf[j], b[0], b[1]);
-        const count = Math.max(2, Math.min(36, Math.ceil(gMax / 0.7) + 1));
-        const band = bandOf((a[0] + b[0]) / 2);
-        const every = Math.max(1, Math.floor(count / 4));
-        for (let q = 0; q < count; q++) {
-          const f = q / (count - 1);
-          const prof = 1 - 0.7 * Math.abs(2 * f - 1);
-          const x0 = A0[0] + (B0[0] - A0[0]) * f, y0 = A0[1] + (B0[1] - A0[1]) * f;
-          const x1 = A1[0] + (B1[0] - A1[0]) * f, y1 = A1[1] + (B1[1] - A1[1]) * f;
-          for (let u = 0; u < SUB; u++) {
-            const g = g0 + (g1 - g0) * ((u + 0.5) / SUB);
-            const gn = isAnchor ? gain(g) : Math.min(cap, gain(g));
-            const alpha = SEAM * gn * prof * Math.min(1, g / (count - 1) / 0.7);
-            const fa = u / SUB, fb = (u + 1) / SUB;
-            put(alpha, band, x0 + (x1 - x0) * fa, y0 + (y1 - y0) * fa, x0 + (x1 - x0) * fb, y0 + (y1 - y0) * fb);
-          }
-          seams.push([x0, y0, x1, y1, lit(gMax) * prof, band]);
-          if (q % every === 0 || q === count - 1) paths.push([[cx + x0, cy + y0], [cx + x1, cy + y1]]);
+    const count = Math.max(2, Math.min(40, Math.ceil(gMax / 0.7) + 1));
+    const every = Math.max(1, Math.floor(count / 4));
+    for (let q = 0; q < count; q++) {
+      const f = q / (count - 1);
+      const prof = 1 - 0.7 * Math.abs(2 * f - 1);
+      const keep = q % every === 0 || q === count - 1; // exported to SVG
+      let prev = null;
+      let run = [];
+      for (let n = 0; n < top.length; n++) {
+        const u = uLo + (iLo + n) * DU;
+        const pt = toScreen(u, top[n] + (bot[n] - top[n]) * f);
+        if (prev) {
+          const op = (open[n] + open[n - 1]) / 2;
+          const w = (bot[n] - top[n] + bot[n - 1] - top[n - 1]) / 2;
+          const isAnchor = Math.abs(u - uAnc - sig * 0.15) < sig * 1.3;
+          const gn = isAnchor ? gain(op) : Math.min(0.6 * anchorGain, gain(op));
+          const alpha = SEAM * gn * prof * Math.min(1, w / (count - 1) / 0.7);
+          const ev = env((pt[0] + prev[0]) / 2, (pt[1] + prev[1]) / 2);
+          if (put(alpha * ev, bandOf(u), prev, pt)) run.push(pt);
+          else { if (keep && run.length > 1) paths.push(run); run = []; }
+          if (q === Math.floor(count / 2) && alpha * ev > 0.02) seamGlow.push([prev, pt, Math.min(1, alpha * ev), bandOf(u)]);
+        }
+        if (!run.length) run.push(pt);
+        prev = pt;
+      }
+      if (keep && run.length > 1) paths.push(run);
+    }
+
+    // Splinters: slivers cut from one plate's edge. They stay put while the
+    // plate pulls away and turn a few degrees, so their lines sit out of step
+    // with both plates, and the fresh cut behind each opens as a small lit
+    // branch of the crack.
+    const wobT = (clock / BREATH_PERIOD) * Math.PI * 2 * 0.6;
+    for (const s of spl) {
+      const outer = s.side < 0 ? OA : OB;
+      const T = (s.side < 0 ? tA : tB)((s.u0 + s.u1) / 2);
+      const poly = [];
+      for (let u = s.u0; u < s.u1; u += DU) poly.push([u, at(outer, u)]);
+      poly.push([s.u1, at(outer, s.u1)]);
+      for (let j = s.p.cut.length - 2; j >= 1; j--) {
+        const u = s.u0 + s.p.cut[j][0] * (s.u1 - s.u0);
+        poly.push([u, at(outer, u) + s.side * s.p.cut[j][1] * s.depth]);
+      }
+      let cu = 0, cv = 0;
+      for (const p of poly) { cu += p[0]; cv += p[1]; }
+      cu /= poly.length; cv /= poly.length;
+      const wob = Math.sin(wobT + s.p.ph);
+      const rot = (s.p.rot * (0.9 * amt + 0.3 * values.motion * wob) * Math.PI) / 180;
+      const cr = Math.cos(rot), sr = Math.sin(rot);
+      const du = unit * 0.0015 * values.motion * wob;
+      const dv = 0;
+      const place = (u, v) => toScreen(cu + cr * (u - cu) - sr * (v - cv) + du, cv + sr * (u - cu) + cr * (v - cv) + dv);
+      const b = lit(gapAt(cu));
+      const alpha = 0.4 + 0.45 * b;
+      const band = bandOf(cu);
+      let lo = Infinity, hi = -Infinity;
+      for (const p of poly) {
+        const q = p[0] * ku + p[1] * kv;
+        lo = Math.min(lo, q); hi = Math.max(hi, q);
+      }
+      for (let m = Math.ceil((lo - offset) / spacing); m <= Math.floor((hi - offset) / spacing); m++) {
+        const o = offset + m * spacing;
+        const ts = [];
+        for (let e = 0; e < poly.length; e++) {
+          const a = poly[e], c = poly[(e + 1) % poly.length];
+          const fa = a[0] * ku + a[1] * kv - o, fc = c[0] * ku + c[1] * kv - o;
+          if ((fa < 0) === (fc < 0)) continue;
+          const w = fa / (fa - fc);
+          const x = a[0] + (c[0] - a[0]) * w, y = a[1] + (c[1] - a[1]) * w;
+          ts.push((x - o * ku) * hu + (y - o * kv) * hv);
+        }
+        ts.sort((x, y) => x - y);
+        for (let j = 0; j + 1 < ts.length; j += 2) {
+          const pa = place(o * ku + ts[j] * hu, o * kv + ts[j] * hv);
+          const pb = place(o * ku + ts[j + 1] * hu, o * kv + ts[j + 1] * hv);
+          const ev = env((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2);
+          if (put(alpha * ev, band, pa, pb)) paths.push([pa, pb]);
         }
       }
+      // The cut: light packed into the gap between the splinter's inner edge
+      // and the plate's, so each splinter reads as a lit fork off the crack.
+      const nOuter = poly.length - (s.p.cut.length - 2);
+      const cut = [poly[nOuter - 1], ...poly.slice(nOuter), poly[0]];
+      const inner = cut.map(([u, v]) => place(u, v));
+      const plate = cut.map(([u, v]) => toScreen(u + T[0], v + T[1]));
+      const ev = env(inner[0][0], inner[0][1]);
+      const cutA = 0.32 * (0.35 + 0.65 * b) * ev;
+      for (let q = 0; q < 4; q++) {
+        const f = q / 3;
+        let prevPt = null;
+        for (let e = 0; e < cut.length; e++) {
+          const pt = [inner[e][0] + (plate[e][0] - inner[e][0]) * f, inner[e][1] + (plate[e][1] - inner[e][1]) * f];
+          if (prevPt) put(cutA, band, prevPt, pt);
+          prevPt = pt;
+        }
+      }
+      if (ev > 0.02) paths.push(inner, plate);
     }
 
     const light = values.invert ? 0.12 : 0.86 - 0.24 * values.saturation;
@@ -416,32 +512,29 @@
       const { h, s } = paletteHsl(values, (bd + 0.5) / BANDS);
       rgb.push(hslToRgb(h, s, light));
     }
-    // Additive on the dark ground so stacked layers brighten on their own;
+    // Additive on the dark ground so stacked light brightens on its own;
     // plain alpha on the light (inverted) ground, where `lighter` would clip.
     ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
     ctx.lineCap = 'butt'; // round caps stack into bright beads under `lighter`
 
-    // Glow, off by default: a wide dim underlay along the open cracks.
+    // Glow, off by default: a wide dim underlay along the open crack,
+    // batched per colour band and brightness step like the main strokes.
     if (values.glow > 0) {
-      // Batched per colour band and brightness step, like the main strokes.
       const GL = 6;
       const glowB = Array.from({ length: BANDS * GL }, () => []);
-      for (const [x0, y0, x1, y1, br, bd] of seams) {
-        const lv = Math.min(GL - 1, Math.floor(br * GL));
-        glowB[bd * GL + lv].push(x0, y0, x1, y1);
-      }
-      ctx.lineWidth = lineWidth + values.glow * 3;
+      for (const [a, b, br, bd] of seamGlow) glowB[bd * GL + Math.min(GL - 1, Math.floor(br * GL))].push(a, b);
+      ctx.lineWidth = lineWidth + values.glow * 4;
       for (let bd = 0; bd < BANDS; bd++) {
-        const [r, g, b] = rgb[bd];
+        const [r, gg, bb] = rgb[bd];
         for (let lv = 0; lv < GL; lv++) {
           const segs = glowB[bd * GL + lv];
           if (!segs.length) continue;
           ctx.beginPath();
-          for (let q = 0; q < segs.length; q += 4) {
-            ctx.moveTo(cx + segs[q], cy + segs[q + 1]);
-            ctx.lineTo(cx + segs[q + 2], cy + segs[q + 3]);
+          for (let q = 0; q < segs.length; q += 2) {
+            ctx.moveTo(segs[q][0], segs[q][1]);
+            ctx.lineTo(segs[q + 1][0], segs[q + 1][1]);
           }
-          ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(1, 0.025 * values.glow * ((lv + 0.5) / GL) * inkAlpha)})`;
+          ctx.strokeStyle = `rgba(${r},${gg},${bb},${Math.min(1, 0.05 * values.glow * ((lv + 0.5) / GL) * inkAlpha)})`;
           ctx.stroke();
         }
       }
@@ -449,30 +542,30 @@
 
     ctx.lineWidth = lineWidth;
     for (let bd = 0; bd < BANDS; bd++) {
-      const [r, g, b] = rgb[bd];
+      const [r, gg, bb] = rgb[bd];
       for (let lv = 0; lv < LEVELS; lv++) {
         const segs = buckets[bd * LEVELS + lv];
         if (!segs.length) continue;
         ctx.beginPath();
         for (let q = 0; q < segs.length; q += 4) {
-          ctx.moveTo(cx + segs[q], cy + segs[q + 1]);
-          ctx.lineTo(cx + segs[q + 2], cy + segs[q + 3]);
+          ctx.moveTo(segs[q], segs[q + 1]);
+          ctx.lineTo(segs[q + 2], segs[q + 3]);
         }
-        ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(1, (A_TOP * (lv + 1) / LEVELS) * inkAlpha)})`;
+        ctx.strokeStyle = `rgba(${r},${gg},${bb},${Math.min(1, (A_TOP * (lv + 1) / LEVELS) * inkAlpha)})`;
         ctx.stroke();
       }
     }
 
-    // ...and a soft bloom on the anchor crack.
-    if (values.glow > 0 && anchor) {
-      const p = T(xf[anchor.i], anchor.mx, anchor.my);
-      const q = T(xf[anchor.j], anchor.mx, anchor.my);
-      const gx = cx + (p[0] + q[0]) / 2, gy = cy + (p[1] + q[1]) / 2;
-      const [r, g, b] = rgb[bandOf(anchor.mx)];
-      const gr = unit * 0.07 * (0.6 + 0.4 * values.glow) * zoom;
+    // ...and a soft bloom on the anchor.
+    if (values.glow > 0) {
+      const ua = uAnc + sig * 0.12;
+      const [gx, gy] = toScreen(ua, (edgeA(ua) + edgeB(ua)) / 2);
+      const [r, gg, bb] = rgb[bandOf(ua)];
+      const gr = unit * 0.08 * (0.6 + 0.4 * values.glow);
+      const ev = env(gx, gy);
       const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-      grad.addColorStop(0, `rgba(${r},${g},${b},${Math.min(1, 0.22 * values.glow * inkAlpha)})`);
-      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      grad.addColorStop(0, `rgba(${r},${gg},${bb},${Math.min(1, 0.22 * values.glow * inkAlpha * ev)})`);
+      grad.addColorStop(1, `rgba(${r},${gg},${bb},0)`);
       ctx.fillStyle = grad;
       ctx.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
     }
