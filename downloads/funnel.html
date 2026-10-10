@@ -154,7 +154,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#aa00ff","colorB":"#00aaff","hue":290,"hueB":190,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"flare":1,"twist":1,"rotX":24,"rotY":0};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1.5,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#aa00ff","colorB":"#00aaff","hue":290,"hueB":190,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"flare":1,"twist":1,"rotX":24,"rotY":0};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1460,7 +1460,8 @@ function createOrbit({
   // ellipses narrowing down to a point, slowly twisting, with the tip as the
   // one bright anchor.
   //
-  // Text-safe zone: the left third of the frame. The funnel stands in the
+  // Text-safe zone (default framing): the left quarter of the frame; the left
+  // third at Scale 1. The funnel stands in the
   // central square, a little right of centre, mouth up, tip down.
   // Anchor: the tip, lower centre. It is not drawn as a glow: the smallest
   // rings stack on top of each other there and brighten additively.
@@ -1508,7 +1509,7 @@ function createOrbit({
       { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 24, category: 'interaction' },
       { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
     ],
-    defaults: { hue: 290, hueB: 190, saturation: 0, colorMode: 'gradient', colorA: '#aa00ff', colorB: '#00aaff' },
+    defaults: { hue: 290, hueB: 190, saturation: 0, scale: 1.5, colorMode: 'gradient', colorA: '#aa00ff', colorB: '#00aaff' },
   });
   const currentValues = baked || panel.values;
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));

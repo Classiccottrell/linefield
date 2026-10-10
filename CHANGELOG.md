@@ -64,6 +64,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Pieces use more of the canvas by default, and Scale is the framing
+  control.** At full canvas most pieces were an island about a third of
+  the width. `docs/house-look.md` §2 now treats framing as a range set by
+  Scale, from contained to full canvas, with defaults judged at full
+  canvas; the 45–75%-of-the-shorter-side rule and the one-third text-safe
+  minimum are retired. Default Scale rises on 14 pieces (flow-field becomes
+  a full-canvas field), preset Scale values move with them, and Scale now
+  widens flow-field, grain-field and cipher-bloom. contrail is recomposed
+  so its tail stays in the square crop, and its oldest strands now fray
+  out at different lengths instead of ending together. Saved settings in
+  a visitor's browser still win over the new defaults; "Reset to defaults"
+  picks them up.
 - `CONTRIBUTING.md` and the docs contributing page no longer tell
   contributors to give each piece a distinct default palette, which
   predates the monochrome house look.

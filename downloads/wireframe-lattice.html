@@ -154,7 +154,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#00d4ff","colorB":"#0095ff","hue":190,"hueB":205,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":36,"rotY":-28};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1.8,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#00d4ff","colorB":"#0095ff","hue":190,"hueB":205,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"rotX":36,"rotY":-28};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1462,7 +1462,8 @@ function createOrbit({
   // The sheet is a square of hairline rows and columns, not a plane running
   // to the horizon: its four edges draw brighter so it reads as one object.
   //
-  // Text-safe zone: the left third of the frame. The sheet sits in the
+  // Text-safe zone (default framing): the left quarter and the top band of the frame; the left
+  // third at Scale 1. The sheet sits in the
   // central square, nudged right of centre.
   // Anchor: the travelling fold where it turns most nearly edge-on, centre
   // right. Its lines close up in projection and brighten with the grazing
@@ -1505,7 +1506,7 @@ function createOrbit({
     ],
     // Monochrome by default (house look §1). The hue pair is what the neon
     // preset and the colour pickers light up.
-    defaults: { hue: 190, hueB: 205, saturation: 0, colorMode: 'gradient', colorA: '#00d4ff', colorB: '#0095ff' },
+    defaults: { hue: 190, hueB: 205, saturation: 0, scale: 1.8, colorMode: 'gradient', colorA: '#00d4ff', colorB: '#0095ff' },
   });
   const currentValues = baked || panel.values;
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));

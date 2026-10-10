@@ -39,9 +39,10 @@
   // quiet central void, trailing hairlines that gather brightness only
   // where their paths happen to cross.
   //
-  // Text-safe zone: the left third of the frame. The region sits right of
-  // centre, inside the central square.
-  // Anchor: the band's inner edge, upper right of the void — checked by
+  // Text-safe zone (default framing, Scale 1.75): the quiet centre, where
+  // the void sits; the field fills the rest of the canvas. At Scale 1 the
+  // field is a ring right of centre and the left third is clear instead.
+  // Anchor: the brightest braid, upper right of the void — checked by
   // measuring the rendered brightest cluster, not assumed from the field's
   // formula, since the noise-driven current doesn't distribute evenly.
   const PIECE_ID = 'flow-field';
@@ -158,7 +159,7 @@
     // Pinned deliberately, not inherited — keeps flow-field's hue TAKEN to
     // the next contributor even if the shared defaults ever move.
     // saturation: 0 per house look §1; colour lives in the neon preset.
-    defaults: { hue: 200, hueB: 280, saturation: 0, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
+    defaults: { hue: 200, hueB: 280, saturation: 0, scale: 1.75, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
   });
   const currentValues = baked || panel.values;
 

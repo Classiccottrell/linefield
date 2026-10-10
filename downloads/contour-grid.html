@@ -154,7 +154,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#ff9500","colorB":"#ff4000","hue":35,"hueB":15,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"relief":1};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1.6,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#ff9500","colorB":"#ff4000","hue":35,"hueB":15,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"relief":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1392,7 +1392,7 @@ function describeForAI({ pieceName, values }) {
       { name: 'relief', label: 'Relief', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'visual' },
     ],
     // saturation: 0 per house look §1; colour lives in the neon preset.
-    defaults: { hue: 35, hueB: 15, saturation: 0, colorMode: 'gradient', colorA: '#ff9500', colorB: '#ff4000' },
+    defaults: { hue: 35, hueB: 15, saturation: 0, scale: 1.6, colorMode: 'gradient', colorA: '#ff9500', colorB: '#ff4000' },
   });
   const currentValues = baked || panel.values;
 

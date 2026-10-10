@@ -21,7 +21,9 @@
 <!--
   cipher-bloom — a compressed oblique band of changing glyph fragments
   with a bright core, drifting slowly along the band's own length.
-  Text-safe zone: top and bottom thirds, clear of the band.
+  Text-safe zone (default framing, Scale 1.5): the top-left and
+  bottom-right corners, clear of the band. At Scale 1 the band is short
+  enough that the top and bottom thirds are clear.
   Anchor: the core, drifting along the band's centre.
 -->
 
@@ -64,11 +66,11 @@
   }
 
   const PRESETS = {
-    whisper: { opacity: 0.35, stroke: 0.2, density: 0.5, scale: 0.75, motion: 0.4, phase: 0.4 },
-    ink:     { opacity: 1, stroke: 1.2, density: 0.75, scale: 1.2, saturation: 0, glow: 0, angle: 352, phase: 0.6 },
-    neon:    { opacity: 0.86, stroke: 0.75, density: 1.15, scale: 0.8, saturation: 0.9, glow: 1.1, angle: 335, phase: 0.2 },
-    drift:   { opacity: 0.6, stroke: 0.45, density: 0.68, scale: 1.35, speed: 0.25, motion: 0.6, phase: 1.2, angle: 355 },
-    dense:   { opacity: 0.8, stroke: 0.7, density: 1.65, scale: 0.9, speed: 0.6, angle: 340, phase: 0.75, glow: 0.4 },
+    whisper: { opacity: 0.35, stroke: 0.2, density: 0.5, scale: 1.13, motion: 0.4, phase: 0.4 },
+    ink:     { opacity: 1, stroke: 1.2, density: 0.75, scale: 1.75, saturation: 0, glow: 0, angle: 352, phase: 0.6 },
+    neon:    { opacity: 0.86, stroke: 0.75, density: 1.15, scale: 1.2, saturation: 0.9, glow: 1.1, angle: 335, phase: 0.2 },
+    drift:   { opacity: 0.6, stroke: 0.45, density: 0.68, scale: 1.75, speed: 0.25, motion: 0.6, phase: 1.2, angle: 355 },
+    dense:   { opacity: 0.8, stroke: 0.7, density: 1.65, scale: 1.35, speed: 0.6, angle: 340, phase: 0.75, glow: 0.4 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -76,7 +78,7 @@
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    defaults: { hue: 42, hueB: 76, saturation: 0, colorMode: 'gradient', colorA: '#d3a565', colorB: '#e7d9a6', opacity: 0.88, stroke: 0.55, angle: 347, speed: 0.5, motion: 0.55 },
+    defaults: { hue: 42, hueB: 76, saturation: 0, scale: 1.5, colorMode: 'gradient', colorA: '#d3a565', colorB: '#e7d9a6', opacity: 0.88, stroke: 0.55, angle: 347, speed: 0.5, motion: 0.55 },
   });
   const currentValues = baked || panel.values;
 

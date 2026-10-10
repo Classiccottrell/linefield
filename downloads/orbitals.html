@@ -154,7 +154,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#6a00ff","colorB":"#ff0080","hue":265,"hueB":330,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"sweep":0.78};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1.6,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#6a00ff","colorB":"#ff0080","hue":265,"hueB":330,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"sweep":0.78};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1265,7 +1265,8 @@ function describeForAI({ pieceName, values }) {
   // arcs' tapered ends. The sliding is bounded, so the crowd never disperses
   // the way free differential rotation would.
   //
-  // Text-safe zone: the left third of the frame. The ring sits in the
+  // Text-safe zone (default framing): the left quarter and the top band of the frame; the left
+  // third at Scale 1. The ring sits in the
   // central square, nudged right, and its left edge stays clear of the
   // third wherever the crescent is.
   // Anchor: the middle of the crescent, starting on the ring's near (lower)
@@ -1317,7 +1318,7 @@ function describeForAI({ pieceName, values }) {
     ],
     // Monochrome by default (house look §1). The hue pair is what the neon
     // preset and the colour pickers light up.
-    defaults: { hue: 265, hueB: 330, saturation: 0, colorMode: 'gradient', colorA: '#6a00ff', colorB: '#ff0080' },
+    defaults: { hue: 265, hueB: 330, saturation: 0, scale: 1.6, colorMode: 'gradient', colorA: '#6a00ff', colorB: '#ff0080' },
   });
   const currentValues = baked || panel.values;
 

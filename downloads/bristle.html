@@ -162,7 +162,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#0033ff","colorB":"#00ffdd","hue":228,"hueB":172,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"dryness":1};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1.6,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#0033ff","colorB":"#00ffdd","hue":228,"hueB":172,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"dryness":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1306,11 +1306,11 @@ function describeForAI({ pieceName, values }) {
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.55, stroke: 0.7, density: 0.55, dryness: 1.3, scale: 0.85 },
+    whisper: { opacity: 0.55, stroke: 0.7, density: 0.55, dryness: 1.3, scale: 1.36 },
     ink:     { opacity: 1, stroke: 1.3, density: 1, saturation: 0, glow: 0, dryness: 0.5 },
     neon:    { opacity: 0.9, stroke: 1, density: 1.1, saturation: 0.9, glow: 1.1 },
-    drift:   { opacity: 0.8, stroke: 0.9, density: 0.8, speed: 0.4, motion: 1.8, dryness: 1.6, scale: 1.1 },
-    dense:   { opacity: 0.85, stroke: 0.9, density: 1.8, dryness: 0.7, scale: 0.9 },
+    drift:   { opacity: 0.8, stroke: 0.9, density: 0.8, speed: 0.4, motion: 1.8, dryness: 1.6, scale: 1.76 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.8, dryness: 0.7, scale: 1.44 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1323,7 +1323,7 @@ function describeForAI({ pieceName, values }) {
       // gaps, rising toward the end of the stroke.
       { name: 'dryness', label: 'Dryness', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'ink' },
     ],
-    defaults: { hue: 228, hueB: 172, saturation: 0, colorMode: 'gradient', colorA: '#0033ff', colorB: '#00ffdd' },
+    defaults: { hue: 228, hueB: 172, saturation: 0, scale: 1.6, colorMode: 'gradient', colorA: '#0033ff', colorB: '#00ffdd' },
   });
   const currentValues = baked || panel.values;
 

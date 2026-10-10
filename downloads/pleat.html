@@ -161,7 +161,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":0.55,"stroke":1.1,"opacity":0.9,"saturation":0,"colorMode":"gradient","colorA":"#efe6c9","colorB":"#f8f1dd","hue":46,"hueB":54,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1.3,"speed":0.55,"stroke":1.1,"opacity":0.9,"saturation":0,"colorMode":"gradient","colorA":"#efe6c9","colorB":"#f8f1dd","hue":46,"hueB":54,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1275,11 +1275,11 @@ function describeForAI({ pieceName, values }) {
   let travel = 0;
 
   const PRESETS = {
-    whisper: { opacity: 0.34, stroke: 0.55, density: 0.52, scale: 0.65, motion: 0.55 },
-    ink:     { opacity: 1, stroke: 1.5, density: 0.8, scale: 1.1, motion: 0.8, saturation: 0, glow: 0, angle: 352 },
-    neon:    { opacity: 0.85, stroke: 0.8, density: 1.1, scale: 0.8, motion: 1.45, saturation: 0.9, glow: 1.1, phase: 0.5 },
-    drift:   { opacity: 0.62, stroke: 0.85, density: 0.68, scale: 1.3, speed: 0.28, motion: 1.6, phase: 1.2, angle: 8 },
-    dense:   { opacity: 0.82, stroke: 1.25, density: 1.7, scale: 1.15, speed: 0.62, motion: 0.7, phase: 0.65, angle: 355, glow: 0.4 },
+    whisper: { opacity: 0.34, stroke: 0.55, density: 0.52, scale: 0.85, motion: 0.55 },
+    ink:     { opacity: 1, stroke: 1.5, density: 0.8, scale: 1.43, motion: 0.8, saturation: 0, glow: 0, angle: 352 },
+    neon:    { opacity: 0.85, stroke: 0.8, density: 1.1, scale: 1.04, motion: 1.45, saturation: 0.9, glow: 1.1, phase: 0.5 },
+    drift:   { opacity: 0.62, stroke: 0.85, density: 0.68, scale: 1.69, speed: 0.28, motion: 1.6, phase: 1.2, angle: 8 },
+    dense:   { opacity: 0.82, stroke: 1.25, density: 1.7, scale: 1.5, speed: 0.62, motion: 0.7, phase: 0.65, angle: 355, glow: 0.4 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1287,7 +1287,7 @@ function describeForAI({ pieceName, values }) {
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: () => {},
-    defaults: { hue: 46, hueB: 54, saturation: 0, colorMode: 'gradient', colorA: '#efe6c9', colorB: '#f8f1dd', opacity: 0.9, stroke: 1.1, speed: 0.55 },
+    defaults: { hue: 46, hueB: 54, saturation: 0, scale: 1.3, colorMode: 'gradient', colorA: '#efe6c9', colorB: '#f8f1dd', opacity: 0.9, stroke: 1.1, speed: 0.55 },
   });
   const currentValues = baked || panel.values;
 
