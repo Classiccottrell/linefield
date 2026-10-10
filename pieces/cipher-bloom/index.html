@@ -89,16 +89,27 @@
     const W = canvas.width;
     const H = canvas.height;
     const unit = Math.min(W / 1280, H / 800);
-    const size = (8 + values.scale * 12) * unit;
-    const cols = Math.max(18, Math.round(86 * Math.sqrt(values.density)));
-    const rows = Math.max(8, Math.round(30 * Math.sqrt(values.density)));
+    // Framing: up to Scale 1 the band and its glyphs grow inside the central
+    // square. Above 1 the band's length switches to the frame's width and
+    // its breadth and thickness envelopes open, so at 2 the glyph cloud runs
+    // edge to edge; glyph size grows more slowly there, the grid grows with
+    // the band (1.45x per axis at 2 — each cell is a fillText + strokeText),
+    // and the core keeps its pixel size. Every `hi` term is zero at Scale 1,
+    // so the default render is unchanged.
+    const hi = Math.max(0, values.scale - 1);
+    const size = (8 + values.scale * 12 - hi * 6) * unit;
+    const cols = Math.max(18, Math.round(86 * Math.sqrt(values.density) * (1 + hi * 0.45)));
+    const rows = Math.max(8, Math.round(30 * Math.sqrt(values.density) * (1 + hi * 0.45)));
     const theta = values.angle * Math.PI / 180;
     const c = Math.cos(theta), s = Math.sin(theta);
     const cx = W * 0.5, cy = H * 0.5;
-    // One object: the band's length is a fixed fraction of the frame, not
-    // edge to edge, so it sits inside the central square.
-    const L = Math.min(W, H) * (0.34 + 0.28 * values.scale);
-    const breadth = H * (0.07 + values.scale * 0.12);
+    // One object: up to Scale 1 the band's length is a fraction of the
+    // frame's shorter side, so it sits inside the central square.
+    const L = Math.min(W, H) * (0.34 + 0.28 * values.scale) + hi * W * 0.7;
+    const breadth0 = H * (0.07 + values.scale * 0.12);
+    const breadth = breadth0 + hi * H * 0.38;
+    const open = 1 + hi * 1.8;
+    const coreU = (L - hi * W * 0.7) / L, coreV = breadth0 / breadth;
     const strokeWidth = values.stroke * size * 0.038;
     travel += dt * values.speed;
     identities += dt * values.motion * 1.4;
@@ -112,10 +123,10 @@
       const u = (col + 0.5) / cols;
       const v = ((row + 0.5 + (hash(col, row, 1) - 0.5) * 0.8) / rows) * 2 - 1;
       const edge = Math.pow(Math.sin(u * Math.PI), 0.8); // tapers the band's two ends
-      const vCore = Math.exp(-v * v / 0.09); // thickness envelope across the band
-      const shoulder = Math.exp(-v * v / 0.42);
-      const du = u - corePos;
-      const anchorCore = Math.exp(-(du * du) / 0.006 - (v * v) / 0.035); // small, under 5% of frame
+      const vCore = Math.exp(-v * v / (0.09 * open)); // thickness envelope across the band
+      const shoulder = Math.exp(-v * v / (0.42 * open));
+      const du = (u - corePos) / coreU, dv = v / coreV;
+      const anchorCore = Math.exp(-(du * du) / 0.006 - (dv * dv) / 0.035); // small, under 5% of frame
       // Occupancy and jitter stay attached to each mark. Motion changes
       // its identity, not its presence, avoiding whole-band flicker.
       if (hash(col, row, 2) > (0.16 + vCore * 0.7) * edge) continue;
