@@ -87,7 +87,7 @@
       { name: 'rotX', label: 'Pitch', type: 'range', min: -90, max: 90, step: 1, default: 24, category: 'interaction' },
       { name: 'rotY', label: 'Yaw', type: 'range', min: -180, max: 180, step: 1, default: 0, category: 'interaction' },
     ],
-    defaults: { hue: 290, hueB: 190, saturation: 0, colorMode: 'gradient', colorA: '#aa00ff', colorB: '#00aaff' },
+    defaults: { hue: 290, hueB: 190, saturation: 0, scale: 1.5, colorMode: 'gradient', colorA: '#aa00ff', colorB: '#00aaff' },
   });
   const currentValues = baked || panel.values;
   const clampDeg = (n, min, max) => Math.max(min, Math.min(max, n));

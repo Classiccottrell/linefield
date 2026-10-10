@@ -27,17 +27,33 @@ that sentence.
 - **Conformance:** the collection-metrics check fails any piece whose
   default render measures mean saturation **> 0.06** (Chunk 2.2).
 
-## 2. Composition: one object, real empty space
+## 2. Composition: one subject, framed by choice
 
-- **One legible object.** A piece is a *thing* in the frame (a band, a
-  knot, a funnel, a cloud), not a texture that runs off every edge. The
-  object's extent should be about **45–75 % of the frame's shorter side**.
+- **One legible subject.** A piece is a *thing* (a band, a knot, a funnel,
+  a cloud) or one clear field (rain across the frame), never undirected
+  texture.
+- **Framing is a range, and Scale is its control.** Every piece's Scale
+  control runs from contained (low Scale: the subject sits inside the frame
+  with space around it) to full canvas (Scale 2: the subject fills the
+  canvas or bleeds off its edges and still reads as the same piece). A
+  piece whose Scale doesn't change how much of the canvas it uses is a
+  defect, the same as a control that changes nothing.
+- **Defaults are judged at full canvas.** The first version of this rule
+  (an object 45–75 % of the frame's *shorter* side) left most pieces as an
+  island about a third of the width on a wide screen. A default should use
+  the canvas: a subject that is still a small island in the middle of a
+  1280×800 frame is too timid. Choose each piece's default Scale by looking
+  at the whole collection side by side at full canvas, and set it in the
+  piece's `defaults` after `hue`, `hueB` and `saturation` (the build reads
+  those three in that order). Preset Scale values are absolute, so scale
+  them with the default.
 - **It must read in a square crop.** Gallery cards and stills are square,
-  but the canvas is wide. Compose so the object sits inside the frame's
+  but the canvas is wide. Compose so the subject sits inside the frame's
   central square, or clearly and deliberately crosses it.
-- **Empty space is designed.** Every piece declares a **text-safe zone**,
-  a region at least a third of the frame where no bright mark lands. Put it
-  in the piece's header comment and in `pieces.json` (see §7).
+- **Empty space, where there is room.** Every piece still declares a
+  **text-safe zone** for its default framing: the region where text reads
+  best, in the piece's header comment and in `pieces.json` (see §7). It no
+  longer has to be a third of the frame, and it may close as Scale rises.
 - **Ink coverage** (the fraction of pixels marked, from `collection-metrics`):
   linework pieces between **0.03 and 0.15**. Home-page heroes (`rainfall`,
   `grain-field`) stay **≤ 0.035**.
