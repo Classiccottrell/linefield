@@ -167,8 +167,8 @@ tooling" below and CONTRIBUTING.md.
 - `swell` — a single ocean swell rising on a diagonal, drawn as a halftone screen whose dot size carries its light
 - `contrail` — one trail of hairlines, tight and bright at its head, loosening and breaking up as it ages along a long arc back to the frame's edge
 - `bristle` — one S-shaped brush swipe of about 300 hairline bristles, thin at both ends and breaking into dry streaks toward its end
-- `louvre` — a flat window of tilted hairline slats, crossed by one slow beam of light that brightens the slats it passes and carries a few drifting motes
-- `fracture` — a pane of diagonal hairlines broken into slowly drifting shards, its cracks lit where the lines break and misalign
+- `louvre` — a blind of tilted hairline slats crossed by one slow beam of light, which brightens the band it passes and carries a few drifting motes
+- `fracture` — one long jagged crack across a full-bleed field of faint diagonal hairlines, its two plates breathing apart so the lines misalign and brighten toward the light inside it
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,

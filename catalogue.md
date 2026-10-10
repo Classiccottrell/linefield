@@ -202,18 +202,18 @@ One S-shaped brush swipe of hairline bristles, running dry in streaks toward its
 
 ## Louvre
 
-A flat window of tilted hairline slats, crossed by one slow diagonal beam of light that brightens the slats it passes and carries a few drifting motes.
+A blind of tilted hairline slats crossed by one slow diagonal beam of light that brightens the band of slats it passes and carries a few drifting motes.
 
 - **Tags:** geometric, kinetic, editorial
-- **Text-safe zone:** left half
-- **Anchor:** where the beam crosses the slats
+- **Text-safe zone:** lower left
+- **Anchor:** beam's brightest stretch, just above and right of centre
 - **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Beam width
 
 ## Fracture
 
-A pane of diagonal hairlines broken into slowly drifting shards, its cracks lit where the lines break and misalign.
+One long jagged crack across a full-bleed field of faint diagonal hairlines, its two plates breathing apart so the lines misalign and brighten toward the light inside it.
 
 - **Tags:** geometric, optical
-- **Text-safe zone:** left third
-- **Anchor:** the widest crack
+- **Text-safe zone:** upper left, above the crack
+- **Anchor:** the crack's widest opening, just right of centre
 - **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Shards

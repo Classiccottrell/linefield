@@ -320,15 +320,18 @@ review) before merge, not after.
   the owner found the one-object framing too extreme. Rather than add a
   control, the existing Scale control is now the framing control
   (house-look §2 rewritten): it runs from contained to full canvas, and
-  defaults are chosen at full canvas. Default Scale went up on 14 pieces:
+  defaults are chosen at full canvas. Default Scale went up on 15 pieces:
   flow-field 1.75 (now a full-canvas field around a quiet centre);
   wireframe-lattice 1.8; driftwork, bristle, orbitals, contour-grid, relay
-  1.6; globe, funnel, louvre, cipher-bloom 1.5; infall 1.4; moire, pleat
-  1.3. Scale was made to widen flow-field, grain-field and cipher-bloom,
+  1.6; globe, funnel, cipher-bloom 1.5; infall 1.4; moire, pleat 1.3.
+  louvre and fracture were then reworked to drop their frames on the
+  owner's review: louvre's slats run edge to edge under one beam, and
+  fracture became one long crack across a full-bleed field; both default
+  to Scale 1.8. Scale was made to widen flow-field, grain-field and cipher-bloom,
   where it previously did little or nothing, and contrail was recomposed so
   its tail sits in the square crop and Scale extends it. Left contained on
   purpose: moire and pleat (the 0.15 ink ceiling), grain-field (the 0.035
-  home-page hero cap) and contrail (its text-safe zone). Six safe-zone
+  home-page hero cap) and contrail (its text-safe zone). Eight safe-zone
   descriptions were rewritten after measuring the new renders.
 
 ## Phase 5 — Packaging

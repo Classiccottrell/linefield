@@ -200,19 +200,19 @@
   {
     "slug": "louvre",
     "title": "Louvre",
-    "blurb": "A flat window of tilted hairline slats, crossed by one slow diagonal beam of light that brightens the slats it passes and carries a few drifting motes.",
+    "blurb": "A blind of tilted hairline slats crossed by one slow diagonal beam of light that brightens the band of slats it passes and carries a few drifting motes.",
     "tags": ["geometric", "kinetic", "editorial"],
     "hue": 18, "hueB": 52, "saturation": 0,
-    "safeZone": "left half",
-    "anchor": "where the beam crosses the slats"
+    "safeZone": "lower left",
+    "anchor": "beam's brightest stretch, just above and right of centre"
   },
   {
     "slug": "fracture",
     "title": "Fracture",
-    "blurb": "A pane of diagonal hairlines broken into slowly drifting shards, its cracks lit where the lines break and misalign.",
+    "blurb": "One long jagged crack across a full-bleed field of faint diagonal hairlines, its two plates breathing apart so the lines misalign and brighten toward the light inside it.",
     "tags": ["geometric", "optical"],
     "hue": 168, "hueB": 312, "saturation": 0,
-    "safeZone": "left third",
-    "anchor": "the widest crack"
+    "safeZone": "upper left, above the crack",
+    "anchor": "the crack's widest opening, just right of centre"
   }
 ]
