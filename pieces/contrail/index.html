@@ -21,8 +21,10 @@
 <!--
   contrail — one trail of hairlines, tight and bright at its newest end,
   loosening, breaking up and fading as it ages along a long, gentle arc
-  back to the left edge.
-  Text-safe zone: the right half and the bottom of the frame.
+  back toward the left edge, its oldest strands fraying out one by one.
+  Scale grows it about its middle: short and central at 0, sweeping most
+  of the frame at 2.
+  Text-safe zone: the right third and the bottom third of the frame.
   Anchor: the head, upper right of centre.
 -->
 
@@ -68,12 +70,16 @@
   const BANDS = 4;                // colour stops along the trail
   const TAU = Math.PI * 2;
 
-  // Centreline: a quadratic arc in frame fractions, from the head back past
-  // the left edge. It rises gently toward the head and flattens there,
-  // so the dispersed tail stays clear of the bottom.
-  const HEAD = [0.6, 0.32];
-  const BEND = [0.25, 0.38];
-  const TAIL = [-0.06, 0.58];
+  // Centreline at Scale 1: a quadratic arc in frame fractions, from the head
+  // back and down toward the left. It rises gently toward the head and
+  // flattens there. It ends well inside the frame, so the wide, broken
+  // stretch of the tail lands in the central square, clear of the bottom.
+  const HEAD = [0.65, 0.3];
+  const BEND = [0.37, 0.34];
+  const TAIL = [0.13, 0.54];
+  // Scale grows the arc about PIVOT, near its middle, so a larger Scale
+  // carries the head up and right and the tail out past the left edge.
+  const PIVOT = [0.4, 0.4];
 
   const turns = (k) => Math.max(1, Math.round(k / FLOW_K));
   const smooth = (a, b, x) => {
@@ -105,6 +111,9 @@
       kb: 1.5 + Math.random(), pb: TAU * Math.random(),
       kd, md: turns(kd), pd: TAU * Math.random(),
       bright: 0.55 + 0.45 * Math.random(),
+      // Staggered ends, so the oldest stretch frays into fewer, fainter
+      // strands instead of stopping square.
+      end: 0.5 + 0.5 * Math.pow(Math.random(), 1.6),
     };
   });
   let paths = [];
@@ -168,15 +177,18 @@
 
     paths = [];
     const S = Math.min(W, H);
-    const z = 0.4 + 0.6 * values.scale;
+    // Scale 0..2 is a zoom of 0.4..1.8 (1 at Scale 1), steepening above 1 so
+    // Scale 2 sweeps the trail across most of the frame.
+    const sc = values.scale;
+    const z = 0.4 + 0.5 * sc + 0.1 * sc * sc;
     const disp = values.dispersion;
     const motion = values.motion;
     const tt = clock / PERIOD + values.phase * 0.5; // loop cycles; Phase 0..2 spans one loop
-    const hx = HEAD[0] * W, hy = HEAD[1] * H;
 
-    // Scale about the head, then Angle as a screen-space rotation about the
+    // Scale about PIVOT, then Angle as a screen-space rotation about the
     // head, so the canvas and the SVG export share every point.
-    const at = (p) => [hx + (p[0] * W - hx) * z, hy + (p[1] * H - hy) * z];
+    const at = (p) => [(PIVOT[0] + (p[0] - PIVOT[0]) * z) * W, (PIVOT[1] + (p[1] - PIVOT[1]) * z) * H];
+    const [hx, hy] = at(HEAD);
     const line = centreline([hx, hy], at(BEND), at(TAIL));
     const th = (values.angle * Math.PI) / 180;
     const cth = Math.cos(th), sth = Math.sin(th);
@@ -216,10 +228,12 @@
       ea[j] = e;
       // Tight for the first stretch, then widening faster with age, so the
       // silhouette flares like a trumpet rather than opening as a cone.
-      const env = Math.pow(Math.min(1, Math.max(0, e - 0.04) / 0.8), 1.4);
-      // The tip narrows to a fine point over its first few percent.
+      const env = Math.pow(Math.min(1, Math.max(0, e - 0.04) / 0.42), 1.4);
+      // The tip narrows to a fine point over its first few percent. It
+      // widens more slowly with Scale than the tail does, so the head stays
+      // a needle when the trail is large.
       const tip = 0.3 + 0.7 * smooth(0, 0.05, e);
-      hw[j] = S * z * (0.0065 * tip + 0.13 * disp * env);
+      hw[j] = S * (0.0065 * tip * Math.sqrt(z) + 0.13 * disp * env * z);
       merge[j] = smooth(0.02, 0.15, e);
       loose[j] = smooth(0.06, 0.7, e);
       lobe[j] = 1 + 0.28 * env * (
@@ -269,6 +283,7 @@
       for (let j = 0; j < n; j++) {
         const e = ea[j];
         if (e < st.lag) continue;
+        if (e > st.end) break;
         const a = aa[j];
         // Breakup: gaps open with age, partly shared with neighbours so the
         // trail comes apart in fragments rather than as dotted lines.
@@ -287,7 +302,7 @@
         const pt = [x, y];
         if (!svg) svg = [];
         svg.push(pt);
-        const level = Math.min(LEVELS - 1, Math.floor(st.bright * fade[j] * LEVELS));
+        const level = Math.min(LEVELS - 1, Math.floor(st.bright * fade[j] * (1 - smooth(st.end - 0.15, st.end, e)) * LEVELS));
         const key = band[j] * LEVELS + level;
         if (key !== runKey) {
           const last = run ? run[run.length - 1] : null;
