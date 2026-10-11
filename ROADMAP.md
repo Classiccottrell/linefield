@@ -360,6 +360,20 @@ review) before merge, not after.
   3.2's type system is the first real step.
 - **ASCII art brought to life.** This builds on the glyph-mark capability
   in `cipher-bloom`.
+- **A space series.** The owner's idea (2026-10-10): a run of compositions
+  built around space (planets, galaxies, nebulae), probably as its own
+  collection. Same house look and framing rules as everything else.
+  - Several pieces already sit near this subject (`globe`, `orbitals`,
+    `infall`), so each new one has to read as its own idea next to them,
+    not as a sibling of one of them.
+  - The originality risk is higher here than anywhere else in the
+    collection. Check every concept and name against the private
+    avoid-list *before* any design work, not after.
+  - Start with a throwaway sketch round, like the 2026-10-07 one, and build
+    only the strongest. Seeds that steer clear of spheres, spirals and
+    rings: a nebula as a slow, drifting cloud of hairline light; a galaxy
+    seen edge-on as one long, thin dust lane; a planet's terminator (the
+    line between day and night) seen close up, bleeding off the frame.
 - **Publishing `shared/` to npm.** Declined for v1.0.0. It's six small
   dependency-free modules that pieces already inline. Weighed against
   permanent version discipline and a second install path, for an audience
