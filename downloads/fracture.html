@@ -154,7 +154,7 @@
   jagged crack, whose two plates breathe slowly apart and back so the lines
   misalign across it and brighten as they near the light inside it.
   Text-safe zone: the upper left, above the crack; only the faint field reaches it.
-  Anchor: the crack's widest opening, just right of centre.
+  Anchor: the crack's widest stretch, a long seam just right of centre.
 -->
 
 
@@ -1329,6 +1329,10 @@ function describeForAI({ pieceName, values }) {
     });
   }
 
+  // How unevenly the crack opens along its length: three slow waves with
+  // phases drawn at load, so the seam swells and pinches without a pattern.
+  const UNEVEN = [9, 17, 31].map((f) => ({ f, p: Math.random() * Math.PI * 2 }));
+
   const smooth = (a, b, x) => {
     const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
     return t * t * (3 - 2 * t);
@@ -1405,20 +1409,30 @@ function describeForAI({ pieceName, values }) {
     // crack (g) and slide a little along it (sh), so the lines misalign.
     const breath = 0.5 - 0.5 * Math.cos((clock / BREATH_PERIOD) * Math.PI * 2 + values.phase * Math.PI);
     const amt = 0.25 + 0.75 * values.motion * breath;
-    const g = unit * 0.012 * amt;
+    const g = unit * 0.009 * amt;
     const sh = unit * 0.006 * amt;
-    // The plates part most around the anchor and less toward the canvas
-    // edges, so the crack tapers to a hairline as it leaves the frame. The
-    // shift varies by a few px over the whole canvas, so the lines stay
-    // visibly straight.
+    // The plates part most along a long stretch right of centre and less
+    // toward the canvas edges, so the crack tapers to a hairline as it
+    // leaves the frame; along the way the opening swells and pinches
+    // unevenly. Around the anchor the unevenness gives way to a steady
+    // widening, so that stretch stays the widest. The shift varies by a few
+    // px over the whole canvas, so the lines stay visibly straight.
     const uAnc = W * 0.07;
-    const spread = (u) => 0.4 + 0.6 * Math.exp(-(((u - uAnc) / (unit * 0.55)) ** 2));
+    const spread = (u) => {
+      const x = u / unit;
+      let n = 0;
+      for (const w of UNEVEN) n += Math.sin(x * w.f + w.p);
+      const near = Math.exp(-(((u - uAnc) / (unit * 0.3)) ** 2));
+      const along = 0.35 + 0.65 * Math.exp(-(((u - uAnc) / (unit * 0.6)) ** 2));
+      return along * ((1 - near) * Math.max(0.3, 1 + 0.35 * (n / 3) * 2) + near * 1.3);
+    };
     const tA = (u) => { const k = spread(u); return [(sh / 2) * k, (-g / 2) * k]; };
     const tB = (u) => { const k = spread(u); return [(-sh / 2) * k, (g / 2) * k]; };
 
-    // The anchor: a lens where both plates are chipped back, so the crack is
-    // widest there. It sits just right of centre and opens with the breath.
-    const sig = unit * 0.11;
+    // The anchor: a long, shallow chipping-back of both plates, so the crack
+    // is a little wider along that stretch, not a lens. It sits just right
+    // of centre and opens with the breath.
+    const sig = unit * 0.3;
     const lensK = 0.6 + 0.4 * amt;
     const lensAt = (u, c, h) => {
       const x = (u - c) / sig;
@@ -1436,8 +1450,8 @@ function describeForAI({ pieceName, values }) {
       while (kn < CRACK.length - 2 && CRACK[kn + 1][0] < un) kn++;
       const [ua, va] = CRACK[kn], [ub, vb] = CRACK[kn + 1];
       const f = (va + (vb - va) * Math.max(0, Math.min(1, (un - ua) / (ub - ua || 1)))) * unit;
-      OA[i] = f - lensAt(u, uAnc, unit * 0.012);
-      OB[i] = f + lensAt(u, uAnc + sig * 0.3, unit * 0.009);
+      OA[i] = f - lensAt(u, uAnc, unit * 0.003);
+      OB[i] = f + lensAt(u, uAnc + sig * 0.2, unit * 0.0025);
       BA[i] = OA[i];
       BB[i] = OB[i];
     }
@@ -1484,8 +1498,11 @@ function describeForAI({ pieceName, values }) {
     const gapAt = (u) => Math.max(0, edgeB(u) - edgeA(u));
     const oRef = unit * 0.01;
     const lit = (o) => 1 - Math.exp(-o / oRef);
-    const gain = (o) => Math.min(1.7, (o / (oRef * 1.5)) ** 1.3);
-    const anchorGain = gain(gapAt(uAnc + sig * 0.12));
+    // Seam light rises with the opening but stays well short of white, so
+    // the widest stretch glows rather than pooling into a solid blob; the
+    // lines breaking into it carry the rest of the light.
+    const gain = (o) => 1.6 * (1 - Math.exp(-o / (unit * 0.009)));
+    const anchorGain = gain(gapAt(uAnc + sig * 0.1));
 
     // Colour runs along the crack in gradient mode.
     const bandOf = (u) => Math.max(0, Math.min(BANDS - 1, Math.floor(((u - visLo) / (visHi - visLo)) * BANDS)));
@@ -1510,7 +1527,7 @@ function describeForAI({ pieceName, values }) {
     // glint at each line's broken end that grows as the crack opens there.
     const spacing = Math.max(6, Math.min(80, (unit * 0.03) / values.density));
     const offset = 0.37 * spacing;
-    const A_FAR = 0.05, A_NEAR = 0.3, D_NEAR = unit * 0.1, GLINT = 1.2;
+    const A_FAR = 0.05, A_NEAR = 0.3, D_NEAR = unit * 0.1, GLINT = 1.3;
 
     function drawPlate(sign, T, B) {
       // Plate-local lattice, clipped to the canvas (shifted into the plate's
@@ -1575,7 +1592,7 @@ function describeForAI({ pieceName, values }) {
           const endB = ends.map((t) => {
             const u = uAt(t);
             const op = gapAt(u + T(u)[0]);
-            return { t, b: 0.25 + 0.75 * lit(op), L: unit * 0.016 + 0.9 * op };
+            return { t, b: 0.2 + 0.8 * lit(op) ** 1.3, L: unit * 0.014 + 2.4 * op };
           });
           let first = null, last = null;
           let t = ta;
@@ -1625,7 +1642,7 @@ function describeForAI({ pieceName, values }) {
       open.push(op);
       gMax = Math.max(gMax, op);
     }
-    const count = Math.max(2, Math.min(40, Math.ceil(gMax / 0.7) + 1));
+    const count = Math.max(2, Math.min(30, Math.ceil(gMax / 1.0) + 1));
     const every = Math.max(1, Math.floor(count / 4));
     for (let q = 0; q < count; q++) {
       const f = q / (count - 1);
@@ -1639,9 +1656,9 @@ function describeForAI({ pieceName, values }) {
         if (prev) {
           const op = (open[n] + open[n - 1]) / 2;
           const w = (bot[n] - top[n] + bot[n - 1] - top[n - 1]) / 2;
-          const isAnchor = Math.abs(u - uAnc - sig * 0.15) < sig * 1.3;
-          const gn = isAnchor ? gain(op) : Math.min(0.6 * anchorGain, gain(op));
-          const alpha = SEAM * gn * prof * Math.min(1, w / (count - 1) / 0.7);
+          const isAnchor = Math.abs(u - uAnc - sig * 0.1) < sig * 0.6;
+          const gn = isAnchor ? gain(op) : Math.min(0.85 * anchorGain, gain(op));
+          const alpha = SEAM * gn * prof * Math.min(1, w / (count - 1) / 1.0);
           const ev = env((pt[0] + prev[0]) / 2, (pt[1] + prev[1]) / 2);
           if (put(alpha * ev, bandOf(u), prev, pt)) run.push(pt);
           else { if (keep && run.length > 1) paths.push(run); run = []; }

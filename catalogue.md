@@ -215,5 +215,5 @@ One long jagged crack across a full-bleed field of faint diagonal hairlines, its
 
 - **Tags:** geometric, optical
 - **Text-safe zone:** upper left, above the crack
-- **Anchor:** the crack's widest opening, just right of centre
+- **Anchor:** the crack's widest stretch, just right of centre
 - **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Shards
