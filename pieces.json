@@ -5,8 +5,8 @@
     "blurb": "Particles confined to one soft, organic region around a quiet central void, trailing hairlines that brighten only where they cross.",
     "tags": ["flow", "organic"],
     "hue": 200, "hueB": 280, "saturation": 0,
-    "safeZone": "left third",
-    "anchor": "band's inner edge, upper right"
+    "safeZone": "the quiet centre",
+    "anchor": "the brightest braid, upper right"
   },
   {
     "slug": "contour-grid",
@@ -32,7 +32,7 @@
     "blurb": "A tilted ring of hairline arcs, each turning at its own rate, whose overlaps gather into one bright crescent that travels slowly round.",
     "tags": ["orb", "kinetic"],
     "hue": 265, "hueB": 330, "saturation": 0,
-    "safeZone": "left third",
+    "safeZone": "left quarter and top band",
     "anchor": "crescent on the ring's near side, lower centre, travelling slowly round"
   },
   {
@@ -50,7 +50,7 @@
     "blurb": "One finite lattice sheet with crisp edges, floating tilted in space and flexing, its fold catching the light where it turns edge-on.",
     "tags": ["geometric", "3d"],
     "hue": 190, "hueB": 205, "saturation": 0,
-    "safeZone": "left third",
+    "safeZone": "left quarter and top band",
     "anchor": "fold crest, upper right, travelling across the sheet"
   },
   {
@@ -95,7 +95,7 @@
     "blurb": "A funnel seen side-on: stacked hairline ellipses narrowing to one bright tip, slowly twisting.",
     "tags": ["3d", "geometric"],
     "hue": 290, "hueB": 190, "saturation": 0,
-    "safeZone": "left third",
+    "safeZone": "left quarter",
     "anchor": "tip and lower stem, centre"
   },
   {
@@ -130,7 +130,7 @@
     "title": "Cipher Bloom",
     "blurb": "A compressed oblique band of shifting glyph fragments, drawing a small bright core along its own length.",
     "tags": ["glyph", "organic", "sparse"],
-    "safeZone": "top and bottom thirds, clear of the band",
+    "safeZone": "top-left and bottom-right corners",
     "anchor": "core, drifting along the band's centre",
     "hue": 42, "hueB": 76, "saturation": 0
   },
@@ -178,5 +178,41 @@
     "hue": 185, "hueB": 250, "saturation": 0,
     "safeZone": "lower left",
     "anchor": "lip, upper right"
+  },
+  {
+    "slug": "contrail",
+    "title": "Contrail",
+    "blurb": "One trail of hairlines, tight and bright at its head, loosening and breaking up as it ages along a long arc back to the frame's edge.",
+    "tags": ["flow", "sparse"],
+    "hue": 350, "hueB": 275, "saturation": 0,
+    "safeZone": "right third and bottom third",
+    "anchor": "the head, upper right of centre"
+  },
+  {
+    "slug": "bristle",
+    "title": "Bristle",
+    "blurb": "One S-shaped brush swipe of hairline bristles, running dry in streaks toward its end.",
+    "tags": ["organic", "flow"],
+    "hue": 228, "hueB": 172, "saturation": 0,
+    "safeZone": "top-left third",
+    "anchor": "mid-stroke, where the bristles bunch"
+  },
+  {
+    "slug": "louvre",
+    "title": "Louvre",
+    "blurb": "A blind of tilted hairline slats crossed by one slow diagonal beam of light that brightens the band of slats it passes and carries a few drifting motes.",
+    "tags": ["geometric", "kinetic", "editorial"],
+    "hue": 18, "hueB": 52, "saturation": 0,
+    "safeZone": "lower left",
+    "anchor": "beam's brightest stretch, just above and right of centre"
+  },
+  {
+    "slug": "fracture",
+    "title": "Fracture",
+    "blurb": "One long jagged crack across a full-bleed field of faint diagonal hairlines, its two plates breathing apart so the lines misalign and brighten toward the light inside it.",
+    "tags": ["geometric", "optical"],
+    "hue": 168, "hueB": 312, "saturation": 0,
+    "safeZone": "upper left, above the crack",
+    "anchor": "the crack's widest stretch, just right of centre"
   }
 ]

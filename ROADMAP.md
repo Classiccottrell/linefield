@@ -309,6 +309,30 @@ review) before merge, not after.
   piece (see INSPIRATION's audit).
 - **Growth is by quality, not a count.** There is no target count. Every new
   piece clears the originality line and the collection constraints.
+- [x] **Sketchbook round (2026-10-07).** Eleven throwaway composition
+  studies, judged side by side; the strongest four became pieces, each
+  built in its own worktree from its own brief: `contrail` and `bristle`
+  (Currents), `louvre` (Volumes), `fracture` (Surfaces). A fifth study
+  was dropped at the originality check rather than reworked. The other six
+  stay unbuilt; none was strong enough as drawn.
+- [x] **Framing pass (2026-10-10).** At full canvas (1280×800), 18 of 24
+  pieces sat in about a third of the width with an empty border all round;
+  the owner found the one-object framing too extreme. Rather than add a
+  control, the existing Scale control is now the framing control
+  (house-look §2 rewritten): it runs from contained to full canvas, and
+  defaults are chosen at full canvas. Default Scale went up on 15 pieces:
+  flow-field 1.75 (now a full-canvas field around a quiet centre);
+  wireframe-lattice 1.8; driftwork, bristle, orbitals, contour-grid, relay
+  1.6; globe, funnel, cipher-bloom 1.5; infall 1.4; moire, pleat 1.3.
+  louvre and fracture were then reworked to drop their frames on the
+  owner's review: louvre's slats run edge to edge under one beam, and
+  fracture became one long crack across a full-bleed field; both default
+  to Scale 1.8. Scale was made to widen flow-field, grain-field and cipher-bloom,
+  where it previously did little or nothing, and contrail was recomposed so
+  its tail sits in the square crop and Scale extends it. Left contained on
+  purpose: moire and pleat (the 0.15 ink ceiling), grain-field (the 0.035
+  home-page hero cap) and contrail (its text-safe zone). Eight safe-zone
+  descriptions were rewritten after measuring the new renders.
 
 ## Phase 5 — Packaging
 
@@ -336,6 +360,20 @@ review) before merge, not after.
   3.2's type system is the first real step.
 - **ASCII art brought to life.** This builds on the glyph-mark capability
   in `cipher-bloom`.
+- **A space series.** The owner's idea (2026-10-10): a run of compositions
+  built around space (planets, galaxies, nebulae), probably as its own
+  collection. Same house look and framing rules as everything else.
+  - Several pieces already sit near this subject (`globe`, `orbitals`,
+    `infall`), so each new one has to read as its own idea next to them,
+    not as a sibling of one of them.
+  - The originality risk is higher here than anywhere else in the
+    collection. Check every concept and name against the private
+    avoid-list *before* any design work, not after.
+  - Start with a throwaway sketch round, like the 2026-10-07 one, and build
+    only the strongest. Seeds that steer clear of spheres, spirals and
+    rings: a nebula as a slow, drifting cloud of hairline light; a galaxy
+    seen edge-on as one long, thin dust lane; a planet's terminator (the
+    line between day and night) seen close up, bleeding off the frame.
 - **Publishing `shared/` to npm.** Declined for v1.0.0. It's six small
   dependency-free modules that pieces already inline. Weighed against
   permanent version discipline and a second install path, for an audience
@@ -352,7 +390,7 @@ review) before merge, not after.
 Every row is **generated**, not hand-recorded. Run `npm run collection-metrics`
 and paste its output here verbatim; it prints this exact table, already
 sorted by ink. Rebuild thumbnails (`npm run build`) first, because it
-measures the committed PNGs. Refreshed 2026-10-05 on `v2`.
+measures the committed PNGs. Refreshed 2026-10-10, after the framing pass.
 
 **Hue is no longer a useful column, and that's success, not a gap.** Every
 piece now reports hue 240 — that's not a real colour, it's the ground's own
@@ -364,23 +402,27 @@ Ink, not hue, is now the axis that tells pieces apart.
 | 240 | 0.13 | 0.00 | 0.006 | `rainfall` |
 | 240 | 0.13 | 0.00 | 0.029 | `grain-field` |
 | 240 | 0.12 | 0.00 | 0.037 | `lacuna` |
-| 240 | 0.08 | 0.00 | 0.037 | `cipher-bloom` |
-| 240 | 0.11 | 0.00 | 0.044 | `flow-field` |
-| 240 | 0.05 | 0.00 | 0.045 | `relay` |
-| 240 | 0.08 | 0.00 | 0.049 | `orbitals` |
-| 240 | 0.06 | 0.00 | 0.049 | `funnel` |
-| 240 | 0.10 | 0.00 | 0.049 | `contour-grid` |
+| 240 | 0.11 | 0.00 | 0.047 | `contrail` |
 | 240 | 0.05 | 0.00 | 0.056 | `mooring` |
 | 240 | 0.03 | 0.00 | 0.059 | `dune` |
-| 240 | 0.12 | 0.00 | 0.060 | `wireframe-lattice` |
+| 240 | 0.05 | 0.00 | 0.064 | `relay` |
+| 240 | 0.10 | 0.00 | 0.065 | `contour-grid` |
+| 240 | 0.06 | 0.00 | 0.069 | `funnel` |
 | 240 | 0.04 | 0.00 | 0.071 | `swell` |
-| 240 | 0.12 | 0.00 | 0.082 | `driftwork` |
-| 240 | 0.06 | 0.00 | 0.088 | `pleat` |
-| 240 | 0.14 | 0.00 | 0.098 | `globe` |
-| 240 | 0.07 | 0.00 | 0.102 | `infall` |
-| 240 | 0.08 | 0.00 | 0.116 | `moire` |
+| 240 | 0.06 | 0.00 | 0.083 | `bristle` |
+| 240 | 0.09 | 0.00 | 0.087 | `orbitals` |
+| 240 | 0.13 | 0.00 | 0.093 | `wireframe-lattice` |
+| 240 | 0.12 | 0.00 | 0.098 | `louvre` |
+| 240 | 0.09 | 0.00 | 0.100 | `fracture` |
+| 240 | 0.09 | 0.00 | 0.108 | `flow-field` |
+| 240 | 0.12 | 0.00 | 0.116 | `driftwork` |
+| 240 | 0.05 | 0.00 | 0.118 | `pleat` |
+| 240 | 0.08 | 0.00 | 0.118 | `cipher-bloom` |
+| 240 | 0.08 | 0.00 | 0.135 | `infall` |
 | 240 | 0.06 | 0.00 | 0.136 | `longwave` |
+| 240 | 0.14 | 0.00 | 0.137 | `globe` |
 | 240 | 0.12 | 0.00 | 0.138 | `parallax` |
+| 240 | 0.08 | 0.00 | 0.141 | `moire` |
 
 **Sat (check)** is what `collection-check` gates on (chroma-floored; see
 Chunk 2.2), against the §1 ceiling of 0.06. It reads 0.00 for every piece:
@@ -465,7 +507,7 @@ trail instead of fading it. `canvas.toBlob('image/png')` faithfully exports
 what's actually on the canvas, so there's no transparent region to export.
 Giving every piece a real alpha channel means tracking ink separately from
 background through each one's own compositing — a render-architecture
-change across all 20 pieces, not a Phase 5 packaging fix. Not chased here.
+change across every piece, not a Phase 5 packaging fix. Not chased here.
 
 **`flow-field`'s still isn't byte-stable across rebuilds.** Two back-to-back
 builds on 2026-10-05 produced identical thumbnails, downloads, gallery and

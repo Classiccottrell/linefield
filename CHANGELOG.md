@@ -8,6 +8,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Four new pieces, bringing the collection to twenty-four, each from its
+  own brief and each in the house look. `contrail` is one trail of
+  hairlines, tight and bright at its head, loosening as it ages back to the
+  frame's edge (Currents, extra control Dispersion). `bristle` is one
+  S-shaped brush swipe of hairline bristles running dry in streaks
+  (Currents, Dryness). `louvre` is a blind of slats running edge to edge,
+  crossed by one slowly sweeping beam of light (Volumes, Beam width).
+  `fracture` is one long jagged crack across a full-bleed field of faint
+  hairlines, its two plates breathing apart around the light inside it
+  (Surfaces, Shards); the crack's path differs on every page load. All
+  four pass `collection-check` and `audit-controls` with every control
+  live.
+
 - **Stills pack and `catalogue.md`** (ROADMAP Phase 5). `node tools/build.mjs`
   now also captures an 800×800 square PNG of every piece at its defaults
   into `stills/`, zips them into `stills.zip`, and links that zip from the
@@ -52,6 +65,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Pieces use more of the canvas by default, and Scale is the framing
+  control.** At full canvas most pieces were an island about a third of
+  the width. `docs/house-look.md` §2 now treats framing as a range set by
+  Scale, from contained to full canvas, with defaults judged at full
+  canvas; the 45–75%-of-the-shorter-side rule and the one-third text-safe
+  minimum are retired. Default Scale rises on 15 pieces (flow-field becomes
+  a full-canvas field), preset Scale values move with them, and Scale now
+  widens flow-field, grain-field and cipher-bloom. contrail is recomposed
+  so its tail stays in the square crop, and its oldest strands now fray
+  out at different lengths instead of ending together. Saved settings in
+  a visitor's browser still win over the new defaults; "Reset to defaults"
+  picks them up.
+- `CONTRIBUTING.md` and the docs contributing page no longer tell
+  contributors to give each piece a distinct default palette, which
+  predates the monochrome house look.
 - **Every piece converted to a monochrome house look** (ROADMAP Phase 2):
   near-white ink on `#0a0a0d` by default (saturation 0; colour stays
   opt-in through the existing controls, concentrated in each piece's

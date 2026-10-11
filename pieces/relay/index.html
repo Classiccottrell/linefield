@@ -135,11 +135,11 @@
   let treeKey = '';
 
   const PRESETS = {
-    whisper: { opacity: 0.6, stroke: 0.6, density: 0.55, spread: 22, scale: 0.85 },
+    whisper: { opacity: 0.6, stroke: 0.6, density: 0.55, spread: 22, scale: 1.36 },
     ink:     { opacity: 1, stroke: 1.3, density: 0.85, glow: 0, spread: 20, motion: 0.4 },
     neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.9, glow: 1.1 },
     drift:   { opacity: 0.75, stroke: 0.8, density: 0.9, speed: 0.4, motion: 1.8, spread: 34 },
-    dense:   { opacity: 0.85, stroke: 0.9, density: 1.5, glow: 0.5, spread: 22, scale: 1.15 },
+    dense:   { opacity: 0.85, stroke: 0.9, density: 1.5, glow: 0.5, spread: 22, scale: 1.84 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -150,7 +150,7 @@
     extraControls: [
       { name: 'spread', label: 'Spread', type: 'range', min: 8, max: 45, step: 1, default: 25, category: 'visual' },
     ],
-    defaults: { hue: 150, hueB: 50, saturation: 0, colorMode: 'gradient', colorA: '#00ff80', colorB: '#ffd500' },
+    defaults: { hue: 150, hueB: 50, saturation: 0, scale: 1.6, colorMode: 'gradient', colorA: '#00ff80', colorB: '#ffd500' },
   });
   const currentValues = baked || panel.values;
 

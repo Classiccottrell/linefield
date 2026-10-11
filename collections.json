@@ -2,12 +2,12 @@
   {
     "id": "currents",
     "title": "Currents",
-    "slugs": ["flow-field", "driftwork", "longwave", "mooring", "rainfall"]
+    "slugs": ["flow-field", "driftwork", "longwave", "mooring", "rainfall", "contrail", "bristle"]
   },
   {
     "id": "volumes",
     "title": "Volumes",
-    "slugs": ["globe", "funnel", "wireframe-lattice", "parallax", "dune"]
+    "slugs": ["globe", "funnel", "wireframe-lattice", "parallax", "dune", "louvre"]
   },
   {
     "id": "orbits",
@@ -17,7 +17,7 @@
   {
     "id": "surfaces",
     "title": "Surfaces",
-    "slugs": ["contour-grid", "pleat", "grain-field", "swell"]
+    "slugs": ["contour-grid", "pleat", "grain-field", "swell", "fracture"]
   },
   {
     "id": "codes",

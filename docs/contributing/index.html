@@ -168,10 +168,10 @@
       in the new <code>index.html</code>.</div></li>
     <li><div>Replace the <code>drawFrame()</code> body with your own
       rendering logic, following the comments left in the template.</div></li>
-    <li><div>Pick a distinct default palette for your piece (see
-      "Defaults" below) so the library doesn't look uniform &mdash; check
-      the other pieces' <code>defaults</code> blocks before choosing
-      hues.</div></li>
+    <li><div>Set your piece's defaults to the house look in
+      <code>docs/house-look.md</code> (saturation 0, so it reads
+      monochrome out of the box), give it the five presets, and declare
+      its text-safe zone and anchor (see "Defaults" below).</div></li>
     <li><div>Verify visually in a browser (see "Verifying a piece"
       below).</div></li>
   </ol>
@@ -321,12 +321,15 @@
   <h2>Defaults</h2>
   <p>Pass a <code>defaults</code> object to
     <code>createControlPanel({ ... defaults })</code> to set your piece's
-    own default values: <code>hue</code>/<code>hueB</code> (exact
-    degrees, most important, so each piece reads as visually distinct out
-    of the box) and <code>colorA</code>/<code>colorB</code> (the hex the
-    picker shows for those same two hues on first load). Check the
-    existing pieces' <code>defaults</code> blocks before picking colors to
-    avoid duplicating another piece's palette.</p>
+    own default values: <code>saturation</code> (0 for every piece, per
+    the house look), <code>hue</code>/<code>hueB</code> (exact degrees)
+    and <code>colorA</code>/<code>colorB</code> (the hex the picker shows
+    for those same two hues on first load). At saturation 0 the hues
+    don't show until someone raises saturation or picks the
+    <code>neon</code> preset, so composition, not colour, is what makes a
+    piece distinct. Mirror <code>hue</code>, <code>hueB</code> and
+    <code>saturation</code> in <code>pieces.json</code> exactly; the build
+    checks them against the running piece.</p>
   <p>A saved <code>localStorage</code> value always outranks a piece's
     defaults for a returning visitor. "Reset to defaults" in the panel
     clears it.</p>

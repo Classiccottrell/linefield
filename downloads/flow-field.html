@@ -154,7 +154,7 @@
 
 
 
-<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#00aaff","colorB":"#aa00ff","hue":200,"hueB":280,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"mode":false};
+<script>window.__LF_BAKED_VALUES__ = {"scale":1.75,"speed":1,"stroke":1,"opacity":1,"saturation":0,"colorMode":"gradient","colorA":"#00aaff","colorB":"#aa00ff","hue":200,"hueB":280,"invert":false,"glow":0,"angle":0,"motion":1,"phase":0,"density":1,"mode":false};
 // --- inlined: ../../shared/color.js ---
 // shared/color.js
 
@@ -1374,9 +1374,10 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
   // quiet central void, trailing hairlines that gather brightness only
   // where their paths happen to cross.
   //
-  // Text-safe zone: the left third of the frame. The region sits right of
-  // centre, inside the central square.
-  // Anchor: the band's inner edge, upper right of the void — checked by
+  // Text-safe zone (default framing, Scale 1.75): the quiet centre, where
+  // the void sits; the field fills the rest of the canvas. At Scale 1 the
+  // field is a ring right of centre and the left third is clear instead.
+  // Anchor: the brightest braid, upper right of the void — checked by
   // measuring the rendered brightest cluster, not assumed from the field's
   // formula, since the noise-driven current doesn't distribute evenly.
   const PIECE_ID = 'flow-field';
@@ -1408,36 +1409,66 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
     return t * t * (3 - 2 * t);
   }
 
-  function maskValue(x, y, width, height) {
-    const r = Math.min(width, height);
-    const dx = (x - width * FOCUS.x) / r;
-    const dy = (y - height * FOCUS.y) / r;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    if (d <= VOID_R) return 0;
-    if (d <= RING_PEAK) return smoothstep(VOID_R, RING_PEAK, d);
-    if (d <= RING_OUTER) return 1 - smoothstep(RING_PEAK, RING_OUTER, d);
-    return 0;
+  // Framing: Scale sets how much of the frame the region spans. Below 1
+  // the whole ring (void included) shrinks in place toward a small,
+  // contained knot. Above 1 the centre slides to frame-centre and the outer
+  // edge opens into a wide ellipse at the frame's own aspect, so at 2 the
+  // field runs off every edge; the void grows far less than the ring, so it
+  // stays a quiet centre rather than becoming a hollow vignette. At Scale 1
+  // every factor is exactly 1 and every offset 0: the default is unchanged.
+  function frameOf(scale) {
+    const hi = Math.max(0, scale - 1);
+    const k = 1 + Math.min(0, scale - 1) * 0.45;
+    return {
+      x: FOCUS.x + hi * (0.5 - FOCUS.x),
+      y: FOCUS.y + hi * (0.5 - FOCUS.y),
+      ex: k * (1 + hi * 3.0),
+      ey: k * (1 + hi * 1.6),
+      v: k * (1 + hi * 0.6),
+      // More particles over more area, so the wide field isn't thinner.
+      count: k * (1 + hi * 1.2),
+    };
   }
 
-  function sampleFocusPoint(width, height) {
+  function particleCount(values) {
+    return Math.round(BASE_COUNT * values.density * frameOf(values.scale).count);
+  }
+
+  function maskValue(x, y, width, height, f) {
+    const r = Math.min(width, height);
+    const dx = (x - width * f.x) / r;
+    const dy = (y - height * f.y) / r;
+    // The void's inner edge is round; the outer edge is the framing ellipse.
+    const dv = Math.sqrt(dx * dx + dy * dy) / f.v;
+    if (dv <= VOID_R) return 0;
+    const ux = dx / f.ex, uy = dy / f.ey;
+    const de = Math.sqrt(ux * ux + uy * uy);
+    if (de >= RING_OUTER) return 0;
+    return smoothstep(VOID_R, RING_PEAK, dv) * (1 - smoothstep(RING_PEAK, RING_OUTER, de));
+  }
+
+  function sampleFocusPoint(width, height, f) {
     const r = Math.min(width, height);
     for (let i = 0; i < 8; i++) {
       const ang = Math.random() * Math.PI * 2;
       const rad = Math.sqrt(Math.random()) * RING_OUTER * r;
-      const x = width * FOCUS.x + Math.cos(ang) * rad;
-      const y = height * FOCUS.y + Math.sin(ang) * rad;
-      if (x >= 0 && x <= width && y >= 0 && y <= height && maskValue(x, y, width, height) > 0) {
+      const x = width * f.x + Math.cos(ang) * rad * f.ex;
+      const y = height * f.y + Math.sin(ang) * rad * f.ey;
+      if (x >= 0 && x <= width && y >= 0 && y <= height && maskValue(x, y, width, height, f) > 0) {
         return { x, y };
       }
     }
-    return { x: width * FOCUS.x, y: height * (FOCUS.y - RING_PEAK) };
+    return { x: width * f.x, y: Math.max(0, height * (f.y - RING_PEAK * f.ey)) };
   }
 
-  function seedParticles(count) {
-    particles = Array.from({ length: count }, () => {
-      const spot = sampleFocusPoint(canvas.width, canvas.height);
-      return { x: spot.x, y: spot.y, trail: [] };
-    });
+  function spawn(f) {
+    const spot = sampleFocusPoint(canvas.width, canvas.height, f);
+    return { x: spot.x, y: spot.y, trail: [] };
+  }
+
+  function seedParticles(values) {
+    const f = frameOf(values.scale);
+    particles = Array.from({ length: particleCount(values) }, () => spawn(f));
   }
 
   const PRESETS = {
@@ -1453,7 +1484,7 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
     pieceId: PIECE_ID,
     presets: PRESETS,
     onChange: (name, value, values) => {
-      if (name === 'density') seedParticles(Math.round(BASE_COUNT * values.density));
+      if (name === 'density') seedParticles(values);
     },
     extraControls: [
       // Off by default: full trails are this piece's identity. On, each
@@ -1463,14 +1494,14 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
     // Pinned deliberately, not inherited — keeps flow-field's hue TAKEN to
     // the next contributor even if the shared defaults ever move.
     // saturation: 0 per house look §1; colour lives in the neon preset.
-    defaults: { hue: 200, hueB: 280, saturation: 0, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
+    defaults: { hue: 200, hueB: 280, saturation: 0, scale: 1.75, colorMode: 'gradient', colorA: '#00aaff', colorB: '#aa00ff' },
   });
   const currentValues = baked || panel.values;
 
   function applyResize({ width, height }) {
     canvas.width = width;
     canvas.height = height;
-    seedParticles(Math.round(BASE_COUNT * currentValues.density));
+    seedParticles(currentValues);
   }
   // dpr fixed at 1: flow-field draws in CSS-pixel space (canvas.width ===
   // window.innerWidth), and particle coords / exportPng's multiplier both
@@ -1522,11 +1553,17 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
     // 90px/s already clears displacement-over-stroke-width by a wide margin.
     const lineWidth = 0.4 + values.stroke * 0.5;
     const baseAlpha = values.opacity * (values.invert ? 0.42 : 0.32);
+    const f = frameOf(values.scale);
+    // Scale changes the count without a reseed, so dragging it tops up or
+    // trims the field instead of wiping every trail at once.
+    const want = particleCount(values);
+    while (particles.length < want) particles.push(spawn(f));
+    if (particles.length > want) particles.length = want;
 
     for (const p of particles) {
       // Mask read at the pre-move position: this frame's stroke belongs to
       // where the particle currently is, not where it's about to land.
-      const m = maskValue(p.x, p.y, W, H);
+      const m = maskValue(p.x, p.y, W, H, f);
       const angle = fieldAngle(p.x, p.y, elapsed, values);
       const speed = 90 * values.speed * (dt || 0.016);
       const nx = p.x + Math.cos(angle) * speed;
@@ -1541,9 +1578,9 @@ function createResizeBatcher(container, onResize, maxDPR = 2) {
       // Respawn on leaving the canvas OR the mask (not the canvas alone) —
       // otherwise the field advects particles back out to uniform coverage
       // within a few seconds and the void/negative space collapses.
-      const outOfMask = maskValue(p.x, p.y, W, H) <= 0;
+      const outOfMask = maskValue(p.x, p.y, W, H, f) <= 0;
       if (p.x < 0 || p.x > W || p.y < 0 || p.y > H || outOfMask) {
-        const spot = sampleFocusPoint(W, H);
+        const spot = sampleFocusPoint(W, H, f);
         p.x = spot.x;
         p.y = spot.y;
         p.trail = [];
