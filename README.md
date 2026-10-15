@@ -169,6 +169,8 @@ tooling" below and CONTRIBUTING.md.
 - `bristle` — one S-shaped brush swipe of about 300 hairline bristles, thin at both ends and breaking into dry streaks toward its end
 - `louvre` — a blind of tilted hairline slats crossed by one slow beam of light, which brightens the band it passes and carries a few drifting motes
 - `fracture` — one long jagged crack across a full-bleed field of faint diagonal hairlines, its two plates breathing apart so the lines misalign and brighten toward the light inside it
+- `magnetosphere` — a tiny quiet body whose field is pushed in on the sunward side and drawn out into a long tail of hairlines that pinches and flares where it reconnects, with a solar-wind stream piling into a bow shock ahead of it
+- `tidal-bridge` — a torn, C-shaped stream of stippled stars arcing between two galaxies off-frame, knots condensing along it around one bright, lumpy knot mid-stream
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,

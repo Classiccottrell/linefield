@@ -214,5 +214,23 @@
     "hue": 168, "hueB": 312, "saturation": 0,
     "safeZone": "upper left, above the crack",
     "anchor": "the crack's widest stretch, just right of centre"
+  },
+  {
+    "slug": "magnetosphere",
+    "title": "Magnetosphere",
+    "blurb": "A tiny quiet body whose field is pushed in on the sunward side and drawn out into a long tail of hairlines that pinches and flares where it reconnects, with a solar-wind stream piling into a bow shock ahead of it.",
+    "tags": ["kinetic", "flow", "celestial"],
+    "hue": 175, "hueB": 290, "saturation": 0,
+    "safeZone": "top band",
+    "anchor": "the reconnection pinch in the tail, right of centre"
+  },
+  {
+    "slug": "tidal-bridge",
+    "title": "Tidal Bridge",
+    "blurb": "A torn, C-shaped stream of stippled stars arcing between two galaxies off-frame, with knots condensing along it and faint debris feathers peeling away as the stars flow through.",
+    "tags": ["grain", "flow", "celestial"],
+    "hue": 210, "hueB": 340, "saturation": 0,
+    "safeZone": "top-left, inside the arc's bow",
+    "anchor": "the knot mid-stream, just right of centre"
   }
 ]
