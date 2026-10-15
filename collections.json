@@ -27,6 +27,6 @@
   {
     "id": "space",
     "title": "Space",
-    "slugs": ["magnetosphere", "tidal-bridge", "dark-nebula"]
+    "slugs": ["magnetosphere", "tidal-bridge", "terminator", "dark-nebula"]
   }
 ]

@@ -241,5 +241,14 @@
     "hue": 28, "hueB": 215, "saturation": 0,
     "safeZone": "the dark body of the cloud, left",
     "anchor": "the young star at the cloud's rim"
+  },
+  {
+    "slug": "terminator",
+    "title": "Terminator",
+    "blurb": "A cratered planet seen from low orbit in stipple: a shallow horizon across the upper third, lit ground on the left and a ragged day/night line coming down the frame, where crater rims flare and peaks catch light out in the night as the ground turns into dawn.",
+    "tags": ["grain", "depth", "celestial"],
+    "hue": 44, "hueB": 18, "saturation": 0,
+    "safeZone": "the sky above the horizon",
+    "anchor": "crater rims flaring along the terminator"
   }
 ]
