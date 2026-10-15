@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — magnetosphere</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  magnetosphere — a tiny quiet body whose field is pushed in on the sunward
+  side and drawn out into a long tail of hairlines, with a solar-wind stream
+  piling into a bow shock ahead of it.
+
+  Text-safe zone: the top band (about the top third). Only the faint wings
+  of the wind and the bow shock reach toward it; it closes as Scale rises.
+  Anchor: the reconnection pinch in the tail, right of centre, where the two
+  lobes meet. The lobe lines drift toward the sheet and reconnect there, so
+  the pinch brightens and fades on a slow conveyor burst (24 s loop at
+  Speed 1) while the tail sways gently around it.
+
+  Technique: field lines are traced once from a dipole plus a tail current
+  sheet (with a normal-field reversal at the X), shaped, and drawn as
+  additive hairlines bucketed by alpha. The lobe lines are a conveyor
+  interpolated between traced lines. The sheet carries a fine stipple
+  jetting both ways from the X. Wind particles run straight until they meet
+  the shock, then turn, slow and brighten along it. Wind sets the stream's
+  strength and density; at 0 the wind and the shock are gone and only the
+  field remains.
+
+  SVG export: the field lines (dayside, night-side and tail lobes) as
+  polylines, only where they are visibly lit, plus a capped sample of the
+  wind dots riding the bow shock as circles. The free-stream wind and the
+  reconnection stipple are not exported; use PNG for those.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'magnetosphere';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // The composition is designed in a 1280x800 frame: body at (0.34, 0.58) of
+  // the frame, 11 px per planet radius. Geometry is traced once in model
+  // units against that frame and never rebuilt, so the tail is the same
+  // tail at every viewport and Scale.
+  const DW = 1280, DH = 800, DS = 11, DCX = 0.34, DCY = 0.58;
+  // Gate captures land 3.984 s after load (250 stepped frames, the first
+  // with dt 0); starting the clock here puts them on the burst's peak.
+  const CLOCK0 = 24 - 3.984;
+
+  // Model units: 1 = planet radius, x tailward, y north.
+  const P = {
+    tilt: -0.035, period: 24,
+    F: { T: 0.0008, x0: -1, w: 6, d: 2.5, conv: 0.06, dl: 14, xX: 42, bn: 0.00008, wX: 5, dn: 2.5 },
+    r0: 1, Lmin: 5.5, Lmax: 400, dayLs: [6.5, 9, 12, 15.5, 19.5, 24], nightLs: [7.5, 11, 16], nNightSeeds: 300, M: 320,
+    Xm: 9, flat: 0.45,
+    Rc: 11, cw: 1.6, ct: 0.4, xT0: -2, xT: 30, pk: 0.78, pw: 8, py: 5, pTail: 0.5,
+    nLobe: 24, jit: 0.8, fadeIn: 0.15, fadeOut: 0.3, lobeA: 0.33, sheetBoost: 0.3, burst: 0.6,
+    dayA: 0.42, nightA: 0.36, f0: 2.4, f1: 7, lw: 0.6, amax: 1,
+    rxBoost: 6, rxW: 6, rxH: 2.2, dip: 0.07,
+    nRx: 2600, rxU: 14, rxV: 2.4, rxEarth: 0.45, rxN: 1, rxRun: 10, rxSpread: 6, rxA: 0.42, rxFloor: 0.1, rxFloorT: 0.28,
+    bow: 13.5, nWind: 2600, windDt: 0.25, windTw: 96, windOut: [-2, 9], windN: 1, windA: 0.2, windDot: 0.4, windLen: 4,
+    rideW: 0.9, rideV: 0.4, rideA: 1.6, flash: 2.5, flashT: 3, wingW: 0.6, bowA: 0.05, windSig: 13,
+    breath: 0.05, flap: 0.6, flapN: 1, flapK: 8, flapY: 5, windPush: 0.03,
+    tailA: 75.5, tailB: 101.5,
+  };
+  const LIM = { r0: P.r0, max: 8000, x0: -DCX * DW / DS - 30, x1: (DW - DCX * DW) / DS + 25, y1: DH / DS + 20 };
+  const WIND_X0 = -DCX * DW / DS - 4;
+  const TAU = Math.PI * 2;
+
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function makeNoise(r, octaves = 4) {
+    const w = [];
+    for (let i = 0; i < octaves; i++) {
+      const f = Math.pow(1.9, i);
+      w.push({ fx: (r() * 2 - 1) * f, fy: (r() * 2 - 1) * f, p: r() * 6.283, a: 1 / (i + 1) });
+    }
+    const norm = w.reduce((s, o) => s + o.a, 0);
+    return (x, y) => w.reduce((s, o) => s + o.a * Math.sin(o.fx * x + o.fy * y + o.p), 0) / norm;
+  }
+  const gauss = (d, s) => Math.exp(-(d * d) / (2 * s * s));
+  const sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+  // ---- field: dipole + tail current sheet (+ normal-field reversal beyond the X) ----
+  function field(x, y) {
+    const F = P.F, r2 = x * x + y * y, r5 = r2 * r2 * Math.sqrt(r2);
+    let bx = 3 * x * y / r5, by = (2 * y * y - x * x) / r5;
+    const S = 0.5 * (1 + Math.tanh((x - F.x0) / F.w));
+    bx += F.T * Math.tanh(y / F.d) * S;
+    by -= F.T * F.conv * Math.tanh(y / F.dl) * S;
+    by += F.bn * Math.tanh((x - F.xX) / F.wX) * Math.exp(-(y * y) / (F.dn * F.dn)) * S;
+    return [bx, by];
+  }
+  function trace(x, y, dir, lim) {
+    const pts = [[x, y]];
+    for (let i = 0; i < lim.max; i++) {
+      const r = Math.hypot(x, y), h = Math.min(0.5, Math.max(0.02, 0.03 * r));
+      let [bx, by] = field(x, y), m = Math.hypot(bx, by) || 1e-12;
+      const mx = x + dir * 0.5 * h * bx / m, my = y + dir * 0.5 * h * by / m;
+      [bx, by] = field(mx, my); m = Math.hypot(bx, by) || 1e-12;
+      x += dir * h * bx / m; y += dir * h * by / m; pts.push([x, y]);
+      if (i > 8 && Math.hypot(x, y) < lim.r0 * 0.98) return { pts, closed: true };
+      if (x < lim.x0 || x > lim.x1 || Math.abs(y) > lim.y1) return { pts, closed: false };
+    }
+    return { pts, closed: false, stuck: true };
+  }
+  // waist profile at the X; tailward it only half-releases so the tail stays one tight bundle
+  const waist = (x) => (x < P.F.xX ? 0 : P.pTail) + (x < P.F.xX ? 1 : 1 - P.pTail) * gauss(x - P.F.xX, P.pw);
+  // static shaping: soft radial compression of the sunward side, gentle squeeze of the tail
+  function shape(x, y) {
+    const r = Math.hypot(x, y);
+    if (x < 0) { const w = (-x / r) ** P.cw, f = (r * (1 - w) + w * P.Rc * Math.tanh(r / P.Rc)) / r; x *= f; y *= f; }
+    y *= 1 - P.ct * sstep(P.xT0, P.xT, x);
+    return [x, y * (1 - P.pk * waist(x) / (1 + (y / P.py) ** 2))];
+  }
+  // dayside only: on top of the radial squeeze, flatten the sunward fronts so the loops read as pushed in
+  function dayShape(x, y) {
+    [x, y] = shape(x, y);
+    if (x < 0) x += P.flat * (-P.Xm * Math.tanh(-x / P.Xm) - x);
+    return [x, y];
+  }
+  function resampleStep(pts, step) {
+    const out = [pts[0]]; let acc = 0;
+    for (let i = 1; i < pts.length; i++) {
+      acc += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      if (acc >= step || i === pts.length - 1) { out.push(pts[i]); acc = 0; }
+    }
+    return out;
+  }
+  function resampleN(pts, M) {
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const tot = cum[cum.length - 1], out = new Float32Array(M * 2); let j = 0;
+    for (let m = 0; m < M; m++) {
+      const d = (tot * m) / (M - 1);
+      while (j < pts.length - 2 && cum[j + 1] < d) j++;
+      const f = (d - cum[j]) / Math.max(1e-9, cum[j + 1] - cum[j]);
+      out[2 * m] = pts[j][0] + (pts[j + 1][0] - pts[j][0]) * f;
+      out[2 * m + 1] = pts[j][1] + (pts[j + 1][1] - pts[j][1]) * f;
+    }
+    return out;
+  }
+
+  // ---- build once ----
+  // Pools hold Density 2 worth of lobe lines and stipple. The first draws keep
+  // the seeded order the composition was tuned with; extras come from a
+  // second seed afterwards, so Density 1 is unchanged by them.
+  const MAX_LOBE = 2 * P.nLobe;
+  function build() {
+    const r = rng(11), r2 = rng(29), nz = makeNoise(r, 3), lim = LIM;
+    const seedL = (k, n, a, b) => 1 / (1 / a + (1 / b - 1 / a) * (k + 0.5) / n);   // equal-flux footpoints
+    const foot = (side, L) => { const lat = Math.acos(Math.sqrt(Math.min(1, P.r0 / L))); return [side * P.r0 * Math.cos(lat), P.r0 * Math.sin(lat)]; };
+    const day = [], night = [], lobe = [];
+    for (const L of P.dayLs) {
+      const [x, y] = foot(-1, L), res = trace(x, y, 1, lim);
+      if (res.closed) day.push({ pts: resampleStep(res.pts.map((q) => dayShape(q[0], q[1])), 2.4 / DS), L });
+    }
+    for (let k = 0; k < P.nNightSeeds; k++) {
+      const L = seedL(k, P.nNightSeeds, P.Lmin, P.Lmax), [x, y] = foot(1, L), res = trace(x, y, 1, lim);
+      if (res.stuck) continue;
+      const pts = res.pts.map((q) => shape(q[0], q[1]));
+      if (res.closed) night.push({ pts: resampleStep(pts, 2.4 / DS), L });
+      else if (res.pts[res.pts.length - 1][0] > lim.x1 - 1) lobe.push({ rs: resampleN(pts, P.M), yEnd: pts[pts.length - 1][1] });
+    }
+    lobe.sort((a, b) => b.yEnd - a.yEnd);                                      // outer lobe first, sheet last
+    // conveyor jitter per hemisphere slot: (jitter, brightness)
+    const conv = { 1: [], '-1': [] };
+    for (const hemi of [1, -1]) for (let k = 0; k < P.nLobe; k++) conv[hemi].push([r(), 0.6 + 0.4 * r()]);
+    const rxOne = (q) => ({ u: Math.abs(q() + q() + q() - 1.5) * P.rxU, v: (q() + q() + q() - 1.5) * P.rxV, ph: q(), dir: q() < P.rxEarth ? -1 : 1, sp: 0.4 + q(), a: 0.3 + 0.7 * q() });
+    const rx = [];
+    for (let i = 0; i < P.nRx; i++) rx.push(rxOne(r));
+    // solar wind: straight and undisturbed until it meets the bow shock, then turned to slide (slower) along it
+    const b = P.bow, wind = [], xL = WIND_X0, dt = P.windDt;
+    const rS = (f) => b * (f < 1e-4 ? 1 : f / Math.sin(f));                 // shock radius at angle f from the sunward axis
+    while (wind.length < P.nWind) {
+      const y0 = (r() + r() + r() + r() - 2) * P.windSig;                     // a stream aimed at the body, not a sheet
+      if (r() > 0.4 + 0.6 * (0.5 + 0.5 * nz(y0 / 9, 0.3))) continue;          // gusty, uneven stream
+      const sg = y0 < 0 ? -1 : 1, f0 = Math.max(1e-3, Math.abs(y0) / b);    // the half-body shock satisfies |y| = b * f
+      const xh = -b * f0 / Math.tan(f0), pts = [];
+      for (let x = xL; x < Math.min(xh, P.windOut[1] + 4); x += dt) pts.push(x, y0);
+      const iHit = pts.length / 2, d = (r() - 0.3) * P.rideW;
+      if (xh < P.windOut[1]) {
+        let f = f0;
+        for (let i = 0; i < 3000 && f < Math.PI - 0.3; i++) {
+          const rr = rS(f) - d * Math.min(1, i / 10), x = -rr * Math.cos(f);
+          if (x > P.windOut[1] + 4) break;
+          pts.push(x, sg * rr * Math.sin(f));
+          const dsdf = Math.hypot((rS(f + 0.01) - rS(f)) / 0.01, rS(f));
+          f += P.rideV * dt / dsdf;
+        }
+      }
+      wind.push({ pts: Float32Array.from(pts), iHit, ph: r(), len: 2 + Math.floor(r() * r() * P.windLen), a: 0.3 + 0.7 * r(), dot: r() < P.windDot });
+    }
+    for (const hemi of [1, -1]) for (let k = P.nLobe; k < MAX_LOBE; k++) conv[hemi].push([r2(), 0.6 + 0.4 * r2()]);
+    for (let i = 0; i < P.nRx; i++) rx.push(rxOne(r2));
+    const MX = 4096;
+    const nightSel = P.nightLs.map((L) => night.reduce((a, n) => (Math.abs(n.L - L) < Math.abs(a.L - L) ? n : a)));
+    return { day, night: nightSel, lobe, conv, rx, wind, X: new Float32Array(MX), Y: new Float32Array(MX), A: new Float32Array(MX) };
+  }
+
+  // polyline runs bucketed by (group, alpha level): neighbours stay in separate strokes so 'lighter' still adds
+  function RunBuckets(G, NQ, amax) {
+    const b = Array.from({ length: G * NQ }, () => []);
+    const qOf = (a) => (a <= 0.004 ? -1 : Math.min(NQ - 1, Math.floor(Math.sqrt(a / amax) * NQ)));
+    return {
+      poly(g, X, Y, A, n) {
+        let i = 0;
+        while (i < n - 1) {
+          const q = qOf(A[i]); let j = i + 1;
+          while (j < n - 1 && qOf(A[j]) === q) j++;
+          if (q >= 0) { const run = []; for (let k = i; k <= j; k++) run.push(X[k], Y[k]); b[(g % G) * NQ + q].push(run); }
+          i = j;
+        }
+      },
+      // Glow: a wider, dimmer underlay under every level bright enough to show
+      // (from level 4 up), so it follows the lines' own falloff without bands.
+      flush(w, mul, glow = 0) {
+        ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+        for (let i = 0; i < b.length; i++) {
+          const runs = b[i]; if (!runs.length) continue;
+          ctx.beginPath();
+          for (const r of runs) { ctx.moveTo(r[0], r[1]); for (let k = 2; k < r.length; k += 2) ctx.lineTo(r[k], r[k + 1]); }
+          const a = amax * ((i % NQ + 0.5) / NQ) ** 2 * mul;
+          if (glow > 0 && i % NQ >= 4) {
+            ctx.lineWidth = w * (3 + 4 * glow); ctx.globalAlpha = Math.min(1, a * 0.13 * glow); ctx.stroke();
+          }
+          ctx.lineWidth = w; ctx.globalAlpha = Math.min(1, a); ctx.stroke(); runs.length = 0;
+        }
+        ctx.globalAlpha = 1;
+      }
+    };
+  }
+
+  const S = build();
+  const rb = RunBuckets(16, 16, P.amax);
+
+  // SVG capture (filled only while exporting, never per frame)
+  let capture = false;
+  let paths = [];
+  let circles = [];
+  const CAP_LINE_A = 0.03;
+  const CAP_DOTS = 1500;
+  function capRuns(X, Y, A, n) {
+    let run = null;
+    for (let i = 0; i < n; i++) {
+      if (A[i] > CAP_LINE_A) (run ||= []).push([X[i], Y[i]]);
+      else if (run) { if (run.length > 1) paths.push(run); run = null; }
+    }
+    if (run && run.length > 1) paths.push(run);
+  }
+
+  const PRESETS = {
+    whisper: { opacity: 0.7, stroke: 0.75, density: 0.6, wind: 0.6, scale: 0.9, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.6, density: 1.1, wind: 1.2, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 1, density: 1.2, saturation: 0.85, glow: 1.1 },
+    drift:   { opacity: 0.85, density: 0.8, speed: 0.4, motion: 1.8, phase: 0.6, scale: 1.25, wind: 0.8 },
+    dense:   { opacity: 0.95, stroke: 0.85, density: 2, wind: 1.4, scale: 1.4, glow: 0 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // Strength and density of the solar-wind stream and its bow shock; at 0
+      // only the field remains. It also leans gently on the dayside loops.
+      { name: 'wind', label: 'Wind', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'form' },
+    ],
+    defaults: { hue: 175, hueB: 290, saturation: 0, scale: 1, colorMode: 'gradient', colorA: '#00ffea', colorB: '#d400ff' },
+  });
+  const currentValues = baked || panel.values;
+
+  let clock = CLOCK0;
+
+  // ---- draw one frame; everything is periodic in P.period ----
+  function drawFrame(dt, values) {
+    clock += dt * values.speed;
+    const W = canvas.width, H = canvas.height, inv = values.invert;
+    const ph = ((clock / P.period + values.phase * 0.5) % 1 + 1) % 1;
+
+    // Model -> design frame (the 1280x800 composition, fitted to the canvas)
+    // -> screen (Scale and Angle about the canvas centre), folded into one affine.
+    const s = DS * Math.min(W / DW, H / DH), ca = Math.cos(P.tilt), sa = Math.sin(P.tilt);
+    const k = 0.4 + 0.5 * values.scale + 0.1 * values.scale * values.scale;   // 0.4 contained .. 1 prototype .. 1.8 bleeding
+    const an = values.angle * Math.PI / 180, cA = Math.cos(an) * k, sA = Math.sin(an) * k;
+    const dx0 = DCX * W - W / 2, dy0 = DCY * H - H / 2;
+    const ax = s * (cA * ca + sA * sa), bx = s * (sA * ca - cA * sa), ex = W / 2 + cA * dx0 - sA * dy0;
+    const ay = s * (sA * ca - cA * sa), by = -s * (sA * sa + cA * ca), ey = H / 2 + sA * dx0 + cA * dy0;
+    const mapX = (x, y) => ax * x + bx * y + ex, mapY = (x, y) => ay * x + by * y + ey;
+    // Soft canvas edges: the tail fades off the frame, the wind fades in.
+    const vig = (Xp, Yp, l) => sstep(0, l, Xp) * (1 - sstep(W - 40, W, Xp)) * sstep(0, 40, Yp) * (1 - sstep(H - 40, H, Yp));
+    const tailEnd = (x) => 1 - sstep(P.tailA, P.tailB, x);                   // the traced tail's own end, seen at low Scale
+    const windStart = 1 - sstep(0.75, 1, k);                                  // ditto for the wind's upstream end
+
+    // ink
+    // Saturated stops drop a little lightness so 'lighter' doesn't wash them to white.
+    const L = inv ? 0.12 : 0.9 - 0.25 * values.saturation;
+    let paint;
+    if (values.saturation > 0) {
+      paint = ctx.createLinearGradient(mapX(-15, 0), mapY(-15, 0), mapX(70, 0), mapY(70, 0));
+      for (let i = 0; i <= 4; i++) {
+        const { h, s: sat } = paletteHsl(values, i / 4);
+        const [r, g, b] = hslToRgb(h, sat, L);
+        paint.addColorStop(i / 4, `rgb(${r},${g},${b})`);
+      }
+    } else {
+      const [r, g, b] = hslToRgb(values.hue, 0, L);
+      paint = `rgb(${r},${g},${b})`;
+    }
+    const op = values.opacity;
+    const sw = 0.3 + 0.7 * values.stroke;
+    const glowAmt = inv ? 0 : values.glow;
+
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.fillStyle = inv ? '#f2f2f4' : '#0a0a0d'; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = inv ? 'source-over' : 'lighter';
+    ctx.strokeStyle = paint; ctx.fillStyle = paint;
+
+    const mo = values.motion, burst = Math.min(0.95, P.burst * mo);
+    const press = 0.5 - 0.5 * Math.cos(TAU * ph);                            // dayside breathing
+    const g = ph + (burst / TAU) * Math.sin(TAU * ph);                        // conveyor phase: bursty, loops at P
+    const flareRaw = Math.pow((1 + burst * Math.cos(TAU * ph)) / (1 + burst), 2);
+    const flare = mo >= 1 ? flareRaw : 0.45 + (flareRaw - 0.45) * mo;
+    const breath = P.breath * mo, flap = P.flap * mo;
+    const wv = values.wind, push = P.windPush * (wv - 1);
+    const X = S.X, Y = S.Y, A = S.A, xX = P.F.xX;
+    let wx = 0, wy = 0, wr = 0;
+    const warp = (x, y) => {
+      wr = Math.hypot(x, y);
+      if (x < 0) { const f = 1 - (breath * press + push) * sstep(2, 9, wr) * (-x / wr); x *= f; y *= f; }
+      else y += flap * sstep(6, 40, x) * Math.sin(TAU * ph * P.flapN - x / P.flapK) / (1 + (y / P.flapY) ** 2);
+      wx = x; wy = y;
+    };
+    const rxGlow = (x, y) => 1 + P.rxBoost * (0.3 + 0.7 * flare) * gauss(x - xX, P.rxW) * gauss(y, P.rxH);
+    let gi = 0;
+    const dip = P.dip * mo * (flare - 0.3);
+    const emit = (pts, aBase, contract) => {
+      let n = 0;
+      for (let i = 0; i < pts.length; i++) {
+        let x0 = pts[i][0];
+        const tip = contract ? 1 - 0.75 * sstep(14, 27, x0) : 1;             // far tips dissolve into the sheet
+        if (contract && x0 > 0) x0 *= 1 - dip * sstep(6, 30, x0);             // stretched loops snap earthward in the burst
+        warp(x0, pts[i][1]);
+        X[n] = mapX(wx, wy); Y[n] = mapY(wx, wy);
+        A[n] = aBase * tip * sstep(P.f0, P.f1, wr) * rxGlow(wx, wy) * vig(X[n], Y[n], 80); n++;
+      }
+      rb.poly(gi++, X, Y, A, n);
+      if (capture) capRuns(X, Y, A, n);
+    };
+    for (const d of S.day) emit(d.pts, P.dayA * sstep(P.Lmin, P.Lmin + 8, d.L), false);
+    for (const d of S.night) emit(d.pts, P.nightA * sstep(P.Lmin, P.Lmin + 8, d.L), true);
+    const LB = S.lobe, nL = LB.length, M = P.M;
+    const nConv = Math.max(4, Math.min(MAX_LOBE, Math.round(P.nLobe * values.density)));
+    for (const hemi of [1, -1]) {
+      const pool = S.conv[hemi];
+      for (let c = 0; c < nConv; c++) {
+        const u0 = (c + (pool[c][0] - 0.5) * P.jit) / nConv + (hemi < 0 ? 0.37 : 0), ca0 = pool[c][1];
+        const v = ((u0 + g) % 1 + 1) % 1, jf = v * (nL - 1), j = Math.min(nL - 2, Math.floor(jf)), f = jf - j;
+        const a0 = LB[j].rs, a1 = LB[j + 1].rs;
+        const aB = P.lobeA * ca0 * sstep(0, P.fadeIn, v) * (1 + P.sheetBoost * v * v), out = 1 - sstep(1 - P.fadeOut, 1, v), endV = 1 - sstep(0.97, 1, v);
+        for (let m = 0; m < M; m++) {
+          warp(a0[2 * m] + (a1[2 * m] - a0[2 * m]) * f, (a0[2 * m + 1] + (a1[2 * m + 1] - a0[2 * m + 1]) * f) * hemi);
+          X[m] = mapX(wx, wy); Y[m] = mapY(wx, wy);
+          const gx = gauss(wx - xX, P.rxW * 1.3);                             // arriving lines stay lit only at the X
+          A[m] = aB * (out + (endV - out) * gx) * sstep(P.f0 * 1.6, P.f1 * 1.6, wr) * rxGlow(wx, wy) * vig(X[m], Y[m], 80) * tailEnd(wx);
+        }
+        rb.poly(gi++, X, Y, A, M);
+        if (capture) capRuns(X, Y, A, M);
+      }
+    }
+    rb.flush(P.lw * sw, op, glowAmt);
+    // reconnection stipple: fine dots jetting both ways along the sheet from the X, flaring with the burst
+    const nRx = Math.max(200, Math.min(S.rx.length, Math.round(P.nRx * values.density))), hd = 0.5 * sw;
+    for (let q = 0; q < nRx; q++) {
+      const p = S.rx[q], age = (ph * P.rxN + p.ph) % 1;
+      const x = xX + p.dir * (p.u + age * P.rxRun * p.sp);
+      warp(x, p.v * (1 + 0.8 * age) * (1 - 0.55 * waist(x)));
+      const a = p.a * P.rxA * (0.25 + 0.75 * flare) * Math.sin(Math.PI * age) ** 2 * ((wx > xX ? P.rxFloorT : P.rxFloor) + gauss(wx - xX, P.rxSpread)) * sstep(10, 22, wx) * tailEnd(wx);
+      const Xp = mapX(wx, wy), Yp = mapY(wx, wy);
+      X[0] = Xp - hd; Y[0] = Yp; X[1] = Xp + hd; Y[1] = Yp; A[0] = a * vig(Xp, Yp, 80); rb.poly(q, X, Y, A, 2);
+    }
+    rb.flush(1.0 * sw, op);
+    // solar wind: Wind thins it by prefix below 1, reuses paths at other phases above 1
+    const wc = wv <= 1 ? wv : 1 + 0.6 * (wv - 1);
+    const wa = Math.sqrt(Math.min(1, wv)) * (1 + 0.35 * Math.max(0, wv - 1));
+    const nWp = S.wind.length, nW = Math.round(nWp * values.density * wc);
+    const dotH = 0.6 * sw;
+    for (let q = 0; q < nW; q++) {
+      const w = S.wind[q % nWp], rep = (q / nWp) | 0;
+      const fr = (ph * P.windN + w.ph + 0.618034 * rep) % 1, i = Math.floor(fr * P.windTw / P.windDt);
+      if (i >= w.pts.length / 2) continue;
+      const x = w.pts[2 * i], y = w.pts[2 * i + 1], Xp = mapX(x, y), Yp = mapY(x, y);
+      let a = w.a * P.windA * wa * vig(Xp, Yp, 80) * (1 - sstep(0.85, 1, fr)) * (1 - sstep(P.windOut[0], P.windOut[1], x));
+      if (windStart > 0) a *= 1 - windStart * (1 - sstep(WIND_X0, WIND_X0 + 14, x));
+      const ride = i >= w.iHit;
+      if (ride) {                                                             // deflected: brighter, then fading down the wings
+        const f = Math.PI - Math.abs(Math.atan2(y, x));
+        a *= (P.rideA + P.flash * Math.exp(-(i - w.iHit) * P.windDt / P.flashT)) * gauss(f, P.wingW);
+      }
+      if (a <= 0.004) continue;
+      if (w.dot) { X[0] = Xp - dotH; X[1] = Xp + dotH; Y[0] = Y[1] = Yp; }
+      else { const j = Math.max(0, i - w.len); X[0] = mapX(w.pts[2 * j], w.pts[2 * j + 1]); Y[0] = mapY(w.pts[2 * j], w.pts[2 * j + 1]); X[1] = Xp; Y[1] = Yp; }
+      A[0] = a; rb.poly(q, X, Y, A, 2);
+      if (capture && ride && a > 0.02 && circles.length < CAP_DOTS) {
+        circles.push({ cx: Xp, cy: Yp, r: 0.6 * sw, fill: 'black', opacity: Math.min(1, 3 * a * op) });
+      }
+    }
+    rb.flush(0.6 * sw, op);
+    // bow shock: barely there, fading along its wings
+    const bowA = P.bowA * Math.min(1, wv) * (1 + 0.35 * Math.max(0, wv - 1));
+    if (bowA > 0) {
+      let n = 0;
+      for (let i = 0; i <= 120; i++) {
+        const dth = (i / 120 * 2 - 1) * 1.9, ad = Math.abs(dth), rr = P.bow * (ad < 1e-4 ? 1 : ad / Math.sin(ad));
+        const x = -Math.cos(ad) * rr, y = Math.sign(dth) * Math.sin(ad) * rr;
+        X[n] = mapX(x, y); Y[n] = mapY(x, y); A[n] = bowA * gauss(ad, 0.6); n++;
+      }
+      rb.poly(0, X, Y, A, n); rb.flush(0.6 * sw, op);
+    }
+    // the body: tiny and quiet
+    ctx.globalAlpha = 0.5 * op;
+    ctx.beginPath(); ctx.arc(mapX(0, 0), mapY(0, 0), 1.6 * Math.sqrt(k), 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const loop = createLoop({
+    onFrame(dt) {
+      drawFrame(dt, currentValues);
+    },
+  });
+  loop.start();
+
+  // Re-render the current frame (no clock advance) with capture on, then export.
+  function exportCurrentSvg() {
+    paths = []; circles = []; capture = true;
+    try { drawFrame(0, currentValues); } finally { capture = false; }
+    exportSvg(paths, { width: canvas.width, height: canvas.height, circles });
+  }
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', exportCurrentSvg);
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
