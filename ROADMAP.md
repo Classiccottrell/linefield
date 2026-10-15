@@ -384,6 +384,31 @@ review) before merge, not after.
     thin a haze or a starfield to pass. Run `collection-check` on sketches
     before the owner picks one, so the version they approve is one that
     can ship as is.
+- **Next series, in order: Old Roads, Weather, Deep sea.** The owner's
+  pick (2026-10-15), each run the way the space series was: concepts and
+  names checked against the private avoid-list first, a throwaway sketch
+  round, more rounds on the chosen subjects, then builds. Measure ink on
+  every sketch, so the version the owner picks can ship as is. Every name
+  below cleared the avoid-list check on 2026-10-15.
+  - **Old Roads** (started 2026-10-15): mythic landscapes, the feeling of
+    an old fantasy epic told through land, weather and light. Evocation
+    only: no names, places, objects, symbols or scripts from any existing
+    book or film. First sketches: *Beacons* (fires lighting peak to peak
+    along a range, the light travelling down the chain each loop),
+    *Hachure* (a range drawn the way engraved maps drew relief, short
+    downhill strokes lit from one side, not contours), *Marsh lights*
+    (faint lights over black water, each doubled by a broken reflection)
+    and *High pass* (snow driven sideways over a jagged ridge).
+  - **Weather:** *Aurora* (hairline curtains hanging from one slow fold,
+    seen from below; they must hang, not wave like `longwave`),
+    *Thunderhead* (a cloud tower in `dune`'s film grain, lit from inside by
+    flickers, never a visible bolt) and *Fog bank* (a bank of fine dots
+    pouring over a crest and dissolving downhill).
+  - **Deep sea:** *Vent plume* (a plume rising and curling from one bright
+    vent on the sea floor), *Marine snow* (sparse specks sinking through a
+    single shaft of light; slower than `rainfall`, and lit by the shaft)
+    and *Siphonophore* (a long chain of small see-through bells drifting in
+    a slow S; segmented, never a trail like `contrail`).
 - **Publishing `shared/` to npm.** Declined for v1.0.0. It's six small
   dependency-free modules that pieces already inline. Weighed against
   permanent version discipline and a second install path, for an audience
