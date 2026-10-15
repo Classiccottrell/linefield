@@ -1666,7 +1666,7 @@ function describeForAI({ pieceName, values }) {
     inkA = hslToRgb(a.h, a.s, values.invert ? 0.12 : 0.9);
   }
 
-  let scene = null, sceneKey = '';
+  let scene = null, sceneKey = '', sceneSize = '', pendingKey = '', pendingSince = 0;
   let clock = 0;
 
   // Per-frame dot kernel from Stroke: below 1 a dot shrinks (dims) toward a
@@ -1730,7 +1730,17 @@ function describeForAI({ pieceName, values }) {
   function drawFrame(dt, elapsed, values) {
     const W = canvas.width, H = canvas.height;
     const key = [W, H, values.scale, values.angle].join();
-    if (!scene || sceneKey !== key) { scene = buildScene(W, H, values.scale, values.angle); sceneKey = key; }
+    const size = W + 'x' + H;
+    // A rebuild costs ~0.7 s, so a Scale or Angle drag keeps the current scene
+    // and rebuilds once the value has held for 150 ms. A new canvas size can't
+    // wait: the buffers are sized to it.
+    let rebuild = !scene || sceneSize !== size;
+    if (!rebuild && sceneKey !== key) {
+      const now = performance.now();
+      if (pendingKey !== key) { pendingKey = key; pendingSince = now; }
+      else rebuild = now - pendingSince >= 150;
+    }
+    if (rebuild) { scene = buildScene(W, H, values.scale, values.angle); sceneKey = key; sceneSize = size; }
     const sc = scene;
     clock += dt * values.speed;
     buildLut(values);
