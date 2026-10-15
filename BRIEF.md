@@ -30,4 +30,4 @@ or code. See ROADMAP.md.
       external references and runs from anywhere, including outside this repo
 
 ## Status
-**shipped** — twenty-eight pieces, six shared modules, and a gallery
+**shipped** — twenty-nine pieces, six shared modules, and a gallery

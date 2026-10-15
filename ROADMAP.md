@@ -363,22 +363,25 @@ review) before merge, not after.
 - **A space series.** The owner's idea (2026-10-10): a run of compositions
   built around space (planets, galaxies, nebulae), as its own collection.
   Same house look and framing rules as everything else.
-  - **Started 2026-10-15.** Four pieces shipped as the Space collection:
+  - **Started 2026-10-15.** Five pieces shipped as the Space collection:
     `magnetosphere` (a field tail pinching where it reconnects, with a
-    bow shock ahead of it), `tidal-bridge` (a torn stream of stars between
-    two galaxies off-frame), `terminator` (a cratered planet's day/night
-    line from low orbit) and `dark-nebula` (a dust cloud carved out of a
-    starfield, lit along one face). A fifth, `dust-lane` (an edge-on galaxy
-    split by its dust lane), is waiting on a motion rework: its first loop
-    read as a shimmer rather than a rotation.
+    bow shock ahead of it), `dust-lane` (an edge-on galaxy split by its
+    dust lane), `tidal-bridge` (a torn stream of stars between two
+    galaxies off-frame), `terminator` (a cratered planet's day/night line
+    from low orbit) and `dark-nebula` (a dust cloud carved out of a
+    starfield, lit along one face).
+  - `dust-lane` took a motion rework before it shipped. Its first loop
+    faded every star on its own cycle, which averaged into a shimmer that
+    read as smudging, not rotation. Stars now ride fixed orbits, the dust
+    and young clusters travel with the disc, and the tilt rocks slowly.
   - They came from two throwaway sketch rounds across the subject, then at
     least three rounds of variants per chosen subject, with every concept
     and name checked against the private avoid-list first. Sketches that drifted toward a sphere, a spiral, rings
     or an existing piece (`globe`, `orbitals`, `infall`) were cut.
-  - **Lesson:** two of the stipple prototypes (`tidal-bridge` and
-    `dark-nebula`) came in over the ink ceiling at thumbnail size (0.23 and
-    0.28 against 0.15), and their builds had to thin a haze or a starfield
-    to pass. Run `collection-check` on sketches
+  - **Lesson:** three of the stipple prototypes (`tidal-bridge`,
+    `dust-lane` and `dark-nebula`) came in over the ink ceiling at
+    thumbnail size (0.20 to 0.28 against 0.15), and their builds had to
+    thin a haze or a starfield to pass. Run `collection-check` on sketches
     before the owner picks one, so the version they approve is one that
     can ship as is.
 - **Publishing `shared/` to npm.** Declined for v1.0.0. It's six small
@@ -431,6 +434,7 @@ Ink, not hue, is now the axis that tells pieces apart.
 | 240 | 0.10 | 0.00 | 0.136 | `tidal-bridge` |
 | 240 | 0.14 | 0.00 | 0.137 | `globe` |
 | 240 | 0.12 | 0.00 | 0.138 | `parallax` |
+| 240 | 0.03 | 0.00 | 0.138 | `dust-lane` |
 | 240 | 0.13 | 0.00 | 0.139 | `dark-nebula` |
 | 240 | 0.08 | 0.00 | 0.141 | `moire` |
 | 240 | 0.05 | 0.00 | 0.142 | `terminator` |

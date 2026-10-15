@@ -253,3 +253,12 @@ A cratered planet seen from low orbit in stipple: a shallow horizon across the u
 - **Text-safe zone:** the sky above the horizon
 - **Anchor:** crater rims flaring along the terminator
 - **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Sun
+
+## Dust Lane
+
+A disc galaxy seen almost edge-on in fine stipple, its bright bulge cut by a ragged dark lane of dust that the turning disc carries along.
+
+- **Tags:** grain, depth, celestial
+- **Text-safe zone:** the bottom third, and the top band above the bulge
+- **Anchor:** the bulge, just above and right of centre, behind the lane
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Rock

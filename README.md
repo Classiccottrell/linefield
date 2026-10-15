@@ -170,6 +170,7 @@ tooling" below and CONTRIBUTING.md.
 - `louvre` — a blind of tilted hairline slats crossed by one slow beam of light, which brightens the band it passes and carries a few drifting motes
 - `fracture` — one long jagged crack across a full-bleed field of faint diagonal hairlines, its two plates breathing apart so the lines misalign and brighten toward the light inside it
 - `magnetosphere` — a tiny quiet body whose field is pushed in on the sunward side and drawn out into a long tail of hairlines that pinches and flares where it reconnects, with a solar-wind stream piling into a bow shock ahead of it
+- `dust-lane` — a disc galaxy seen almost edge-on in fine stipple, its bright bulge cut by a ragged dark lane of dust that the turning disc carries along
 - `tidal-bridge` — a torn, C-shaped stream of stippled stars arcing between two galaxies off-frame, knots condensing along it around one bright, lumpy knot mid-stream
 - `terminator` — a cratered planet from low orbit in stipple, its ragged day/night line coming down the frame as crater rims flare along it and peaks catch light out in the night
 - `dark-nebula` — one billowed dust cloud carved out of a stippled starfield as pure negative space, its upper-right face lit by a hidden star in stipple and fine wisps

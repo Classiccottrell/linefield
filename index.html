@@ -219,17 +219,17 @@
 <div class="wrap">
 
 <header class="intro">
-  <span class="label">Collection / 28 pieces / live</span>
+  <span class="label">Collection / 29 pieces / live</span>
   <h1>Generative backgrounds, <span class="op">shipped as one file.</span></h1>
-  <p class="lede">28 self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
-  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning. Want stills instead of code? <a href="stills.zip">Download all 28 as square PNGs</a>.</p>
+  <p class="lede">29 self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
+  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning. Want stills instead of code? <a href="stills.zip">Download all 29 as square PNGs</a>.</p>
 </header>
 
 <section class="mechanisms" aria-label="Interaction mechanisms">
   <a class="mechanism" href="interactions/wake/">
     <span class="mechanism-label">Interaction mechanism — not a piece</span>
     <h2 class="mechanism-title">Wake</h2>
-    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the 28 pieces below.</p>
+    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the 29 pieces below.</p>
     <p class="mechanism-detail">Off by default, opt-in per canvas, never baked into an exported piece. Try it live and tune strength, trail life, strand count, and color.</p>
   </a>
   <a class="btn" href="interactions/wake/">open wake</a>
@@ -641,6 +641,22 @@
     </div>
     <div class="meta">
       <h2 class="name">Magnetosphere</h2>
+      <p class="collection-label">Space</p>
+    </div>
+  </article>
+  <article class="card" data-collection="space">
+    <div class="stage">
+      <a class="frame" href="pieces/dust-lane/" data-src="pieces/dust-lane/" aria-label="Open Dust Lane">
+        <img src="thumbs/dust-lane.png" alt="Dust Lane preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/dust-lane/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/dust-lane/">Copy embed</button>
+        <a class="btn" href="downloads/dust-lane.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Dust Lane</h2>
       <p class="collection-label">Space</p>
     </div>
   </article>
@@ -1333,6 +1349,29 @@ const PIECES = [
     "saturation": 0,
     "safeZone": "the sky above the horizon",
     "anchor": "crater rims flaring along the terminator",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "space"
+  },
+  {
+    "slug": "dust-lane",
+    "title": "Dust Lane",
+    "blurb": "A disc galaxy seen almost edge-on in fine stipple, its bright bulge cut by a ragged dark lane of dust that the turning disc carries along.",
+    "tags": [
+      "grain",
+      "depth",
+      "celestial"
+    ],
+    "hue": 330,
+    "hueB": 215,
+    "saturation": 0,
+    "safeZone": "the bottom third, and the top band above the bulge",
+    "anchor": "the bulge, just above and right of centre, behind the lane",
     "presets": [
       "whisper",
       "ink",
