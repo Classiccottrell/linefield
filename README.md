@@ -171,6 +171,7 @@ tooling" below and CONTRIBUTING.md.
 - `fracture` — one long jagged crack across a full-bleed field of faint diagonal hairlines, its two plates breathing apart so the lines misalign and brighten toward the light inside it
 - `magnetosphere` — a tiny quiet body whose field is pushed in on the sunward side and drawn out into a long tail of hairlines that pinches and flares where it reconnects, with a solar-wind stream piling into a bow shock ahead of it
 - `tidal-bridge` — a torn, C-shaped stream of stippled stars arcing between two galaxies off-frame, knots condensing along it around one bright, lumpy knot mid-stream
+- `dark-nebula` — one billowed dust cloud carved out of a stippled starfield as pure negative space, its upper-right face lit by a hidden star in stipple and fine wisps
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,

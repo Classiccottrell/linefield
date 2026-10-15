@@ -232,5 +232,14 @@
     "hue": 210, "hueB": 340, "saturation": 0,
     "safeZone": "top-left, inside the arc's bow",
     "anchor": "the knot mid-stream, just right of centre"
+  },
+  {
+    "slug": "dark-nebula",
+    "title": "Dark Nebula",
+    "blurb": "One billowed dust cloud carved out of a stippled starfield as pure negative space, its upper-right face lit by a hidden star in stipple and fine wisps.",
+    "tags": ["grain", "depth", "celestial"],
+    "hue": 28, "hueB": 215, "saturation": 0,
+    "safeZone": "the dark body of the cloud, left",
+    "anchor": "the young star at the cloud's rim"
   }
 ]
