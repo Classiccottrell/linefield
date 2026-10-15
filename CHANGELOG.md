@@ -8,6 +8,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A Space collection**, four new pieces bringing the collection to
+  twenty-eight. Each started as a throwaway sketch and was built only once
+  it held up at full width. `magnetosphere` is a tiny body whose field is
+  pushed in on the sunward side and drawn into a long tail of hairlines
+  that pinches and flares where it reconnects, with a bow shock ahead of it
+  (extra control Wind). `tidal-bridge` is a torn stream of stippled stars
+  arcing between two galaxies off-frame, with knots condensing along it
+  (Tear). `terminator` is a cratered planet from low orbit, its day/night
+  line crossing the frame as crater rims flare along it (Sun).
+  `dark-nebula` is a dust cloud carved out of a starfield as negative
+  space, lit along one face by a hidden star (Rim). All four pass
+  `collection-check` and `audit-controls` with every control live, loop
+  seamlessly, and export SVG as line geometry, a capped sample of dots,
+  or both.
+
 - Four new pieces, bringing the collection to twenty-four, each from its
   own brief and each in the house look. `contrail` is one trail of
   hairlines, tight and bright at its head, loosening as it ages back to the

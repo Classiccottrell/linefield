@@ -219,17 +219,17 @@
 <div class="wrap">
 
 <header class="intro">
-  <span class="label">Collection / 24 pieces / live</span>
+  <span class="label">Collection / 28 pieces / live</span>
   <h1>Generative backgrounds, <span class="op">shipped as one file.</span></h1>
-  <p class="lede">24 self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
-  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning. Want stills instead of code? <a href="stills.zip">Download all 24 as square PNGs</a>.</p>
+  <p class="lede">28 self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
+  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning. Want stills instead of code? <a href="stills.zip">Download all 28 as square PNGs</a>.</p>
 </header>
 
 <section class="mechanisms" aria-label="Interaction mechanisms">
   <a class="mechanism" href="interactions/wake/">
     <span class="mechanism-label">Interaction mechanism — not a piece</span>
     <h2 class="mechanism-title">Wake</h2>
-    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the 24 pieces below.</p>
+    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the 28 pieces below.</p>
     <p class="mechanism-detail">Off by default, opt-in per canvas, never baked into an exported piece. Try it live and tune strength, trail life, strand count, and color.</p>
   </a>
   <a class="btn" href="interactions/wake/">open wake</a>
@@ -625,6 +625,71 @@
     <div class="meta">
       <h2 class="name">Relay</h2>
       <p class="collection-label">Codes</p>
+    </div>
+  </article>
+  <h3 class="group-head" data-collection="space">Space</h3>
+  <article class="card" data-collection="space">
+    <div class="stage">
+      <a class="frame" href="pieces/magnetosphere/" data-src="pieces/magnetosphere/" aria-label="Open Magnetosphere">
+        <img src="thumbs/magnetosphere.png" alt="Magnetosphere preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/magnetosphere/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/magnetosphere/">Copy embed</button>
+        <a class="btn" href="downloads/magnetosphere.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Magnetosphere</h2>
+      <p class="collection-label">Space</p>
+    </div>
+  </article>
+  <article class="card" data-collection="space">
+    <div class="stage">
+      <a class="frame" href="pieces/tidal-bridge/" data-src="pieces/tidal-bridge/" aria-label="Open Tidal Bridge">
+        <img src="thumbs/tidal-bridge.png" alt="Tidal Bridge preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/tidal-bridge/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/tidal-bridge/">Copy embed</button>
+        <a class="btn" href="downloads/tidal-bridge.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Tidal Bridge</h2>
+      <p class="collection-label">Space</p>
+    </div>
+  </article>
+  <article class="card" data-collection="space">
+    <div class="stage">
+      <a class="frame" href="pieces/terminator/" data-src="pieces/terminator/" aria-label="Open Terminator">
+        <img src="thumbs/terminator.png" alt="Terminator preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/terminator/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/terminator/">Copy embed</button>
+        <a class="btn" href="downloads/terminator.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Terminator</h2>
+      <p class="collection-label">Space</p>
+    </div>
+  </article>
+  <article class="card" data-collection="space">
+    <div class="stage">
+      <a class="frame" href="pieces/dark-nebula/" data-src="pieces/dark-nebula/" aria-label="Open Dark Nebula">
+        <img src="thumbs/dark-nebula.png" alt="Dark Nebula preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/dark-nebula/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/dark-nebula/">Copy embed</button>
+        <a class="btn" href="downloads/dark-nebula.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Dark Nebula</h2>
+      <p class="collection-label">Space</p>
     </div>
   </article>
 </div>
@@ -1184,6 +1249,98 @@ const PIECES = [
       "dense"
     ],
     "collection": "surfaces"
+  },
+  {
+    "slug": "magnetosphere",
+    "title": "Magnetosphere",
+    "blurb": "A tiny quiet body whose field is pushed in on the sunward side and drawn out into a long tail of hairlines that pinches and flares where it reconnects, with a solar-wind stream piling into a bow shock ahead of it.",
+    "tags": [
+      "kinetic",
+      "flow",
+      "celestial"
+    ],
+    "hue": 175,
+    "hueB": 290,
+    "saturation": 0,
+    "safeZone": "top band",
+    "anchor": "the reconnection pinch in the tail, right of centre",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "space"
+  },
+  {
+    "slug": "tidal-bridge",
+    "title": "Tidal Bridge",
+    "blurb": "A torn, C-shaped stream of stippled stars arcing between two galaxies off-frame, with knots condensing along it and faint debris feathers peeling away as the stars flow through.",
+    "tags": [
+      "grain",
+      "flow",
+      "celestial"
+    ],
+    "hue": 210,
+    "hueB": 340,
+    "saturation": 0,
+    "safeZone": "top-left, inside the arc's bow",
+    "anchor": "the knot mid-stream, just right of centre",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "space"
+  },
+  {
+    "slug": "dark-nebula",
+    "title": "Dark Nebula",
+    "blurb": "One billowed dust cloud carved out of a stippled starfield as pure negative space, its upper-right face lit by a hidden star in stipple and fine wisps.",
+    "tags": [
+      "grain",
+      "depth",
+      "celestial"
+    ],
+    "hue": 28,
+    "hueB": 215,
+    "saturation": 0,
+    "safeZone": "the dark body of the cloud, left",
+    "anchor": "the young star at the cloud's rim",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "space"
+  },
+  {
+    "slug": "terminator",
+    "title": "Terminator",
+    "blurb": "A cratered planet seen from low orbit in stipple: a shallow horizon across the upper third, lit ground on the left and a ragged day/night line coming down the frame, where crater rims flare and peaks catch light out in the night as the ground turns into dawn.",
+    "tags": [
+      "grain",
+      "depth",
+      "celestial"
+    ],
+    "hue": 44,
+    "hueB": 18,
+    "saturation": 0,
+    "safeZone": "the sky above the horizon",
+    "anchor": "crater rims flaring along the terminator",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "space"
   }
 ];
 const COLLECTIONS = [
@@ -1206,6 +1363,10 @@ const COLLECTIONS = [
   {
     "id": "codes",
     "title": "Codes"
+  },
+  {
+    "id": "space",
+    "title": "Space"
   }
 ];
 
