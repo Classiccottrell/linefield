@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — dark-nebula</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  dark-nebula — one billowed dust cloud coming in from the left edge, carved
+  out of a stippled starfield as pure negative space, its upper-right face
+  lit by a hidden star as stipple and fine hairline wisps.
+
+  Text-safe zone: the dark body of the cloud, left. Nothing is drawn there
+  but a few dimmed stars where the cloud thins.
+  Anchor: one young star just inside the brightest stretch of the rim, left
+  of centre, lighting its own pocket of dust. It holds still; the three star
+  layers drift behind the cloud on 4, 7 and 13 px parallax ellipses, the
+  veils in the cloud's fringe thicken and thin, and the lit face ripples, all
+  on one seamless 32 s loop at Speed 1.
+
+  Technique: the cloud is a column-density field on a 2 px grid (an opaque
+  billowed core, ridged-noise fibres and a soft veil). Light from the hidden
+  star is marched through the core, and the lit gas is sampled as stipple
+  dots. Wisps are short hairlines traced along the density's iso-lines where
+  the light is strongest. Every star is dimmed by exp(-density), so the cloud
+  exists only as missing and dimmed stars. All of it is built once per
+  framing (canvas size, Scale, Angle) in screen space with Angle applied, so
+  nothing is rotated with ctx.rotate.
+
+  Controls: Scale sizes the cloud about its anchor (contained at 0, bleeding
+  off three edges at 2). Density takes a prefix of every dot list (stars,
+  haze, stipple), Stroke sets dot size and wisp width, Rim sets the hidden
+  star's light on the lit face and wisps, Motion scales every drift and
+  shimmer, Glow adds a halo round the anchor and a soft underlay to the
+  wisps. In gradient mode the lit gas takes Color A and the starfield Color B.
+
+  SVG export: the wisps as polylines, plus an evenly thinned sample of the
+  stipple and star dots as circles (capped at 12,000, faint ones dropped),
+  with the anchor.
+  The full field of a hundred thousand dots stays raster: use PNG for it.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'dark-nebula';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // The composition is authored in a 1280x800 design frame and fitted to
+  // the canvas by cover. Scale and Angle act about PIVOT, which sits at the
+  // anchor, so the young star stays put while the cloud grows or turns.
+  const REF_W = 1280, REF_H = 800;
+  const PIVOT = [0.49 * REF_W, 0.48 * REF_H];
+  const PERIOD = 32;      // seconds per loop at Speed 1; every term is an integer harmonic
+  const SEED = 15838;
+  const G = 2;            // field grid step, screen px
+  const STAR_MARGIN = 32; // the 13 px near layer at Motion 2 never uncovers an edge
+  const HUE_STEPS = 8, LEVELS = 1024;
+
+  const PRESETS = {
+    whisper: { opacity: 0.9, stroke: 0.8, density: 0.7, rim: 0.75, scale: 0.75, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.5, density: 0.85, rim: 1.5, saturation: 0, glow: 0, angle: 12 },
+    neon:    { opacity: 1, stroke: 1.1, density: 1, rim: 1.3, saturation: 0.85, glow: 1.2 },
+    drift:   { opacity: 0.9, stroke: 0.9, density: 0.8, speed: 0.4, motion: 1.9, phase: 0.6, scale: 1.3 },
+    dense:   { opacity: 1, stroke: 1.2, density: 1.9, rim: 1.25, scale: 1.6, angle: 348 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // The hidden star's light on the cloud's lit face and its wisps. The
+      // young star's own pocket of lit dust is not part of it.
+      { name: 'rim', label: 'Rim', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'ink' },
+    ],
+    defaults: { hue: 28, hueB: 215, saturation: 0, scale: 1, colorMode: 'gradient', colorA: '#ffa04d', colorB: '#4d97ff' },
+  });
+  const currentValues = baked || panel.values;
+
+  // ---------- seeded noise ------------------------------------------------
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const gauss = (d, s) => Math.exp(-(d * d) / (2 * s * s));
+  const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+  const sstep = (a, b, v) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // Seeded 2D gradient noise, roughly [-1, 1].
+  function gnoise(r) {
+    const P = new Uint16Array(512), GX = new Float32Array(256), GY = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { P[i] = i; const a = r() * 6.2832; GX[i] = Math.cos(a); GY[i] = Math.sin(a); }
+    for (let i = 255; i > 0; i--) { const j = (r() * (i + 1)) | 0; const t = P[i]; P[i] = P[j]; P[j] = t; }
+    for (let i = 0; i < 256; i++) P[i + 256] = P[i];
+    const f = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+    return (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+      const X = xi & 255, Y = yi & 255;
+      const a = P[P[X] + Y], b = P[P[X + 1] + Y], c = P[P[X] + Y + 1], d = P[P[X + 1] + Y + 1];
+      const na = GX[a] * xf + GY[a] * yf, nb = GX[b] * (xf - 1) + GY[b] * yf;
+      const nc = GX[c] * xf + GY[c] * (yf - 1), nd = GX[d] * (xf - 1) + GY[d] * (yf - 1);
+      const u = f(xf), v = f(yf);
+      return 1.6 * (na + (nb - na) * u + (nc - na) * v + (na - nb - nc + nd) * u * v);
+    };
+  }
+  // fBm with per-octave rotation; mode 0 plain, 1 ridged (1-|n|), 2 billow (|n|).
+  function fbm(r, oct = 5, mode = 0, gain = 0.5) {
+    const n = gnoise(r);
+    const offs = []; for (let i = 0; i < oct; i++) offs.push([r() * 100, r() * 100]);
+    const c = 0.8, s = 0.6;
+    let norm = 0; for (let i = 0, a = 1; i < oct; i++, a *= gain) norm += a;
+    return (x, y) => {
+      let sum = 0, amp = 1;
+      for (let i = 0; i < oct; i++) {
+        let v = n(x + offs[i][0], y + offs[i][1]);
+        if (mode === 1) v = 1 - Math.abs(v); else if (mode === 2) v = Math.abs(v) * 2 - 1;
+        sum += amp * v; amp *= gain;
+        const nx = (c * x - s * y) * 2.03, ny = (s * x + c * y) * 2.03; x = nx; y = ny;
+      }
+      return sum / norm;
+    };
+  }
+  // A cumulus-like mass: gaussian lobes scattered along a polyline path.
+  function billows(r, path, n, rmin, rmax, spread) {
+    const L = []; let tot = 0;
+    for (let i = 0; i < path.length - 1; i++) { const l = Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]); L.push(l); tot += l; }
+    const blobs = [];
+    for (let k = 0; k < n; k++) {
+      let d = r() * tot, i = 0; while (i < L.length - 1 && d > L[i]) { d -= L[i]; i++; }
+      const t = Math.min(1, d / L[i]), a = path[i], b = path[i + 1];
+      const rr = rmin + (rmax - rmin) * Math.pow(r(), 1.6);
+      const ang = r() * 6.2832, off = Math.sqrt(r()) * spread * rr;
+      blobs.push([a[0] + (b[0] - a[0]) * t + Math.cos(ang) * off, a[1] + (b[1] - a[1]) * t + Math.sin(ang) * off, rr]);
+    }
+    return (x, y) => {
+      let m = 0;
+      for (const [bx, by, br] of blobs) { const dx = x - bx, dy = y - by, q = (dx * dx + dy * dy) / (br * br); if (q < 9) m += Math.exp(-q); }
+      return m;
+    };
+  }
+  function bil(f, GW, GH, fx, fy) {
+    if (fx < 0) fx = 0; if (fy < 0) fy = 0; if (fx > GW - 1.001) fx = GW - 1.001; if (fy > GH - 1.001) fy = GH - 1.001;
+    const x0 = fx | 0, y0 = fy | 0, tx = fx - x0, ty = fy - y0, i = y0 * GW + x0;
+    return (f[i] * (1 - tx) + f[i + 1] * tx) * (1 - ty) + (f[i + GW] * (1 - tx) + f[i + GW + 1] * tx) * ty;
+  }
+  function splat(buf, W, H, x, y, a) {
+    const x0 = Math.floor(x - 0.5), y0 = Math.floor(y - 0.5), tx = x - 0.5 - x0, ty = y - 0.5 - y0;
+    if (x0 < 0 || y0 < 0 || x0 >= W - 1 || y0 >= H - 1) return;
+    const i = y0 * W + x0;
+    buf[i] += a * (1 - tx) * (1 - ty); buf[i + 1] += a * tx * (1 - ty);
+    buf[i + W] += a * (1 - tx) * ty; buf[i + W + 1] += a * tx * ty;
+  }
+
+  // ---------- the cloud, in design px ----------------------------------
+  const Z = REF_W / 1040;
+  const OPT = {
+    // A billowed mass entering from the left edge; the hidden star sits off the upper right.
+    mass: billows(rng(21), [[-0.15, 0.55], [0.2, 0.5], [0.44, 0.58]].map(([x, y]) => [x * REF_W, y * REF_H]), 60, 0.05 * REF_H, 0.17 * REF_H, 1.3),
+    S: [1.25 * REF_W, -0.45 * REF_H],
+    warp: 60 * Z, ws: 300 * Z, ns: 260 * Z, nAmp: 0.28, nHi: 0.14, ngain: 0.6, nBil: 0.45, bScale: 70 * Z, sharp: 0.035, soft: 0.35, coreTau: 4.5,
+    veil: 2.0, haze2: 1.2, envW: 0.4, faceClear: 0.9, fibAng: 0.2, fibLong: 150 * Z, fibShort: 50 * Z, faceStep: 0.1 * REF_H,
+    kappa: 0.012 / Z, eCap: 3.2, emitGain: 1.3, Sfall: 3000 * Z, stip: 0.22, rimShimmer: 0.35,
+    // The anchor: target, pocket strength, pocket radius, search radius, inward step.
+    embed: [0.5 * REF_W, 0.42 * REF_H, 2.3, 190, 200, 16], anchorFocus: [0.4, 280],
+    wisps: 800, wispSeed: 0.5, wispLen: 26, wispA: 0.45, wispMax: 0.32, wispW: 0.5, wispGrad: 0.2, veilAnim: 2.0, veilS: 110 * Z,
+    // Starfield: a band behind the cloud's dissolving underside, three drifting depth layers plus pixel-snapped haze.
+    // Counts are held to the house ink ceiling: every visible dot marks the
+    // half-size thumbnail, so the band is kept tight and low, and the dots a
+    // little brighter, rather than spreading a thin snow over the frame.
+    nStars: 21000, nHaze: 9000, bandSg: 0.17, bandFloor: 0.01, bandCy: 0.67, hazeA: 0.1, laneLo: 0.84, laneW: 0.035, laneS: [240, 110],
+    layers: [[0.7, 0.18, 0.48, 4], [0.25, 0.3, 0.62, 7], [0.05, 0.55, 0.95, 13]],
+  };
+  const bandNoise = fbm(rng(3), 4);
+  // Star density: a band lying behind the cloud's underside, rising to the right.
+  function band(x, y, widen) {
+    const cx = 0.42 * REF_W, cy = OPT.bandCy * REF_H, c = Math.cos(-0.3), s = Math.sin(-0.3), sg = OPT.bandSg * REF_H * widen, floor = OPT.bandFloor;
+    const d = -(x - cx) * s + (y - cy) * c;
+    return floor + (1 - floor) * gauss(d, sg) * clamp01(0.55 + 1.0 * bandNoise(x / (240 * Z), y / (240 * Z)));
+  }
+
+  // ---------- scene build: once per framing ------------------------------
+  function buildScene(W, H, scaleV, angleDeg) {
+    const o = OPT, r = rng(SEED);
+    const g = G, GW = Math.ceil(W / g) + 2, GH = Math.ceil(H / g) + 2, N = GW * GH;
+    const fit = Math.max(W / REF_W, H / REF_H);
+    const s = fit * (0.4 + 0.6 * scaleV);   // screen px per design px for the cloud
+    const s2 = fit * (0.7 + 0.3 * (0.4 + 0.6 * scaleV)); // the starfield's structure scales less
+    const th = angleDeg * Math.PI / 180, ca = Math.cos(th), sa = Math.sin(th);
+    const px = W / 2 + (PIVOT[0] - REF_W / 2) * fit, py = H / 2 + (PIVOT[1] - REF_H / 2) * fit;
+    const refX = (x, y, k) => PIVOT[0] + (ca * (x - px) + sa * (y - py)) / k;
+    const refY = (x, y, k) => PIVOT[1] + (-sa * (x - px) + ca * (y - py)) / k;
+    const scrX = (u, v) => px + s * (ca * (u - PIVOT[0]) - sa * (v - PIVOT[1]));
+    const scrY = (u, v) => py + s * (sa * (u - PIVOT[0]) + ca * (v - PIVOT[1]));
+
+    const wn1 = fbm(r, 4), wn2 = fbm(r, 4), dn = fbm(r, 3, 0, 0.5), dnH = fbm(r, 5, 0, o.ngain), dn2 = fbm(r, 4), fib = fbm(r, 5, 1), vA = fbm(r, 4), vB = fbm(r, 4), bn = fbm(r, 3, 2, 0.45), vn = fbm(r, 5, 0, 0.55);
+    // Empirical CDF of the ridged fibre noise, so fibre thresholds are quantiles.
+    const smp = []; for (let i = 0; i < 4000; i++) smp.push(fib(r() * 80, r() * 80)); smp.sort((a, b) => a - b);
+    const rank = (v) => { let lo = 0, hi = smp.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (smp[m] < v) lo = m + 1; else hi = m; } return lo / smp.length; };
+    const rho = new Float32Array(N), rhoC = new Float32Array(N), veilA = new Float32Array(N), veilB = new Float32Array(N), env = new Float32Array(N);
+    const fc = Math.cos(o.fibAng), fs = Math.sin(o.fibAng), fw = fbm(r, 3), fh = o.faceStep;
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+      const sx0 = gx * g, sy0 = gy * g, i = gy * GW + gx;
+      const x = refX(sx0, sy0, s), y = refY(sx0, sy0, s);
+      const wx = x + o.warp * wn1(x / o.ws, y / o.ws) * 2, wy = y + o.warp * wn2(x / o.ws + 5.2, y / o.ws + 1.3) * 2;
+      const m = o.mass(wx, wy);
+      // Facing from a wide finite difference, so it doesn't flip between neighbouring lobes.
+      const mgx = o.mass(wx + fh, wy) - o.mass(wx - fh, wy), mgy = o.mass(wx, wy + fh) - o.mass(wx, wy - fh);
+      let lx = o.S[0] - x, ly = o.S[1] - y; const ll = Math.hypot(lx, ly); lx /= ll; ly /= ll;
+      const gl = Math.hypot(mgx, mgy) + 1e-6;
+      const facing = sstep(0.1, 0.7, (-mgx * lx - mgy * ly) / gl);
+      const n = dn(wx / o.ns, wy / o.ns) * 2.2, nh = dnH(wx / (o.ns * 0.25), wy / (o.ns * 0.25)) * 2.2;
+      const bil0 = bn(wx / o.bScale, wy / o.bScale);
+      const d = m - 0.5 + o.nAmp * n + o.nHi * nh * (1 - 0.85 * facing) + o.nBil * bil0 * facing;
+      const w = lerp(o.soft, o.sharp, facing);
+      const core = sstep(-w, w, d);
+      // Fibres: quantile-thresholded ridged noise in a narrow envelope, off the starward face.
+      const fx2 = wx + 40 * fw(wx / 120, wy / 120), fy2 = wy + 40 * fw(wx / 120 + 9, wy / 120 + 4);
+      const u = (fx2 * fc + fy2 * fs) / o.fibLong, v = (-fx2 * fs + fy2 * fc) / o.fibShort;
+      const e = sstep(-o.envW, 0.02, d), off = 1 - o.faceClear * facing;
+      const q = rank(fib(u, v));
+      const ten = sstep(1 - e, 1 - e + 0.14, q) * off;
+      env[i] = e * off;
+      const vf = sstep(-0.35, 0.55, vn(wx / 160, wy / 160) * 2.2);
+      const c = core * o.coreTau * (0.7 + 0.6 * dn2(wx / 90, wy / 90));
+      rhoC[i] = c;
+      rho[i] = c + o.veil * ten * (0.35 + 0.65 * e) + o.haze2 * Math.pow(e, 1.5) * vf * off;
+      veilA[i] = off * vA(wx / o.veilS, wy / o.veilS) * 2; veilB[i] = off * vB(wx / o.veilS, wy / o.veilS) * 2;
+    }
+    // Veils evolve in the outer envelope and the translucent fringe, not in the opaque core.
+    for (let i = 0; i < N; i++) { const w = o.veilAnim * clamp01(env[i] * 1.6) * (1 - sstep(1.0, 2.0, rho[i])); veilA[i] *= w; veilB[i] *= w; }
+    // Light is shadowed by the core plus a little of the veil.
+    const rhoL = new Float32Array(N); for (let i = 0; i < N; i++) rhoL[i] = rhoC[i] + 0.15 * (rho[i] - rhoC[i]) * env[i] * env[i];
+
+    // Shadow march toward a light (screen px) -> emission of lit gas.
+    const kStep = o.kappa * g / s;
+    let emit = new Float32Array(N);
+    const march = (lxp, lyp, gain, maxR, fall) => {
+      for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+        const i = gy * GW + gx, p = rhoL[i]; if (p < 0.02) continue;
+        const x = gx * g, y = gy * g;
+        let dx = lxp - x, dy = lyp - y; const dist = Math.hypot(dx, dy); if (dist > maxR) continue;
+        dx /= dist; dy /= dist;
+        let tau = 0, cx = gx, cy = gy, run = 0;
+        while (tau < 7) {
+          cx += dx; cy += dy; run += g;
+          if (run > dist) break;
+          const ix = Math.round(cx), iy = Math.round(cy);
+          if (ix < 0 || iy < 0 || ix >= GW || iy >= GH) break;
+          tau += rhoL[iy * GW + ix] * kStep;
+        }
+        emit[i] += gain * Math.min(p, 2.5) * Math.exp(-tau) * fall(dist / s);
+      }
+    };
+    const Sx = scrX(o.S[0], o.S[1]), Sy = scrY(o.S[0], o.S[1]);
+    const hidden = () => march(Sx, Sy, o.emitGain, 1e9, (d) => 1 / (1 + Math.pow(d / o.Sfall, 2)));
+    // Auto-place the anchor: the brightest rim cell near the target, stepped inward.
+    hidden();
+    const [tx, ty, es, er, searchR, inward] = o.embed;
+    const tsx = scrX(tx, ty), tsy = scrY(tx, ty);
+    let best = -1, bx = tsx, by = tsy;
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+      const x = gx * g, y = gy * g; if (Math.hypot(x - tsx, y - tsy) > searchR * s) continue;
+      const v = emit[gy * GW + gx]; if (v > best) { best = v; bx = x; by = y; }
+    }
+    { const dx = Sx - bx, dy = Sy - by, dl = Math.hypot(dx, dy);
+      bx = Math.round(bx - (dx / dl) * inward * s) + 0.5; by = Math.round(by - (dy / dl) * inward * s) + 0.5; }
+    const anchor = [bx, by];
+    emit = new Float32Array(N);
+    hidden();
+    // Grade the rim toward the anchor, so the eye lands there.
+    { const [f, R] = o.anchorFocus;
+      for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) emit[gy * GW + gx] *= 1 - f + f * gauss(Math.hypot(gx * g - bx, gy * g - by) / s, R); }
+    const emitS = emit.slice();
+    march(bx, by, es, er * 2.2 * s, (d) => 1 / (1 + Math.pow(d / (er * 0.35), 2)));
+
+    // Blurred density, for the wisps' direction.
+    let bl = rho.slice();
+    for (let it = 0; it < 3; it++) {
+      const nb = new Float32Array(N);
+      for (let gy = 1; gy < GH - 1; gy++) for (let gx = 1; gx < GW - 1; gx++) {
+        const i = gy * GW + gx;
+        nb[i] = (bl[i] * 4 + bl[i - 1] + bl[i + 1] + bl[i - GW] + bl[i + GW]) / 8;
+      }
+      // Replicate the border, so the edge of the frame never reads as a density edge.
+      for (let gx = 0; gx < GW; gx++) { nb[gx] = nb[GW + gx]; nb[(GH - 1) * GW + gx] = nb[(GH - 2) * GW + gx]; }
+      for (let gy = 0; gy < GH; gy++) { nb[gy * GW] = nb[gy * GW + 1]; nb[gy * GW + GW - 1] = nb[gy * GW + GW - 2]; }
+      bl = nb;
+    }
+
+    // Lit-gas stipple, generated at Density 2 and shuffled, so any prefix is
+    // an even thinning. Each dot: x, y, alpha, cos/sin of its shimmer phase,
+    // and 1 if the hidden star lit it (Rim) or 0 if the young star did.
+    const rs = rng(SEED + 1), phn = fbm(rs, 3);
+    const dots = [];
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+      const i = gy * GW + gx, E = emit[i]; if (E < 0.002) continue;
+      const fromRim = Math.min(1, emitS[i] / E);
+      let lam = Math.min(E, o.eCap) * o.stip * g * g * 2;
+      while (lam > 0) {
+        if (rs() < Math.min(1, lam)) {
+          const x = gx * g + (rs() - 0.5) * g, y = gy * g + (rs() - 0.5) * g;
+          const ph = phn(refX(x, y, s) / 70, refY(x, y, s) / 70) * 9;
+          dots.push(x, y, 0.1 + 0.2 * rs(), Math.cos(ph), Math.sin(ph), rs() < fromRim ? 1 : 0);
+        }
+        lam -= 1;
+      }
+    }
+    const nDots = dots.length / 6, stip = new Float32Array(dots.length);
+    { const idx = new Uint32Array(nDots); for (let i = 0; i < nDots; i++) idx[i] = i;
+      for (let i = nDots - 1; i > 0; i--) { const j = (rs() * (i + 1)) | 0; const t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
+      for (let i = 0; i < nDots; i++) for (let k = 0; k < 6; k++) stip[i * 6 + k] = dots[idx[i] * 6 + k]; }
+
+    // Rim wisps: short hairlines along iso-density of the blurred field, seeded by the hidden star's light.
+    const rw = rng(SEED + 2);
+    const sampleE = (x, y) => bil(emitS, GW, GH, x / g, y / g);
+    const wisps = [];
+    const nW = Math.round(o.wisps * s * Math.min(W, H) / (fit * REF_H));
+    const wLen = o.wispLen * s, wGrad = o.wispGrad / s;
+    let tries = 0;
+    while (wisps.length < nW && tries < nW * 400) {
+      tries++;
+      const x = rw() * W, y = rw() * H, E = sampleE(x, y);
+      if (rw() > E * o.wispSeed) continue;
+      { const fx = x / g, fy = y / g;
+        const gm0 = Math.hypot(bil(bl, GW, GH, fx + 1, fy) - bil(bl, GW, GH, fx - 1, fy), bil(bl, GW, GH, fx, fy + 1) - bil(bl, GW, GH, fx, fy - 1));
+        if (gm0 < wGrad) continue; }
+      const pts = [[x, y]];
+      const L = wLen * (0.3 + rw());
+      for (const dir of [1, -1]) {
+        let qx = x, qy = y, len = 0, pdx = 0, pdy = 0, turn = 0;
+        // Turning is capped, so a wisp never curls into a closed loop.
+        while (len < L * 0.5 && turn < 1.1) {
+          const fx = qx / g, fy = qy / g;
+          const gxv = bil(bl, GW, GH, fx + 1, fy) - bil(bl, GW, GH, fx - 1, fy);
+          const gyv = bil(bl, GW, GH, fx, fy + 1) - bil(bl, GW, GH, fx, fy - 1);
+          const gm = Math.hypot(gxv, gyv); if (gm < 1e-5) break;
+          let tdx = -gyv / gm * dir, tdy = gxv / gm * dir;
+          if (pdx * tdx + pdy * tdy < 0) { tdx = -tdx; tdy = -tdy; }
+          if (len > 0) turn += Math.acos(Math.max(-1, Math.min(1, pdx * tdx + pdy * tdy)));
+          qx += tdx * 1.2; qy += tdy * 1.2; len += 1.2; pdx = tdx; pdy = tdy;
+          if (sampleE(qx, qy) < E * 0.2) break;
+          if (dir > 0) pts.push([qx, qy]); else pts.unshift([qx, qy]);
+        }
+      }
+      if (pts.length < 5) continue;
+      wisps.push({ pts, a: Math.min(1, E * o.wispA), ph: rw() * 6.2832, k: 1 + ((rw() * 3) | 0) });
+    }
+
+    // Starfield in screen space, generated at Density 2 (a prefix thins it):
+    // three depth layers of x, y, alpha, big, then pixel-snapped haze.
+    const rst = rng(SEED + 3), lane = fbm(rst, 5, 1);
+    const M = STAR_MARGIN, area = (W * H) / (REF_W * REF_H);
+    // The band stays behind the cloud's underside at every Scale, but its
+    // width and the lanes change less than the cloud does.
+    const inBand = (x, y) => band(refX(x, y, s), refY(x, y, s), s2 / s);
+    const laneAt = (x, y) => sstep(o.laneLo, o.laneLo + o.laneW, lane(refX(x, y, s2) / o.laneS[0], refY(x, y, s2) / o.laneS[1]));
+    const stars = o.layers.map(([frac, a0, a1, amp], L) => {
+      const want = Math.round(o.nStars * frac * area * 2), out = new Float32Array(want * 4);
+      let got = 0, guard = 0;
+      while (got < want && guard++ < want * 60) {
+        const x = -M + rst() * (W + 2 * M), y = -M + rst() * (H + 2 * M);
+        if (rst() > inBand(x, y)) continue;
+        let a = a0 + (a1 - a0) * Math.pow(rst(), 2.2);
+        if (L < 2) a *= 1 - (L === 0 ? 0.95 : 0.7) * laneAt(x, y);
+        out.set([x, y, a, L === 2 && rst() < 0.25 ? 1 : 0], got * 4);
+        got++;
+      }
+      return { list: out.subarray(0, got * 4), amp };
+    });
+    const hazeWant = Math.round(o.nHaze * area * 2), hz = new Float32Array(hazeWant * 3);
+    let hg = 0, hguard = 0;
+    while (hg < hazeWant && hguard++ < hazeWant * 80) {
+      const x = -M + rst() * (W + 2 * M), y = -M + rst() * (H + 2 * M);
+      const b = inBand(x, y); if (rst() > b * b) continue;
+      const a = o.hazeA * (0.5 + rst()) * (1 - 0.95 * laneAt(x, y));
+      hz.set([x, y, a], hg * 3); hg++;
+    }
+
+    return { W, H, GW, GH, s, rho, veilA, veilB, stip, wisps, stars, haze: hz.subarray(0, hg * 3), anchor,
+      tauF: new Float32Array(N), accC: new Float32Array(W * H), accS: new Float32Array(W * H), img: null, u32: null };
+  }
+
+  // ---------- palette ------------------------------------------------------
+  // Neutral ink added to the ground, so a faint dot never inherits a tint:
+  // with saturation 0 every pixel keeps the ground's own chroma of 3.
+  const lut = new Uint32Array(HUE_STEPS * LEVELS);
+  let lutKey = '', groundPx = 0, inkA = [0, 0, 0];
+  function buildLut(values) {
+    const key = [values.hue, values.hueB, values.saturation, values.colorMode, values.invert].join();
+    if (key === lutKey) return;
+    lutKey = key;
+    const ground = values.invert ? [242, 242, 244] : [10, 10, 13];
+    for (let h = 0; h < HUE_STEPS; h++) {
+      const stop = paletteHsl(values, h / (HUE_STEPS - 1));
+      const ink = hslToRgb(stop.h, stop.s, values.invert ? 0.12 : 0.9);
+      for (let l = 0; l < LEVELS; l++) {
+        const a = l / (LEVELS - 1);
+        const c = values.invert
+          ? ground.map((gv, k) => gv + (ink[k] - gv) * a)
+          : ground.map((gv, k) => Math.min(255, gv + ink[k] * a));
+        lut[h * LEVELS + l] = (255 << 24) | (Math.round(c[2]) << 16) | (Math.round(c[1]) << 8) | Math.round(c[0]);
+      }
+    }
+    groundPx = lut[0];
+    const a = paletteHsl(values, 0);
+    inkA = hslToRgb(a.h, a.s, values.invert ? 0.12 : 0.9);
+  }
+
+  let scene = null, sceneKey = '';
+  let clock = 0;
+
+  // Per-frame dot kernel from Stroke: below 1 a dot shrinks (dims) toward a
+  // speck; above 1 it spreads into a 2x2 block.
+  function dot(buf, W, H, x, y, a, spread, big) {
+    splat(buf, W, H, x, y, a);
+    const e = big ? Math.max(spread, 1) : spread;
+    if (e > 0) {
+      splat(buf, W, H, x + 0.8, y, a * 0.5 * e); splat(buf, W, H, x, y + 0.8, a * 0.5 * e);
+      splat(buf, W, H, x + 0.8, y + 0.8, a * 0.35 * e);
+    }
+  }
+
+  function frameState(values) {
+    const th = (clock / PERIOD) * Math.PI * 2 + values.phase * Math.PI;
+    const mo = values.motion;
+    return {
+      th, mo, c1: Math.cos(th), s1: Math.sin(th),
+      dotA: Math.min(1, 0.25 + 0.75 * values.stroke), spread: Math.min(1, Math.max(0, values.stroke - 1)),
+      rim: values.rim, density: values.density,
+    };
+  }
+
+  // Each visible mark at the current frame, in screen px. visit(kind, x, y, a)
+  // with kind 'gas' or 'star'; shared by the renderer and SVG export.
+  function eachDot(sc, f, visit, stride = 1) {
+    const { GW, GH, tauF, stip } = sc;
+    const shA = OPT.rimShimmer * f.mo * Math.sin(2 * f.th), shB = OPT.rimShimmer * f.mo * Math.cos(2 * f.th);
+    const nStip = Math.round((stip.length / 6) * f.density / 2);
+    for (let i = 0; i < nStip; i += stride) {
+      const j = i * 6;
+      const a = stip[j + 2] * (1 + shA * stip[j + 3] + shB * stip[j + 4]) * (stip[j + 5] ? f.rim : 1) * f.dotA;
+      if (a > 0.002) visit('gas', stip[j], stip[j + 1], a, 0);
+    }
+    for (const { list, amp } of sc.stars) {
+      const n = Math.round((list.length / 4) * f.density / 2);
+      const ox = amp * f.mo * f.c1, oy = amp * f.mo * 0.55 * f.s1;
+      for (let i = 0; i < n; i += stride) {
+        const j = i * 4, x = list[j] + ox, y = list[j + 1] + oy;
+        const a = list[j + 2] * Math.exp(-bil(tauF, GW, GH, x / G, y / G)) * f.dotA;
+        if (a >= 0.004) visit('star', x, y, a, list[j + 3]);
+      }
+    }
+    const hz = sc.haze, nh = Math.round((hz.length / 3) * f.density / 2);
+    const ox = sc.stars[0].amp * f.mo * f.c1, oy = sc.stars[0].amp * f.mo * 0.55 * f.s1;
+    for (let i = 0; i < nh; i += stride) {
+      const j = i * 3, x = Math.round(hz[j] + ox), y = Math.round(hz[j + 1] + oy);
+      const a = hz[j + 2] * Math.exp(-bil(tauF, GW, GH, x / G, y / G)) * f.dotA;
+      if (a >= 0.004) visit('haze', x, y, a, 0);
+    }
+  }
+
+  function updateTau(sc, f) {
+    const { rho, veilA, veilB, tauF } = sc, k = f.mo;
+    for (let i = 0; i < tauF.length; i++) {
+      const v = rho[i] + k * (f.c1 * veilA[i] + f.s1 * veilB[i]);
+      tauF[i] = v > 0 ? v * 1.15 : 0;
+    }
+  }
+
+  function drawFrame(dt, elapsed, values) {
+    const W = canvas.width, H = canvas.height;
+    const key = [W, H, values.scale, values.angle].join();
+    if (!scene || sceneKey !== key) { scene = buildScene(W, H, values.scale, values.angle); sceneKey = key; }
+    const sc = scene;
+    clock += dt * values.speed;
+    buildLut(values);
+    const f = frameState(values);
+    updateTau(sc, f);
+
+    const { accC, accS } = sc;
+    accC.fill(0); accS.fill(0);
+    eachDot(sc, f, (kind, x, y, a, big) => {
+      if (kind === 'haze') { if (x >= 0 && y >= 0 && x < W && y < H) accS[y * W + x] += a; }
+      else dot(kind === 'gas' ? accC : accS, W, H, x, y, a, f.spread, big);
+    });
+    // The anchor: a pixel-centred point with a tight falloff.
+    const [ax, ay] = sc.anchor;
+    for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) {
+      const d2 = ox * ox + oy * oy, w = d2 === 0 ? 1 : d2 <= 2 ? 0.42 : d2 <= 5 ? 0.12 : 0.04;
+      splat(accC, W, H, ax + ox, ay + oy, w);
+    }
+
+    if (!sc.img) { sc.img = ctx.createImageData(W, H); sc.u32 = new Uint32Array(sc.img.data.buffer); }
+    const u32 = sc.u32, op = values.opacity, mono = values.saturation === 0 || values.colorMode === 'solid';
+    for (let i = 0, n = W * H; i < n; i++) {
+      const c = accC[i], t = c + accS[i];
+      let v = t * op;
+      if (v < 0.0005) { u32[i] = groundPx; continue; }
+      if (v > 1) v = 1;
+      const h = mono ? 0 : (((t - c) / t) * (HUE_STEPS - 1) + 0.5) | 0;
+      u32[i] = lut[h * LEVELS + ((v * (LEVELS - 1)) | 0)];
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.putImageData(sc.img, 0, 0);
+
+    // Wisps, bucketed by alpha; additive on the dark ground.
+    const [ir, ig, ib] = inkA;
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const NB = 24, amax = OPT.wispMax * 2, paths = [];
+    for (let b = 0; b < NB; b++) paths.push(new Path2D());
+    for (const w of sc.wisps) {
+      const sh = 1 - 0.28 * f.mo * (1 - Math.sin(f.th * w.k + w.ph));
+      const a = Math.min(1, w.a * Math.max(0, sh)) * OPT.wispMax * f.rim * op;
+      if (a < 0.006) continue;
+      const p = paths[Math.min(NB - 1, (a / amax * NB) | 0)];
+      p.moveTo(w.pts[0][0], w.pts[0][1]);
+      for (let i = 1; i < w.pts.length; i++) p.lineTo(w.pts[i][0], w.pts[i][1]);
+    }
+    const lw = OPT.wispW * (0.3 + 0.7 * values.stroke);
+    for (let b = 0; b < NB; b++) {
+      const a = ((b + 0.5) / NB) * amax;
+      if (values.glow > 0) {
+        ctx.lineWidth = lw + 3 * values.glow;
+        ctx.strokeStyle = `rgba(${ir},${ig},${ib},${a * 0.12 * values.glow})`;
+        ctx.stroke(paths[b]);
+      }
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = `rgba(${ir},${ig},${ib},${a})`;
+      ctx.stroke(paths[b]);
+    }
+    if (values.glow > 0) {
+      const R = (18 + 46 * values.glow) * sc.s;
+      const grad = ctx.createRadialGradient(ax, ay, 0, ax, ay, R);
+      grad.addColorStop(0, `rgba(${ir},${ig},${ib},${Math.min(1, 0.32 * values.glow * op)})`);
+      grad.addColorStop(0.25, `rgba(${ir},${ig},${ib},${Math.min(1, 0.08 * values.glow * op)})`);
+      grad.addColorStop(1, `rgba(${ir},${ig},${ib},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(ax - R, ay - R, 2 * R, 2 * R);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // SVG: the wisps as polylines, and an evenly thinned sample of the dots.
+  const SVG_DOT_CAP = 12000;
+  function exportVector() {
+    const values = currentValues;
+    if (!scene) return;
+    const sc = scene, f = frameState(values);
+    updateTau(sc, f);
+    let total = 0; eachDot(sc, f, () => { total++; });
+    const stride = Math.max(1, Math.ceil(total / SVG_DOT_CAP));
+    const stop = (t) => { const p = paletteHsl(values, t); const [r, g, b] = hslToRgb(p.h, p.s, values.invert ? 0.12 : 0.9); return `rgb(${r},${g},${b})`; };
+    const fillGas = stop(0), fillStar = stop(1), rDot = 0.35 + 0.35 * values.stroke;
+    const circles = [];
+    eachDot(sc, f, (kind, x, y, a, big) => {
+      const o = Math.min(1, a * values.opacity);
+      if (o < 0.03 || x < 0 || y < 0 || x > sc.W || y > sc.H) return;
+      circles.push({ cx: x, cy: y, r: big ? rDot * 1.6 : rDot, fill: kind === 'gas' ? fillGas : fillStar, opacity: o });
+    }, stride);
+    circles.push({ cx: sc.anchor[0], cy: sc.anchor[1], r: 1.6, fill: fillGas, opacity: Math.min(1, values.opacity) });
+    const paths = sc.wisps.filter((w) => w.a * values.rim > 0.02).map((w) => w.pts);
+    exportSvg(paths, { width: canvas.width, height: canvas.height, circles });
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', exportVector);
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
