@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — terminator</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  terminator — a cratered planet seen from low orbit, its horizon a shallow
+  arc across the upper third, the lit ground on the left and a ragged
+  day/night line coming down the frame, all in stipple, on a 150 s dawn loop.
+
+  Text-safe zone: the sky above the horizon (the top third). Only a thin
+  haze of atmosphere sits on the lit end of the limb.
+  Anchor: the crater rims flaring along the terminator. The line stays where
+  it is (Motion rocks it gently); the ground slides through it from the
+  night, so each rim catches light as a bright crescent at the line, with
+  peaks lit out in the dark ahead of it, and settles into the plain beyond.
+
+  Technique (stipple): the sun is fixed and the planet turns about an axis
+  in the terminator plane, so terrain periodic in longitude makes the loop
+  seamless. About half a million surface-fixed dots, each with a fixed
+  random threshold, carry a precomputed normal and its horizon toward the
+  sun; per frame only the light, a shadow test and a box splat into a float
+  buffer run, and a LUT turns the buffer into pixels (bloom, when Glow is
+  up, is a quarter-resolution copy drawn back with drawImage under
+  'lighter').
+
+  Controls: Scale zooms the camera about the frame's centre, from a soft
+  patch of lit ground under a short horizon (0) to a closer pass that fills
+  the frame (2). Density sets the dot count, Stroke the dot size, Angle
+  turns the view, Phase picks a point in the loop. Sun scales the sun's
+  elevation over the ground: low rakes it, lengthening the light and
+  lighting more peaks past the line; high flattens and brightens the lit
+  side.
+
+  SVG export: a capped, uniformly sampled set of the dots drawn in the
+  current frame (at most 20,000 ground dots and 3,000 atmosphere dots), as
+  circles in screen space with Angle and Scale applied. The full stipple
+  and its accumulated brightness are a canvas property; use PNG for those.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'terminator';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const PERIOD = 150; // seconds per seamless loop at speed 1
+
+  // Seeded generator: the terrain is the same on every load, whatever else
+  // the page has drawn.
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  // 2D sum-of-sines noise, periodic in u with period U.
+  function makeNoise(r, octaves, lam, U, per = 4) {
+    const w = [];
+    for (let i = 0; i < octaves; i++) for (let k = 0; k < per; k++) {
+      const f = 2 * Math.PI / lam * Math.pow(1.9, i) * (0.75 + 0.5 * r()), a = r() * 6.283;
+      const ku = Math.round(f * Math.cos(a) * U / (2 * Math.PI)) * 2 * Math.PI / U;
+      w.push(ku, f * Math.sin(a), r() * 6.283, 1 / (i + 1));
+    }
+    let n = 0;
+    for (let i = 3; i < w.length; i += 4) n += w[i];
+    return (u, v) => {
+      let s = 0;
+      for (let i = 0; i < w.length; i += 4) s += w[i + 3] * Math.sin(w[i] * u + w[i + 1] * v + w[i + 2]);
+      return s / n * 1.6;
+    };
+  }
+  const gauss = (d, s) => Math.exp(-(d * d) / (2 * s * s));
+  const smooth = (a, b, x) => {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+
+  // ---- the planet, laid out in a 1280x800 design frame -----------------
+  // A big sphere whose centre sits far below the frame, so its limb is a
+  // shallow arc across the upper third. Each frame projects the design
+  // frame onto the canvas (cover fit, then Scale's zoom and Angle's turn).
+  const PW = 1280, PH = 800;
+  const R = 3 * PH, PCX = 0.45 * PW, PCY = 0.36 * PH + R, LZ = 0.2, KZ = Math.sqrt(1 - LZ * LZ);
+  let a0 = null, a1 = null;
+  for (let t = -1.5 * Math.PI; t < 0.5 * Math.PI; t += 0.0005) {
+    const x = PCX + R * Math.cos(t), y = PCY + R * Math.sin(t);
+    if (x >= 0 && x <= PW && y >= 0 && y <= PH) { if (a0 === null) a0 = t; a1 = t; }
+  }
+  // The terminator meets the limb 47% along the visible horizon; the light
+  // is perpendicular to the limb there, from the left.
+  const tm = a0 + 0.47 * (a1 - a0);
+  const E1 = [Math.cos(tm), Math.sin(tm), 0];
+  const L = [Math.sin(tm) * KZ, -Math.cos(tm) * KZ, LZ];
+  const A = [L[1] * E1[2] - L[2] * E1[1], L[2] * E1[0] - L[0] * E1[2], L[0] * E1[1] - L[1] * E1[0]]; // spin axis
+  // Planet frame: a point at (phi, h) is cos(phi)cos(h) L + cos(phi)sin(h) E1 + sin(phi) A.
+  let phiMin = 9, phiMax = -9, hMin = 9;
+  for (let y = 0; y <= PH; y += 4) for (let x = 0; x <= PW; x += 4) {
+    const px = (x - PCX) / R, py = (y - PCY) / R, rr = px * px + py * py;
+    if (rr >= 1) continue;
+    const pz = Math.sqrt(1 - rr);
+    const phi = Math.asin(px * A[0] + py * A[1] + pz * A[2]);
+    const h = Math.atan2(px * E1[0] + py * E1[1], px * L[0] + py * L[1] + pz * L[2]);
+    phiMin = Math.min(phiMin, phi); phiMax = Math.max(phiMax, phi); hMin = Math.min(hMin, h);
+  }
+  function termX(y) {
+    let prev = null;
+    for (let x = 0; x <= PW * 1.5; x++) {
+      const px = (x - PCX) / R, py = (y - PCY) / R, rr = px * px + py * py;
+      if (rr >= 1) { prev = null; continue; }
+      const se = px * L[0] + py * L[1] + Math.sqrt(1 - rr) * L[2];
+      if (prev !== null && (prev > 0) !== (se > 0)) return x;
+      prev = se;
+    }
+    return null;
+  }
+  const phiAt = (x, y) => {
+    const px = (x - PCX) / R, py = (y - PCY) / R;
+    return Math.asin(px * A[0] + py * A[1] + Math.sqrt(1 - px * px - py * py) * A[2]);
+  };
+
+  // The surface window: longitude from just past the design frame's day
+  // edge to past the last lit peak in the night, latitude from the limb to
+  // just below the frame. The extra margins are where the window's edges
+  // fade out, so a zoomed-out or turned view shows a soft edge, never a cut.
+  const S = 1.25; // texel size, surface px
+  const FADE_DAY = 0.05, FADE_NIGHT = 0.04, FADE_PHI = 0.05;
+  const HA = hMin - 0.03 - FADE_DAY;
+  const HN = Math.PI / 2 + 0.22;
+  const NU = Math.ceil((HN - HA) * R / S), LAM = NU * S / R; // one loop turns the planet by LAM
+  const V0 = (phiMin - 0.01) * R;
+  const PHI_FADE = phiMax + 0.01;
+  const NV = Math.ceil(((PHI_FADE + FADE_PHI) * R - V0) / S);
+  const SIN_PF0 = Math.sin(PHI_FADE), SIN_PF1 = Math.sin(PHI_FADE + FADE_PHI);
+
+  // ---- terrain heightfield (px), periodic in u -----------------------------
+  const r = rng(4021), U = NU * S;
+  const hgt = new Float32Array(NU * NV);
+  const mareN = makeNoise(r, 3, 900, U, 3);
+  const vMare = phiAt(termX(560), 560) * R - V0;
+  const mare = (u, v) => smooth(0.15, 0.55, gauss(v - vMare - 40 * mareN(u, v * 0.3), 150) + 0.25 * mareN(u * 0.7, v));
+  function splat(uc, vc, rad, prof) {
+    const cphi = Math.cos((V0 + vc) / R), ext = rad * 1.7;
+    const iu0 = Math.floor((uc - ext / cphi) / S), iu1 = Math.ceil((uc + ext / cphi) / S);
+    const iv0 = Math.max(0, Math.floor((vc - ext) / S)), iv1 = Math.min(NV - 1, Math.ceil((vc + ext) / S));
+    for (let iv = iv0; iv <= iv1; iv++) {
+      const dv = (iv * S - vc) / rad;
+      for (let iu = iu0; iu <= iu1; iu++) {
+        const du = (iu * S - uc) * cphi / rad, d2 = du * du + dv * dv;
+        if (d2 > 2.9) continue;
+        hgt[iv * NU + ((iu % NU) + NU) % NU] += prof(d2);
+      }
+    }
+  }
+  const crater = (rad, depth, rim, peak) => (d2) => {
+    const d = Math.sqrt(d2), q = (d - 1) / 0.24;
+    return (d < 1 ? depth * (d2 - 1) : 0) + rim * Math.exp(-q * q) + (peak ? peak * Math.exp(-d2 / 0.03) : 0);
+  };
+  const bump = (ht) => (d2) => ht * Math.exp(-d2 * 1.6);
+  const nCr = Math.round(U * NV * S * 0.00035);
+  for (let i = 0; i < nCr; i++) {
+    const u = r() * U, v = r() * NV * S;
+    const rad = 2 * Math.pow(60 / 2, Math.pow(r(), 4));
+    if (mare(u, v) * (rad > 20 ? 0.6 : 0.9) > r()) continue;
+    splat(u, v, rad, crater(rad, rad * (0.32 - 0.12 * Math.min(1, rad / 40)) * (0.7 + 0.6 * r()), rad * 0.14, rad > 21 ? rad * (0.3 + 0.35 * r()) : 0));
+  }
+  for (let i = 0; i < nCr * 12; i++) {
+    const u = r() * U, v = r() * NV * S, rad = 1.2 + 2 * r();
+    if (mare(u, v) * 0.7 > r()) continue;
+    splat(u, v, rad, crater(rad, rad * 0.3, rad * 0.12, 0));
+  }
+  // Mountain ranges spaced around the loop at different heights, and lone
+  // peaks: these are what catch light out in the night.
+  const vs = (dv) => (vMare + dv) / (NV * S);
+  const ranges = [[0.0, vs(-260), vs(-120)], [0.2, vs(140), vs(260)], [0.4, vs(-330), vs(-200)], [0.6, vs(90), vs(-60)], [0.8, vs(220), vs(330)]];
+  for (const [uf, vf0, vf1] of ranges) {
+    for (let i = 0; i < 100; i++) {
+      const t = r(), u = (uf + 0.15 * t) * U + (r() - 0.5) * 36;
+      const v = (vf0 + (vf1 - vf0) * t) * NV * S + (r() - 0.5) * 22 + 30 * Math.sin(t * 5 + uf * 9);
+      splat(u, v, 2 + 4 * r(), bump(5 + 26 * Math.pow(r(), 2.2)));
+    }
+  }
+  const nPeaks = Math.round(650 * (NU * NV) / (1303 * 1373));
+  for (let i = 0; i < nPeaks; i++) splat(r() * U, r() * NV * S, 2 + 3.5 * r(), bump(4 + 18 * Math.pow(r(), 2)));
+
+  // ---- dots: fixed to the surface, each with a fixed random threshold ------
+  // Generated once at Density 2 and dealt into NB random bins, each kept in
+  // scan order (coherent memory and branches). Any density, and Scale's zoom,
+  // which changes how many land per pixel, draws whole bins plus a hashed
+  // share of the next: an even thinning, never a spatial strip.
+  const GAIN = 1.6, C0 = 0.015, CAP = 7, D0 = 0.2, GMAX = 2, NB = 8;
+  const steps = [];
+  for (let d = 2; d < 700; d *= 1.22) steps.push(d);
+  const cosHA = Math.cos(HA);
+  const binOf = (g) => {
+    let x = Math.imul(g ^ 0x2c1b3c6d, 0x297a2d39);
+    x ^= x >>> 15; x = Math.imul(x, 0x5bd1e995); x ^= x >>> 13;
+    return x & (NB - 1);
+  };
+  const cnt = new Uint8Array(NU * NV);
+  const binStart = new Uint32Array(NB);
+  let N = 0;
+  for (let iv = 1; iv < NV - 1; iv++) {
+    const phi = (V0 + iv * S) / R, cphi = Math.cos(phi);
+    const muMax = cphi * cosHA * LZ + Math.sin(phi) * KZ;
+    if (muMax <= 0.002) continue;
+    const de = S * cphi;
+    for (let iu = 0; iu < NU; iu++) {
+      const gE = (hgt[iv * NU + (iu + 1) % NU] - hgt[iv * NU + (iu + NU - 1) % NU]) / (2 * de) * GAIN;
+      const gN = (hgt[(iv + 1) * NU + iu] - hgt[(iv - 1) * NU + iu]) / (2 * S) * GAIN;
+      const nE = -gE / Math.hypot(gE, gN, 1);
+      const bMax = Math.min(CAP, Math.max(1, -nE / C0));
+      const m = D0 * GMAX * bMax * S * S * cphi * muMax;
+      let n = Math.floor(m);
+      if (r() < m - n) n++;
+      cnt[iv * NU + iu] = n;
+      for (let c = 0; c < n; c++) binStart[binOf(N++)]++;
+    }
+  }
+  const binEnd = new Uint32Array(NB);
+  for (let b = 0, s = 0; b < NB; b++) { const c = binStart[b]; binStart[b] = s; s += c; binEnd[b] = s; }
+  const binFirst = Uint32Array.from(binStart);
+  const H0 = new Float32Array(N), C0H = new Float32Array(N), S0H = new Float32Array(N);
+  const CP = new Float32Array(N), SP = new Float32Array(N);
+  const CA = new Float32Array(N), CB = new Float32Array(N), HZ = new Float32Array(N), TH = new Float32Array(N);
+  {
+    let g = 0;
+    for (let iv = 1; iv < NV - 1; iv++) {
+      const phi = (V0 + iv * S) / R, cphi = Math.cos(phi), sphi = Math.sin(phi);
+      const muMax = cphi * cosHA * LZ + sphi * KZ;
+      if (muMax <= 0.002) continue;
+      const de = S * cphi;
+      for (let iu = 0; iu < NU; iu++) {
+        const k = iv * NU + iu, n = cnt[k];
+        if (!n) continue;
+        const h0 = hgt[k];
+        const gE = (hgt[iv * NU + (iu + 1) % NU] - hgt[iv * NU + (iu + NU - 1) % NU]) / (2 * de) * GAIN;
+        const gN = (hgt[k + NU] - hgt[k - NU]) / (2 * S) * GAIN;
+        const nl = Math.hypot(gE, gN, 1), nE = -gE / nl, nN = -gN / nl, nUp = 1 / nl;
+        // Horizon toward the sun (which lies toward -u near the line),
+        // with the planet's curvature.
+        let hz = -1;
+        for (const d of steps) {
+          const j = ((iu - Math.round(d / de)) % NU + NU) % NU;
+          const ang = (hgt[iv * NU + j] - h0) / d - d / (2 * R);
+          if (ang > hz) hz = ang;
+        }
+        const bMax = Math.min(CAP, Math.max(1, -nE / C0));
+        const cb = nUp * cphi - nN * sphi;
+        for (let c = 0; c < n; c++) {
+          const s = binStart[binOf(g++)]++;
+          const p = phi + (r() - 0.5) * S / R;
+          const hh = HA + (iu + r()) * S / R;
+          H0[s] = hh; C0H[s] = Math.cos(hh); S0H[s] = Math.sin(hh);
+          CP[s] = Math.cos(p); SP[s] = Math.sin(p);
+          CA[s] = -nE; CB[s] = cb; HZ[s] = hz;
+          TH[s] = r() * bMax * muMax;
+        }
+      }
+    }
+  }
+
+  // ---- atmosphere: a thin haze on the lit end of the limb -------------------
+  // Dealt in random order like the ground, so a prefix thins it evenly.
+  const atm = (() => {
+    const ra = rng(99), ll = Math.hypot(L[0], L[1]);
+    const t0 = a0 - 0.35, span = a1 - a0 + 0.7;
+    const tries = Math.round(2 * 90000 * span / (a1 - a0 + 0.1));
+    const xs = [], ys = [], as = [];
+    for (let i = 0; i < tries; i++) {
+      const t = t0 + ra() * span, ux = Math.cos(t), uy = Math.sin(t);
+      const h = Math.atan2(ux * E1[0] + uy * E1[1], ux * L[0] + uy * L[1]);
+      const w = smooth(-0.06, 0.7, (ux * L[0] + uy * L[1]) / ll) * smooth(HA, HA + FADE_DAY, h);
+      if (ra() > w) continue;
+      const dr = -3.5 * Math.log(1 - ra() * 0.999) - 1;
+      xs.push(PCX + ux * (R + dr)); ys.push(PCY + uy * (R + dr)); as.push(0.08 * Math.exp(-Math.max(0, dr) / 9));
+    }
+    return { x: Float32Array.from(xs), y: Float32Array.from(ys), a: Float32Array.from(as), n: xs.length };
+  })();
+
+  // cos/sin over every angle the frame needs (longitudes, with Sun and
+  // Motion applied), linearly interpolated: two loads instead of two calls.
+  const T_LO = -0.6, T_HI = 3.2, TN = 8192, T_INV = TN / (T_HI - T_LO);
+  const TCOS = new Float32Array(TN + 2), TSIN = new Float32Array(TN + 2);
+  for (let i = 0; i <= TN + 1; i++) {
+    const a = T_LO + i / T_INV;
+    TCOS[i] = Math.cos(a); TSIN[i] = Math.sin(a);
+  }
+
+  // ---- canvas buffers -------------------------------------------------------
+  let W = 0, H = 0, acc, image, pixels;
+  const glowCanvas = document.createElement('canvas');
+  const glowCtx = glowCanvas.getContext('2d');
+  let gw = 0, gh = 0, gbuf, gtmp, gimage, gpixels;
+  function resize() {
+    canvas.width = Math.max(1, window.innerWidth);
+    canvas.height = Math.max(1, window.innerHeight);
+    W = canvas.width; H = canvas.height;
+    acc = new Float32Array(W * H);
+    image = ctx.createImageData(W, H);
+    pixels = new Uint32Array(image.data.buffer);
+    gw = Math.ceil(W / 4); gh = Math.ceil(H / 4);
+    glowCanvas.width = gw; glowCanvas.height = gh;
+    gbuf = new Float32Array(gw * gh); gtmp = new Float32Array(gw * gh);
+    gimage = glowCtx.createImageData(gw, gh);
+    gpixels = new Uint32Array(gimage.data.buffer);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const PRESETS = {
+    whisper: { opacity: 0.6, stroke: 0.7, density: 0.6, sun: 1.3, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.4, density: 1.15, sun: 0.75, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 1, density: 1.1, saturation: 0.9, glow: 1.1, sun: 0.9 },
+    drift:   { opacity: 0.85, density: 0.85, speed: 0.4, motion: 1.8, phase: 0.6, scale: 1.3, sun: 0.7 },
+    dense:   { opacity: 0.9, stroke: 0.9, density: 2, scale: 1.25, sun: 0.85, angle: 352 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // The sun's elevation over the ground, as a multiple of the default:
+      // low rakes the plain and lights more peaks past the line, high
+      // flattens and brightens the lit side. The line itself stays put.
+      { name: 'sun', label: 'Sun', type: 'range', min: 0.5, max: 2, step: 0.01, default: 1, category: 'form' },
+    ],
+    defaults: { hue: 44, hueB: 18, saturation: 0, scale: 1, colorMode: 'gradient', colorA: '#ffbb00', colorB: '#ff4d00' },
+  });
+  const currentValues = baked || panel.values;
+
+  // Light level -> pixel. Bright marks take colour stop A, faint ones B.
+  // max(ground, grey + ink * t), not a blend over the ground, so faint dots
+  // stay neutral grey instead of inheriting its blue cast.
+  const LN = 256;
+  const lut = new Uint32Array(LN + 1);
+  let lutKey = '';
+  function buildLut(values) {
+    const key = `${values.hue},${values.hueB},${values.saturation},${values.colorMode},${values.invert}`;
+    if (key === lutKey) return;
+    lutKey = key;
+    const ground = values.invert ? [242, 242, 244] : [10, 10, 13];
+    for (let i = 0; i <= LN; i++) {
+      const t = i / LN;
+      const stop = paletteHsl(values, 1 - t);
+      const ink = hslToRgb(stop.h, stop.s, values.invert ? 0.12 : 0.88);
+      const c = [0, 1, 2].map((j) => Math.round(values.invert
+        ? ground[j] + (ink[j] - ground[j]) * t
+        : Math.min(255, Math.max(ground[j], 10 + ink[j] * t))));
+      lut[i] = (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
+    }
+  }
+
+  const SWAY = 0.012; // terminator rock per unit of Motion, radians of longitude
+  const LOOP_START = 1; // Phase 0 opens on a large crater wall crossing the line
+  const RELIEF = 0.7; // extra slope contrast on the far, higher-sun plain
+
+  // Shading factors over the flat ground's light `pos`: brightness is the
+  // slope's light normalised by the flat ground's, so slopes flare only near
+  // the line, with a little extra slope contrast where the sun is high.
+  // b = (lit * G1 - pos * G2) / (pos + C0)
+  const PT = 255;
+  const G1 = new Float32Array(PT + 1), G2 = new Float32Array(PT + 1);
+  for (let i = 0; i <= PT; i++) {
+    const pos = i / PT, rel = RELIEF * smooth(0.1, 0.4, pos), lift = 0.6 + 0.4 * smooth(0, 0.5, pos);
+    G1[i] = (1 + rel) * lift; G2[i] = rel * lift;
+  }
+
+  // Dot footprint: a box of side ds px, area-weighted onto the pixels
+  // (side 1 is a bilinear splat). Returns false off the canvas.
+  function splat2(buf, w, h, x, y, ds, a) {
+    const x0 = x - ds / 2, y0 = y - ds / 2, ix = Math.floor(x0), iy = Math.floor(y0);
+    if (ix < 0 || iy < 0 || ix + 1 >= w || iy + 1 >= h) return false;
+    const wx0 = Math.min(ix + 1 - x0, ds), wx1 = ds - wx0;
+    const wy0 = Math.min(iy + 1 - y0, ds) * a, wy1 = ds * a - wy0;
+    const k = iy * w + ix;
+    buf[k] += wx0 * wy0; buf[k + 1] += wx1 * wy0; buf[k + w] += wx0 * wy1; buf[k + w + 1] += wx1 * wy1;
+    return true;
+  }
+  function splat3(buf, w, h, x, y, ds, a) {
+    const x0 = x - ds / 2, y0 = y - ds / 2, ix = Math.floor(x0), iy = Math.floor(y0);
+    if (ix < 0 || iy < 0 || ix + 2 >= w || iy + 2 >= h) return false;
+    const wx0 = ix + 1 - x0, rx = ds - wx0, wx1 = Math.min(1, rx), wx2 = rx - wx1;
+    const wy0 = iy + 1 - y0, ry = ds - wy0, wy1 = Math.min(1, ry), wy2 = ry - wy1;
+    let k = iy * w + ix, c = wy0 * a;
+    buf[k] += wx0 * c; buf[k + 1] += wx1 * c; buf[k + 2] += wx2 * c;
+    k += w; c = wy1 * a;
+    buf[k] += wx0 * c; buf[k + 1] += wx1 * c; buf[k + 2] += wx2 * c;
+    k += w; c = wy2 * a;
+    buf[k] += wx0 * c; buf[k + 1] += wx1 * c; buf[k + 2] += wx2 * c;
+    return true;
+  }
+
+  // One frame of light at time `time` into acc. With `collect`, also lists
+  // every dot drawn (screen x, y, weight) for SVG export. The two dot loops
+  // live in their own functions so each is optimised on its own.
+  function render(time, values, collect) {
+    acc.fill(0);
+    // Design frame -> canvas: cover fit, Scale's zoom and Angle's turn,
+    // all about the frame's centre.
+    const z = (0.5 + 0.5 * values.scale) * Math.max(W / PW, H / PH);
+    const th = values.angle * Math.PI / 180;
+    const m00 = z * Math.cos(th), m01 = -z * Math.sin(th), m10 = z * Math.sin(th), m11 = z * Math.cos(th);
+    const ds = 0.55 + 0.45 * values.stroke; // dot side, px
+    const view = {
+      m00, m01, m10, m11,
+      ox: W / 2 - (m00 * PW / 2 + m01 * PH / 2), oy: H / 2 - (m10 * PW / 2 + m11 * PH / 2),
+      // Dots per screen pixel follow density / zoom^2; past what was
+      // generated, the weight per dot makes up the rest. A dot's light grows
+      // with its side, not its area, so fine dots don't vanish.
+      share: Math.min(1, values.density * z * z / GMAX),
+      comp: Math.max(1, values.density * z * z / GMAX) / ds,
+      ds,
+    };
+    drawAtmosphere(view, collect && collect.atm);
+    // The planet turns by D; Phase is an offset into the loop. Motion rocks
+    // the sun (and so the line) a little about its rest position, three
+    // times per loop. Sun scales every point's angle from the line.
+    const tt = time + (values.phase + LOOP_START) * PERIOD / 2;
+    const D = ((tt / PERIOD) % 1 + 1) % 1 * LAM;
+    const dl = values.motion * SWAY * Math.sin(2 * Math.PI * 3 * tt / PERIOD);
+    drawGround(view, D, dl, values.sun, collect && collect.ground);
+  }
+
+  // Atmosphere: already in random order, so a prefix thins it evenly.
+  function drawAtmosphere(view, out) {
+    const { m00, m01, m10, m11, ox, oy, ds, comp } = view;
+    const buf = acc, w = W, h = H, xs = atm.x, ys = atm.y, as = atm.a;
+    const na = Math.round(atm.n * view.share);
+    for (let i = 0; i < na; i++) {
+      const x = xs[i], y = ys[i];
+      const X = ox + m00 * x + m01 * y, Y = oy + m10 * x + m11 * y;
+      const a = as[i] * comp;
+      const ok = ds <= 1 ? splat2(buf, w, h, X, Y, ds, a) : splat3(buf, w, h, X, Y, ds, a);
+      if (ok && out) out.push(X, Y, a);
+    }
+  }
+
+  // Ground: one call per bin (the last one hashed down to its share), so the
+  // loop's function is called often enough to be optimised on entry rather
+  // than only mid-loop.
+  function drawGround(view, D, dl, k, out) {
+    const s = view.share * NB;
+    for (let b = 0; b < NB && b < s; b++) groundSpan(view, D, dl, k, out, binFirst[b], binEnd[b], Math.min(1, s - b));
+  }
+
+  function groundSpan(view, D, dl, k, out, from, to, keep) {
+    const { m00, m01, m10, m11, ox, oy, ds, comp } = view;
+    const buf = acc, w = W, h = H;
+    const partial = keep < 1, keepLim = keep * 4294967296;
+    // Rotations for the turn (and the turn less one period, for the dots
+    // that have wrapped), and for Motion's rock of the light.
+    const cD = Math.cos(D), sD = Math.sin(D), cDw = Math.cos(D - LAM), sDw = Math.sin(D - LAM);
+    const unit = k === 1, cdl = Math.cos(dl), sdl = Math.sin(dl);
+    const hl0 = Math.PI / 2 * (1 - k) - k * dl; // light angle = hl0 + k * longitude
+    const lift = 0.8 * Math.max(0, k - 1); // a higher sun also brightens the far plain
+    const Lx = L[0], Ly = L[1], Ex = E1[0], Ey = E1[1], Ax = A[0], Ay = A[1];
+    const HAF = HA + FADE_DAY, HNF = HN - FADE_NIGHT;
+    const h0s = H0, c0s = C0H, s0s = S0H, cps = CP, sps = SP, cas = CA, cbs = CB, hzs = HZ, ths = TH;
+    const tc = TCOS, ts = TSIN, g1 = G1, g2 = G2;
+    const ha = HA, lam = LAM, sinPf0 = SIN_PF0, big = ds > 1, xMax = w - 3, yMax = h - 3;
+
+    for (let i = from; i < to; i++) {
+      if (partial) {
+        let x = Math.imul(i ^ 0x5f3759df, 0x2c1b3c6d); x ^= x >>> 12; x = Math.imul(x, 0x297a2d39); x ^= x >>> 15;
+        if ((x >>> 0) >= keepLim) continue;
+      }
+      // Dawn: the ground moves from the night toward the day.
+      const c0 = c0s[i], s0 = s0s[i];
+      let lon = h0s[i] - D, ch, sh;
+      if (lon < ha) { lon += lam; ch = c0 * cDw + s0 * sDw; sh = s0 * cDw - c0 * sDw; }
+      else { ch = c0 * cD + s0 * sD; sh = s0 * cD - c0 * sD; }
+      let chl, shl;
+      if (unit) { chl = ch * cdl + sh * sdl; shl = sh * cdl - ch * sdl; }
+      else {
+        const ti = (hl0 + k * lon - T_LO) * T_INV, j = ti | 0, f = ti - j;
+        chl = tc[j] + (tc[j + 1] - tc[j]) * f; shl = ts[j] + (ts[j + 1] - ts[j]) * f;
+      }
+      const cp = cps[i], se = cp * chl;
+      if (se < hzs[i] || se < -0.22) continue; // in shadow or deep night
+      const lit = cas[i] * shl + cbs[i] * chl;
+      if (lit <= 0) continue;
+      const sp = sps[i];
+      let lim = cp * ch * LZ + sp * KZ; // foreshortening
+      if (lim <= 0) continue;
+      const x = PCX + R * (cp * (ch * Lx + sh * Ex) + sp * Ax), y = PCY + R * (cp * (ch * Ly + sh * Ey) + sp * Ay);
+      const X = ox + m00 * x + m01 * y, Y = oy + m10 * x + m11 * y;
+      if (X < 0 || Y < 0 || X >= xMax || Y >= yMax) continue;
+      let b;
+      if (se > 0) { const pi = se * PT | 0; b = (lit * g1[pi] - se * g2[pi]) / (se + C0); } else b = lit * 0.6 / C0;
+      if (b > CAP) b = CAP;
+      lim *= b;
+      if (lon < HAF) lim *= smooth(ha, HAF, lon);
+      else if (lon > HNF) lim *= 1 - smooth(HNF, HN, lon);
+      if (sp > sinPf0) lim *= 1 - smooth(SIN_PF0, SIN_PF1, sp);
+      if (ths[i] > lim) continue;
+      const a = (se < 0 ? 0.5 : (0.11 + 0.035 * b) * (1 + lift * smooth(0.1, 0.5, se))) * comp;
+      const ok = big ? splat3(buf, w, h, X, Y, ds, a) : splat2(buf, w, h, X, Y, ds, a);
+      if (ok && out) out.push(X, Y, a);
+    }
+  }
+
+  // Bloom: a quarter-resolution copy of the light, box-blurred twice, drawn
+  // back over the frame with drawImage under 'lighter'. Each loop is its own
+  // function so each is optimised on its own.
+  const GLOW_R = 3;
+  function downsample(src, dst, w, h, dw) {
+    dst.fill(0);
+    for (let y = 0; y < h; y++) {
+      const row = y * w, drow = (y >> 2) * dw;
+      for (let x = 0; x < w; x++) dst[drow + (x >> 2)] += src[row + x];
+    }
+  }
+  function boxBlur(buf, tmp, bw, bh, r) {
+    for (let y = 0; y < bh; y++) {
+      const row = y * bw;
+      let s = 0;
+      for (let x = -r; x < bw; x++) {
+        if (x + r < bw) s += buf[row + x + r];
+        if (x - r - 1 >= 0) s -= buf[row + x - r - 1];
+        if (x >= 0) tmp[row + x] = s;
+      }
+    }
+    for (let x = 0; x < bw; x++) {
+      let s = 0;
+      for (let y = -r; y < bh; y++) {
+        if (y + r < bh) s += tmp[(y + r) * bw + x];
+        if (y - r - 1 >= 0) s -= tmp[(y - r - 1) * bw + x];
+        if (y >= 0) buf[y * bw + x] = s;
+      }
+    }
+  }
+  function glowPixels(buf, out, norm, ir, ig, ib) {
+    for (let i = 0, n = buf.length; i < n; i++) {
+      const v = Math.min(1, buf[i] * norm);
+      out[i] = (255 << 24) | (Math.round(ib * v) << 16) | (Math.round(ig * v) << 8) | Math.round(ir * v);
+    }
+  }
+  function drawGlow(values) {
+    downsample(acc, gbuf, W, H, gw);
+    boxBlur(gbuf, gtmp, gw, gh, GLOW_R);
+    boxBlur(gbuf, gtmp, gw, gh, GLOW_R);
+    const stop = paletteHsl(values, 0);
+    const [ir, ig, ib] = hslToRgb(stop.h, stop.s, 0.6);
+    glowPixels(gbuf, gpixels, values.glow * values.opacity * 2.5 / (16 * (2 * GLOW_R + 1) ** 4), ir, ig, ib);
+    glowCtx.putImageData(gimage, 0, 0);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(glowCanvas, 0, 0, gw * 4, gh * 4);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // Light -> pixels through the LUT, in slices: a function called several
+  // times a frame is optimised on entry, not only mid-loop.
+  function toPixels(src, dst, table, gain) {
+    const n = src.length, step = Math.ceil(n / 8);
+    for (let a = 0; a < n; a += step) pixelSpan(src, dst, table, gain, a, Math.min(n, a + step));
+  }
+  function pixelSpan(src, dst, table, gain, from, to) {
+    const ground = table[0];
+    for (let i = from; i < to; i++) {
+      const v = src[i];
+      if (v <= 0) { dst[i] = ground; continue; }
+      const j = v * gain | 0;
+      dst[i] = table[j > LN ? LN : j];
+    }
+  }
+
+  let clock = 0;
+  function drawFrame(dt, elapsed, values) {
+    clock += dt * values.speed;
+    if (canvas.width !== W || canvas.height !== H) resize();
+    render(clock, values, null);
+    buildLut(values);
+    toPixels(acc, pixels, lut, values.opacity * LN * 1.06);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.putImageData(image, 0, 0);
+    if (values.glow > 0 && !values.invert) drawGlow(values);
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  function svgCircles(values) {
+    const got = { ground: [], atm: [] };
+    render(clock, values, got);
+    buildLut(values);
+    const ds = 0.55 + 0.45 * values.stroke;
+    const out = [];
+    const take = (list, cap) => {
+      const n = list.length / 3, stride = Math.max(1, Math.ceil(n / cap));
+      for (let i = 0; i < n; i += stride) {
+        const a = Math.min(1, list[i * 3 + 2] * values.opacity * 1.06);
+        const px = lut[Math.min(LN, Math.round(a * LN))];
+        const fill = `rgb(${px & 255},${(px >> 8) & 255},${(px >> 16) & 255})`;
+        out.push({ cx: list[i * 3], cy: list[i * 3 + 1], r: ds / 2, fill, opacity: 1 });
+      }
+    };
+    take(got.ground, 20000);
+    take(got.atm, 3000);
+    return out;
+  }
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg([], { width: canvas.width, height: canvas.height, circles: svgCircles(currentValues) }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
