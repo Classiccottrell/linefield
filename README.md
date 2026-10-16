@@ -174,6 +174,7 @@ tooling" below and CONTRIBUTING.md.
 - `tidal-bridge` — a torn, C-shaped stream of stippled stars arcing between two galaxies off-frame, knots condensing along it around one bright, lumpy knot mid-stream
 - `terminator` — a cratered planet from low orbit in stipple, its ragged day/night line coming down the frame as crater rims flare along it and peaks catch light out in the night
 - `dark-nebula` — one billowed dust cloud carved out of a stippled starfield as pure negative space, its upper-right face lit by a hidden star in stipple and fine wisps
+- `old-road` — a pale track winding toward the viewer over dark moonlit moorland in fine stipple, dropping out of sight behind each rise and coming back in fragments toward the horizon on a slow walk up the road
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,
