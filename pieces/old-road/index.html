@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — old road</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  old-road — a pale track winding toward the viewer over dark moonlit
+  moorland, all in stipple: it drops out of sight behind each rise and comes
+  back in fragments toward the horizon, on a 60 s walk up the road.
+
+  Text-safe zone: the sky above the horizon, the top ~40% of the frame.
+  Only a faint far skyline is drawn there.
+  Anchor: the near stretch of the road at the foot of the frame, where it is
+  widest and palest (lower centre). The walker drifts after the road's
+  bends, so it swings slowly left and right of centre while the ground flows
+  toward the viewer and out through the bottom of the frame.
+
+  Technique (stipple): the moor is a heightfield periodic in depth, and one
+  loop walks exactly one period up it, so the loop is seamless. Every mark
+  is fixed to the ground and carries a fixed random rank; at any depth it
+  shows while its rank is under its dots per pixel times the pixels a unit
+  of ground covers there, so the screen density holds steady as the ground
+  comes closer. The marks are generated once, per depth row sorted by rank,
+  from bounds tight enough that the first frame comes quickly. Per frame
+  each 2 px column is marched front to back for occlusion, so the road
+  really drops behind each rise; the visible marks splat into a float buffer
+  and a LUT turns it into pixels (bloom, when Glow is up, is a
+  quarter-resolution copy drawn back with drawImage under 'lighter').
+  Between about 110 and 170 units out the road's broken stretches cross-fade
+  to a second pattern, so the far half of the view never repeats the near.
+
+  Controls: Scale zooms about the frame's centre, from a soft-edged patch of
+  moor under a short horizon (0) to a closer view with the road bleeding off
+  the bottom (2). Density sets the dot count, Stroke the dot size, Angle
+  turns the view, Phase picks a point on the walk, and Motion sets how
+  closely the walker follows the road's bends. Relief sets how hilly the
+  moor is, so how often the road drops out of sight.
+
+  SVG export: a capped, uniformly sampled set of the dots drawn in the
+  current frame (at most 20,000), as circles in screen space with Angle and
+  Scale applied, plus the far skyline as a polyline. The full stipple and
+  its accumulated brightness are a canvas property; use PNG for those.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'old-road';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const PERIOD = 60; // seconds per seamless loop at speed 1
+  const TAU = 2 * Math.PI;
+
+  // Seeded generator: the moor and its marks are the same on every load.
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const smooth = (a, b, v) => {
+    const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+
+  // Gradient noise with integer lattice periods (0 = not periodic) and
+  // hashed gradients. `row` adds amp * noise(x0 + i dx, y) for i < n to out,
+  // looking the corner gradients up once per lattice cell, not per sample.
+  function perlinP(seed, PX, PY) {
+    const N = 4096, gx = new Float32Array(N), gy = new Float32Array(N), r0 = rng(seed);
+    for (let i = 0; i < N; i++) { const a = r0() * TAU; gx[i] = Math.cos(a); gy[i] = Math.sin(a); }
+    const s0 = Math.imul(seed, 0x9E3779B1);
+    const hsh = (i, j) => {
+      let h = (Math.imul(i, 0x27d4eb2d) ^ Math.imul(j, 0x165667b1) ^ s0) | 0;
+      h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15;
+      return h & (N - 1);
+    };
+    const wrap = (v, P) => (P ? ((v % P) + P) % P : v);
+    const fd = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+    const at = (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+      const x0 = wrap(xi, PX), x1 = wrap(xi + 1, PX), y0 = wrap(yi, PY), y1 = wrap(yi + 1, PY);
+      const a = hsh(x0, y0), b = hsh(x1, y0), c = hsh(x0, y1), d = hsh(x1, y1);
+      const va = gx[a] * xf + gy[a] * yf, vb = gx[b] * (xf - 1) + gy[b] * yf;
+      const vc = gx[c] * xf + gy[c] * (yf - 1), vd = gx[d] * (xf - 1) + gy[d] * (yf - 1);
+      const u = fd(xf), v = fd(yf), top = va + u * (vb - va);
+      return top + v * (vc + u * (vd - vc) - top);
+    };
+    at.row = (n, x0, dx, y, out, amp) => {
+      const yi = Math.floor(y), yf = y - yi, y0 = wrap(yi, PY), y1 = wrap(yi + 1, PY), v = fd(yf);
+      let cell = NaN, ax = 0, ay = 0, bx = 0, by = 0, cx = 0, cy = 0, ex = 0, ey = 0;
+      for (let i = 0; i < n; i++) {
+        const x = x0 + i * dx, xi = Math.floor(x), xf = x - xi;
+        if (xi !== cell) {
+          cell = xi;
+          const xa = wrap(xi, PX), xb = wrap(xi + 1, PX);
+          let k = hsh(xa, y0); ax = gx[k]; ay = gy[k];
+          k = hsh(xb, y0); bx = gx[k]; by = gy[k];
+          k = hsh(xa, y1); cx = gx[k]; cy = gy[k];
+          k = hsh(xb, y1); ex = gx[k]; ey = gy[k];
+        }
+        const va = ax * xf + ay * yf, vb = bx * (xf - 1) + by * yf;
+        const vc = cx * xf + cy * (yf - 1), vd = ex * (xf - 1) + ey * (yf - 1);
+        const u = fd(xf), top = va + u * (vb - va);
+        out[i] += amp * (top + v * (vc + u * (vd - vc) - top));
+      }
+    };
+    return at;
+  }
+  // Fractal sum periodic in y, lattice period PY at the base octave.
+  function fbmP(seed, oct, PY) {
+    const ns = [];
+    let nm = 0;
+    for (let i = 0, a = 1; i < oct; i++, a *= 0.5) { ns.push(perlinP(seed + 101 * i, 0, PY << i)); nm += a; }
+    return (n, x0, dx, y, out) => {
+      for (let i = 0, a = 1, f = 1; i < oct; i++, a *= 0.5, f *= 2) ns[i].row(n, x0 * f, dx * f, y * f, out, a / nm);
+    };
+  }
+
+  // ---- the world, laid out in a 1280x800 design frame ----------------------
+  // X across, Z away from the viewer, heights up. The camera looks along +Z
+  // from height CAM; F is the focal length in design px, YH the horizon.
+  // Each frame maps the design frame onto the canvas (cover fit, then
+  // Scale's zoom and Angle's turn about the centre).
+  const PW = 1280, PH = 800, YH = 0.4 * PH, F = 760, F2 = F * F;
+  const ZP = 136; // the moor and the road repeat every ZP units of depth
+  const ZN = 3, ZNEAR = 6, ZFAR = 260, CAM = 5.5, CURVE = 0.018;
+  const LAND = 0.4, RW = 0.38, LX = 0.62, LY = 0.55, LZ = -0.56; // L: the moon's direction
+  // Margins round the design frame where the moor thins out, so a zoomed-out
+  // or turned view ends in a soft edge, never a cut.
+  const MX = 192, MY = 160;
+  // The road's centre line.
+  const RX = (Zw) => 3.4 * Math.sin(TAU * 2 * Zw / ZP + 0.2) + 1.3 * Math.sin(TAU * 5 * Zw / ZP + 2.1) - 0.4;
+  // The walker drifts after the road: camera x = follow * RX(Zc + 9), with
+  // follow = FOLLOW0 + FOLLOW1 * Motion. Never fully straight, so the point
+  // the ground streams from keeps swinging.
+  const FOLLOW0 = 0.25, FOLLOW1 = 0.35;
+  let cxMin = 0, cxMax = 0;
+  for (let i = 0; i < 2000; i++) {
+    const v = RX(i / 2000 * ZP);
+    for (const f of [FOLLOW0, FOLLOW0 + 2 * FOLLOW1]) { cxMin = Math.min(cxMin, f * v); cxMax = Math.max(cxMax, f * v); }
+  }
+
+  // ---- heightfield on a 0.25-unit grid, periodic in Z ----------------------
+  const DXG = 0.25, X0 = -236, NX = 1889, NZ = ZP / DXG, NG = NX * NZ;
+  const H0 = new Float32Array(NG), HEATH = new Float32Array(NG);
+  {
+    const Fn = fbmP(81, 4, ZP / 17), Gn = fbmP(82, 3, ZP / 6.8), heathN = perlinP(83, 0, 150);
+    const a = new Float64Array(NX), b = new Float64Array(NX), c = new Float64Array(NX);
+    for (let j = 0; j < NZ; j++) {
+      const Zw = j * DXG;
+      a.fill(0); b.fill(0); c.fill(0);
+      Fn(NX, X0 / 20, DXG / 20, Zw / 17, a);
+      Gn(NX, X0 / 6.8, DXG / 6.8, Zw / 6.8, b);
+      heathN.row(NX, X0 * 1.3, DXG * 1.3, Zw * 150 / ZP, c, 1);
+      for (let i = 0, k = j * NX; i < NX; i++, k++) { H0[k] = 5.2 * a[i] + 1.1 * b[i]; HEATH[k] = smooth(-0.1, 0.5, c[i]); }
+    }
+  }
+  // Relief scales the heights. The moonlight sees only relief^0.4 of it
+  // (SHADE scales the slopes it is computed from), so a gentle moor keeps
+  // its lit faces and a steep one doesn't burn out: Relief reads as how
+  // often the road drops from sight, not as a dimmer.
+  const HG = new Float32Array(NG);
+  let SHADE = 1;
+  function buildGround(relief) {
+    for (let k = 0; k < NG; k++) HG[k] = relief * H0[k];
+    SHADE = Math.pow(relief, -0.6);
+  }
+  // Moonlight on a face of slope (dX, dZ).
+  const litOf = (dX, dZ) => {
+    dX *= SHADE; dZ *= SHADE;
+    return Math.max(0, Math.min(1, (-dX * LX + LY - dZ * LZ) / Math.sqrt(dX * dX + 1 + dZ * dZ)));
+  };
+  const heathOf = (lit, heath) => {
+    const s = smooth(0.56, 0.95, lit);
+    return s > 0 ? LAND * Math.pow(s, 1.3) * (0.3 + 0.7 * heath) : 0;
+  };
+  function hAt(X, Zw) {
+    let gx = (X - X0) / DXG;
+    gx = gx < 0 ? 0 : gx > NX - 1.001 ? NX - 1.001 : gx;
+    let gz = Zw / DXG;
+    gz = ((gz % NZ) + NZ) % NZ;
+    const i = gx | 0, j = gz | 0, u = gx - i, v = gz - j, j1 = j + 1 === NZ ? 0 : j + 1;
+    const a = HG[j * NX + i], b = HG[j * NX + i + 1], c = HG[j1 * NX + i], d = HG[j1 * NX + i + 1];
+    const top = a + (b - a) * u;
+    return top + (c + (d - c) * u - top) * v;
+  }
+
+  // ---- marks ----------------------------------------------------------------
+  // Each mark is fixed to the ground with a fixed random rank, and shows at
+  // depth z while rank < d * J(z) * S: d its dots per px, J the design px a
+  // unit of ground covers there, S = Density * zoom^2 (so the dots per
+  // screen px hold as Scale zooms). A cell gets marks up to the most any
+  // Scale could ask of it at the built headroom, from its nearest visible
+  // depth at each zoom; past that the weight per dot makes up the rest.
+  const ZK = [0.5, 0.75, 1, 1.25, 1.5], NK = ZK.length;
+  const ZK2 = ZK.map((z) => z * z);
+  const VDEN = ZK.map((z) => F / (Math.min(PH + 0.35 * MY, PH / 2 + PH / (2 * z)) - YH + CURVE * F));
+  const HW = ZK.map((z) => Math.min(PW / 2 + 0.35 * MX, PW / (2 * z)));
+  const ZLAT = new Float32Array(NX * NK);
+  for (let i = 0; i < NX; i++) {
+    const Xc = X0 + (i + 0.5) * DXG;
+    const d = Math.max(0, (Xc < cxMin ? cxMin - Xc : Xc > cxMax ? Xc - cxMax : 0) - DXG);
+    for (let k = 0; k < NK; k++) ZLAT[i * NK + k] = d * F / HW[k];
+  }
+  const slopeClass = (tz) => (tz <= 0 ? 0 : tz <= 0.15 ? 1 : tz <= 0.4 ? 2 : 3);
+  const NB = 4; // slope classes per row, for a tighter bound per bucket
+
+  const gapN = perlinP(85, 0, 408), patN = perlinP(86, 299, 0), wN = perlinP(84, 122, 0);
+
+  // Column store (one Float32Array per field), grown by doubling.
+  function makeStore(names, cap) {
+    const s = { n: 0, cap, names };
+    for (const k of names) s[k] = new Float32Array(cap);
+    s.need = (m) => {
+      if (s.n + m <= s.cap) return;
+      let c = s.cap;
+      while (c < s.n + m) c *= 2;
+      for (const k of names) { const a = new Float32Array(c); a.set(s[k].subarray(0, s.n)); s[k] = a; }
+      s.cap = c;
+    };
+    return s;
+  }
+  const LAND_F = ['x', 'z', 'h', 't', 'p', 'a', 'rk'];
+  const ROAD_F = ['x', 'z', 'h', 't', 'p', 'g', 'g2', 'a', 'rk'];
+  // One row's marks before sorting, with each mark's bucket.
+  const rowL = makeStore([...LAND_F, 'b'], 1 << 14), rowR = makeStore([...ROAD_F, 'b'], 1 << 14);
+  let keys = new Float64Array(1 << 14);
+
+  let landS = null, roadS = null, builtGmax = 1;
+  const LS = new Int32Array(NZ * NB + 1), RS = new Int32Array(NZ * NB + 1);
+  const LBH = new Float32Array(NZ * NB), LBT = new Float32Array(NZ * NB), LBD = new Float32Array(NZ * NB);
+  const RBH = new Float32Array(NZ * NB), RBT = new Float32Array(NZ * NB), RBD = new Float32Array(NZ * NB);
+
+  // Sorts one row's marks into its buckets by rank and appends them to the
+  // store, recording each bucket's lowest ground, steepest face and largest
+  // dots per px (the bound that lets a frame stop reading a bucket early).
+  function flushRow(j, tmp, store, names, start, bh, bt, bd, dOf) {
+    const n = tmp.n;
+    if (keys.length < n) keys = new Float64Array(Math.max(n, keys.length * 2));
+    const bits = new Uint32Array(tmp.rk.buffer, 0, n);
+    store.need(n);
+    const src = names.map((k) => tmp[k]), dst = names.map((k) => store[k]), nf = names.length;
+    const th = tmp.h, tt = tmp.t, tb = tmp.b;
+    let o = store.n;
+    for (let b = 0; b < NB; b++) {
+      const q = j * NB + b;
+      start[q] = o;
+      let m = 0;
+      for (let i = 0; i < n; i++) if (tb[i] === b) keys[m++] = bits[i] * 1048576 + i;
+      const ks = keys.subarray(0, m).sort();
+      let hmin = 1e9, tmax = 0, dmax = 0;
+      for (let s = 0; s < m; s++, o++) {
+        const i = ks[s] % 1048576;
+        for (let f = 0; f < nf; f++) dst[f][o] = src[f][i];
+        if (th[i] < hmin) hmin = th[i];
+        if (tt[i] > tmax) tmax = tt[i];
+        const d = dOf(tmp, i);
+        if (d > dmax) dmax = d;
+      }
+      bh[q] = hmin; bt[q] = tmax; bd[q] = dmax;
+    }
+    store.n = o;
+    start[(j + 1) * NB] = o;
+    tmp.n = 0;
+  }
+  const landD = (s, i) => 0.003 + s.p[i];
+  const roadD = (s, i) => Math.max(s.g[i], s.g2[i]);
+
+  function buildMarks(gmax) {
+    const r = rng(8181), A = DXG * DXG, ZV = new Float64Array(NK);
+    landS = makeStore(LAND_F, 1 << 19);
+    roadS = makeStore(ROAD_F, 1 << 19);
+    builtGmax = gmax;
+    for (let j = 0; j < NZ; j++) {
+      const j1 = (j + 1) % NZ, Zj = j * DXG, rxc = RX(Zj + DXG / 2);
+      for (let i = 0; i < NX - 1; i++) {
+        const k00 = j * NX + i, k10 = k00 + 1, k01 = j1 * NX + i, k11 = k01 + 1;
+        const h00 = HG[k00], h10 = HG[k10], h01 = HG[k01], h11 = HG[k11];
+        const hmin = Math.min(h00, h10, h01, h11), hmax = Math.max(h00, h10, h01, h11);
+        // The cell's slope is its bilinear patch's: dh/dX linear in v, dh/dZ in u.
+        const gx0 = (h10 - h00) / DXG, gx1 = (h11 - h01) / DXG, gz0 = (h01 - h00) / DXG, gz1 = (h11 - h10) / DXG;
+        const tz = Math.max(0, gz0, gz1);
+        // The most ground px per unit^2 this cell can cover, over every zoom.
+        const camL = CAM - hmin, camH = CAM - hmax, lo = i * NK;
+        let jb = 0;
+        for (let k = 0; k < NK; k++) {
+          let zv = ZLAT[lo + k];
+          const zz = camH * VDEN[k];
+          if (zz > zv) zv = zz;
+          if (zv < ZNEAR) zv = ZNEAR;
+          ZV[k] = zv;
+          if (zv > ZFAR) continue;
+          const J = ZK2[k] * F2 * (camL + tz * zv) / (zv * zv * zv);
+          if (J > jb) jb = J;
+        }
+        if (jb <= 0) continue;
+        const X = X0 + i * DXG;
+        // Brightest moonlight over the patch (its corners, with a margin).
+        const litB = Math.min(1, 0.08 + Math.max(litOf(gx0, gz0), litOf(gx1, gz0), litOf(gx0, gz1), litOf(gx1, gz1)));
+        const e00 = HEATH[k00], e10 = HEATH[k10], e01 = HEATH[k01], e11 = HEATH[k11];
+
+        // Heath: marks gather on the faces the moon lights.
+        const kl = 1.02 * gmax * jb, bl = (0.003 + heathOf(litB, Math.max(e00, e10, e01, e11))) * kl;
+        let n = Math.floor(bl * A + r());
+        if (n) {
+          rowL.need(n);
+          for (let m = 0; m < n; m++) {
+            const u = r(), v = r(), rank = r() * bl;
+            const sx = gx0 + (gx1 - gx0) * v, t = gz0 + (gz1 - gz0) * u, lit = litOf(sx, t);
+            const w00 = (1 - u) * (1 - v), w10 = u * (1 - v), w01 = (1 - u) * v, w11 = u * v;
+            const dens = heathOf(lit, e00 * w00 + e10 * w10 + e01 * w01 + e11 * w11);
+            if (rank >= (0.003 + dens) * kl) continue;
+            const o = rowL.n++;
+            rowL.x[o] = X + u * DXG; rowL.z[o] = Zj + v * DXG;
+            rowL.h[o] = h00 * w00 + h10 * w10 + h01 * w01 + h11 * w11;
+            rowL.t[o] = t; rowL.p[o] = dens; rowL.a[o] = lit * r(); rowL.rk[o] = rank; rowL.b[o] = slopeClass(t);
+          }
+        }
+
+        // The road: wider with distance, so a strip off the centre line only
+        // counts once it is far away.
+        const zroad = 160 * (Math.abs(X + DXG / 2 - rxc) / (RW * 1.2) - 1);
+        if (zroad > ZFAR) continue;
+        let jr = 0;
+        for (let k = 0; k < NK; k++) {
+          const zr = Math.max(ZV[k], zroad);
+          if (zr > ZFAR) continue;
+          const J = ZK2[k] * F2 * (camL + tz * zr) / (zr * zr * zr);
+          if (J > jr) jr = J;
+        }
+        if (jr <= 0) continue;
+        const kr = 1.02 * gmax * jr;
+        const br = (0.4 + 0.6 * litB) * kr;
+        n = Math.floor(br * A + r());
+        if (!n) continue;
+        rowR.need(n);
+        for (let m = 0; m < n; m++) {
+          const u = r(), v = r(), rank = r() * br;
+          const Xm = X + u * DXG, Zw = Zj + v * DXG;
+          const t = gz0 + (gz1 - gz0) * u, lit = litOf(gx0 + (gx1 - gx0) * v, t);
+          // Broken stretches: pattern A near, B far (see drawRoad).
+          const fl = 0.4 + 0.6 * lit, zq = Zw * 299 / ZP;
+          const gA = smooth(-0.45, 0.05, gapN(Xm * 4, Zw * 3)) * (0.5 + 0.5 * smooth(-0.2, 0.3, patN(zq, 3.3))) * fl;
+          const gB = smooth(-0.45, 0.05, gapN(Xm * 4 + 157.3, Zw * 3 + 203)) * (0.5 + 0.5 * smooth(-0.2, 0.3, patN(zq, 11.7))) * fl;
+          const g = Math.max(gA, gB);
+          if (rank >= g * kr) continue;
+          const dr0 = Math.abs(Xm - RX(Zw)) / (RW * (0.85 + 0.3 * wN(Zw * 122 / ZP, 7)));
+          const zc = 160 * (dr0 - 1);
+          if (zc > ZFAR) continue;
+          if (zc > zroad) {
+            // Off the centre line: bound it again from the depth it first shows at.
+            let jc = 0;
+            for (let k = 0; k < NK; k++) {
+              const zr = Math.max(ZV[k], zc);
+              if (zr > ZFAR) continue;
+              const J = ZK2[k] * F2 * (camL + tz * zr) / (zr * zr * zr);
+              if (J > jc) jc = J;
+            }
+            if (rank >= g * 1.02 * gmax * jc) continue;
+          }
+          const w00 = (1 - u) * (1 - v), w10 = u * (1 - v), w01 = (1 - u) * v, w11 = u * v;
+          const o = rowR.n++;
+          rowR.x[o] = Xm; rowR.z[o] = Zw; rowR.h[o] = h00 * w00 + h10 * w10 + h01 * w01 + h11 * w11;
+          rowR.t[o] = t; rowR.p[o] = dr0; rowR.g[o] = gA; rowR.g2[o] = gB;
+          rowR.a[o] = (0.3 + 0.7 * lit) * r(); rowR.rk[o] = rank; rowR.b[o] = slopeClass(t);
+        }
+      }
+      flushRow(j, rowL, landS, LAND_F, LS, LBH, LBT, LBD, landD);
+      flushRow(j, rowR, roadS, ROAD_F, RS, RBH, RBT, RBD, roadD);
+    }
+    for (const st of [landS, roadS]) for (const k of st.names) st[k] = st[k].slice(0, st.n);
+  }
+
+  // ---- occlusion: each 2 px design column marched front to back ------------
+  const NCOL = (PW + 2 * MX) / 2, RSTEP = 1.02, LNRS = Math.log(RSTEP);
+  const NS = Math.ceil(Math.log(ZFAR / ZN) / LNRS) + 2;
+  const ZS = new Float32Array(NS);
+  for (let s = 0; s < NS; s++) ZS[s] = ZN * RSTEP ** s;
+  const HM = new Float32Array(NCOL * NS); // nearest-terrain horizon in front of each depth step
+  function march(Zc, camx) {
+    for (let c = 0; c < NCOL; c++) {
+      const dir = (2 * c + 1 - MX - PW / 2) / F, o = c * NS;
+      let m = 1e9;
+      for (let s = 0; s < NS; s++) {
+        const z = ZS[s];
+        HM[o + s] = m;
+        const y = YH + (CAM - hAt(camx + dir * z, Zc + z) - CURVE * z) * F / z;
+        if (y < m) m = y;
+      }
+    }
+  }
+
+  // ---- canvas buffers -----------------------------------------------------------
+  let W = 0, H = 0, acc, image, pixels;
+  const glowCanvas = document.createElement('canvas');
+  const glowCtx = glowCanvas.getContext('2d');
+  let gw = 0, gh = 0, gbuf, gtmp, gimage, gpixels;
+  function resize() {
+    canvas.width = Math.max(1, window.innerWidth);
+    canvas.height = Math.max(1, window.innerHeight);
+    W = canvas.width; H = canvas.height;
+    acc = new Float32Array(W * H);
+    image = ctx.createImageData(W, H);
+    pixels = new Uint32Array(image.data.buffer);
+    gw = Math.ceil(W / 4); gh = Math.ceil(H / 4);
+    glowCanvas.width = gw; glowCanvas.height = gh;
+    gbuf = new Float32Array(gw * gh); gtmp = new Float32Array(gw * gh);
+    gimage = glowCtx.createImageData(gw, gh);
+    gpixels = new Uint32Array(gimage.data.buffer);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const PRESETS = {
+    whisper: { opacity: 1, stroke: 1, density: 0.7, scale: 1, relief: 0.85, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.4, density: 1.15, relief: 1.25, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 1, density: 1.1, saturation: 0.9, glow: 1.1, relief: 0.9 },
+    drift:   { opacity: 1, stroke: 1.2, density: 0.9, speed: 0.4, motion: 1.8, phase: 0.6, scale: 1.3, relief: 0.75 },
+    dense:   { opacity: 0.9, stroke: 0.9, density: 2, scale: 1.25, relief: 1.4 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // How hilly the moor is, as a multiple of the default heights: low
+      // keeps the road in sight almost to the horizon, high hides it behind
+      // more and steeper rises. Rebuilds the marks once the value settles.
+      { name: 'relief', label: 'Relief', type: 'range', min: 0.4, max: 2, step: 0.01, default: 1, category: 'form' },
+    ],
+    defaults: { hue: 196, hueB: 250, saturation: 0, scale: 1, colorMode: 'gradient', colorA: '#00bbff', colorB: '#2b00ff' },
+  });
+  const currentValues = baked || panel.values;
+
+  // Light level -> pixel. Bright marks take colour stop A, faint ones B.
+  // max(ground, grey + ink * t), not a blend over the ground, so faint dots
+  // stay neutral grey instead of inheriting its blue cast.
+  const LN = 256;
+  const lut = new Uint32Array(LN + 1);
+  let lutKey = '';
+  function buildLut(values) {
+    const key = `${values.hue},${values.hueB},${values.saturation},${values.colorMode},${values.invert}`;
+    if (key === lutKey) return;
+    lutKey = key;
+    const ground = values.invert ? [242, 242, 244] : [10, 10, 13];
+    for (let i = 0; i <= LN; i++) {
+      const t = i / LN;
+      const stop = paletteHsl(values, 1 - t);
+      const ink = hslToRgb(stop.h, stop.s, values.invert ? 0.12 : 0.88);
+      const c = [0, 1, 2].map((j) => Math.round(values.invert
+        ? ground[j] + (ink[j] - ground[j]) * t
+        : Math.min(255, Math.max(ground[j], 10 + ink[j] * t))));
+      lut[i] = (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
+    }
+  }
+
+  // Dot footprint: a box of side ds px, area-weighted onto the pixels (side 1
+  // is a bilinear splat). Returns false off the canvas.
+  function splat2(buf, w, h, x, y, ds, a) {
+    const x0 = x - ds / 2, y0 = y - ds / 2, ix = Math.floor(x0), iy = Math.floor(y0);
+    if (ix < 0 || iy < 0 || ix + 1 >= w || iy + 1 >= h) return false;
+    const wx0 = Math.min(ix + 1 - x0, ds), wx1 = ds - wx0;
+    const wy0 = Math.min(iy + 1 - y0, ds) * a, wy1 = ds * a - wy0;
+    const k = iy * w + ix;
+    buf[k] += wx0 * wy0; buf[k + 1] += wx1 * wy0; buf[k + w] += wx0 * wy1; buf[k + w + 1] += wx1 * wy1;
+    return true;
+  }
+  function splat3(buf, w, h, x, y, ds, a) {
+    const x0 = x - ds / 2, y0 = y - ds / 2, ix = Math.floor(x0), iy = Math.floor(y0);
+    if (ix < 0 || iy < 0 || ix + 2 >= w || iy + 2 >= h) return false;
+    const wx0 = ix + 1 - x0, rx = ds - wx0, wx1 = Math.min(1, rx), wx2 = rx - wx1;
+    const wy0 = iy + 1 - y0, ry = ds - wy0, wy1 = Math.min(1, ry), wy2 = ry - wy1;
+    let k = iy * w + ix, c = wy0 * a;
+    buf[k] += wx0 * c; buf[k + 1] += wx1 * c; buf[k + 2] += wx2 * c;
+    k += w; c = wy1 * a;
+    buf[k] += wx0 * c; buf[k + 1] += wx1 * c; buf[k + 2] += wx2 * c;
+    k += w; c = wy2 * a;
+    buf[k] += wx0 * c; buf[k + 1] += wx1 * c; buf[k + 2] += wx2 * c;
+    return true;
+  }
+
+  // Margin fade: 1 inside the design frame, thinning to 0 across the margin.
+  function edge(sx, sy) {
+    let e = 1;
+    if (sx < 0) e = smooth(-MX, 0, sx); else if (sx > PW) e = 1 - smooth(PW, PW + MX, sx);
+    if (sy > PH) e *= 1 - smooth(PH, PH + MY, sy);
+    return e;
+  }
+
+  // Frame state, shared by the span loops.
+  let fZc = 0, fCamx = 0, fS = 1, fKA = 1, fDS = 1;
+  let m00 = 1, m01 = 0, m10 = 0, m11 = 1, fOX = 0, fOY = 0, fOut = null;
+
+  // One frame of light at time `time` into acc. With `collect`, also lists
+  // every dot drawn (screen x, y, weight) and the skyline for SVG export.
+  function render(time, values, collect) {
+    acc.fill(0);
+    const cover = Math.max(W / PW, H / PH), zs = 0.5 + 0.5 * values.scale, z = zs * cover;
+    const th = values.angle * Math.PI / 180;
+    m00 = z * Math.cos(th); m01 = -z * Math.sin(th); m10 = z * Math.sin(th); m11 = z * Math.cos(th);
+    fOX = W / 2 - (m00 * PW / 2 + m01 * PH / 2); fOY = H / 2 - (m10 * PW / 2 + m11 * PH / 2);
+    fDS = 0.55 + 0.45 * values.stroke; // dot side, px
+    // Dots per px follow Density * zoom^2 up to what was generated; past it
+    // the weight per dot makes up the rest. A dot's light grows with its
+    // side, not its area, so fine dots don't vanish.
+    const want = values.density * z * z;
+    fS = Math.min(want, builtGmax * zs * zs);
+    fKA = want / fS / fDS;
+    fOut = collect ? collect.dots : null;
+
+    // The walk: one period of the moor per loop. Phase is an offset into it.
+    let t = time + values.phase * PERIOD / 2;
+    t = Math.round((((t % PERIOD) + PERIOD) % PERIOD) * 1e6) / 1e6;
+    fZc = ZP * t / PERIOD;
+    fCamx = (FOLLOW0 + FOLLOW1 * values.motion) * RX(fZc + 9);
+    march(fZc, fCamx);
+
+    for (let j = 0; j < NZ; j++) {
+      const zc = (j + 0.5) * DXG - fZc;
+      for (let z0 = ((zc - (ZN - DXG)) % ZP + ZP) % ZP + (ZN - DXG); z0 <= ZFAR + DXG; z0 += ZP) {
+        const zl = Math.max(ZN, z0 - DXG), dz = z0 - (j + 0.5) * DXG, jl = F2 / (zl * zl * zl) * fS;
+        for (let b = 0; b < NB; b++) {
+          const q = j * NB + b;
+          if (LS[q] < LS[q + 1]) {
+            const bound = LBD[q] * jl * (CAM - LBH[q] + LBT[q] * zl);
+            if (bound > 0) drawLand(landS, LS[q], LS[q + 1], dz, bound);
+          }
+          if (RS[q] < RS[q + 1]) {
+            const bound = RBD[q] * jl * (CAM - RBH[q] + RBT[q] * zl);
+            if (bound > 0) drawRoad(roadS, RS[q], RS[q + 1], dz, bound);
+          }
+        }
+      }
+    }
+
+    // The far skyline only, faintly.
+    const sky = collect ? collect.sky : null, step = 2 / z, zf = 250;
+    for (let sx = -MX; sx < PW + MX; sx += step) {
+      const sy = YH + (CAM - hAt(fCamx + (sx - PW / 2) * zf / F, fZc + zf) - CURVE * zf) * F / zf;
+      const X = fOX + m00 * sx + m01 * sy, Y = fOY + m10 * sx + m11 * sy;
+      const ok = splat3(acc, W, H, X, Y, fDS, 0.08 * edge(sx, sy) / fDS);
+      if (sky && ok) sky.push([X, Y]);
+    }
+  }
+
+  function drawLand(st, from, to, dz, bound) {
+    const X = st.x, Z = st.z, Hh = st.h, T = st.t, P = st.p, Aa = st.a, RK = st.rk;
+    const buf = acc, w = W, h = H, camx = fCamx, S = fS, kA = fKA, ds = fDS, big = ds > 1, out = fOut;
+    for (let i = from; i < to; i++) {
+      const rk = RK[i];
+      if (rk > bound) break;
+      const z = Z[i] + dz;
+      if (z < ZN || z > ZFAR) continue;
+      const iz = 1 / z, sx = PW / 2 + (X[i] - camx) * F * iz;
+      if (sx < -MX || sx >= PW + MX) continue;
+      const hh = Hh[i], sy = YH + (CAM - hh - CURVE * z) * F * iz;
+      if (sy < 0 || sy >= PH + MY) continue;
+      const J = F2 * (CAM - hh + T[i] * z) * iz * iz * iz;
+      if (J <= 0) continue;
+      const fade = Math.exp(-z / 160);
+      let ratio = (0.003 + P[i] * (0.4 + 0.6 * fade)) * J * S / rk;
+      if (ratio <= 1) continue;
+      if (sx < 0 || sx > PW || sy > PH) { ratio *= edge(sx, sy); if (ratio <= 1) continue; }
+      const s = Math.ceil(Math.log(z / ZN) / LNRS), col = (sx + MX) >> 1;
+      if (sy > HM[col * NS + (s < NS ? s : NS - 1)] + 1) continue;
+      const a = (0.055 + 0.2 * Aa[i]) * (ratio > 1.35 ? 1 : (ratio - 1) / 0.35) * kA;
+      const Xs = fOX + m00 * sx + m01 * sy, Ys = fOY + m10 * sx + m11 * sy;
+      const ok = big ? splat3(buf, w, h, Xs, Ys, ds, a) : splat2(buf, w, h, Xs, Ys, ds, a);
+      if (ok && out) out.push(Xs, Ys, a * ds);
+    }
+  }
+
+  function drawRoad(st, from, to, dz, bound) {
+    const X = st.x, Z = st.z, Hh = st.h, T = st.t, P = st.p, G = st.g, G2 = st.g2, Aa = st.a, RK = st.rk;
+    const buf = acc, w = W, h = H, camx = fCamx, S = fS, kA = fKA, ds = fDS, big = ds > 1, out = fOut;
+    for (let i = from; i < to; i++) {
+      const rk = RK[i];
+      if (rk > bound) break;
+      const z = Z[i] + dz;
+      if (z < ZN || z > ZFAR) continue;
+      const dr = P[i] / (1 + z / 160);
+      if (dr >= 1) continue;
+      const iz = 1 / z, sx = PW / 2 + (X[i] - camx) * F * iz;
+      if (sx < -MX || sx >= PW + MX) continue;
+      const hh = Hh[i], sy = YH + (CAM - hh - CURVE * z) * F * iz;
+      if (sy < 0 || sy >= PH + MY) continue;
+      const J = F2 * (CAM - hh + T[i] * z) * iz * iz * iz;
+      if (J <= 0) continue;
+      // The broken stretches cross-fade to pattern B far out, so the two
+      // copies of one stretch of moor in view never break the same way.
+      const far = z <= 110 ? 0 : z >= 170 ? 1 : smooth(110, 170, z);
+      const g = G[i] + (G2[i] - G[i]) * far;
+      let ratio = (1 - dr * dr * dr) * g * J * S / rk;
+      if (ratio <= 1) continue;
+      if (sx < 0 || sx > PW || sy > PH) { ratio *= edge(sx, sy); if (ratio <= 1) continue; }
+      const s = Math.ceil(Math.log(z / ZN) / LNRS), col = (sx + MX) >> 1;
+      if (sy > HM[col * NS + (s < NS ? s : NS - 1)] + 1) continue;
+      const fade = Math.exp(-z / 160);
+      const a = (0.08 + 0.55 * Aa[i] * (0.45 + 0.55 * fade)) * (ratio > 1.35 ? 1 : (ratio - 1) / 0.35) * kA;
+      const Xs = fOX + m00 * sx + m01 * sy, Ys = fOY + m10 * sx + m11 * sy;
+      const ok = big ? splat3(buf, w, h, Xs, Ys, ds, a) : splat2(buf, w, h, Xs, Ys, ds, a);
+      if (ok && out) out.push(Xs, Ys, a * ds);
+    }
+  }
+
+  // Bloom: a quarter-resolution copy of the light, box-blurred twice, drawn
+  // back over the frame with drawImage under 'lighter'.
+  const GLOW_R = 3;
+  function downsample(src, dst, w, h, dw) {
+    dst.fill(0);
+    for (let y = 0; y < h; y++) {
+      const row = y * w, drow = (y >> 2) * dw;
+      for (let x = 0; x < w; x++) dst[drow + (x >> 2)] += src[row + x];
+    }
+  }
+  function boxBlur(buf, tmp, bw, bh, r) {
+    for (let y = 0; y < bh; y++) {
+      const row = y * bw;
+      let s = 0;
+      for (let x = -r; x < bw; x++) {
+        if (x + r < bw) s += buf[row + x + r];
+        if (x - r - 1 >= 0) s -= buf[row + x - r - 1];
+        if (x >= 0) tmp[row + x] = s;
+      }
+    }
+    for (let x = 0; x < bw; x++) {
+      let s = 0;
+      for (let y = -r; y < bh; y++) {
+        if (y + r < bh) s += tmp[(y + r) * bw + x];
+        if (y - r - 1 >= 0) s -= tmp[(y - r - 1) * bw + x];
+        if (y >= 0) buf[y * bw + x] = s;
+      }
+    }
+  }
+  function glowPixels(buf, out, norm, ir, ig, ib) {
+    for (let i = 0, n = buf.length; i < n; i++) {
+      const v = Math.min(1, buf[i] * norm);
+      out[i] = (255 << 24) | (Math.round(ib * v) << 16) | (Math.round(ig * v) << 8) | Math.round(ir * v);
+    }
+  }
+  function drawGlow(values) {
+    downsample(acc, gbuf, W, H, gw);
+    boxBlur(gbuf, gtmp, gw, gh, GLOW_R);
+    boxBlur(gbuf, gtmp, gw, gh, GLOW_R);
+    const stop = paletteHsl(values, 0);
+    const [ir, ig, ib] = hslToRgb(stop.h, stop.s, 0.6);
+    glowPixels(gbuf, gpixels, values.glow * values.opacity * 2.5 / (16 * (2 * GLOW_R + 1) ** 4), ir, ig, ib);
+    glowCtx.putImageData(gimage, 0, 0);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(glowCanvas, 0, 0, gw * 4, gh * 4);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function toPixels(src, dst, table, gain) {
+    const n = src.length, step = Math.ceil(n / 8);
+    for (let a = 0; a < n; a += step) pixelSpan(src, dst, table, gain, a, Math.min(n, a + step));
+  }
+  function pixelSpan(src, dst, table, gain, from, to) {
+    const ground = table[0];
+    for (let i = from; i < to; i++) {
+      const v = src[i];
+      if (v <= 0) { dst[i] = ground; continue; }
+      const j = v * gain | 0;
+      dst[i] = table[j > LN ? LN : j];
+    }
+  }
+
+  // The marks depend on Relief and on their headroom: 2 where Density, or a
+  // canvas bigger than the design frame, asks for more than 1 dot per design
+  // px of the default. A change keeps the current marks and rebuilds once it
+  // has held for 150 ms, so a drag doesn't stall on every input.
+  let worldKey = '', pendingKey = '', pendingSince = 0;
+  function ensureWorld(values) {
+    const cover = Math.max(W / PW, H / PH);
+    const relief = values.relief ?? 1, gmax = values.density * cover * cover > 1.5 ? 2 : 1, key = `${relief}|${gmax}`;
+    if (key === worldKey) return;
+    if (worldKey) {
+      const now = performance.now();
+      if (pendingKey !== key) { pendingKey = key; pendingSince = now; return; }
+      if (now - pendingSince < 150) return;
+    }
+    if (!worldKey || relief !== +worldKey.split('|')[0]) buildGround(relief);
+    buildMarks(gmax);
+    worldKey = key;
+  }
+
+  let clock = 0;
+  function drawFrame(dt, elapsed, values) {
+    clock += dt * values.speed;
+    if (canvas.width !== W || canvas.height !== H) resize();
+    ensureWorld(values);
+    render(clock, values, null);
+    buildLut(values);
+    toPixels(acc, pixels, lut, values.opacity * LN * 228 / 224);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.putImageData(image, 0, 0);
+    if (values.glow > 0 && !values.invert) drawGlow(values);
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  function svgExport(values) {
+    const got = { dots: [], sky: [] };
+    ensureWorld(values);
+    render(clock, values, got);
+    buildLut(values);
+    const ds = 0.55 + 0.45 * values.stroke;
+    const circles = [];
+    const n = got.dots.length / 3, stride = Math.max(1, Math.ceil(n / 20000));
+    for (let i = 0; i < n; i += stride) {
+      const a = Math.min(1, got.dots[i * 3 + 2] * values.opacity * 228 / 224);
+      const px = lut[Math.min(LN, Math.round(a * LN))];
+      circles.push({ cx: got.dots[i * 3], cy: got.dots[i * 3 + 1], r: ds / 2, fill: `rgb(${px & 255},${(px >> 8) & 255},${(px >> 16) & 255})`, opacity: 1 });
+    }
+    return { paths: got.sky.length > 1 ? [got.sky] : [], circles };
+  }
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => {
+    const { paths, circles } = svgExport(currentValues);
+    exportSvg(paths, { width: canvas.width, height: canvas.height, circles });
+  });
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
