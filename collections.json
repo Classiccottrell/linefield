@@ -32,6 +32,6 @@
   {
     "id": "old-roads",
     "title": "Old Roads",
-    "slugs": ["beacons", "old-road"]
+    "slugs": ["beacons", "high-pass", "old-road"]
   }
 ]

@@ -270,6 +270,15 @@
     "anchor": "the newest fire, just right of centre, stepping right along the chain"
   },
   {
+    "slug": "high-pass",
+    "title": "High Pass",
+    "blurb": "A jagged peak in cross-section with the wind from the left, driving drift up its snowy face and tearing a plume of spindrift off the crest that sags into the lee and frays downwind in clumps.",
+    "tags": ["grain", "flow", "landscape"],
+    "hue": 258, "hueB": 192, "saturation": 0,
+    "safeZone": "the sky over the windward slope, upper left",
+    "anchor": "the crest, right of centre, where the plume tears off"
+  },
+  {
     "slug": "old-road",
     "title": "Old Road",
     "blurb": "A pale track winding toward the viewer over dark moonlit moorland in fine stipple, dropping out of sight behind each rise and coming back in fragments toward the horizon on a slow walk up the road.",
