@@ -393,12 +393,25 @@ review) before merge, not after.
   - **Old Roads** (started 2026-10-15): mythic landscapes, the feeling of
     an old fantasy epic told through land, weather and light. Evocation
     only: no names, places, objects, symbols or scripts from any existing
-    book or film. First sketches: *Beacons* (fires lighting peak to peak
-    along a range, the light travelling down the chain each loop),
-    *Hachure* (a range drawn the way engraved maps drew relief, short
-    downhill strokes lit from one side, not contours), *Marsh lights*
-    (faint lights over black water, each doubled by a broken reflection)
-    and *High pass* (snow driven sideways over a jagged ridge).
+    book or film.
+    - **Sketch round 1 (2026-10-15):** seven stills, all inside the ink
+      gate. *Beacons* (fires stepping down along a drawn range; a new one
+      catches every 10 s, so the light walks the chain, 70 s loop),
+      *Hachure* (a range in engraved-map downhill strokes; the low sun
+      swings across it, 40 s), *Marsh lights* (faint lights over black
+      water with broken reflections; sits on the 0.03 ink floor), *High
+      pass* (snow streaming off a jagged crest in gusts), *Cloud sea* (a
+      peak above rolling cloud tops at first light), *Fog fall* (fog
+      pouring through a col and fraying downhill) and *Old road* (a track
+      over moorland that you travel along, dropping behind each rise).
+    - **Killed:** *Cairn line* (the cairns read as small lit domes, or as
+      a glowing ribbon), and, before drawing, a ruin on a tor (pillars), a
+      ford (lines parting around a void) and a switchback road (a
+      lightning zigzag).
+    - **Next:** a rough motion pass on all seven, so the owner chooses with
+      the motion in view (the `dust-lane` lesson). Then refine the picks
+      into animated prototypes and build them. Front-runners: Beacons,
+      High pass, Old road.
   - **Weather:** *Aurora* (hairline curtains hanging from one slow fold,
     seen from below; they must hang, not wave like `longwave`),
     *Thunderhead* (a cloud tower in `dune`'s film grain, lit from inside by
