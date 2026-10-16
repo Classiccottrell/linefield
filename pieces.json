@@ -261,6 +261,15 @@
     "anchor": "the bulge, just above and right of centre, behind the lane"
   },
   {
+    "slug": "beacons",
+    "title": "Beacons",
+    "blurb": "One drawn mountain range at night in stipple and hairlines, where fires catch from summit to summit so the light walks along the chain and wraps round, each new fire lighting the ribs of its own rock.",
+    "tags": ["grain", "depth", "kinetic", "landscape"],
+    "hue": 38, "hueB": 8, "saturation": 0,
+    "safeZone": "the sky above the range, top quarter; the bottom fifth",
+    "anchor": "the newest fire, just right of centre, stepping right along the chain"
+  },
+  {
     "slug": "old-road",
     "title": "Old Road",
     "blurb": "A pale track winding toward the viewer over dark moonlit moorland in fine stipple, dropping out of sight behind each rise and coming back in fragments toward the horizon on a slow walk up the road.",
