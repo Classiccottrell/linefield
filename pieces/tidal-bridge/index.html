@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — tidal-bridge</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  tidal-bridge — a torn, C-shaped stream of stippled stars arcing between two
+  galaxies that sit off-frame, with smaller knots condensing along it, a torn
+  neck, a short fork and faint debris feathers peeling off its outer side.
+
+  Anchor: the lumpy knot mid-stream, just right of centre. It rides the
+  stream's slow breathing and swells and settles a little on the 20 s loop
+  while stars flow through it. Scale and Angle carry it about the frame's
+  centre.
+  Text-safe zone: the top-left, inside the arc's bow. It narrows as Scale
+  rises.
+
+  Technique (the stipple material): about 175k stars are precomputed once in
+  a fixed 1280x800 design space, and rebuilt only when Density or Tear
+  changes. Each star lives on a frac(phase) cycle and fades in and out at its
+  ends, so the loop is seamless. Per frame one affine (fit x Scale x Angle,
+  about the centre) maps them to the screen, where they splat into a float
+  luminance buffer. A soft-knee tone curve then writes opaque pixels, so the
+  anchor never flattens to a white disc and the faint halo still reads.
+
+  Controls: Stroke sets the star dot size, Density the star count, and Tear
+  how far the stream is torn and clumped (low: a smooth, continuous stream;
+  high: a ragged one with a second tear and stronger knots).
+
+  SVG export: the piece has no line geometry, and its stars can't go into an
+  SVG whole. The SVG carries a capped, representative sample of the current
+  frame (at most 20,000 stars) as <circle>s in screen space, with Angle
+  applied, each circle's opacity scaled by the sampling stride. Use PNG for
+  the full stipple.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'tidal-bridge';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Stars are built in a fixed design space, so a bigger window never asks
+  // for more geometry than the design holds; `fit` maps it to the screen.
+  const DW = 1280, DH = 800, K = DW / 1040;
+  const SEED = 20261014;
+  const PERIOD = 20; // seconds per loop at speed 1
+  const N = 1024; // arc table samples
+  const HB = 16; // gradient colour buckets
+  const GLOW_CELL = 8; // glow buffer cell, in canvas pixels
+  const SVG_CAP = 20000;
+  const TAU = Math.PI * 2;
+
+  let W = 0, H = 0, fit = 1, image, px32, lum, glowCanvas, glowCtx, glowImg, glowPx, glowBuf, glowTmp, gw = 0, gh = 0;
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    W = canvas.width;
+    H = canvas.height;
+    fit = Math.sqrt((W * H) / (DW * DH));
+    image = ctx.createImageData(W, H);
+    px32 = new Uint32Array(image.data.buffer);
+    lum = new Float32Array(W * H);
+    gw = Math.ceil(W / GLOW_CELL);
+    gh = Math.ceil(H / GLOW_CELL);
+    glowCanvas = document.createElement('canvas');
+    glowCanvas.width = gw;
+    glowCanvas.height = gh;
+    glowCtx = glowCanvas.getContext('2d');
+    glowImg = glowCtx.createImageData(gw, gh);
+    glowPx = new Uint32Array(glowImg.data.buffer);
+    glowBuf = new Float32Array(gw * gh);
+    glowTmp = new Float32Array(gw * gh);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const PRESETS = {
+    whisper: { opacity: 0.75, stroke: 0.8, density: 0.6, scale: 0.85, tear: 0.75, saturation: 0, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.35, density: 1.1, tear: 1.3, angle: 352, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 1, density: 1.15, saturation: 0.85, glow: 1, angle: 8 },
+    drift:   { opacity: 1, density: 0.95, speed: 0.4, motion: 1.8, phase: 0.6, tear: 0.55, scale: 1.2, saturation: 0, glow: 0 },
+    dense:   { opacity: 0.9, stroke: 0.9, density: 1.9, tear: 1.5, scale: 1.35, angle: 6, saturation: 0, glow: 0 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // How far the stream is torn and clumped. Low is one smooth,
+      // continuous stream; high tears it twice and condenses stronger knots.
+      { name: 'tear', label: 'Tear', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'form' },
+    ],
+    defaults: { hue: 210, hueB: 340, saturation: 0, scale: 1, colorMode: 'gradient', colorA: '#0080ff', colorB: '#ff0055' },
+  });
+  const currentValues = baked || panel.values;
+
+  // --- engine helpers ---------------------------------------------------
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function makeNoise(r, octaves = 4) {
+    const w = [];
+    for (let i = 0; i < octaves; i++) {
+      const f = Math.pow(1.9, i);
+      w.push({ fx: (r() * 2 - 1) * f, fy: (r() * 2 - 1) * f, p: r() * 6.283, a: 1 / (i + 1) });
+    }
+    const norm = w.reduce((s, o) => s + o.a, 0);
+    return (x, y) => w.reduce((s, o) => s + o.a * Math.sin(o.fx * x + o.fy * y + o.p), 0) / norm;
+  }
+  const gauss = (d, s) => Math.exp(-(d * d) / (2 * s * s));
+  const smooth = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+  const gn = (r) => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(TAU * r());
+  const frac = (x) => x - Math.floor(x);
+
+  // --- the bridge at Tear 1 ---------------------------------------------
+  // Positions along the stream are q: 0 and 1 are where the arc leaves the
+  // design frame (bottom-left and top-right). Knot 0 is the anchor.
+  const BASE = {
+    P: [[-0.15, 0.95], [0.33, 0.8], [0.7, 0.52], [1.1, -0.18]],
+    sig: 12, count: 70000, alpha: 0.19, flow: 90, coreClear: 0.07, edgeDense: 2.2,
+    halo: { count: 21600, mult: 3.2, alpha: 0.28 },
+    knots: [
+      { q: 0.53, r: 9, count: 4000, alpha: 0.135, spread: 1.2, subR: 0.3, mainR: 1.1, along: 1.3, bulge: 0.6, pulse: 0.1 },
+      { q: 0.38, r: 6, count: 700, alpha: 0.15 },
+      { q: 0.685, r: 5, count: 500, alpha: 0.15, strand: true },
+      { q: 0.86, r: 6, count: 650, alpha: 0.14, dv: 3 },
+      { q: 0.14, r: 4, count: 300, alpha: 0.14 },
+    ],
+    debris: { alpha: 0.42, scatter: 2000, reach: 50, fans: [
+      { q0: 0.62, q1: 0.84, count: 21000, reach: 75, lag: -0.35, curl: -0.3, freq: 240, floor: 0.3 },
+      { q0: 0.2, q1: 0.4, count: 14000, reach: 60, lag: 0.35, curl: 0.3, freq: 240, floor: 0.3 } ] },
+    splits: [{ q0: 0.6, q1: 0.76, sep: 20, side: -1, frac: 0.45 }],
+  };
+  // Each knot's clump of sub-centres, in units of its own radius (along,
+  // across, weight). Fixed, so the anchor keeps its lumpy, round shape at
+  // every Density and Tear.
+  const SUBS = [
+    [[0, 0, 1], [0.5634, 0.5548, 0.6559], [-0.6856, 0.6663, 0.6173], [-0.7816, -1.4845, 0.3802], [1.0227, -0.5754, 0.3898], [0.0536, -0.8306, 0.6813], [-0.3769, 0.5463, 0.6814]],
+    [[0, 0, 1], [0.2163, -0.0004, 0.6571], [-1.6369, 0.474, 0.6699]],
+    [[0, 0, 1], [0.3467, -0.2521, 0.7601], [-0.0737, 1.4423, 0.6309]],
+    [[0, 0, 1], [-0.1007, -0.0518, 0.7844], [-1.4198, 0.4977, 0.668]],
+    [[0, 0, 1], [0.9392, -1.022, 0.362], [1.2498, 1.5275, 0.6929]],
+  ];
+
+  // Tear reshapes the stream: 1 is the base bridge; 0 closes the tear and
+  // smooths out the beads and dwarf knots; above 1 the tear widens, a second
+  // one opens past the fork and the knots condense harder. The anchor stays
+  // the brightest knot throughout.
+  function shape(t) {
+    const lo = Math.min(1, t), hi = Math.max(0, t - 1);
+    const tears = [{ q: 0.27, w: 0.028 * (1 + 0.5 * hi), kink: 6 * t, depth: 0.985 * Math.pow(lo, 0.6) + 0.013 * hi, thin: 0.6 * lo + 0.15 * hi, weight: lo }];
+    if (hi > 0) tears.push({ q: 0.79, w: 0.02, kink: 4 * hi, depth: 0.85 * hi, thin: 0.4 * hi, weight: hi });
+    return {
+      ...BASE,
+      tears,
+      bead: 0.4 * t,
+      fil: 0.18 * (0.3 + 0.7 * lo) + 0.06 * hi,
+      core: 0.35 * (0.5 + 0.5 * lo),
+      bendNoise: 3 * (0.5 + 0.5 * t),
+      anchorGain: 1 + 0.15 * hi,
+      dwarfGain: t < 1 ? 0.35 + 0.65 * t : 1 + 0.5 * hi,
+      fanGain: 0.5 + 0.5 * t,
+    };
+  }
+
+  // Build every star once: struct-of-arrays, positions as (arc s, along u,
+  // across v) with drift per life. `amount` multiplies every layer's count.
+  function build(tear, amount) {
+    const o = shape(tear);
+    const r = rng(SEED), nz = makeNoise(r, 4), nzK = makeNoise(r, 3);
+    // arc table: uniform arc length
+    const P = o.P.map(([x, y]) => [x * DW, y * DH]);
+    const bez = (u) => { const v = 1 - u; return [0, 1].map((c) => v * v * v * P[0][c] + 3 * v * v * u * P[1][c] + 3 * v * u * u * P[2][c] + u * u * u * P[3][c]); };
+    const M = 4096, cum = new Float64Array(M + 1);
+    let prev = bez(0);
+    for (let i = 1; i <= M; i++) { const p = bez(i / M); cum[i] = cum[i - 1] + Math.hypot(p[0] - prev[0], p[1] - prev[1]); prev = p; }
+    const L = cum[M];
+    const X = new Float32Array(N), Y = new Float32Array(N), TX = new Float32Array(N), TY = new Float32Array(N), NX = new Float32Array(N), NY = new Float32Array(N);
+    let j = 0;
+    for (let i = 0; i < N; i++) {
+      const target = (i / (N - 1)) * L;
+      while (j < M - 1 && cum[j + 1] < target) j++;
+      const u = (j + (target - cum[j]) / Math.max(1e-9, cum[j + 1] - cum[j])) / M;
+      const [x, y] = bez(u), [x2, y2] = bez(Math.min(1, u + 1e-4)), [x0, y0] = bez(Math.max(0, u - 1e-4));
+      const tl = Math.hypot(x2 - x0, y2 - y0);
+      X[i] = x; Y[i] = y; TX[i] = (x2 - x0) / tl; TY[i] = (y2 - y0) / tl;
+    }
+    // outer normal = the convex (bow) side
+    const mid = N >> 1, bx = X[mid] - (X[0] + X[N - 1]) / 2, by = Y[mid] - (Y[0] + Y[N - 1]) / 2;
+    for (let i = 0; i < N; i++) { let nx = -TY[i], ny = TX[i]; if (nx * bx + ny * by < 0) { nx = -nx; ny = -ny; } NX[i] = nx; NY[i] = ny; }
+    let i0 = 0, i1 = N - 1;
+    const inside = (i) => X[i] >= 0 && X[i] <= DW && Y[i] >= 0 && Y[i] <= DH;
+    while (i0 < N - 1 && !inside(i0)) i0++;
+    while (i1 > 0 && !inside(i1)) i1--;
+    const sv0 = i0 / (N - 1), sv1 = i1 / (N - 1), sOf = (q) => sv0 + q * (sv1 - sv0), qOf = (s) => (s - sv0) / (sv1 - sv0);
+    const pxS = 1 / L, pxQ = pxS / (sv1 - sv0);
+
+    // profiles along q
+    const nzB = makeNoise(r, 3), nzF = [makeNoise(r, 3), makeNoise(r, 3), makeNoise(r, 3)];
+    const edge = (q) => Math.max(smooth(0.3, -0.05, q), smooth(0.7, 1.05, q));
+    const { tears, splits, knots } = o;
+    const tearAt = (q) => tears.reduce((m, t) => Math.max(m, t.weight * gauss(q - t.q, t.w)), 0);
+    const bulgeAt = (q) => knots.reduce((m, kn) => m + (kn.bulge ?? 0.5) * gauss(q - kn.q, kn.r * K * 5 * pxQ), 0);
+    const sigma = (q) => {
+      let s = o.sig * K * (1 + 3.2 * edge(q) ** 1.5) * (0.8 + 0.35 * nz(q * 9, 0.3));
+      for (const t of tears) s *= 1 - t.thin * gauss(q - t.q, t.w * 2.5);
+      return s * (1 + bulgeAt(q));
+    };
+    const bead = o.bead;
+    const dens = (q) => {
+      let d = (1 + o.edgeDense * edge(q) ** 1.3) * (0.75 + 0.35 * nz(q * 14, 1.7));
+      d *= 1 - bead + bead * 2.2 * Math.max(0, 0.15 + nzB(q * 60, 0.7));
+      for (const t of tears) d *= 1 - t.depth * gauss(q - t.q, t.w);
+      return Math.max(0.01, d * (1 + 0.8 * bulgeAt(q)));
+    };
+    const kinkAt = (q) => tears.reduce((m, t) => m + t.kink * K * Math.tanh((q - t.q) / (t.w * 0.8)), 0);
+    const spineAt = (q) => kinkAt(q) + o.bendNoise * K * nz(q * 5, 4.1);
+    // fork: a secondary strand peels off to one side and rejoins
+    const forkAt = (q) => {
+      for (const sp of splits) if (q > sp.q0 && q < sp.q1) {
+        const x = (q - sp.q0) / (sp.q1 - sp.q0);
+        return { sp, env: Math.sin(Math.PI * Math.pow(x, 0.65)) ** 1.4 };
+      }
+      return null;
+    };
+
+    // capacity from the counts every layer asks for
+    const kk = K * K * amount;
+    const knotCount = knots.reduce((m, kn, ki) => m + kn.count * (ki ? o.dwarfGain : o.anchorGain), 0);
+    const cap = Math.ceil((o.count + o.halo.count + knotCount + o.debris.scatter
+      + o.debris.fans.reduce((m, fn) => m + fn.count * o.fanGain, 0)) * kk) + 64;
+    const S = new Float32Array(cap), DS = new Float32Array(cap), U0 = new Float32Array(cap), DU = new Float32Array(cap),
+      V0 = new Float32Array(cap), DV = new Float32Array(cap), A0 = new Float32Array(cap), PH = new Float32Array(cap),
+      MM = new Uint8Array(cap), KN = new Int8Array(cap);
+    let n = 0;
+    const add = (rr, s, ds, u0, du, v0, dv, a, sz, kn = -1, m = 1) => {
+      if (n >= cap) return;
+      S[n] = s; DS[n] = ds; U0[n] = u0; DU[n] = du; V0[n] = v0; DV[n] = dv; A0[n] = sz ? a * 2 : a; KN[n] = kn; PH[n] = rr(); MM[n] = m; n++;
+    };
+    // inverse-CDF sampler over q in [-0.04, 1.04]
+    const QN = 2048, qa = -0.04, qb = 1.04, cdf = new Float64Array(QN + 1);
+    for (let i = 0; i < QN; i++) cdf[i + 1] = cdf[i] + dens(qa + (qb - qa) * (i + 0.5) / QN);
+    const sampleQ = () => {
+      const x = r() * cdf[QN];
+      let lo = 0, hi = QN;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cdf[m] < x) lo = m; else hi = m; }
+      return qa + (qb - qa) * (lo + r()) / QN;
+    };
+    const flow = o.flow * K * pxS; // travel per life, in s units
+    const aS = o.alpha;
+    // stream
+    const fil = o.fil, nzC = makeNoise(r, 3);
+    const coreAt = (q) => o.core * smooth(0.3, 0.75, nzC(q * 40, 0.2)) * (1 - tearAt(q)) * (1 - edge(q)) * (1 - gauss(q - knots[0].q, o.coreClear));
+    for (let i = 0; i < o.count * K * K * amount; i++) {
+      const q = sampleQ(), sg = sigma(q), fk = forkAt(q);
+      let v = gn(r) * sg * (r() < coreAt(q) ? 0.3 : 1);
+      if (fil && r() < fil) { const fj = nzF[(r() * 3) | 0]; v = sg * 1.1 * fj(q * 7, 0.4) + gn(r) * sg * 0.22; }
+      if (fk) {
+        const { sp, env } = fk, sep = sp.sep * K * env;
+        if (r() < sp.frac * Math.sqrt(env)) v = sp.side * sep + gn(r) * sg * 0.45;
+        else v = -sp.side * sep * 0.2 + v * (1 - 0.35 * env);
+      }
+      v += spineAt(q);
+      const thin = Math.min(1.1, sg / (o.sig * K * (1 + bulgeAt(q))));
+      const tdim = 1 - 0.55 * tearAt(q);
+      const a = aS * (0.45 + 0.75 * r() * r() + 0.2) * (0.55 + 0.45 * thin) * tdim * (1 - 0.35 * edge(q));
+      const speed = 1 / Math.max(0.5, thin); // continuity: the thin neck flows faster
+      add(r, sOf(q), flow * speed * (0.6 + 0.8 * r()), 0, 0, v, 0, a, r() < 0.12 ? 1 : 0, -1, r() < 0.3 ? 2 : 1);
+    }
+    // halo: a noisy, wide, faint envelope
+    const h = o.halo;
+    for (let i = 0; i < h.count * K * K * amount; i++) {
+      const q = sampleQ(), sg = sigma(q) * h.mult * (0.7 + 0.6 * Math.abs(nz(q * 6, 9.3)));
+      const v = gn(r) * sg + spineAt(q) + h.mult * 2 * K * nz(q * 11, 2.2);
+      add(r, sOf(q), flow * 0.6 * (0.5 + r()), 0, 0, v, 0, h.alpha * (0.5 + r()) * (1 - 0.3 * edge(q)), 0, -1, 1);
+    }
+    // knots: ragged clumps of sub-gaussians
+    const rK = rng(SEED + 101);
+    const kv0 = new Float32Array(knots.length), kpulse = new Float32Array(knots.length);
+    knots.forEach((kn, ki) => {
+      const spread = kn.spread ?? 0.9;
+      const subs = SUBS[ki].map(([a, b, f]) => ({ du: a * kn.r * spread * K, dv: b * kn.r * spread * 0.66 * K, f }));
+      const tot = subs.reduce((m, s) => m + s.f, 0);
+      const q = kn.q, fk = forkAt(q);
+      const v0 = spineAt(q) + (kn.dv || 0) * K + (kn.strand && fk ? fk.sp.side * fk.sp.sep * K * fk.env : 0);
+      kv0[ki] = v0;
+      kpulse[ki] = kn.pulse ?? 0.14;
+      const gain = ki ? o.dwarfGain : o.anchorGain;
+      for (const sb of subs) {
+        const cnt = Math.round(kn.count * kk * gain * sb.f / tot);
+        const sr = kn.r * K * (sb.f === 1 ? (kn.mainR ?? 1) : (kn.subR ?? 0.6));
+        for (let i = 0; i < cnt; i++) {
+          const du = sb.du + gn(rK) * sr * (kn.along ?? 1.25), dv = sb.dv + gn(rK) * sr;
+          if (rK() > 0.55 + 0.45 * nzK(du / (4 * K), dv / (4 * K) + ki * 3)) continue; // ragged
+          add(rK, sOf(q), flow * 0.12, du, 0, v0 + dv, 0, kn.alpha * (0.5 + 0.7 * rK()), rK() < 0.25 ? 1 : 0, ki, 1);
+        }
+      }
+    });
+    // debris: feathers peeling off the outer side near the tear and the fork
+    const rD = rng(SEED + 202), d = o.debris;
+    d.fans.forEach((fn, fi) => {
+      for (let i = 0; i < fn.count * kk * o.fanGain; i++) {
+        const x = Math.max(0, Math.min(1, 0.5 + gn(rD) * 0.2)), q = fn.q0 + (fn.q1 - fn.q0) * x; // gaussian span: soft ends
+        if (rD() > fn.floor + (1 - fn.floor) * Math.max(0, nzK(q * fn.freq, fi * 7.1)) ** 0.6) continue; // feathers
+        const reach = fn.reach * K * (0.25 + 0.75 * Math.sin(Math.PI * x)) * (0.7 + 0.6 * Math.abs(nz(q * 9, fi + 2.3)));
+        const dist = sigma(q) * 1.1 + (-Math.log(rD() + 1e-9)) * reach;
+        const lg = fn.lag * (0.6 + 0.8 * rD()), du = -lg * dist - fn.curl * dist * dist / (reach * 4), dv = dist + gn(rD) * 1.5 * K;
+        const fade = Math.exp(-dist / (reach * 2));
+        const drift = 12 * K;
+        add(rD, sOf(q), 0, du, -lg * drift, dv + spineAt(q), drift, d.alpha * (0.4 + 0.8 * rD()) * (0.35 + 0.65 * fade), 0, -1, 1);
+      }
+    });
+    // sparse scatter on the outer side
+    for (let i = 0; i < d.scatter * kk; i++) {
+      const q = fn0(rD), sg = sigma(q);
+      const v = sg * 1.5 + (-Math.log(rD() + 1e-9)) * d.reach * K * (0.6 + 0.8 * Math.abs(nz(q * 7, 5.5)));
+      add(rD, sOf(q), flow * 0.4, 0, 0, v, 8 * K, d.alpha * (0.3 + 0.7 * rD()), 0, -1, 1);
+    }
+    function fn0(rr) {
+      const x = rr() * cdf[QN];
+      let lo = 0, hi = QN;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cdf[m] < x) lo = m; else hi = m; }
+      return qa + (qb - qa) * (lo + rr()) / QN;
+    }
+
+    // per-arc-sample tables the frame reads
+    const QT = new Float32Array(N), ENV = new Float32Array(N), S7 = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const q = qOf(i / (N - 1));
+      QT[i] = q;
+      ENV[i] = Math.sin(Math.PI * Math.max(0, Math.min(1, q)));
+      S7[i] = Math.sin(q * 7);
+    }
+    const idx = (q) => Math.max(0, Math.min(N - 1, Math.round(sOf(q) * (N - 1))));
+    return {
+      n, S, DS, U0, DU, V0, DV, A0, PH, MM, KN, X, Y, TX, TY, NX, NY, QT, ENV, S7, kv0, kpulse,
+      iq0: idx(0), iq1: idx(1), iqa: idx(-0.04), iqb: idx(1.04),
+    };
+  }
+
+  // --- per-frame state ---------------------------------------------------
+  const SX = new Float32Array(N), SY = new Float32Array(N), STX = new Float32Array(N), STY = new Float32Array(N),
+    SNX = new Float32Array(N), SNY = new Float32Array(N), breathe = new Float32Array(N), EF = new Float32Array(N);
+  const ks = new Float32Array(8);
+  const frame = { ph: 0, mot: 1, vsc: 1, aMul: 1, w: 1, energy: 1 };
+
+  // Soft-knee tone curve over lum 0..2: never a flat white blob. The toe
+  // drops the faintest bilinear fringe, so lone stars read crisp and the
+  // haze around the stream stays dark ground.
+  const KNEE = 0.55, TOE = 0.12, TONE = new Float32Array(1024);
+  for (let i = 0; i < 1024; i++) {
+    const v = i / 512;
+    TONE[i] = Math.min(1, v < KNEE ? v : KNEE + (1 - KNEE) * (1 - Math.exp(-(v - KNEE) / (1 - KNEE))));
+    TONE[i] *= smooth(TOE * 0.5, TOE * 1.5, v);
+  }
+  const pal = new Uint32Array(HB * 1024);
+  const inkRgb = Array.from({ length: HB }, () => [0, 0, 0]);
+  let groundPx = 0, palKey = '';
+  const pack = (r, g, b, a = 255) => ((a << 24) | (Math.round(b) << 16) | (Math.round(g) << 8) | Math.round(r)) >>> 0;
+  function buildPalette(values) {
+    const key = `${values.invert}|${values.saturation}|${values.colorMode}|${values.hue}|${values.hueB}`;
+    if (key === palKey) return;
+    palKey = key;
+    const inv = values.invert;
+    const g = inv ? [242, 242, 244] : [10, 10, 13];
+    for (let b = 0; b < HB; b++) {
+      const stop = paletteHsl(values, b / (HB - 1));
+      // House look: near-white ink; colour, when asked for, deepens it a little.
+      const ink = hslToRgb(stop.h, stop.s, inv ? 0.12 : 0.89 - 0.2 * stop.s);
+      inkRgb[b] = ink;
+      for (let l = 0; l < 1024; l++) {
+        const al = TONE[l];
+        // Opaque, pre-composited: additive over the dark ground, a plain
+        // blend over the light one. Exact integers keep the monochrome
+        // default neutral (chroma never above the ground's own 3).
+        pal[b * 1024 + l] = inv
+          ? pack(g[0] + (ink[0] - g[0]) * al, g[1] + (ink[1] - g[1]) * al, g[2] + (ink[2] - g[2]) * al)
+          : pack(Math.min(255, g[0] + Math.round(ink[0] * al)), Math.min(255, g[1] + Math.round(ink[1] * al)), Math.min(255, g[2] + Math.round(ink[2] * al)));
+      }
+    }
+    groundPx = pack(g[0], g[1], g[2]);
+  }
+
+  let bridge = null, bridgeKey = '';
+  function countFactor() {
+    // More stars on a bigger screen, within limits; alpha covers the rest.
+    return Math.min(2, Math.max(0.5, Math.round(fit * fit * 20) / 20));
+  }
+  function ensureBridge(values) {
+    const density = Math.round(values.density * 100) / 100;
+    const tear = Math.round((values.tear ?? 1) * 100) / 100;
+    const cf = countFactor();
+    const key = `${density}|${tear}|${cf}`;
+    if (key === bridgeKey) return;
+    bridgeKey = key;
+    bridge = build(tear, density * cf);
+  }
+
+  // Lay the frame out: the screen-space arc tables (one affine from design
+  // space, with Scale and Angle about the centre), breathing, end taper.
+  function layout(values, clock) {
+    const b = bridge;
+    const zs = 0.4 + 0.6 * values.scale;
+    const z = fit * zs;
+    const th = values.angle * Math.PI / 180, ca = Math.cos(th), sa = Math.sin(th);
+    const cx = W / 2, cy = H / 2, dcx = DW / 2, dcy = DH / 2;
+    for (let i = 0; i < N; i++) {
+      const dx = b.X[i] - dcx, dy = b.Y[i] - dcy;
+      SX[i] = cx + z * (ca * dx - sa * dy);
+      SY[i] = cy + z * (sa * dx + ca * dy);
+      STX[i] = z * (ca * b.TX[i] - sa * b.TY[i]);
+      STY[i] = z * (sa * b.TX[i] + ca * b.TY[i]);
+      SNX[i] = z * (ca * b.NX[i] - sa * b.NY[i]);
+      SNY[i] = z * (sa * b.NX[i] + ca * b.NY[i]);
+    }
+    const mot = values.motion;
+    const ph = clock / PERIOD + values.phase * 0.5;
+    const b1 = Math.sin(TAU * ph), b2 = Math.sin(TAU * 2 * ph + 1.3);
+    for (let i = 0; i < N; i++) breathe[i] = mot * b.ENV[i] * K * (5 * b1 + 1.5 * b2 * b.S7[i]);
+    for (let ki = 0; ki < b.kpulse.length; ki++) ks[ki] = 1 - mot * b.kpulse[ki] * Math.sin(TAU * ph + ki * 1.9);
+    frame.ph = ph;
+    frame.mot = mot;
+    frame.vsc = 1 + mot * 0.035 * Math.sin(TAU * ph + 0.6);
+
+    // End taper. At the default framing the stream's ends sit off-frame;
+    // when Scale or Angle brings an end inward, fade it out instead of
+    // showing where the stars stop.
+    const out = (x, y) => Math.max(-x, x - W, -y, y - H);
+    const ref = (i) => out(cx + fit * (b.X[i] - dcx), cy + fit * (b.Y[i] - dcy));
+    const span = 150 * fit;
+    const cutA = smooth(0, span, ref(b.iqa) - out(SX[b.iqa], SY[b.iqa]));
+    const cutB = smooth(0, span, ref(b.iqb) - out(SX[b.iqb], SY[b.iqb]));
+    for (let i = 0; i < N; i++) {
+      const q = b.QT[i];
+      EF[i] = (1 - cutA * (1 - smooth(-0.04, 0.12, q))) * (1 - cutB * (1 - smooth(1.04, 0.88, q)));
+    }
+
+    // Stars per pixel change with zoom and screen size: alpha follows, so
+    // the stream keeps its tone (a little brighter when zoomed in).
+    const zoomComp = zs < 1 ? zs : Math.pow(zs, 1.5);
+    frame.aMul = values.opacity * zoomComp * (fit * fit) / countFactor();
+    // Stroke is the dot: 1 px at 1 (bilinear), crisper below, a wider and
+    // brighter box up to 2 px above.
+    frame.w = values.stroke <= 1 ? 0.35 + 0.65 * values.stroke : values.stroke;
+    frame.energy = Math.max(1, frame.w);
+  }
+
+  function splat() {
+    const b = bridge, n = b.n;
+    const { S, DS, U0, DU, V0, DV, A0, PH, MM, KN, kv0 } = b;
+    const { ph, mot, vsc, aMul, w, energy } = frame;
+    const fast = Math.abs(w - 1) < 1e-6;
+    const xMax = W - (w > 1 ? 3 : 1), yMax = H - (w > 1 ? 3 : 1);
+    const norm = (energy / (w * w));
+    lum.fill(0);
+    for (let p = 0; p < n; p++) {
+      const life = frac(ph * MM[p] + PH[p]);
+      let f = life < 0.22 ? life / 0.22 : life > 0.78 ? (1 - life) / 0.22 : 1;
+      f = f * f * (3 - 2 * f);
+      let a = A0[p] * f * aMul;
+      if (a < 0.003) continue;
+      const t = (life - 0.5) * mot;
+      let fi = (S[p] + DS[p] * t) * (N - 1);
+      if (fi < 0) fi = 0; else if (fi > N - 1.001) fi = N - 1.001;
+      const i = fi | 0, fr = fi - i;
+      a *= EF[i];
+      let u = U0[p] + DU[p] * t, v = V0[p] + DV[p] * t;
+      const kn = KN[p];
+      if (kn >= 0) { u *= ks[kn]; v = kv0[kn] + (v - kv0[kn]) * ks[kn]; }
+      v = v * vsc + breathe[i];
+      const x = SX[i] + (SX[i + 1] - SX[i]) * fr + STX[i] * u + SNX[i] * v;
+      const y = SY[i] + (SY[i + 1] - SY[i]) * fr + STY[i] * u + SNY[i] * v;
+      if (x < 0 || y < 0 || x >= xMax || y >= yMax) continue;
+      const x0 = x | 0, y0 = y | 0;
+      if (fast) {
+        const fx = x - x0, fy = y - y0, j = y0 * W + x0;
+        lum[j] += a * (1 - fx) * (1 - fy); lum[j + 1] += a * fx * (1 - fy);
+        lum[j + W] += a * (1 - fx) * fy; lum[j + W + 1] += a * fx * fy;
+      } else {
+        // box footprint [x, x+w] x [y, y+w], area-weighted per pixel
+        const x1 = x + w, y1 = y + w, an = a * norm;
+        for (let yy = y0; yy < y1; yy++) {
+          const oy = Math.min(y1, yy + 1) - Math.max(y, yy);
+          if (oy <= 0) continue;
+          const row = yy * W;
+          for (let xx = x0; xx < x1; xx++) {
+            const ox = Math.min(x1, xx + 1) - Math.max(x, xx);
+            if (ox > 0) lum[row + xx] += an * ox * oy;
+          }
+        }
+      }
+    }
+  }
+
+  // Gradient position f (0 at the stream's bottom-left end, 1 at its other
+  // end) as a linear function of screen position, pre-scaled to buckets.
+  function gradientRamp() {
+    const b = bridge;
+    const ax = SX[b.iq0], ay = SY[b.iq0], dx = SX[b.iq1] - ax, dy = SY[b.iq1] - ay;
+    const l2 = Math.max(1, dx * dx + dy * dy);
+    const gx = (dx / l2) * HB, gy = (dy / l2) * HB;
+    return { gx, gy, g0: -(ax * gx + ay * gy) };
+  }
+
+  function composite(values) {
+    const flat = values.saturation === 0 || values.colorMode === 'solid';
+    const e = W * H;
+    if (flat) {
+      for (let j = 0; j < e; j++) {
+        const v = lum[j];
+        px32[j] = v <= 0 ? groundPx : pal[v >= 1.998 ? 1023 : (v * 512) | 0];
+      }
+    } else {
+      const { gx, gy, g0 } = gradientRamp();
+      for (let y = 0, j = 0; y < H; y++) {
+        let fb = g0 + gy * y;
+        for (let x = 0; x < W; x++, j++, fb += gx) {
+          const v = lum[j];
+          if (v <= 0) { px32[j] = groundPx; continue; }
+          const bk = fb < 0 ? 0 : fb >= HB - 1 ? HB - 1 : fb | 0;
+          px32[j] = pal[bk * 1024 + (v >= 1.998 ? 1023 : (v * 512) | 0)];
+        }
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+
+  // Glow: the luminance pooled into coarse cells, blurred, and laid back
+  // over the frame (added on the dark ground, blended on the light one).
+  function drawGlow(values) {
+    if (values.glow <= 0) return;
+    glowBuf.fill(0);
+    for (let y = 0, j = 0; y < H; y++) {
+      const row = ((y / GLOW_CELL) | 0) * gw;
+      for (let x = 0; x < W; x++, j++) {
+        const v = lum[j];
+        if (v > 0) glowBuf[row + ((x / GLOW_CELL) | 0)] += v > 2 ? 2 : v;
+      }
+    }
+    for (let pass = 0; pass < 2; pass++) {
+      for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+        let s = 0, c = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= gw || yy >= gh) continue;
+          s += glowBuf[yy * gw + xx]; c++;
+        }
+        glowTmp[y * gw + x] = s / c;
+      }
+      glowBuf.set(glowTmp);
+    }
+    const flat = values.saturation === 0 || values.colorMode === 'solid';
+    const { gx, gy, g0 } = gradientRamp();
+    const gain = values.glow * 0.9 / (GLOW_CELL * GLOW_CELL);
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+      const j = y * gw + x;
+      const al = Math.min(1, glowBuf[j] * gain);
+      if (al < 0.004) { glowPx[j] = 0; continue; }
+      let bk = 0;
+      if (!flat) {
+        const fb = g0 + gx * (x + 0.5) * GLOW_CELL + gy * (y + 0.5) * GLOW_CELL;
+        bk = fb < 0 ? 0 : fb >= HB - 1 ? HB - 1 : fb | 0;
+      }
+      const ink = inkRgb[bk];
+      glowPx[j] = pack(ink[0], ink[1], ink[2], Math.round(al * 255));
+    }
+    glowCtx.putImageData(glowImg, 0, 0);
+    ctx.save();
+    ctx.globalCompositeOperation = values.invert ? 'source-over' : 'lighter';
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(glowCanvas, 0, 0, gw * GLOW_CELL, gh * GLOW_CELL);
+    ctx.restore();
+  }
+
+  let clock = 0;
+  function drawFrame(dt, values) {
+    clock += dt * values.speed;
+    ensureBridge(values);
+    buildPalette(values);
+    layout(values, clock);
+    splat();
+    composite(values);
+    drawGlow(values);
+  }
+
+  // A capped, representative sample of the current frame, as circles.
+  function svgCircles(values) {
+    const b = bridge, n = b.n;
+    const { ph, mot, vsc, aMul, w } = frame;
+    const stride = Math.max(1, Math.ceil(n / SVG_CAP));
+    const flat = values.saturation === 0 || values.colorMode === 'solid';
+    const { gx, gy, g0 } = gradientRamp();
+    const hex = inkRgb.map(([r, g, bl]) => `#${[r, g, bl].map((c) => c.toString(16).padStart(2, '0')).join('')}`);
+    const out = [];
+    for (let p = 0; p < n; p += stride) {
+      const life = frac(ph * b.MM[p] + b.PH[p]);
+      let f = life < 0.22 ? life / 0.22 : life > 0.78 ? (1 - life) / 0.22 : 1;
+      f = f * f * (3 - 2 * f);
+      const t = (life - 0.5) * mot;
+      let fi = (b.S[p] + b.DS[p] * t) * (N - 1);
+      if (fi < 0) fi = 0; else if (fi > N - 1.001) fi = N - 1.001;
+      const i = fi | 0, fr = fi - i;
+      const a = b.A0[p] * f * aMul * EF[i] * stride * 0.5;
+      if (a < 0.02) continue;
+      let u = b.U0[p] + b.DU[p] * t, v = b.V0[p] + b.DV[p] * t;
+      const kn = b.KN[p];
+      if (kn >= 0) { u *= ks[kn]; v = b.kv0[kn] + (v - b.kv0[kn]) * ks[kn]; }
+      v = v * vsc + breathe[i];
+      const x = SX[i] + (SX[i + 1] - SX[i]) * fr + STX[i] * u + SNX[i] * v;
+      const y = SY[i] + (SY[i + 1] - SY[i]) * fr + STY[i] * u + SNY[i] * v;
+      if (x < 0 || y < 0 || x > W || y > H) continue;
+      const fb = g0 + gx * x + gy * y;
+      const bk = flat ? 0 : fb < 0 ? 0 : fb >= HB - 1 ? HB - 1 : fb | 0;
+      out.push({ cx: x + w / 2, cy: y + w / 2, r: w / 2, fill: hex[bk], opacity: Math.min(1, a) });
+    }
+    return out;
+  }
+
+  const loop = createLoop({
+    onFrame(dt) {
+      drawFrame(dt, currentValues);
+    },
+  });
+  loop.start();
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => {
+    if (bridge) exportSvg([], { width: canvas.width, height: canvas.height, circles: svgCircles(currentValues) });
+  });
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

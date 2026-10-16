@@ -361,19 +361,29 @@ review) before merge, not after.
 - **ASCII art brought to life.** This builds on the glyph-mark capability
   in `cipher-bloom`.
 - **A space series.** The owner's idea (2026-10-10): a run of compositions
-  built around space (planets, galaxies, nebulae), probably as its own
-  collection. Same house look and framing rules as everything else.
-  - Several pieces already sit near this subject (`globe`, `orbitals`,
-    `infall`), so each new one has to read as its own idea next to them,
-    not as a sibling of one of them.
-  - The originality risk is higher here than anywhere else in the
-    collection. Check every concept and name against the private
-    avoid-list *before* any design work, not after.
-  - Start with a throwaway sketch round, like the 2026-10-07 one, and build
-    only the strongest. Seeds that steer clear of spheres, spirals and
-    rings: a nebula as a slow, drifting cloud of hairline light; a galaxy
-    seen edge-on as one long, thin dust lane; a planet's terminator (the
-    line between day and night) seen close up, bleeding off the frame.
+  built around space (planets, galaxies, nebulae), as its own collection.
+  Same house look and framing rules as everything else.
+  - **Started 2026-10-15.** Five pieces shipped as the Space collection:
+    `magnetosphere` (a field tail pinching where it reconnects, with a
+    bow shock ahead of it), `dust-lane` (an edge-on galaxy split by its
+    dust lane), `tidal-bridge` (a torn stream of stars between two
+    galaxies off-frame), `terminator` (a cratered planet's day/night line
+    from low orbit) and `dark-nebula` (a dust cloud carved out of a
+    starfield, lit along one face).
+  - `dust-lane` took a motion rework before it shipped. Its first loop
+    faded every star on its own cycle, which averaged into a shimmer that
+    read as smudging, not rotation. Stars now ride fixed orbits, the dust
+    and young clusters travel with the disc, and the tilt rocks slowly.
+  - They came from two throwaway sketch rounds across the subject, then at
+    least three rounds of variants per chosen subject, with every concept
+    and name checked against the private avoid-list first. Sketches that drifted toward a sphere, a spiral, rings
+    or an existing piece (`globe`, `orbitals`, `infall`) were cut.
+  - **Lesson:** three of the stipple prototypes (`tidal-bridge`,
+    `dust-lane` and `dark-nebula`) came in over the ink ceiling at
+    thumbnail size (0.20 to 0.28 against 0.15), and their builds had to
+    thin a haze or a starfield to pass. Run `collection-check` on sketches
+    before the owner picks one, so the version they approve is one that
+    can ship as is.
 - **Publishing `shared/` to npm.** Declined for v1.0.0. It's six small
   dependency-free modules that pieces already inline. Weighed against
   permanent version discipline and a second install path, for an audience
@@ -390,7 +400,7 @@ review) before merge, not after.
 Every row is **generated**, not hand-recorded. Run `npm run collection-metrics`
 and paste its output here verbatim; it prints this exact table, already
 sorted by ink. Rebuild thumbnails (`npm run build`) first, because it
-measures the committed PNGs. Refreshed 2026-10-10, after the framing pass.
+measures the committed PNGs. Refreshed 2026-10-15, after the space series.
 
 **Hue is no longer a useful column, and that's success, not a gap.** Every
 piece now reports hue 240 — that's not a real colour, it's the ground's own
@@ -411,18 +421,23 @@ Ink, not hue, is now the axis that tells pieces apart.
 | 240 | 0.04 | 0.00 | 0.071 | `swell` |
 | 240 | 0.06 | 0.00 | 0.083 | `bristle` |
 | 240 | 0.09 | 0.00 | 0.087 | `orbitals` |
+| 240 | 0.11 | 0.00 | 0.088 | `magnetosphere` |
+| 240 | 0.14 | 0.00 | 0.089 | `fracture` |
 | 240 | 0.13 | 0.00 | 0.093 | `wireframe-lattice` |
-| 240 | 0.12 | 0.00 | 0.098 | `louvre` |
-| 240 | 0.09 | 0.00 | 0.100 | `fracture` |
+| 240 | 0.12 | 0.00 | 0.101 | `louvre` |
 | 240 | 0.09 | 0.00 | 0.108 | `flow-field` |
 | 240 | 0.12 | 0.00 | 0.116 | `driftwork` |
 | 240 | 0.05 | 0.00 | 0.118 | `pleat` |
 | 240 | 0.08 | 0.00 | 0.118 | `cipher-bloom` |
 | 240 | 0.08 | 0.00 | 0.135 | `infall` |
 | 240 | 0.06 | 0.00 | 0.136 | `longwave` |
+| 240 | 0.10 | 0.00 | 0.136 | `tidal-bridge` |
 | 240 | 0.14 | 0.00 | 0.137 | `globe` |
 | 240 | 0.12 | 0.00 | 0.138 | `parallax` |
+| 240 | 0.03 | 0.00 | 0.138 | `dust-lane` |
+| 240 | 0.13 | 0.00 | 0.139 | `dark-nebula` |
 | 240 | 0.08 | 0.00 | 0.141 | `moire` |
+| 240 | 0.05 | 0.00 | 0.142 | `terminator` |
 
 **Sat (check)** is what `collection-check` gates on (chroma-floored; see
 Chunk 2.2), against the §1 ceiling of 0.06. It reads 0.00 for every piece:

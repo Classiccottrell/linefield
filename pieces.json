@@ -214,5 +214,50 @@
     "hue": 168, "hueB": 312, "saturation": 0,
     "safeZone": "upper left, above the crack",
     "anchor": "the crack's widest stretch, just right of centre"
+  },
+  {
+    "slug": "magnetosphere",
+    "title": "Magnetosphere",
+    "blurb": "A tiny quiet body whose field is pushed in on the sunward side and drawn out into a long tail of hairlines that pinches and flares where it reconnects, with a solar-wind stream piling into a bow shock ahead of it.",
+    "tags": ["kinetic", "flow", "celestial"],
+    "hue": 175, "hueB": 290, "saturation": 0,
+    "safeZone": "top band",
+    "anchor": "the reconnection pinch in the tail, right of centre"
+  },
+  {
+    "slug": "tidal-bridge",
+    "title": "Tidal Bridge",
+    "blurb": "A torn, C-shaped stream of stippled stars arcing between two galaxies off-frame, with knots condensing along it and faint debris feathers peeling away as the stars flow through.",
+    "tags": ["grain", "flow", "celestial"],
+    "hue": 210, "hueB": 340, "saturation": 0,
+    "safeZone": "top-left, inside the arc's bow",
+    "anchor": "the knot mid-stream, just right of centre"
+  },
+  {
+    "slug": "dark-nebula",
+    "title": "Dark Nebula",
+    "blurb": "One billowed dust cloud carved out of a stippled starfield as pure negative space, its upper-right face lit by a hidden star in stipple and fine wisps.",
+    "tags": ["grain", "depth", "celestial"],
+    "hue": 28, "hueB": 215, "saturation": 0,
+    "safeZone": "the dark body of the cloud, left",
+    "anchor": "the young star at the cloud's rim"
+  },
+  {
+    "slug": "terminator",
+    "title": "Terminator",
+    "blurb": "A cratered planet seen from low orbit in stipple: a shallow horizon across the upper third, lit ground on the left and a ragged day/night line coming down the frame, where crater rims flare and peaks catch light out in the night as the ground turns into dawn.",
+    "tags": ["grain", "depth", "celestial"],
+    "hue": 44, "hueB": 18, "saturation": 0,
+    "safeZone": "the sky above the horizon",
+    "anchor": "crater rims flaring along the terminator"
+  },
+  {
+    "slug": "dust-lane",
+    "title": "Dust Lane",
+    "blurb": "A disc galaxy seen almost edge-on in fine stipple, its bright bulge cut by a ragged dark lane of dust that the turning disc carries along.",
+    "tags": ["grain", "depth", "celestial"],
+    "hue": 330, "hueB": 215, "saturation": 0,
+    "safeZone": "the bottom third, and the top band above the bulge",
+    "anchor": "the bulge, just above and right of centre, behind the lane"
   }
 ]

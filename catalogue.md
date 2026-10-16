@@ -217,3 +217,48 @@ One long jagged crack across a full-bleed field of faint diagonal hairlines, its
 - **Text-safe zone:** upper left, above the crack
 - **Anchor:** the crack's widest stretch, just right of centre
 - **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Shards
+
+## Magnetosphere
+
+A tiny quiet body whose field is pushed in on the sunward side and drawn out into a long tail of hairlines that pinches and flares where it reconnects, with a solar-wind stream piling into a bow shock ahead of it.
+
+- **Tags:** kinetic, flow, celestial
+- **Text-safe zone:** top band
+- **Anchor:** the reconnection pinch in the tail, right of centre
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Wind
+
+## Tidal Bridge
+
+A torn, C-shaped stream of stippled stars arcing between two galaxies off-frame, with knots condensing along it and faint debris feathers peeling away as the stars flow through.
+
+- **Tags:** grain, flow, celestial
+- **Text-safe zone:** top-left, inside the arc's bow
+- **Anchor:** the knot mid-stream, just right of centre
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Tear
+
+## Dark Nebula
+
+One billowed dust cloud carved out of a stippled starfield as pure negative space, its upper-right face lit by a hidden star in stipple and fine wisps.
+
+- **Tags:** grain, depth, celestial
+- **Text-safe zone:** the dark body of the cloud, left
+- **Anchor:** the young star at the cloud's rim
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Rim
+
+## Terminator
+
+A cratered planet seen from low orbit in stipple: a shallow horizon across the upper third, lit ground on the left and a ragged day/night line coming down the frame, where crater rims flare and peaks catch light out in the night as the ground turns into dawn.
+
+- **Tags:** grain, depth, celestial
+- **Text-safe zone:** the sky above the horizon
+- **Anchor:** crater rims flaring along the terminator
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Sun
+
+## Dust Lane
+
+A disc galaxy seen almost edge-on in fine stipple, its bright bulge cut by a ragged dark lane of dust that the turning disc carries along.
+
+- **Tags:** grain, depth, celestial
+- **Text-safe zone:** the bottom third, and the top band above the bulge
+- **Anchor:** the bulge, just above and right of centre, behind the lane
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Rock

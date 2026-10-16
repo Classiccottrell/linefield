@@ -23,5 +23,10 @@
     "id": "codes",
     "title": "Codes",
     "slugs": ["cipher-bloom", "relay"]
+  },
+  {
+    "id": "space",
+    "title": "Space",
+    "slugs": ["magnetosphere", "dust-lane", "tidal-bridge", "terminator", "dark-nebula"]
   }
 ]

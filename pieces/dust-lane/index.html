@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — dust-lane</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  dust-lane — a disc galaxy seen almost edge-on in fine stipple, its bright
+  bulge cut by a ragged dark lane of dust that the turning disc carries along.
+
+  Anchor: the bulge, just above and right of centre, behind the lane. It
+  stays in place; the disc turns through it, and the lane rises and settles
+  across it as the tilt rocks.
+  Text-safe zone: the bottom third of the frame, and the top band above the
+  bulge (about the top fifth). Both are clear at the default framing and
+  close as Scale rises.
+
+  Technique (stipple / lit volume): stars and dust are sampled once in 3D
+  (X along the major axis, Y depth, Z out of the disc), tilted a few degrees
+  and projected. Light is summed into a float buffer by hand and written
+  through ImageData via a tone table. A star is dimmed only by dust in front
+  of it: the static, clumpy dust is binned into depth slabs and cumulated
+  front to back, precomputed at tilt steps of 0.34 deg and the two nearest
+  steps blended while the tilt rocks. Moving dust (clumps, tendrils) and
+  young clusters are rigid groups carried round with the disc, fading in and
+  out over their life; their depth sits in moment grids rebuilt each frame.
+
+  Motion: a seamless 30 s loop at Speed 1. Stars ride fixed orbits as
+  "necklaces": a ring of n identical beads turns m/n of a turn per loop, so
+  every bead ends on its neighbour's start and no star ever fades. The near
+  side of the disc runs one way across the frame and the far side the other.
+  The tilt rocks once per loop, 3.5 to 7.0 deg at Rock 1.
+
+  Controls: Scale sizes the galaxy (projection zoom; star count follows the
+  projected area, so the grain holds, coarsening a little past Scale 1 to
+  cap the cost). Density sets the star count,
+  Stroke the dot size, Opacity the exposure, Angle the position angle on
+  screen. Motion scales the secondary drift (dust groups, clusters, the
+  background twinkle); Speed the loop rate; Phase where in the loop it is.
+  Glow adds a bloom from the light buffer itself. Rock (0-2) sets how far the
+  tilt rocks: 0 holds it at 6.3 deg, 1 is 3.5-7.0 deg, 2 opens it to
+  2.2-7.0 deg. The top end never passes 7.0 deg.
+  Nothing rebuilds on a control change: the dust steps are built once (the
+  four below 3.5 deg the first time Rock asks for them), and Density and
+  Scale draw a prefix of one growing star list, cut on whole necklaces.
+
+  SVG export: stipple of several hundred thousand dots can't go into an SVG
+  whole. The SVG carries a capped, uniform sample of the current frame's dots
+  (at most 16,000 disc stars plus the clusters and background stars) as
+  <circle>s in screen space with Angle applied, each at its own brightness
+  after the dust in front of it, so the lane still reads. Use PNG for the
+  full grain.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'dust-lane';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const TAU = Math.PI * 2;
+  const LOOP = 30; // seconds per seamless loop at Speed 1
+  // The loop's key frame (tilt 6.3 deg) sits this far in, which is
+  // where the gallery's still and thumbnail are taken.
+  const T0 = 4;
+  // The galaxy is built once in base units: 1 unit = 1 px at 1280x800
+  // and Scale 1. Scale and the canvas size only change the projection.
+  const BASE_W = 1280, BASE_H = 800;
+  const M = {
+    seed: 11, pa: -0.1, cx: 0.5, cy: 0.47,
+    Rd: 210, Rmax: 570, hz: 7, hzThick: 20, thickFrac: 0.2, thin: 0.6, warpA: 28, warpR: 330,
+    nDisc: 230000, nBulge: 110000, bulgeA: 115, bulgeQ: 0.7, bulgeCap: 2.6, bulgeSpin: 0.6,
+    nBg: 1100, bgA: 0.95, twinkle: 0.05,
+    clusters: 12, clusterN: 140, clusterSig: 3.2, clusterLum: 1.25, farClusters: 3,
+    dustN: 70000, dustRd: 420, dustHole: 30, dustRmax: 600, hd: 3.2, dustTau: 4,
+    dustLam: 70, dustClump: 1.9, corrug: 1.2,
+    clumps: 160, clumpN: 60, clumpMass: 1.35, fils: 40, filN: 70, filH: 55, filMass: 1.7, filNear: 2.2,
+    groupFade: 0.25,
+    vmax: 14, vR1: 45, vR2: 120,
+    peak: 0.76, gamma: 0.85, toe0: 0.03, toe1: 0.19,
+    depthK: 1, depthW: 12,
+    slabs: [-0.6, -0.3, -0.13, -0.05, 0, 0.05, 0.13, 0.3, 0.6], baseV: 100,
+    minA: 0.002, // per-dot floor: fainter dots are skipped
+  };
+  const NBASE = M.nDisc + M.nBulge; // stars at Density 1, Scale 1
+
+  // Tilt in radians; negative tips the near side down, so the lane sits
+  // below the bulge. Rock 1 swings between TOP (7.0 deg) and LOW1 (3.55 deg)
+  // and passes KEY (6.3 deg) at t = 0; Rock 2 opens the low end to LOW2.
+  const TILT_TOP = -0.122, TILT_KEY = -0.110, TILT_LOW1 = -0.062, TILT_LOW2 = -0.038;
+  const ROCK_PH = -0.6435; // sin(ROCK_PH) = -0.6
+  const KF_STEP = 0.006; // one dust step, 0.34 deg
+  const KF_N = Math.round((TILT_LOW2 - TILT_TOP) / KF_STEP) + 1; // 15
+  const KF_UP_FRONT = Math.round((TILT_LOW1 - TILT_TOP) / KF_STEP) + 1; // 11
+
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  // Value-noise fbm: less stripy than summed sines; it clumps the dust.
+  function makeFbm(r, oct) {
+    const N = 256, tab = new Float32Array(N * N);
+    for (let i = 0; i < tab.length; i++) tab[i] = r() * 2 - 1;
+    const n = (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+      const x0 = xi & 255, y0 = yi & 255, x1 = (x0 + 1) & 255, y1 = (y0 + 1) & 255;
+      const a = tab[y0 * N + x0], b = tab[y0 * N + x1], c = tab[y1 * N + x0], d = tab[y1 * N + x1];
+      const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+      return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+    };
+    return (x, y) => {
+      let s = 0, amp = 1, f = 1, norm = 0;
+      for (let i = 0; i < oct; i++) { s += amp * n(x * f + i * 17.3, y * f + i * 9.1); norm += amp; amp *= 0.55; f *= 2.03; }
+      return s / norm;
+    };
+  }
+  const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+  // ---------- the model ----------
+  // One stream for the dust and the moving dust groups; stars, clusters and
+  // the background each have their own, so growing one never moves another.
+  const r = rng(M.seed * 9973 + 1);
+  const fbm = makeFbm(r, 4), fbm2 = makeFbm(r, 3);
+  const Rmax = M.Rmax, A = M.bulgeA;
+  const speedAt = (R) => M.vmax * (1 - Math.exp(-R / M.vR1)) * Math.sqrt(M.vR2 / (M.vR2 + R)) * 1.25;
+  const warpAt = (R) => M.warpA * Math.pow(Math.max(0, (R - M.warpR) / (Rmax - M.warpR)), 2);
+
+  // Moving-dust grid in band coords: interleaved [mass, mass*depth, mass*depth^2].
+  const DU = 2, DV = 1;
+  const U0 = Math.ceil(Rmax + 30), V0 = Math.ceil(0.17 * BASE_H);
+  const GU = Math.ceil((2 * U0) / DU) + 2, GV = Math.ceil((2 * V0) / DV) + 2;
+  const grid = new Float32Array(GU * GV * 3);
+  function splatM(u, v, m, z) {
+    const gx = (u + U0) / DU, gy = (v + V0) / DV;
+    const ix = gx | 0, iy = gy | 0;
+    if (ix < 1 || iy < 1 || ix >= GU - 2 || iy >= GV - 2) return;
+    const g = grid, fx = gx - ix, fy = gy - iy, o = (iy * GU + ix) * 3, z2 = z * z;
+    let w = m * (1 - fx) * (1 - fy); g[o] += w; g[o + 1] += w * z; g[o + 2] += w * z2;
+    w = m * fx * (1 - fy); g[o + 3] += w; g[o + 4] += w * z; g[o + 5] += w * z2;
+    const o2 = o + GU * 3;
+    w = m * (1 - fx) * fy; g[o2] += w; g[o2 + 1] += w * z; g[o2 + 2] += w * z2;
+    w = m * fx * fy; g[o2 + 3] += w; g[o2 + 4] += w * z; g[o2 + 5] += w * z2;
+  }
+
+  // Static dust: a clumpy, corrugated sheet, kept as 3D points so it can be
+  // projected at any tilt.
+  const hd = M.hd, dRd = M.dustRd, dRmax = M.dustRmax, lam = M.dustLam;
+  const bX = new Float32Array(M.dustN), bY = new Float32Array(M.dustN), bZ = new Float32Array(M.dustN);
+  let nB = 0;
+  {
+    let guard = 0;
+    while (nB < M.dustN && guard++ < M.dustN * 40) {
+      const R = -dRd * Math.log(r() * r());
+      if (R > dRmax * (0.85 + 0.3 * r())) continue;
+      if (r() > 1 - Math.exp(-(R * R) / (M.dustHole * M.dustHole))) continue;
+      const ph = r() * TAU, X = R * Math.cos(ph), Y = R * Math.sin(ph);
+      const c = Math.max(0, 0.3 + M.dustClump * fbm(X / lam, Y / lam));
+      if (r() * 1.6 > c) continue;
+      const lap = (r() < 0.5 ? -1 : 1) * Math.log(1 - r() * 0.98);
+      bX[nB] = X; bY[nB] = Y;
+      bZ[nB] = M.corrug * hd * 2.2 * fbm2(X / (lam * 1.6), Y / (lam * 1.6)) + hd * (0.7 + 0.6 * c) * lap + warpAt(R) * (X / R);
+      nB++;
+    }
+  }
+  // Depth slabs; a branch-free slab lookup for the star loop (the bounds are
+  // multiples of 0.005 Rmax).
+  const bounds = M.slabs.map((s) => s * Rmax), NS = bounds.length + 1;
+  const slabOf = (zc) => { let s = 0; while (s < bounds.length && zc > bounds[s]) s++; return s; };
+  const SL = new Uint8Array(301);
+  for (let i = 0; i <= 300; i++) SL[i] = slabOf((i / 200 - 0.75 + 0.0025) * Rmax);
+  const SLK = 200 / Rmax;
+  const BV0 = Math.ceil(M.baseV), BGV = Math.ceil((2 * BV0) / DV) + 2, BGN = GU * BGV;
+  const slabTmp = [];
+  for (let s = 0; s < NS; s++) slabTmp.push(new Float32Array(BGN));
+  const tmp1 = new Float32Array(BGN);
+  function blur1(g) {
+    for (let y = 0; y < BGV; y++) for (let x = 1; x < GU - 1; x++) { const o = y * GU + x; tmp1[o] = 0.25 * g[o - 1] + 0.5 * g[o] + 0.25 * g[o + 1]; }
+    for (let y = 1; y < BGV - 1; y++) for (let x = 0; x < GU; x++) { const o = y * GU + x; g[o] = 0.25 * tmp1[o - GU] + 0.5 * tmp1[o] + 0.25 * tmp1[o + GU]; }
+  }
+  function projectSlabs(tl) {
+    const ce = Math.cos(tl), se = Math.sin(tl);
+    for (let s = 0; s < NS; s++) slabTmp[s].fill(0);
+    for (let i = 0; i < nB; i++) {
+      const X = bX[i], Y = bY[i], Z = bZ[i], v = Z * ce - Y * se, g = slabTmp[slabOf(Y * ce + Z * se)];
+      const gx = (X + U0) / DU, gy = (v + BV0) / DV, ix = gx | 0, iy = gy | 0;
+      if (ix < 1 || iy < 1 || ix >= GU - 2 || iy >= BGV - 2) continue;
+      const fx = gx - ix, fy = gy - iy, o = iy * GU + ix;
+      g[o] += (1 - fx) * (1 - fy); g[o + 1] += fx * (1 - fy); g[o + GU] += (1 - fx) * fy; g[o + GU + 1] += fx * fy;
+    }
+    for (let s = 0; s < NS; s++) blur1(slabTmp[s]);
+  }
+  // Normalise at the key tilt so the darkest column reaches dustTau.
+  let bMass = 1;
+  {
+    projectSlabs(TILT_KEY);
+    const tot = new Float32Array(BGN);
+    let n = 0;
+    for (let i = 0; i < BGN; i++) { let s2 = 0; for (let s = 0; s < NS; s++) s2 += slabTmp[s][i]; if (s2 > 0) tot[n++] = s2; }
+    const sorted = tot.subarray(0, n).sort();
+    bMass = M.dustTau / (sorted[Math.floor(n * 0.995)] || 1);
+  }
+  // Dust steps: per band cell and slab, the optical depth in front of that
+  // slab's middle, in 1/32 steps. Step k is the dust at tilt TOP + k * KF_STEP.
+  const kf = new Array(KF_N).fill(null);
+  function ensureKF(k) {
+    if (kf[k]) return;
+    projectSlabs(TILT_TOP + k * KF_STEP);
+    const out = new Uint8Array(BGN * NS);
+    for (let i = 0; i < BGN; i++) {
+      let run = 0;
+      const o = i * NS;
+      for (let s = 0; s < NS; s++) {
+        const here = slabTmp[s][i] * bMass;
+        out[o + s] = Math.min(255, Math.round((run + 0.5 * here) * 32));
+        run += here;
+      }
+    }
+    kf[k] = out;
+  }
+  for (let k = 0; k < KF_UP_FRONT; k++) ensureKF(k);
+  const work = new Uint8Array(BGN * NS); // the blended step the frame reads
+  let lastA = -1, lastB = -1;
+  const blobScale = bMass * 0.9;
+
+  // Moving dust: rigid clumps and tendrils carried round with the disc,
+  // each living one loop and fading in and out, so any drift is seamless.
+  const lifeTurns = (R, v) => (v / Math.max(R, 1)) * LOOP / TAU; // turns per loop at linear speed v
+  const groups = [];
+  function addGroup(kind) {
+    let R, ph;
+    for (;;) {
+      R = -dRd * Math.log(r() * r()) * 0.9;
+      if (R < M.dustHole * 0.8 || R > dRmax * 0.9) continue;
+      ph = r() * TAU;
+      if (kind === 'fil' && Math.sin(ph) > -0.15) continue;
+      if (kind === 'fil' && r() < 0.8 && Math.abs(R * Math.cos(ph)) > M.filNear * A * (0.5 + r())) continue;
+      break;
+    }
+    const g = { R, ph0: ph, turns: lifeTurns(R, speedAt(R)), off: 0, blobs: [] };
+    const tx = -Math.sin(ph), ty = Math.cos(ph);
+    if (kind === 'clump') {
+      const len = 14 + 30 * r(), wid = 3 + 4 * r();
+      for (let i = 0; i < M.clumpN; i++) {
+        const a = (r() + r() + r() - 1.5) * len, b = (r() + r() - 1) * wid;
+        g.blobs.push(a * tx + b * Math.cos(ph), a * ty + b * Math.sin(ph), (r() + r() - 1) * hd * 1.4, M.clumpMass * (0.5 + r()));
+      }
+    } else {
+      // A tendril lifts out of the plane, mostly upward into the bulge.
+      const hgt = M.filH * (0.4 + 0.9 * r()) * (1 - 0.5 * R / dRmax), sgn = r() < 0.72 ? 1 : -1;
+      const bend = (r() * 2 - 1) * 0.9, wob = r() * 6;
+      for (let i = 0; i < M.filN; i++) {
+        const s = Math.pow(r(), 0.8);
+        const lat = (bend * s * s + 0.15 * Math.sin(s * 7 + wob)) * hgt * 0.8 + (r() - 0.5) * (1.5 + 3 * s);
+        g.blobs.push(lat * tx, lat * ty + (r() - 0.5) * 6, sgn * s * hgt, M.filMass * Math.pow(1 - s, 0.6) * (0.5 + r()));
+      }
+    }
+    g.blobs = new Float32Array(g.blobs);
+    groups.push(g);
+  }
+  for (let i = 0; i < M.clumps; i++) addGroup('clump');
+  for (let i = 0; i < M.fils; i++) addGroup('fil');
+  groups.forEach((g, i) => { g.off = (i * 0.618034) % 1; });
+
+  // Young clusters: rigid knots carried round, fading slowly in and out.
+  const rC = rng(M.seed * 9973 + 3);
+  const clusters = [];
+  for (let c = 0; c < M.clusters; c++) {
+    const R = (0.22 + 0.62 * rC()) * Rmax;
+    const far = c < M.farClusters;
+    const ph = far ? Math.PI * (0.15 + 0.7 * rC()) : Math.PI * (1.05 + 0.9 * rC());
+    const sig = M.clusterSig * (0.6 + 0.8 * rC()), n = Math.round(M.clusterN * (0.5 + rC()));
+    const mem = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
+      mem[i * 4] = (rC() + rC() + rC() - 1.5) * sig * 2.2; mem[i * 4 + 1] = (rC() + rC() + rC() - 1.5) * sig * 2;
+      mem[i * 4 + 2] = (rC() - 0.5) * 4 + (rC() + rC() + rC() - 1.5) * sig; mem[i * 4 + 3] = M.clusterLum * (0.3 + 0.6 * rC() * rC());
+    }
+    clusters.push({ R, ph0: ph, turns: lifeTurns(R, speedAt(R)), off: (c * 0.381966 + 0.13) % 1, mem });
+  }
+
+  // Stars on necklaces. A ring (radius, height, brightness) carries n
+  // identical beads; over one loop it turns m/n of a turn, so every bead
+  // lands exactly on a neighbour's start: seamless, with no fades. Disc and
+  // bulge are drawn from one stream in proportion, so any prefix of the list
+  // is a fair sample; Density and Scale draw a prefix, cut on whole rings.
+  function beads(R, v) {
+    const x = (TAU * R) / (Math.max(v, 1e-3) * LOOP); // n/m wanted
+    let best = null;
+    for (let m = 1; m <= 6; m++) {
+      const n = Math.max(1, Math.round(m * x));
+      const err = Math.abs(n / m - x) / x;
+      if (!best || err < best.err - 0.02) best = { n, m, err };
+    }
+    return best;
+  }
+  const rS = rng(M.seed * 9973 + 2);
+  const DISC_SHARE = M.nDisc / NBASE;
+  let cap = 0, N = 0;
+  let sR, sZ, sW, sA, sQ, sT, sFirst;
+  function growTo(n) {
+    const c = Math.max(n, Math.ceil(cap * 1.6), 1 << 16);
+    const fresh = [new Float32Array(c), new Float32Array(c), new Float32Array(c), new Float32Array(c),
+      new Float64Array(c), new Float64Array(c), new Uint8Array(c)];
+    if (cap) [sR, sZ, sW, sA, sQ, sT, sFirst].forEach((a, i) => fresh[i].set(a.subarray(0, N)));
+    [sR, sZ, sW, sA, sQ, sT, sFirst] = fresh;
+    cap = c;
+  }
+  function addRing(R, Z, wc, a, ph, v) {
+    const { n, m } = beads(R, v);
+    if (rS() * n > 1) return; // keep the expected bead count at one per sample
+    if (N + n > cap) growTo(N + n);
+    for (let j = 0; j < n; j++) {
+      sR[N] = R; sZ[N] = Z; sW[N] = wc; sA[N] = a;
+      sQ[N] = ph / TAU + j / n; sT[N] = m / n; sFirst[N] = j === 0 ? 1 : 0; N++;
+    }
+  }
+  function sampleStar() {
+    if (rS() < DISC_SHARE) {
+      for (;;) {
+        const thick = rS() < M.thickFrac;
+        const R = -M.Rd * (thick ? 1.15 : 1) * Math.log(rS() * rS() + 1e-9);
+        if (rS() > 1 / (1 + Math.exp((R - Rmax) / (0.06 * Rmax)))) continue;
+        const hz = (thick ? M.hzThick : M.hz) * (1 - M.thin * smooth(0.35 * Rmax, Rmax, R));
+        const z = Math.atanh(Math.min(0.995, Math.max(-0.995, 2 * rS() - 1)));
+        const a = (0.35 + 0.65 * rS() * rS()) * (rS() < 0.004 ? 3 : 1);
+        addRing(R, hz * z, warpAt(R) / Math.max(R, 1), a, rS() * TAU, speedAt(R));
+        return;
+      }
+    }
+    for (;;) {
+      const rr = A / Math.sqrt(Math.pow(rS(), -2 / 3) - 1);
+      if (rr > M.bulgeCap * A * (0.8 + 0.4 * rS())) continue;
+      const ct = 2 * rS() - 1, st = Math.sqrt(1 - ct * ct);
+      const R = rr * st, a = 0.35 + 0.65 * rS() * rS();
+      addRing(R, rr * ct * M.bulgeQ, 0, a, rS() * TAU, M.bulgeSpin * speedAt(R));
+      return;
+    }
+  }
+  // The longest whole-ring prefix of at most n stars (growing the list if needed).
+  function starPrefix(n) {
+    while (N < n) sampleStar();
+    let c = n;
+    while (c > 0 && c < N && !sFirst[c]) c--;
+    return c;
+  }
+
+  // ---------- tables ----------
+  const TN = 16384, COS = new Float32Array(TN), SIN = new Float32Array(TN);
+  for (let i = 0; i < TN; i++) { COS[i] = Math.cos(TAU * i / TN); SIN[i] = Math.sin(TAU * i / TN); }
+  const ENV = new Float32Array(1025);
+  for (let i = 0; i <= 1024; i++) { const f = i / 1024; ENV[i] = smooth(0, M.groupFade, f) * smooth(1, 1 - M.groupFade, f); }
+  const EXPL = new Float32Array(16 * 256 + 1);
+  for (let i = 0; i < EXPL.length; i++) EXPL[i] = Math.exp(-(i + 0.5) / 256);
+  const WZ = M.depthW;
+  const LUTN = 4096, LUTMAX = 6, TONE_M = 0.95;
+  const toneOf = (a) => TONE_M * Math.pow(1 - Math.exp(-a / TONE_M), M.gamma);
+
+  // Extinction of a point at band coords (u, v) and depth zc: the static
+  // dust from the blended step, the moving dust from the moment grid (spread
+  // evenly over mean +- sqrt(3) sigma in depth).
+  function ext(u, v, zc, behindAll) {
+    const gx = (u + U0) / DU;
+    if (!(gx > 0 && gx < GU - 1)) return 1;
+    const ix = gx | 0, fx = gx - ix;
+    let tau = 0;
+    const by = (v + BV0) / DV;
+    if (by > 0 && by < BGV - 1) {
+      const iy = by | 0, fy = by - iy;
+      let si = (zc * SLK + 150) | 0; si = si < 0 ? 0 : si > 300 ? 300 : si;
+      const s = behindAll ? NS - 1 : SL[si];
+      tau = work[((iy + (fy > 0.5 ? 1 : 0)) * GU + ix + (fx > 0.5 ? 1 : 0)) * NS + s] * 0.03125;
+    }
+    const gy = (v + V0) / DV;
+    if (gy > 0 && gy < GV - 1) {
+      const iy = gy | 0, fy = gy - iy, o = (iy * GU + ix) * 3, o2 = o + GU * 3;
+      const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+      const md = grid[o] * w00 + grid[o + 3] * w10 + grid[o2] * w01 + grid[o2 + 3] * w11;
+      if (md > 0.004) {
+        const z1 = (grid[o + 1] * w00 + grid[o + 4] * w10 + grid[o2 + 1] * w01 + grid[o2 + 4] * w11) / md;
+        const z2 = (grid[o + 2] * w00 + grid[o + 5] * w10 + grid[o2 + 2] * w01 + grid[o2 + 5] * w11) / md;
+        const hw = M.depthK * Math.sqrt(Math.max(0, 3 * (z2 - z1 * z1))) + WZ;
+        let w = (zc - z1) / (2 * hw) + 0.5; w = w < 0 ? 0 : w > 1 ? 1 : w;
+        tau += md * w;
+      }
+    }
+    if (tau < 0.004) return 1;
+    return tau < 16 ? EXPL[(tau * 256) | 0] : 0;
+  }
+
+  // Tilt centre and swing for a Rock value.
+  function rockOf(rock) {
+    if (rock <= 1) {
+      const c1 = (TILT_TOP + TILT_LOW1) / 2, a1 = (TILT_LOW1 - TILT_TOP) / 2;
+      return { c: TILT_KEY + rock * (c1 - TILT_KEY), a: rock * a1 };
+    }
+    const low = TILT_LOW1 + Math.min(1, rock - 1) * (TILT_LOW2 - TILT_LOW1);
+    return { c: (TILT_TOP + low) / 2, a: (low - TILT_TOP) / 2 };
+  }
+  const tiltAt = (V, t) => V.tc + V.ta * Math.sin(TAU * t / LOOP + ROCK_PH);
+
+  // ---------- one frame of light into V.acc ----------
+  function render(t, V) {
+    const { W, H, acc } = V;
+    const tl = tiltAt(V, t), ce = Math.cos(tl), se = Math.sin(tl);
+
+    // Static dust: blend the two nearest steps; the weight is quantised to
+    // 1/16 of a step (< 0.3 px of lane shift), so the blend is only redone
+    // when it changes.
+    let kk = (tl - TILT_TOP) / KF_STEP;
+    kk = kk < 0 ? 0 : kk > KF_N - 1 ? KF_N - 1 : kk;
+    let kA = Math.min(KF_N - 2, Math.floor(kk)), kB = Math.round((kk - kA) * 16) / 16;
+    if (kB >= 1) { kA += 1; kB = 0; }
+    if (kA !== lastA || kB !== lastB) {
+      ensureKF(kA);
+      const a = kf[kA];
+      if (kB > 0) {
+        ensureKF(kA + 1);
+        const b = kf[kA + 1], wa = 1 - kB, n = a.length;
+        for (let i = 0; i < n; i++) work[i] = a[i] * wa + b[i] * kB + 0.5;
+      } else work.set(a);
+      lastA = kA; lastB = kB;
+    }
+
+    // Moving dust groups into the moment grid.
+    grid.fill(0);
+    const motion = V.motion;
+    for (const g of groups) {
+      let f = t / LOOP + g.off; f -= Math.floor(f);
+      const env = ENV[(f * 1024) | 0];
+      if (env < 0.01) continue;
+      const rot = TAU * g.turns * motion * (f - 0.5), ph = g.ph0 + rot;
+      const gx = g.R * Math.cos(ph), gy = g.R * Math.sin(ph), rc = Math.cos(rot), rs = Math.sin(rot), wr = warpAt(g.R) / g.R;
+      const b = g.blobs, ms = env * blobScale;
+      for (let i = 0; i < b.length; i += 4) {
+        const X = gx + b[i] * rc - b[i + 1] * rs, Y = gy + b[i] * rs + b[i + 1] * rc, Z = b[i + 2] + wr * X;
+        splatM(X, Z * ce - Y * se, b[i + 3] * ms, Y * ce + Z * se);
+      }
+    }
+
+    acc.fill(0);
+    const k = V.k, kca = k * V.ca, ksa = k * V.sa, CX = V.CX, CY = V.CY, SH = V.sharp, W1 = W - 1, H1 = H - 1;
+    const splat = (x, y, a) => {
+      if (!(x >= 0 && y >= 0 && x < W1 && y < H1)) return;
+      const ix = x | 0, iy = y | 0;
+      let fx = x - ix, fy = y - iy;
+      if (SH !== 1) {
+        fx = (fx - 0.5) * SH + 0.5; fx = fx < 0 ? 0 : fx > 1 ? 1 : fx;
+        fy = (fy - 0.5) * SH + 0.5; fy = fy < 0 ? 0 : fy > 1 ? 1 : fy;
+      }
+      const o = iy * W + ix;
+      acc[o] += a * (1 - fx) * (1 - fy); acc[o + 1] += a * fx * (1 - fy);
+      acc[o + W] += a * (1 - fx) * fy; acc[o + W + 1] += a * fx * fy;
+    };
+
+    // Stars, with the extinction inlined (same as ext()) and the nearest
+    // dust cell read: the slab grids are already blurred.
+    const gn = V.gS, tt = t / LOOP, nS = V.nS, IDU = 1 / DU, IDV = 1 / DV, DK = M.depthK, MINA = M.minA;
+    for (let i = 0; i < nS; i++) {
+      let q = sQ[i] + sT[i] * tt; q -= Math.floor(q);
+      const kq = (q * TN) | 0, R = sR[i];
+      const X = R * COS[kq], Y = R * SIN[kq], Z = sZ[i] + sW[i] * X;
+      const v = Z * ce - Y * se;
+      let tau = 0;
+      const gx = (X + U0) * IDU;
+      if (gx > 0 && gx < GU - 1) {
+        const zc = Y * ce + Z * se;
+        const by = (v + BV0) * IDV;
+        if (by > 0 && by < BGV - 1) {
+          let si = (zc * SLK + 150) | 0; si = si < 0 ? 0 : si > 300 ? 300 : si;
+          tau = work[(((by + 0.5) | 0) * GU + ((gx + 0.5) | 0)) * NS + SL[si]] * 0.03125;
+        }
+        const gy = (v + V0) * IDV;
+        if (gy > 0 && gy < GV - 1) {
+          const o = (((gy + 0.5) | 0) * GU + ((gx + 0.5) | 0)) * 3;
+          const md = grid[o];
+          if (md > 0.004) {
+            const z1 = grid[o + 1] / md, z2 = grid[o + 2] / md;
+            const hw = DK * Math.sqrt(Math.max(0, 3 * (z2 - z1 * z1))) + WZ;
+            let w = (zc - z1) / (2 * hw) + 0.5; w = w < 0 ? 0 : w > 1 ? 1 : w;
+            tau += md * w;
+          }
+        }
+      }
+      let a = sA[i] * gn;
+      if (tau > 0.004) a *= tau < 16 ? EXPL[(tau * 256) | 0] : 0;
+      if (a < MINA) continue;
+      const x = CX + X * kca + v * ksa, y = CY + X * ksa - v * kca;
+      if (!(x >= 0 && y >= 0 && x < W1 && y < H1)) continue;
+      const ix = x | 0, iy = y | 0;
+      let fx = x - ix, fy = y - iy;
+      if (SH !== 1) {
+        fx = (fx - 0.5) * SH + 0.5; fx = fx < 0 ? 0 : fx > 1 ? 1 : fx;
+        fy = (fy - 0.5) * SH + 0.5; fy = fy < 0 ? 0 : fy > 1 ? 1 : fy;
+      }
+      const o = iy * W + ix;
+      acc[o] += a * (1 - fx) * (1 - fy); acc[o + 1] += a * fx * (1 - fy);
+      acc[o + W] += a * (1 - fx) * fy; acc[o + W + 1] += a * fx * fy;
+    }
+
+    const gc = V.gC;
+    for (const c of clusters) {
+      let f = t / LOOP + c.off; f -= Math.floor(f);
+      const env = ENV[(f * 1024) | 0];
+      if (env < 0.01) continue;
+      const rot = TAU * c.turns * motion * (f - 0.5), ph = c.ph0 + rot;
+      const gx = c.R * Math.cos(ph), gy = c.R * Math.sin(ph), rc = Math.cos(rot), rs = Math.sin(rot), wr = warpAt(c.R) / c.R;
+      const mm = c.mem;
+      for (let i = 0; i < mm.length; i += 4) {
+        const X = gx + mm[i] * rc - mm[i + 1] * rs, Y = gy + mm[i] * rs + mm[i + 1] * rc, Z = mm[i + 2] + wr * X;
+        const v = Z * ce - Y * se;
+        const a = mm[i + 3] * env * gc * ext(X, v, Y * ce + Z * se);
+        if (a > MINA) splat(CX + X * kca + v * ksa, CY + X * ksa - v * kca, a);
+      }
+    }
+
+    // Background field, screen-anchored, dimmed by the whole dust column.
+    const tw = M.twinkle * motion, ik = 1 / k, ca = V.ca, sa = V.sa, gb = V.gB;
+    for (let i = 0; i < V.bgN; i++) {
+      const sx = bgX[i], sy = bgY[i], dx = sx - CX, dy = sy - CY;
+      const u = (dx * ca + dy * sa) * ik, v = (dx * sa - dy * ca) * ik;
+      const a = bgA[i] * (1 - tw + tw * (0.5 + 0.5 * Math.sin(TAU * bgK[i] * t / LOOP + bgPh[i]))) * ext(u, v, 1e9, true) * gb;
+      if (bgBig[i]) { splat(sx, sy, a); splat(sx + 1, sy, a * 0.6); splat(sx, sy + 1, a * 0.6); splat(sx + 1, sy + 1, a * 0.4); }
+      else splat(sx, sy, a);
+    }
+    return tl;
+  }
+
+  // ---------- gain: the bulge's brightest 7x7 patch maps to `peak` ----------
+  // Measured once on a base frame (1280x800, Scale 1, Density 1, t = 0);
+  // Scale and Density then move it analytically, since the light per pixel
+  // only depends on stars per projected area.
+  let gain0 = 1;
+  {
+    const W = BASE_W, H = BASE_H, rk = rockOf(1);
+    const V = { W, H, acc: new Float32Array(W * H), k: 1, CX: M.cx * W, CY: M.cy * H,
+      ca: Math.cos(M.pa), sa: Math.sin(M.pa), sharp: 1, nS: starPrefix(NBASE), gS: 1, gC: 1, gB: 0, bgN: 0,
+      motion: 1, tc: rk.c, ta: rk.a };
+    render(0, V);
+    const acc = V.acc, r0 = Math.round(A * 0.9);
+    let best = 0;
+    for (let y = Math.max(3, (V.CY - r0) | 0); y < Math.min(H - 3, V.CY + r0); y += 2) {
+      for (let x = Math.max(3, (V.CX - r0) | 0); x < Math.min(W - 3, V.CX + r0); x += 2) {
+        let s = 0;
+        for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) s += acc[(y + j) * W + x + i];
+        if (s > best) best = s;
+      }
+    }
+    best /= 49;
+    gain0 = (-TONE_M * Math.log(1 - Math.pow(M.peak / TONE_M, 1 / M.gamma))) / Math.max(best, 1e-6);
+  }
+
+  // ---------- canvas, buffers, background ----------
+  let W = 0, H = 0, acc, blurTmp, image, pix;
+  let gw = 0, gh = 0, small, smallTmp, rowBuf, glowX0, glowWX;
+  let bgX, bgY, bgA, bgK, bgPh, bgBig, bgMax = 0;
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    W = canvas.width; H = canvas.height;
+    acc = new Float32Array(W * H);
+    blurTmp = new Float32Array(W * H);
+    image = ctx.createImageData(W, H);
+    pix = new Uint32Array(image.data.buffer);
+    gw = Math.ceil(W / 8) + 1; gh = Math.ceil(H / 8) + 1;
+    small = new Float32Array(gw * gh); smallTmp = new Float32Array(gw * gh); rowBuf = new Float32Array(gw);
+    glowX0 = new Int32Array(W); glowWX = new Float32Array(W);
+    for (let x = 0; x < W; x++) {
+      const f = Math.max(0, (x + 0.5) / 8 - 0.5), x0 = Math.min(gw - 2, f | 0);
+      glowX0[x] = x0; glowWX[x] = Math.min(1, f - x0);
+    }
+    // Background stars in screen space, enough for Density 2; a prefix is drawn.
+    const rB = rng(M.seed * 9973 + 4);
+    bgMax = Math.round(M.nBg * 2 * (W * H) / (BASE_W * BASE_H));
+    bgX = new Float32Array(bgMax); bgY = new Float32Array(bgMax); bgA = new Float32Array(bgMax);
+    bgK = new Uint8Array(bgMax); bgPh = new Float32Array(bgMax); bgBig = new Uint8Array(bgMax);
+    for (let i = 0; i < bgMax; i++) {
+      const b = rB(), big = rB() < 0.035;
+      bgX[i] = rB() * W; bgY[i] = rB() * H;
+      bgA[i] = M.bgA * (big ? 0.6 + 0.4 * b : 0.12 + 0.5 * b * b * b);
+      bgK[i] = 1 + ((rB() * 3) | 0); bgPh[i] = rB() * TAU; bgBig[i] = big ? 1 : 0;
+    }
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Ink for a tone T. Neutral ink is one near-white (lightness 0.94). With
+  // saturation the gradient runs from stop A in the bright core to stop B in
+  // the faint disc, and the lightness opens up toward the faint end so the
+  // colour shows instead of washing out to white.
+  function inkAt(values, T) {
+    const stop = paletteHsl(values, Math.max(0, 1 - T / TONE_M)), u = T / TONE_M;
+    const L = values.invert ? 0.12 + stop.s * 0.38 * (1 - u) : 0.94 + stop.s * (0.5 + 0.44 * u - 0.94);
+    return hslToRgb(stop.h, stop.s, L);
+  }
+  // Tone table: light -> colour. The faintest tones get a toe, so a lone
+  // dim dot in the outer haze fades to ground while the bulge, the lane and
+  // the mid-tones keep their tone. On the dark ground a pixel is
+  // max(ground, ink * T): equal channels when neutral, with no blue cast
+  // carried up from the ground.
+  const lut = new Uint32Array(LUTN);
+  let lutKey = '';
+  const toeOf = (T) => T * smooth(M.toe0, M.toe1, T);
+  function buildLut(values) {
+    const key = `${values.saturation}|${values.hue}|${values.hueB}|${values.colorMode}|${values.invert}`;
+    if (key === lutKey) return;
+    lutKey = key;
+    const G = values.invert ? [242, 242, 244] : [10, 10, 13];
+    for (let i = 0; i < LUTN; i++) {
+      const T = toneOf((i / (LUTN - 1)) * LUTMAX), Tt = toeOf(T), ink = inkAt(values, T);
+      const c = G.map((g, j) => Math.max(0, Math.min(255, Math.round(
+        values.invert ? g + (ink[j] - g) * Tt : Math.max(g, ink[j] * Tt)))));
+      lut[i] = (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
+    }
+  }
+
+  // ---------- per-frame view from the controls ----------
+  const view = {};
+  function updateView(values) {
+    const U = Math.min(W / BASE_W, H / BASE_H);
+    const k = U * (0.4 + 0.6 * values.scale);
+    // Star count follows the projected area up to Scale ~1, then only the
+    // size, so a huge frame never multiplies the cost: past that the grain
+    // gets a little coarser instead.
+    const cm = k <= 1 ? k * k : Math.min(2, k);
+    const d = values.density;
+    const pa = M.pa + (values.angle * Math.PI) / 180;
+    const rk = rockOf(values.rock);
+    Object.assign(view, {
+      W, H, acc, k, CX: M.cx * W, CY: M.cy * H, ca: Math.cos(pa), sa: Math.sin(pa),
+      // Stroke under 1 sharpens each dot toward one pixel; over 1 is a blur after.
+      sharp: values.stroke >= 1 ? 1 : 1 / Math.max(0.05, values.stroke),
+      nS: starPrefix(Math.round(NBASE * d * cm)),
+      // More stars build a slightly brighter core (d^0.3), not a 2x one.
+      gS: (gain0 * k * k) / (d * cm) * Math.pow(d, 0.3),
+      gC: gain0 * (k <= 1 ? k * k : k),
+      gB: gain0,
+      bgN: Math.min(bgMax, Math.round(bgMax * 0.5 * d)),
+      motion: values.motion, tc: rk.c, ta: rk.a,
+    });
+  }
+
+  // Bigger dots: a separable [w, 1-2w, w] blur of the light buffer.
+  function strokeBlur(stroke) {
+    const w = 0.25 * Math.min(1, stroke - 1), c = 1 - 2 * w;
+    for (let y = 0; y < H; y++) {
+      const o = y * W;
+      blurTmp[o] = acc[o]; blurTmp[o + W - 1] = acc[o + W - 1];
+      for (let x = 1; x < W - 1; x++) blurTmp[o + x] = c * acc[o + x] + w * (acc[o + x - 1] + acc[o + x + 1]);
+    }
+    for (let y = 1; y < H - 1; y++) {
+      const o = y * W;
+      for (let x = 0; x < W; x++) acc[o + x] = c * blurTmp[o + x] + w * (blurTmp[o + x - W] + blurTmp[o + x + W]);
+    }
+  }
+
+  // Bloom: the buffer averaged to 1/8 size, blurred, and added back before
+  // tone mapping, so colour and Invert apply to it too.
+  function addGlow(glow) {
+    small.fill(0);
+    for (let y = 0; y < H; y++) {
+      const o = y * W, so = (y >> 3) * gw;
+      for (let x = 0; x < W; x++) small[so + (x >> 3)] += acc[o + x];
+    }
+    for (let i = 0; i < small.length; i++) small[i] *= 1 / 64;
+    for (let pass = 0; pass < 3; pass++) {
+      for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+        const o = y * gw + x;
+        smallTmp[o] = 0.5 * small[o] + 0.25 * (small[x > 0 ? o - 1 : o] + small[x < gw - 1 ? o + 1 : o]);
+      }
+      for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+        const o = y * gw + x;
+        small[o] = 0.5 * smallTmp[o] + 0.25 * (smallTmp[y > 0 ? o - gw : o] + smallTmp[y < gh - 1 ? o + gw : o]);
+      }
+    }
+    const gk = 0.7 * glow;
+    for (let y = 0; y < H; y++) {
+      const f = Math.max(0, (y + 0.5) / 8 - 0.5), y0 = Math.min(gh - 2, f | 0), wy = Math.min(1, f - y0);
+      const r0 = y0 * gw, r1 = r0 + gw;
+      for (let x = 0; x < gw; x++) rowBuf[x] = gk * (small[r0 + x] + (small[r1 + x] - small[r0 + x]) * wy);
+      const o = y * W;
+      for (let x = 0; x < W; x++) {
+        const x0 = glowX0[x];
+        acc[o + x] += rowBuf[x0] + (rowBuf[x0 + 1] - rowBuf[x0]) * glowWX[x];
+      }
+    }
+  }
+
+  // Every piece ships the same five preset names. Scale values are absolute.
+  const PRESETS = {
+    whisper: { opacity: 0.6, density: 0.45, stroke: 0.6, scale: 0.85, rock: 0.7 },
+    ink:     { opacity: 1, density: 1.3, stroke: 1.5, scale: 1.05 },
+    neon:    { opacity: 0.95, density: 1.1, saturation: 0.85, glow: 1, scale: 1.1, angle: 354 },
+    drift:   { opacity: 0.85, density: 0.8, speed: 0.4, motion: 1.8, rock: 1.7, scale: 1.25 },
+    dense:   { opacity: 1, density: 1.8, stroke: 0.85, scale: 1.15, angle: 352 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // How far the tilt rocks over one loop; the top end stays at 7.0 deg.
+      { name: 'rock', label: 'Rock', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'motion' },
+    ],
+    defaults: { hue: 330, hueB: 215, saturation: 0, scale: 1, colorMode: 'gradient', colorA: '#ff0080', colorB: '#006aff' },
+  });
+  const currentValues = baked || panel.values;
+
+  let clock = 0, lastT = 0;
+  function drawFrame(dt, values) {
+    clock += dt * values.speed;
+    let t = (clock + (values.phase * LOOP) / 2 - T0) % LOOP;
+    if (t < 0) t += LOOP;
+    lastT = t;
+    updateView(values);
+    buildLut(values);
+    render(t, view);
+    if (values.stroke > 1) strokeBlur(values.stroke);
+    if (values.glow > 0) addGlow(values.glow);
+    const K = ((LUTN - 1) / LUTMAX) * values.opacity, TOP = LUTN - 1, n = W * H;
+    for (let i = 0; i < n; i++) { const v = acc[i] * K; pix[i] = lut[v >= TOP ? TOP : v | 0]; }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.putImageData(image, 0, 0);
+  }
+
+  const loop = createLoop({
+    onFrame(dt) {
+      drawFrame(dt, currentValues);
+    },
+  });
+  loop.start();
+
+  // SVG: a capped, uniform sample of the current frame's dots (see header).
+  const SVG_STARS = 16000;
+  function svgCircles(values) {
+    const V = view, t = lastT, tl = tiltAt(V, t), ce = Math.cos(tl), se = Math.sin(tl);
+    const kca = V.k * V.ca, ksa = V.k * V.sa, op = values.opacity;
+    const rad = 0.35 + 0.35 * values.stroke;
+    const out = [];
+    const push = (x, y, a, rr) => {
+      if (!(x >= 0 && y >= 0 && x < V.W && y < V.H)) return;
+      const T = toneOf(a * op), Tt = toeOf(T);
+      if (Tt < 0.02) return;
+      const [cr, cg, cb] = inkAt(values, T);
+      out.push({ cx: x, cy: y, r: rr, fill: `rgb(${cr},${cg},${cb})`, opacity: Math.min(1, Tt / TONE_M) });
+    };
+    const stride = Math.max(1, Math.ceil(V.nS / SVG_STARS));
+    for (let i = 0; i < V.nS; i += stride) {
+      let q = sQ[i] + sT[i] * (t / LOOP); q -= Math.floor(q);
+      const X = sR[i] * Math.cos(TAU * q), Y = sR[i] * Math.sin(TAU * q), Z = sZ[i] + sW[i] * X;
+      const v = Z * ce - Y * se;
+      push(V.CX + X * kca + v * ksa, V.CY + X * ksa - v * kca, sA[i] * V.gS * ext(X, v, Y * ce + Z * se), rad);
+    }
+    for (const c of clusters) {
+      let f = t / LOOP + c.off; f -= Math.floor(f);
+      const env = ENV[(f * 1024) | 0];
+      if (env < 0.01) continue;
+      const rot = TAU * c.turns * V.motion * (f - 0.5), ph = c.ph0 + rot;
+      const gx = c.R * Math.cos(ph), gy = c.R * Math.sin(ph), rc = Math.cos(rot), rs = Math.sin(rot), wr = warpAt(c.R) / c.R;
+      for (let i = 0; i < c.mem.length; i += 4) {
+        const m = c.mem, X = gx + m[i] * rc - m[i + 1] * rs, Y = gy + m[i] * rs + m[i + 1] * rc, Z = m[i + 2] + wr * X;
+        const v = Z * ce - Y * se;
+        push(V.CX + X * kca + v * ksa, V.CY + X * ksa - v * kca, m[i + 3] * env * V.gC * ext(X, v, Y * ce + Z * se), rad);
+      }
+    }
+    for (let i = 0; i < V.bgN; i++) {
+      const dx = bgX[i] - V.CX, dy = bgY[i] - V.CY;
+      const u = (dx * V.ca + dy * V.sa) / V.k, v = (dx * V.sa - dy * V.ca) / V.k;
+      push(bgX[i], bgY[i], bgA[i] * V.gB * ext(u, v, 1e9, true), bgBig[i] ? rad * 1.6 : rad);
+    }
+    return out;
+  }
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg([], { width: canvas.width, height: canvas.height, circles: svgCircles(currentValues) }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>
+
