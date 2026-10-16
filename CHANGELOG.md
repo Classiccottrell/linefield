@@ -8,6 +8,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **An Old Roads collection**, three new pieces bringing the collection to
+  thirty-two: mythic landscapes, drawn by evocation only. `beacons` is one
+  drawn mountain range at night where fires catch from summit to summit, so
+  the light walks along the chain and wraps round (extra control Fires).
+  `high-pass` is a jagged peak in cross-section with the wind tearing a
+  plume of spindrift off its crest that frays downwind in clumps (Gust).
+  `old-road` is a pale track over moonlit moorland that you walk along, the
+  road dropping out of sight behind each rise (Relief). All three passed a
+  motion pass before they were picked, pass `collection-check` and
+  `audit-controls` with every control live, loop seamlessly, and show their
+  first frame in under half a second.
+
 - **A Space collection**, five new pieces bringing the collection to
   twenty-nine. Each started as a throwaway sketch and was built only once
   it held up at full width. `magnetosphere` is a tiny body whose field is
