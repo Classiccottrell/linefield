@@ -494,8 +494,8 @@ export function buildGallery(manifest) {
   const out = template
     .replace('<!--CARDS-->', () => cards)
     .replace('/*PIECES*/[]', () => pieceJson)
-    .replace('/*COLLECTIONS*/[]', () => collectionsJson)
-    .split('{{PIECE_COUNT}}').join(String(manifest.length));
+    .replace('/*COLLECTIONS*/[]', () => collectionsJson);
+
   writeFileSync(join(ROOT, 'index.html'), out);
   console.log(`  gallery: index.html (${manifest.length} cards, ${collections.length} collections)`);
 }

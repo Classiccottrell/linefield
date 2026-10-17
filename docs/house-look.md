@@ -145,7 +145,7 @@ the redesign, not a restyle.
 
 ## What done looks like
 
-A contact sheet of all 18 at the shipping viewport, square-cropped, reads as
+A contact sheet of every piece at the shipping viewport, square-cropped, reads as
 one collection: monochrome, fine, one object each, with room to breathe.
 Every piece passes the conformance check and the existing gate suite. And
 none of them, described in one sentence, is also the description of a
