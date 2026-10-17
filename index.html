@@ -219,17 +219,17 @@
 <div class="wrap">
 
 <header class="intro">
-  <span class="label">Collection / 29 pieces / live</span>
+  <span class="label">Collection / 32 pieces / live</span>
   <h1>Generative backgrounds, <span class="op">shipped as one file.</span></h1>
-  <p class="lede">29 self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
-  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning. Want stills instead of code? <a href="stills.zip">Download all 29 as square PNGs</a>.</p>
+  <p class="lede">32 self-contained pieces. No framework, no bundler, no build step: open one, tune it, export it. Hover any specimen below to see it running live.</p>
+  <p class="grid-note">Every Download ships that piece's default settings — bake from inside the piece to capture your own tuning. Want stills instead of code? <a href="stills.zip">Download all 32 as square PNGs</a>.</p>
 </header>
 
 <section class="mechanisms" aria-label="Interaction mechanisms">
   <a class="mechanism" href="interactions/wake/">
     <span class="mechanism-label">Interaction mechanism — not a piece</span>
     <h2 class="mechanism-title">Wake</h2>
-    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the 29 pieces below.</p>
+    <p class="mechanism-copy">A pointer-trail overlay you attach to any canvas, separate from the 32 pieces below.</p>
     <p class="mechanism-detail">Off by default, opt-in per canvas, never baked into an exported piece. Try it live and tune strength, trail life, strand count, and color.</p>
   </a>
   <a class="btn" href="interactions/wake/">open wake</a>
@@ -706,6 +706,55 @@
     <div class="meta">
       <h2 class="name">Dark Nebula</h2>
       <p class="collection-label">Space</p>
+    </div>
+  </article>
+  <h3 class="group-head" data-collection="old-roads">Old Roads</h3>
+  <article class="card" data-collection="old-roads">
+    <div class="stage">
+      <a class="frame" href="pieces/beacons/" data-src="pieces/beacons/" aria-label="Open Beacons">
+        <img src="thumbs/beacons.png" alt="Beacons preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/beacons/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/beacons/">Copy embed</button>
+        <a class="btn" href="downloads/beacons.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Beacons</h2>
+      <p class="collection-label">Old Roads</p>
+    </div>
+  </article>
+  <article class="card" data-collection="old-roads">
+    <div class="stage">
+      <a class="frame" href="pieces/high-pass/" data-src="pieces/high-pass/" aria-label="Open High Pass">
+        <img src="thumbs/high-pass.png" alt="High Pass preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/high-pass/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/high-pass/">Copy embed</button>
+        <a class="btn" href="downloads/high-pass.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">High Pass</h2>
+      <p class="collection-label">Old Roads</p>
+    </div>
+  </article>
+  <article class="card" data-collection="old-roads">
+    <div class="stage">
+      <a class="frame" href="pieces/old-road/" data-src="pieces/old-road/" aria-label="Open Old Road">
+        <img src="thumbs/old-road.png" alt="Old Road preview" loading="lazy" width="300" height="300" />
+      </a>
+      <div class="actions">
+        <a class="btn" href="pieces/old-road/">Open</a>
+        <button class="btn" type="button" data-embed="pieces/old-road/">Copy embed</button>
+        <a class="btn" href="downloads/old-road.html" download>Download</a>
+      </div>
+    </div>
+    <div class="meta">
+      <h2 class="name">Old Road</h2>
+      <p class="collection-label">Old Roads</p>
     </div>
   </article>
 </div>
@@ -1380,6 +1429,77 @@ const PIECES = [
       "dense"
     ],
     "collection": "space"
+  },
+  {
+    "slug": "beacons",
+    "title": "Beacons",
+    "blurb": "One drawn mountain range at night in stipple and hairlines, where fires catch from summit to summit so the light walks along the chain and wraps round, each new fire lighting the ribs of its own rock.",
+    "tags": [
+      "grain",
+      "depth",
+      "kinetic",
+      "landscape"
+    ],
+    "hue": 38,
+    "hueB": 8,
+    "saturation": 0,
+    "safeZone": "the sky above the range, top quarter; the bottom fifth",
+    "anchor": "the newest fire, just right of centre, stepping right along the chain",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "old-roads"
+  },
+  {
+    "slug": "high-pass",
+    "title": "High Pass",
+    "blurb": "A jagged peak in cross-section with the wind from the left, driving drift up its snowy face and tearing a plume of spindrift off the crest that sags into the lee and frays downwind in clumps.",
+    "tags": [
+      "grain",
+      "flow",
+      "landscape"
+    ],
+    "hue": 258,
+    "hueB": 192,
+    "saturation": 0,
+    "safeZone": "the sky over the windward slope, upper left",
+    "anchor": "the crest, right of centre, where the plume tears off",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "old-roads"
+  },
+  {
+    "slug": "old-road",
+    "title": "Old Road",
+    "blurb": "A pale track winding toward the viewer over dark moonlit moorland in fine stipple, dropping out of sight behind each rise and coming back in fragments toward the horizon on a slow walk up the road.",
+    "tags": [
+      "grain",
+      "depth",
+      "kinetic",
+      "landscape"
+    ],
+    "hue": 196,
+    "hueB": 250,
+    "saturation": 0,
+    "safeZone": "the sky above the horizon, the top 40%",
+    "anchor": "the near road at the foot of the frame, lower centre",
+    "presets": [
+      "whisper",
+      "ink",
+      "neon",
+      "drift",
+      "dense"
+    ],
+    "collection": "old-roads"
   }
 ];
 const COLLECTIONS = [
@@ -1406,6 +1526,10 @@ const COLLECTIONS = [
   {
     "id": "space",
     "title": "Space"
+  },
+  {
+    "id": "old-roads",
+    "title": "Old Roads"
   }
 ];
 

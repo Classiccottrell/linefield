@@ -28,5 +28,10 @@
     "id": "space",
     "title": "Space",
     "slugs": ["magnetosphere", "dust-lane", "tidal-bridge", "terminator", "dark-nebula"]
+  },
+  {
+    "id": "old-roads",
+    "title": "Old Roads",
+    "slugs": ["beacons", "high-pass", "old-road"]
   }
 ]

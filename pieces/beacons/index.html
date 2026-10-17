@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linefield — beacons</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!--
+  beacons — one drawn mountain range at night, in stipple and hairlines,
+  where fires catch from summit to summit so the light walks along the
+  chain and wraps round, on a seamless 60 s loop.
+
+  Text-safe zone: the sky above the range (the top quarter of the frame),
+  and the dark foot of the range along the bottom fifth. Only a few faint
+  stars reach the sky; the smoke thins out below it.
+  Anchor: the newest fire and the rock it lights, on a summit just right of
+  centre in the opening frame. It moves: every 10 s (at Speed 1) a fire
+  catches on the next summit to the right while the older ones gutter to
+  embers, so the anchor steps left to right along the chain and wraps from
+  the right end back to the left with no reset. Flames sway on a 7.5 s
+  breath that runs along the range with the wind; smoke puffs rise and drift.
+
+  Technique: the range is a ridge line over a field of starlit snow in the
+  gullies, so a summit with no fire still has its faces. Around each
+  fire 8,000 to 11,000 rock-fixed dots carry a fixed random threshold and
+  a facing term from the ribs of the rock; per frame the fire's light
+  decides which show, so its glow spreads down the gullies and ribs
+  instead of filling a disc. Flames are tongues of hairline strokes, with an ember bed, rising
+  sparks and puffs of stippled smoke. Everything splats into one float
+  buffer in screen space, with Scale and Angle applied, and a LUT with a
+  soft shoulder below white turns it into pixels.
+
+  Controls: Scale zooms about the middle of the chain, from the whole
+  range contained in the frame with its ends fading out (0) to a close view
+  of three or four summits (2). Density sets how many dots and flame strokes
+  there are, Stroke their size, Angle turns the view, Phase picks a point in
+  the loop, Motion scales the wind in the flames and smoke. Fires sets how
+  many fires burn at once along the chain: 1 hands the light from summit to
+  summit, 6 keeps every summit burning.
+
+  SVG export: the ridge line and every flame stroke of the current frame as
+  polylines, plus a capped, evenly thinned sample of the stipple drawn in
+  that frame (at most 15,000 dots) as circles, all in screen space with
+  Angle and Scale applied. The full stipple and its accumulated brightness
+  are a canvas property; use PNG for those.
+-->
+
+<div class="lf-export-row" data-lf-panel>
+  <button id="btn-baked">Baked HTML</button>
+  <button id="btn-source">Source</button>
+  <button id="btn-png-2x">PNG 2x</button>
+  <button id="btn-png-4x">PNG 4x</button>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-prompt">Copy AI Prompt</button>
+</div>
+
+<script type="module">
+  import { createControlPanel } from '../../shared/controls.js';
+  import { createLoop } from '../../shared/anim.js';
+  import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
+
+  const PIECE_ID = 'beacons';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // The composition is authored in a 1280x800 design frame and fitted to
+  // the canvas by cover. Scale and Angle act about PIVOT, the middle of the
+  // chain.
+  const PW = 1280, PH = 800;
+  const PIVOT_X = 640, PIVOT_Y = 440;
+
+  // Six fires, one catching every STEP seconds; every other cycle is an
+  // integer fraction of the loop, so the seam is exact.
+  const NF = 6, STEP = 10, PERIOD = NF * STEP;
+  const BREATH = PERIOD / 8, SMOKE_T = PERIOD / 5, SPARK_T = PERIOD / 12, LICK_T = PERIOD / 20;
+  const TAU = 2 * Math.PI;
+  // At loop time 0 the fire on the highest summit is 8 s old and the next
+  // catches 2 s later. 4 s in (Speed 1, Phase 0) lands on that frame.
+  const PHASE0 = 3.8, LOOP_START = PERIOD - 4;
+
+  // Seeded generator: the range, the rock and the fires are the same on
+  // every load, whatever else the page has drawn.
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function perlin(seed) {
+    const r = rng(seed), p = new Uint8Array(512), g = new Float32Array(512);
+    const perm = [...Array(256).keys()];
+    for (let i = 255; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+    for (let i = 0; i < 512; i++) p[i] = perm[i & 255];
+    for (let i = 0; i < 256; i++) { const a = r() * 6.283; g[2 * i] = Math.cos(a); g[2 * i + 1] = Math.sin(a); }
+    const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+    return (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+      const X = xi & 255, Y = yi & 255;
+      const dot = (h, dx, dy) => g[2 * h] * dx + g[2 * h + 1] * dy;
+      const aa = p[p[X] + Y], ab = p[p[X] + Y + 1], ba = p[p[X + 1] + Y], bb = p[p[X + 1] + Y + 1];
+      const u = fade(xf), v = fade(yf);
+      const x1 = dot(aa, xf, yf) + u * (dot(ba, xf - 1, yf) - dot(aa, xf, yf));
+      const x2 = dot(ab, xf, yf - 1) + u * (dot(bb, xf - 1, yf - 1) - dot(ab, xf, yf - 1));
+      return x1 + v * (x2 - x1);
+    };
+  }
+  function fbm(n, oct = 4) {
+    return (x, y) => { let s = 0, a = 1, f = 1, nm = 0; for (let i = 0; i < oct; i++) { s += a * n(x * f + i * 17.3, y * f - i * 9.1); nm += a; a *= 0.5; f *= 2.03; } return s / nm; };
+  }
+  function ridged(n, oct = 4) {
+    return (x, y) => { let s = 0, a = 1, f = 1, nm = 0; for (let i = 0; i < oct; i++) { const v = 1 - Math.abs(n(x * f + i * 31.7, y * f + i * 5.3)) * 1.4; s += a * v * v; nm += a; a *= 0.5; f *= 2.03; } return s / nm; };
+  }
+  const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+  const gauss = (d, s) => Math.exp(-(d * d) / (2 * s * s));
+  const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const gn = (r) => (r() + r() + r() + r() - 2) * 1.732;
+  const frac = (v) => v - Math.floor(v);
+
+  // ---- the range ------------------------------------------------------------
+  // `r` draws the composition at Density 1 in a fixed order; the extra
+  // marks for Density above 1 (`rB`), the parts of the range and sky
+  // outside the design frame (`rM`) and the thinning ranks (`rK`) each have
+  // their own generator, so none of them moves a mark of the composition.
+  const r = rng(1337), rB = rng(7331), rM = rng(4242), rK = rng(9091);
+  const f1 = fbm(perlin(11), 5), rd = ridged(perlin(12), 4), rib = ridged(perlin(13), 3), nz = perlin(14);
+  const PK = [[0.02, 0.62, 0.5, 0.45], [0.15, 0.535, 0.7, 0.42], [0.285, 0.575, 0.38, 0.75], [0.42, 0.50, 0.55, 0.36], [0.585, 0.455, 0.42, 0.8], [0.745, 0.53, 0.62, 0.4], [0.885, 0.49, 0.5, 0.66], [1.02, 0.58, 0.5, 0.5]];
+  const ridge = (x) => {
+    let y = Infinity;
+    for (const [px, py, sl, sr] of PK) { const dx = x - px * PW; y = Math.min(y, py * PH + (dx < 0 ? -dx * sl : dx * sr) + 0.0007 * dx * dx); }
+    return y + 14 * f1(x / 60, 0.3) + 16 * (rd(x / 38, 1.7) - 0.5) + 5 * (rd(x / 11, 4.2) - 0.5);
+  };
+  // The table runs past the design frame, where the range falls away on
+  // both sides and fades out over EDGE px, so a zoomed-out or turned view
+  // shows soft ends, never a cut.
+  const XM = 1100, RN = PW + 2 * XM, EDGE = 320;
+  const ry = new Float32Array(RN + 1);
+  for (let i = 0; i <= RN; i++) ry[i] = ridge(i - XM);
+  const RY = (x) => ry[clamp(Math.round(x) + XM, 0, RN)];
+  const env = (x) => smooth(-EDGE, 0, x) * (1 - smooth(PW, PW + EDGE, x));
+  const summits = PK.map(([px]) => { let bx = px * PW, by = 1e9; for (let x = px * PW - 25; x <= px * PW + 25; x++) if (x >= 0 && x <= PW && RY(x) < by) { by = RY(x); bx = x; } return [bx, by]; });
+  // Six fire summits, left to right; the two end summits stay dark.
+  const fires = summits.slice(1, 7).map(([x, y]) => ({ x, y }));
+  const If = new Float32Array(NF);
+  // A fire's light over its age p (in steps): it catches, holds while it is
+  // the newest, then gutters at rate k and is out before it catches again.
+  const intensity = (p, k) => smooth(0, 0.35, p) * (p < 1 ? 1 : Math.exp(-k * (p - 1))) * (1 - smooth(4.4, 5.98, p));
+
+  // ---- static marks: stars, and starlit snow in the gullies ---------------
+  // Kept as design-space lists, each dot with a thinning rank (Density 1
+  // in [0, 1), the extra Density in [1, 2)), and splatted into `base` once
+  // per framing.
+  const sx = [], sy = [], sa = [], sk = [];
+  const keepDot = (x, y, a, k) => { sx.push(x); sy.push(y); sa.push(a); sk.push(k); };
+  function star(g, x, y, k) {
+    if (y > RY(x) - 40 || g() > 0.25 + 0.75 * (1 - y / (0.6 * PH))) return;
+    keepDot(x, y, 0.05 + 0.28 * g() ** 3, k);
+  }
+  const nearest = (x) => summits.reduce((m, s) => (Math.abs(x - s[0]) < Math.abs(x - m[0]) ? s : m));
+  function snow(g, x, k) {
+    const dv = Math.abs(gn(g)) * 32, y = RY(x) + dv;
+    const near = nearest(x);
+    const u = (x + 0.5 * dv * (Math.sign(x - near[0]) || 1)) / 22;
+    if (g() > (0.7 * gauss(dv, 5) + 0.6 * gauss(dv, 40)) * rib(u, dv / 140) ** 5) return;
+    keepDot(x, y, 0.07 + 0.1 * g(), k);
+  }
+  // A further 50,000 snow tries from their own generator thicken the snow
+  // a little without moving any other mark.
+  const SNOW = 120000, rS = rng(5151);
+  for (let i = 0; i < 240; i++) star(r, r() * PW, r() * PH * 0.6, rK());
+  for (let i = 0; i < 70000; i++) snow(r, r() * PW, rK());
+  for (let i = 70000; i < SNOW; i++) snow(rS, rS() * PW, rK());
+  // Outside the design frame: the sky (for turned and zoomed-out views),
+  // and the ends of the range as they fade.
+  const SKY_X0 = -1000, SKY_X1 = PW + 1000, SKY_Y0 = -1200, SKY_Y1 = 0.6 * PH;
+  const skyTries = Math.round(240 * (SKY_X1 - SKY_X0) * (SKY_Y1 - SKY_Y0) / (PW * SKY_Y1));
+  for (let i = 0; i < skyTries; i++) {
+    const x = SKY_X0 + rM() * (SKY_X1 - SKY_X0), y = SKY_Y0 + rM() * (SKY_Y1 - SKY_Y0);
+    if (x >= 0 && x <= PW && y >= 0) continue;
+    star(rM, x, y, rK());
+  }
+  const edgeTries = Math.round(SNOW * EDGE / PW);
+  for (const x0 of [-EDGE, PW]) {
+    for (let i = 0; i < edgeTries; i++) {
+      const x = x0 + rM() * EDGE;
+      if (rM() > env(x)) continue;
+      snow(rM, x, rK());
+    }
+  }
+
+  // ---- fire-lit rock: dots fixed to the rock, each with a fixed threshold --
+  // The fire's light decides which show. Per fire, the Density-1 dots come
+  // first, then the extra ones; each run is in random order, so a prefix is
+  // an even thinning.
+  const cx = [], cy = [], cg = [], ct = [], cd = [], cm = [];
+  function rockDots(g, f) {
+    for (let i = 0; i < 170000; i++) {
+      const x = f.x + (g() * 2 - 1) * 320, y = f.y - 8 + g() * 340, thr = g(), big = g() < 0.2;
+      const dv = y - RY(x); if (dv < 0.5) continue;
+      const d = Math.hypot(x - f.x, (y - f.y) * 1.2);
+      if (thr > 2.6 * (gauss(d, 56) + 0.16 * gauss(d, 130))) continue; // never lit even at full blaze
+      const side = Math.sign(x - f.x) || 1;
+      const u = (x + 0.5 * dv * side) / 22, v = dv / 140;
+      const gr = (rib(u + 0.05, v) - rib(u - 0.05, v)) / 0.1;
+      const facing = clamp(0.5 - 0.45 * gr * side + 0.3 * gauss(dv, 20));
+      const geo = facing * (0.45 + 0.55 * rib(u, v));
+      if (thr > 2.6 * (gauss(d, 56) + 0.16 * gauss(d, 130)) * geo) continue;
+      cx.push(x); cy.push(y); cg.push(2.6 * geo); ct.push(thr); cd.push(d * d); cm.push(big ? 1.96 : 1);
+    }
+  }
+  const rockA = [], rockB = [];
+  for (const f of fires) { const s = cx.length; rockDots(r, f); rockA.push([s, cx.length]); }
+
+  // ---- fires: tongues of hairline strokes, built once at full blaze --------
+  // Dimmer fires use fewer, shorter ones.
+  function strokes(g, n) {
+    const out = [];
+    for (let j = 0; j < n; j++) out.push({ oF: g() - 0.5, hF: 0.35 + 0.65 * g() ** 0.6, ph: g() * TAU, b0R: g(), aR: 0.5 + 0.5 * g() });
+    return out;
+  }
+  const fireGeo = fires.map(() => {
+    const tongues = [];
+    for (let k = 0; k < 9; k++) {
+      const st = strokes(r, 50);
+      tongues.push({ txF: (r() - 0.5) * 0.85, thR: r() ** 0.7, twF: 0.14 + 0.16 * r(), ph: r() * TAU, strokes: st });
+    }
+    tongues.sort((a, b) => Math.abs(a.txF) - Math.abs(b.txF)); // the central tongues survive longest
+    const embers = []; for (let i = 0; i < 110; i++) embers.push({ xF: (r() - 0.5) * 1.2, dy: Math.abs(gn(r)) * 2.2, aR: r() });
+    const sparks = []; for (let i = 0; i < 70; i++) sparks.push({ u: r(), jx: gn(r), aR: r() });
+    // Smoke: puffs that rise on a fixed cycle; each puff is a ragged clump of dots.
+    const puffs = [];
+    for (let k = 0; k < 10; k++) {
+      const dots = [], px = r() * 50, py = r() * 50;
+      while (dots.length < 340) {
+        const gx = gn(r), gy = gn(r);
+        if (r() > smooth(-0.15, 0.45, nz(px + gx * 1.3, py + gy * 1.3))) continue;
+        dots.push(gx, gy, r(), 0.5 + 0.5 * r());
+      }
+      puffs.push({ off: (k + 0.6 * r()) / 10, ph: r() * TAU, dots });
+    }
+    return { tongues, embers, sparks, puffs };
+  });
+  // The extra Density: more rock dots and more strokes per tongue.
+  for (const f of fires) { const s = cx.length; rockDots(rB, f); rockB.push([s, cx.length]); }
+  for (const G of fireGeo) for (const tg of G.tongues) tg.strokes.push(...strokes(rB, 50));
+  const CX = Float32Array.from(cx), CY = Float32Array.from(cy), CG = Float32Array.from(cg);
+  const CT = Float32Array.from(ct), CD = Float32Array.from(cd), CM = Float32Array.from(cm);
+  for (let i = 0; i < SNOW * (PW + 2 * EDGE) / PW; i++) {
+    const x = -EDGE + rB() * (PW + 2 * EDGE);
+    if (rB() > env(x)) continue;
+    snow(rB, x, 1 + rK());
+  }
+  for (let i = 0; i < 240 + skyTries; i++) star(rB, SKY_X0 + rB() * (SKY_X1 - SKY_X0), SKY_Y0 + rB() * (SKY_Y1 - SKY_Y0), 1 + rK());
+  const SX = Float32Array.from(sx), SY = Float32Array.from(sy), SA = Float32Array.from(sa), SK = Float32Array.from(sk);
+
+  // ---- canvas buffers -------------------------------------------------------
+  let W = 0, H = 0, acc, base, image, pixels;
+  const glowCanvas = document.createElement('canvas');
+  const glowCtx = glowCanvas.getContext('2d');
+  let gw = 0, gh = 0, gbuf, gtmp, gimage, gpixels;
+  let baseKey = '';
+  function resize() {
+    canvas.width = Math.max(1, window.innerWidth);
+    canvas.height = Math.max(1, window.innerHeight);
+    W = canvas.width; H = canvas.height;
+    acc = new Float32Array(W * H);
+    base = new Float32Array(W * H);
+    image = ctx.createImageData(W, H);
+    pixels = new Uint32Array(image.data.buffer);
+    gw = Math.ceil(W / 4); gh = Math.ceil(H / 4);
+    glowCanvas.width = gw; glowCanvas.height = gh;
+    gbuf = new Float32Array(gw * gh); gtmp = new Float32Array(gw * gh);
+    gimage = glowCtx.createImageData(gw, gh);
+    gpixels = new Uint32Array(gimage.data.buffer);
+    baseKey = '';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const PRESETS = {
+    whisper: { opacity: 0.9, stroke: 0.8, density: 0.7, fires: 3, glow: 0 },
+    ink:     { opacity: 1, stroke: 1.4, density: 1.2, fires: 4.5, saturation: 0, glow: 0 },
+    neon:    { opacity: 0.95, stroke: 1, density: 1.1, fires: 4, saturation: 0.9, glow: 1.1 },
+    drift:   { opacity: 0.85, density: 0.85, speed: 0.4, motion: 1.8, phase: 0.6, scale: 1.3, fires: 5 },
+    dense:   { opacity: 1, stroke: 1.1, density: 2, scale: 1.15, fires: 6 },
+  };
+
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => {},
+    extraControls: [
+      // How many fires burn at once along the chain: how slowly each one
+      // gutters once the next has caught. 1 hands the light from summit to
+      // summit; 6 keeps every summit burning.
+      { name: 'fires', label: 'Fires', type: 'range', min: 1, max: 6, step: 0.1, default: 4, category: 'form' },
+    ],
+    defaults: { hue: 38, hueB: 8, saturation: 0, scale: 1, colorMode: 'gradient', colorA: '#ffa200', colorB: '#ff2200' },
+  });
+  const currentValues = baked || panel.values;
+
+  // Light level -> pixel. Bright marks take colour stop A, faint ones B.
+  // max(ground, grey + ink * v), not a blend over the ground, so faint dots
+  // stay neutral grey instead of inheriting its blue cast. One unit of
+  // light is 228 grey over the ground, reaching white at AMAX; above KNEE a
+  // soft shoulder rolls the light toward white, so a flame's core stays a
+  // tongue of light rather than a clipped white needle.
+  const LN = 1536, AMAX = 245 / 228, VMAX = 1.6, KNEE = 0.95;
+  const shoulder = (v) => v <= KNEE ? v : KNEE + (AMAX - KNEE) * (1 - Math.exp(-(v - KNEE) / (AMAX - KNEE)));
+  const lut = new Uint32Array(LN + 1);
+  let lutKey = '';
+  function buildLut(values) {
+    const key = `${values.hue},${values.hueB},${values.saturation},${values.colorMode},${values.invert}`;
+    if (key === lutKey) return;
+    lutKey = key;
+    const ground = values.invert ? [242, 242, 244] : [10, 10, 13];
+    for (let i = 0; i <= LN; i++) {
+      const v = shoulder(i / LN * VMAX), t = v / AMAX;
+      const stop = paletteHsl(values, 1 - t);
+      const ink = hslToRgb(stop.h, stop.s, values.invert ? 0.12 : 0.894);
+      const c = [0, 1, 2].map((j) => Math.round(values.invert
+        ? ground[j] + (ink[j] - ground[j]) * t
+        : Math.min(255, Math.max(ground[j], 10 + ink[j] * v))));
+      lut[i] = (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
+    }
+  }
+
+  // Mark footprint: a box of side ds px, area-weighted onto the pixels
+  // (side 1 is a bilinear splat). `a` is light per unit area.
+  function splat2(buf, w, h, x, y, ds, a) {
+    const x0 = x - ds / 2, y0 = y - ds / 2, ix = Math.floor(x0), iy = Math.floor(y0);
+    if (ix < 0 || iy < 0 || ix + 1 >= w || iy + 1 >= h) return false;
+    const wx0 = Math.min(ix + 1 - x0, ds), wx1 = ds - wx0;
+    const wy0 = Math.min(iy + 1 - y0, ds) * a, wy1 = ds * a - wy0;
+    const k = iy * w + ix;
+    buf[k] += wx0 * wy0; buf[k + 1] += wx1 * wy0; buf[k + w] += wx0 * wy1; buf[k + w + 1] += wx1 * wy1;
+    return true;
+  }
+  function splat3(buf, w, h, x, y, ds, a) {
+    const x0 = x - ds / 2, y0 = y - ds / 2, ix = Math.floor(x0), iy = Math.floor(y0);
+    if (ix < 0 || iy < 0 || ix + 2 >= w || iy + 2 >= h) return false;
+    const wx0 = ix + 1 - x0, rx = ds - wx0, wx1 = Math.min(1, rx), wx2 = rx - wx1;
+    const wy0 = iy + 1 - y0, ry0 = ds - wy0, wy1 = Math.min(1, ry0), wy2 = ry0 - wy1;
+    let k = iy * w + ix, c = wy0 * a;
+    buf[k] += wx0 * c; buf[k + 1] += wx1 * c; buf[k + 2] += wx2 * c;
+    k += w; c = wy1 * a;
+    buf[k] += wx0 * c; buf[k + 1] += wx1 * c; buf[k + 2] += wx2 * c;
+    k += w; c = wy2 * a;
+    buf[k] += wx0 * c; buf[k + 1] += wx1 * c; buf[k + 2] += wx2 * c;
+    return true;
+  }
+
+  // The framing: design frame -> canvas by cover fit, Scale's zoom and
+  // Angle's turn about PIVOT. Marks keep their screen size at any zoom, so
+  // dots are thinned (or weighted) by zoom^2 and strokes weighted by zoom
+  // to hold the light per pixel.
+  function makeView(values) {
+    const fit = Math.max(W / PW, H / PH), z = fit * (0.5 + 0.5 * values.scale);
+    const th = values.angle * Math.PI / 180;
+    const m00 = z * Math.cos(th), m01 = -z * Math.sin(th), m10 = z * Math.sin(th), m11 = z * Math.cos(th);
+    const psx = W / 2 + fit * (PIVOT_X - PW / 2), psy = H / 2 + fit * (PIVOT_Y - PH / 2);
+    const dens = values.density, q = dens * z * z;
+    const ds = 0.55 + 0.45 * values.stroke; // mark side, px
+    return {
+      m00, m01, m10, m11, ox: psx - (m00 * PIVOT_X + m01 * PIVOT_Y), oy: psy - (m10 * PIVOT_X + m11 * PIVOT_Y),
+      z, dens, q, ds,
+      // Stipple: the share of the dots drawn (ranks under q), and past what
+      // was generated, the weight per dot makes up the rest. Above Density 1
+      // each dot is a little fainter, so more dots build texture faster than
+      // light. A mark's light grows with its side, not its area, so fine
+      // dots don't vanish.
+      comp: Math.max(1, q / 2) / ds / (dens > 1 ? Math.sqrt(dens) : 1),
+      // Strokes: more of them at higher Density, each fainter, so a flame
+      // gets finer, never whiter.
+      lineK: z * (dens > 1 ? 1 / dens : 1) / ds,
+      // Small fixed sets (embers, smoke): weighted down when zoomed out.
+      dotK: Math.min(1, z * z) * (dens > 1 ? Math.sqrt(dens) : 1) / ds,
+      cnt: Math.min(1, dens),
+      key: `${W}x${H},${values.scale},${values.angle},${dens},${values.stroke}`,
+    };
+  }
+
+  function buildBase(view) {
+    base.fill(0);
+    const { m00, m01, m10, m11, ox, oy, ds, comp } = view, keep = Math.min(2, view.q);
+    const sp = ds <= 1 ? splat2 : splat3;
+    for (let i = 0, n = SX.length; i < n; i++) {
+      if (SK[i] >= keep) continue;
+      const x = SX[i], y = SY[i];
+      sp(base, W, H, ox + m00 * x + m01 * y, oy + m10 * x + m11 * y, ds, SA[i] * comp);
+    }
+  }
+
+  function light(x, y) {
+    let L = 0;
+    for (let i = 0; i < NF; i++) {
+      const I = If[i]; if (I < 0.002) continue;
+      const f = fires[i], d2 = (x - f.x) ** 2 + ((y - f.y) * 1.2) ** 2;
+      L += I * (Math.exp(-d2 / (2 * 56 * 56 * I)) + 0.16 * Math.exp(-d2 / (2 * 130 * 130 * I)));
+    }
+    return L;
+  }
+
+  // A hairline from (x0, y0) to (x1, y1) in screen px, `m` light per px of
+  // length, as a row of footprints 0.8 px apart.
+  function seg(view, x0, y0, x1, y1, m) {
+    const ds = view.ds, len = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.ceil(len / 0.8)), a = m * len / n / ds;
+    const sp = ds <= 1 ? splat2 : splat3;
+    for (let i = 0; i < n; i++) { const t = (i + 0.5) / n; sp(acc, W, H, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, ds, a); }
+  }
+
+  const pts = new Float32Array(64);
+  // One frame at loop time `time` into acc. With `out`, also lists every
+  // stroke drawn (screen polylines) and every dot (screen x, y, light) for
+  // SVG export.
+  function render(time, values, view, out) {
+    const t = Math.round(((time % PERIOD) + PERIOD) % PERIOD * 1e6) / 1e6;
+    const kGut = 0.6 * (4 / values.fires) ** 2, mo = values.motion;
+    for (let i = 0; i < NF; i++) If[i] = intensity((((t / STEP - i + PHASE0) % NF) + NF) % NF, kGut);
+    const { m00, m01, m10, m11, ox, oy, ds } = view;
+    const sp = ds <= 1 ? splat2 : splat3;
+    const dot = (x, y, a) => {
+      const X = ox + m00 * x + m01 * y, Y = oy + m10 * x + m11 * y;
+      if (sp(acc, W, H, X, Y, ds, a) && out) out.dots.push(X, Y, a * ds);
+    };
+    acc.set(base);
+
+    // The ridge line: faint everywhere so the range is drawn, brighter in
+    // firelight, fading with the range's ends.
+    let line = out ? [] : null;
+    for (let x = -EDGE; x < PW + EDGE; x += 2) {
+      const e = env(x + 1);
+      if (e <= 0) continue;
+      const ya = RY(x) + 0.5, yb = RY(x + 2) + 0.5;
+      const ax = ox + m00 * x + m01 * ya, ay = oy + m10 * x + m11 * ya;
+      const bx = ox + m00 * (x + 2) + m01 * yb, by = oy + m10 * (x + 2) + m11 * yb;
+      seg(view, ax, ay, bx, by, (0.11 + 0.5 * Math.min(1, light(x, RY(x)))) * 0.6 * e);
+      if (line) { if (!line.length) line.push([ax, ay]); line.push([bx, by]); }
+    }
+    if (line && line.length > 1) out.lines.push(line);
+
+    // Lit rock.
+    const rq = view.q, nA = Math.min(1, rq), nB = clamp(rq - 1), comp = view.comp;
+    for (let fi = 0; fi < NF; fi++) {
+      const I = If[fi]; if (I < 0.002) continue;
+      const k1 = 1 / (2 * 56 * 56 * I), k2 = 1 / (2 * 130 * 130 * I);
+      const [a0, a1] = rockA[fi], [b0, b1] = rockB[fi];
+      rockSpan(I, k1, k2, a0, a0 + Math.round((a1 - a0) * nA), view, comp, out);
+      if (nB > 0) rockSpan(I, k1, k2, b0, b0 + Math.round((b1 - b0) * nB), view, comp, out);
+    }
+
+    // Fires.
+    const lineK = view.lineK, dotK = view.dotK, cnt = view.cnt;
+    for (let fi = 0; fi < NF; fi++) {
+      const I = If[fi]; if (I < 0.003) continue;
+      const f = fires[fi], G = fireGeo[fi];
+      const bw = 10 + 26 * I, ntE = 2 + 5 * I, nsE = Math.max(3, (12 + 38 * I) * view.dens), sqI = Math.sqrt(I);
+      const br = TAU * t / BREATH - f.x / 240, lick = TAU * t / LICK_T;
+      for (let k = 0; k < G.tongues.length; k++) {
+        const wk = clamp(ntE - k); if (wk <= 0) break;
+        const tg = G.tongues[k], tx = f.x + tg.txF * bw, sway = mo * Math.sin(br + 0.5 * tg.ph);
+        const th = (8 + 52 * tg.thR) * (0.25 + 0.75 * I) * (1 - 0.6 * Math.abs(tg.txF)) * (1 + 0.14 * sway);
+        const lean = mo * 0.2 + 0.15 * sway, tw = bw * tg.twF, by = Math.min(RY(tx), f.y + 3);
+        for (let j = 0; j < tg.strokes.length; j++) {
+          const wj = clamp(nsE - j); if (wj <= 0) break;
+          // Each hairline climbs through the tongue at its own offset and
+          // stops at its own height, so the tongue fills as a teardrop and
+          // only the longest strokes reach the tip.
+          const s = tg.strokes[j], o = s.oF * tw * 1.25, zt = s.hF, b0 = 1 + 3 * s.b0R;
+          const m = (0.028 + 0.03 * I) * s.aR * wk * wj * 0.55 * lineK;
+          const n = Math.min(30, Math.max(5, Math.ceil((th * zt + b0) / 2)));
+          for (let q = 0; q <= n; q++) {
+            const z = zt * q / n, prof = (1 - z) * (0.7 + 1.5 * z);
+            const x = tx + o * prof + lean * th * z * z + mo * (1.4 * z * Math.sin(tg.ph + z * 4 - lick) + 0.4 * z * Math.sin(s.ph + z * 7 - lick));
+            const y = by + b0 * (1 - q / n) - th * z;
+            pts[2 * q] = ox + m00 * x + m01 * y; pts[2 * q + 1] = oy + m10 * x + m11 * y;
+          }
+          for (let q = 0; q < n; q++) seg(view, pts[2 * q], pts[2 * q + 1], pts[2 * q + 2], pts[2 * q + 3], m);
+          if (out) { const pl = []; for (let q = 0; q <= n; q++) pl.push([pts[2 * q], pts[2 * q + 1]]); out.lines.push(pl); }
+        }
+      }
+      // Ember bed.
+      const ne = (40 + 70 * I) * cnt;
+      for (let i = 0; i < G.embers.length; i++) {
+        const w = clamp(ne - i); if (w <= 0) break;
+        const e = G.embers[i], x = f.x + e.xF * bw;
+        dot(x, RY(x) + 1 - e.dy, (0.06 + 0.15 * I * e.aR) * (1 - 0.15 * mo + 0.15 * mo * Math.sin(br + e.xF * 3)) * w * dotK);
+      }
+      // Sparks rising on a fixed cycle, carried downwind.
+      const ns = (4 + 66 * I) * cnt;
+      for (let i = 0; i < G.sparks.length; i++) {
+        const w = clamp(ns - i); if (w <= 0) break;
+        const s = G.sparks[i], tp = frac(s.u + t / SPARK_T), tt = tp ** 1.4, hh = tt * 120 * sqI + 6;
+        const env2 = smooth(0, 0.06, tp) * (1 - smooth(0.8, 1, tp));
+        dot(f.x + mo * hh * 0.22 + s.jx * (2 + hh * 0.2), f.y - 4 - hh, (0.5 - 0.42 * tt) * (0.3 + 0.7 * s.aR) * (0.5 + 0.5 * I) * env2 * w / ds);
+      }
+      // Smoke: puffs rise and drift downwind, lit from below near the fire.
+      const sf = (2600 * I + 900 * (1 - I)) / 3400 * cnt, sOn = smooth(0, 0.06, I);
+      for (const pf of G.puffs) {
+        const tp = frac(pf.off + t / SMOKE_T), hh = 8 + tp * 150, wid = 5 + tp * 40;
+        const e3 = smooth(0, 0.1, tp) * (1 - smooth(0.65, 1, tp)) * sOn;
+        if (e3 <= 0) continue;
+        const pcx = f.x + mo * (hh * 0.3 + 12 * tp * Math.sin(pf.ph + tp * 3)), pcy = f.y - hh;
+        const a0 = (0.03 + 0.1 * I * (1 - tp) ** 2) * e3 * dotK, D = pf.dots;
+        for (let i = 0; i < D.length; i += 4) {
+          if (D[i + 2] > sf) continue;
+          dot(pcx + D[i] * wid, pcy + D[i + 1] * wid * 0.55, a0 * D[i + 3]);
+        }
+      }
+    }
+  }
+
+  // The lit-rock loop lives in its own function so it is optimised on its own.
+  function rockSpan(I, k1, k2, from, to, view, comp, out) {
+    const { m00, m01, m10, m11, ox, oy, ds } = view;
+    const buf = acc, w = W, h = H, big = ds > 1;
+    for (let i = from; i < to; i++) {
+      const d2 = CD[i], L = I * (Math.exp(-d2 * k1) + 0.16 * Math.exp(-d2 * k2)), p = L * CG[i] - CT[i];
+      if (p <= 0) continue;
+      const wt = p > 0.1 ? 1 : p / 0.1, Lc = L > 1 ? 1 : L;
+      const a = (0.06 + 0.3 * Math.pow(Lc, 1.3)) * wt * CM[i] * comp;
+      const x = CX[i], y = CY[i], X = ox + m00 * x + m01 * y, Y = oy + m10 * x + m11 * y;
+      const ok = big ? splat3(buf, w, h, X, Y, ds, a) : splat2(buf, w, h, X, Y, ds, a);
+      if (ok && out) out.dots.push(X, Y, a * ds);
+    }
+  }
+
+  // Bloom on the flames only: what rises past GLOW_T at quarter resolution,
+  // box-blurred twice and drawn back with drawImage under 'lighter'. The
+  // threshold keeps it off the lit rock, so a summit never turns to a dome.
+  const GLOW_R = 2, GLOW_T = 0.45;
+  function downsample(src, dst, w, h, dw) {
+    dst.fill(0);
+    for (let y = 0; y < h; y++) {
+      const row = y * w, drow = (y >> 2) * dw;
+      for (let x = 0; x < w; x++) { const v = src[row + x] - GLOW_T; if (v > 0) dst[drow + (x >> 2)] += v; }
+    }
+  }
+  function boxBlur(buf, tmp, bw, bh, rr) {
+    for (let y = 0; y < bh; y++) {
+      const row = y * bw;
+      let s = 0;
+      for (let x = -rr; x < bw; x++) {
+        if (x + rr < bw) s += buf[row + x + rr];
+        if (x - rr - 1 >= 0) s -= buf[row + x - rr - 1];
+        if (x >= 0) tmp[row + x] = s;
+      }
+    }
+    for (let x = 0; x < bw; x++) {
+      let s = 0;
+      for (let y = -rr; y < bh; y++) {
+        if (y + rr < bh) s += tmp[(y + rr) * bw + x];
+        if (y - rr - 1 >= 0) s -= tmp[(y - rr - 1) * bw + x];
+        if (y >= 0) buf[y * bw + x] = s;
+      }
+    }
+  }
+  function glowPixels(buf, out, norm, ir, ig, ib) {
+    for (let i = 0, n = buf.length; i < n; i++) {
+      const v = Math.min(1, buf[i] * norm);
+      out[i] = (255 << 24) | (Math.round(ib * v) << 16) | (Math.round(ig * v) << 8) | Math.round(ir * v);
+    }
+  }
+  function drawGlow(values) {
+    downsample(acc, gbuf, W, H, gw);
+    boxBlur(gbuf, gtmp, gw, gh, GLOW_R);
+    boxBlur(gbuf, gtmp, gw, gh, GLOW_R);
+    const stop = paletteHsl(values, 0);
+    const [ir, ig, ib] = hslToRgb(stop.h, stop.s, 0.6);
+    glowPixels(gbuf, gpixels, values.glow * values.opacity * 1.6 / (16 * (2 * GLOW_R + 1) ** 4), ir, ig, ib);
+    glowCtx.putImageData(gimage, 0, 0);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(glowCanvas, 0, 0, gw * 4, gh * 4);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // Light -> pixels through the LUT, in slices: a function called several
+  // times a frame is optimised on entry, not only mid-loop.
+  function toPixels(src, dst, table, gain) {
+    const n = src.length, step = Math.ceil(n / 8);
+    for (let a = 0; a < n; a += step) pixelSpan(src, dst, table, gain, a, Math.min(n, a + step));
+  }
+  function pixelSpan(src, dst, table, gain, from, to) {
+    const ground = table[0];
+    for (let i = from; i < to; i++) {
+      const v = src[i];
+      if (v <= 0) { dst[i] = ground; continue; }
+      const j = v * gain + 0.5 | 0;
+      dst[i] = table[j > LN ? LN : j];
+    }
+  }
+
+  let clock = 0;
+  const loopTime = (values) => clock + values.phase * PERIOD / 2 + LOOP_START;
+  function frameView(values) {
+    if (canvas.width !== W || canvas.height !== H) resize();
+    const view = makeView(values);
+    if (view.key !== baseKey) { buildBase(view); baseKey = view.key; }
+    return view;
+  }
+  function drawFrame(dt, elapsed, values) {
+    clock += dt * values.speed;
+    const view = frameView(values);
+    render(loopTime(values), values, view, null);
+    buildLut(values);
+    toPixels(acc, pixels, lut, values.opacity * LN / VMAX);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.putImageData(image, 0, 0);
+    if (values.glow > 0 && !values.invert) drawGlow(values);
+  }
+
+  const loop = createLoop({
+    onFrame(dt, elapsed) {
+      drawFrame(dt, elapsed, currentValues);
+    },
+  });
+  loop.start();
+
+  // SVG: the strokes as polylines, and an evenly thinned sample of the dots
+  // (the static stars and snow, then the lit rock, embers, sparks, smoke).
+  const SVG_DOT_CAP = 15000;
+  function exportVector() {
+    const values = currentValues;
+    const view = frameView(values);
+    const got = { lines: [], dots: [] };
+    const { m00, m01, m10, m11, ox, oy, ds, comp } = view, keep = Math.min(2, view.q);
+    for (let i = 0, n = SX.length; i < n; i++) {
+      if (SK[i] >= keep) continue;
+      const x = SX[i], y = SY[i], X = ox + m00 * x + m01 * y, Y = oy + m10 * x + m11 * y;
+      if (X >= 0 && Y >= 0 && X < W && Y < H) got.dots.push(X, Y, SA[i] * comp * ds);
+    }
+    render(loopTime(values), values, view, got);
+    buildLut(values);
+    const n = got.dots.length / 3, stride = Math.max(1, Math.ceil(n / SVG_DOT_CAP));
+    const circles = [];
+    for (let i = 0; i < n; i += stride) {
+      const px = lut[Math.min(LN, Math.round(got.dots[i * 3 + 2] * values.opacity / VMAX * LN))];
+      circles.push({ cx: got.dots[i * 3], cy: got.dots[i * 3 + 1], r: ds / 2, fill: `rgb(${px & 255},${(px >> 8) & 255},${(px >> 16) & 255})`, opacity: 1 });
+    }
+    exportSvg(got.lines, { width: canvas.width, height: canvas.height, circles });
+  }
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', exportVector);
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script>
+</body>
+</html>

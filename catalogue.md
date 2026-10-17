@@ -262,3 +262,30 @@ A disc galaxy seen almost edge-on in fine stipple, its bright bulge cut by a rag
 - **Text-safe zone:** the bottom third, and the top band above the bulge
 - **Anchor:** the bulge, just above and right of centre, behind the lane
 - **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Rock
+
+## Beacons
+
+One drawn mountain range at night in stipple and hairlines, where fires catch from summit to summit so the light walks along the chain and wraps round, each new fire lighting the ribs of its own rock.
+
+- **Tags:** grain, depth, kinetic, landscape
+- **Text-safe zone:** the sky above the range, top quarter; the bottom fifth
+- **Anchor:** the newest fire, just right of centre, stepping right along the chain
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Fires
+
+## High Pass
+
+A jagged peak in cross-section with the wind from the left, driving drift up its snowy face and tearing a plume of spindrift off the crest that sags into the lee and frays downwind in clumps.
+
+- **Tags:** grain, flow, landscape
+- **Text-safe zone:** the sky over the windward slope, upper left
+- **Anchor:** the crest, right of centre, where the plume tears off
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Gust
+
+## Old Road
+
+A pale track winding toward the viewer over dark moonlit moorland in fine stipple, dropping out of sight behind each rise and coming back in fragments toward the horizon on a slow walk up the road.
+
+- **Tags:** grain, depth, kinetic, landscape
+- **Text-safe zone:** the sky above the horizon, the top 40%
+- **Anchor:** the near road at the foot of the frame, lower centre
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Relief

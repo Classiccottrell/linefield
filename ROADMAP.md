@@ -408,10 +408,15 @@ review) before merge, not after.
       a glowing ribbon), and, before drawing, a ruin on a tor (pillars), a
       ford (lines parting around a void) and a switchback road (a
       lightning zigzag).
-    - **Next:** a rough motion pass on all seven, so the owner chooses with
-      the motion in view (the `dust-lane` lesson). Then refine the picks
-      into animated prototypes and build them. Front-runners: Beacons,
-      High pass, Old road.
+    - **Motion pass (2026-10-15):** all seven animated as rough loops and
+      watched in motion before any pick, the `dust-lane` lesson applied.
+    - **Shipped 2026-10-16:** `beacons`, `high-pass` and `old-road`, as the
+      Old Roads collection. The builds fixed what the motion pass showed:
+      fire-lit summits kept to their ribs so they never read as domes, the
+      spindrift's parallel streamers broken into puffs, and the road's load
+      time cut from about 3 s to half a second.
+    - **Still candidates:** *Hachure*, *Marsh lights*, *Cloud sea* and *Fog
+      fall* have motion prototypes and can be built later.
   - **Weather:** *Aurora* (hairline curtains hanging from one slow fold,
     seen from below; they must hang, not wave like `longwave`),
     *Thunderhead* (a cloud tower in `dune`'s film grain, lit from inside by
@@ -438,7 +443,7 @@ review) before merge, not after.
 Every row is **generated**, not hand-recorded. Run `npm run collection-metrics`
 and paste its output here verbatim; it prints this exact table, already
 sorted by ink. Rebuild thumbnails (`npm run build`) first, because it
-measures the committed PNGs. Refreshed 2026-10-15, after the space series.
+measures the committed PNGs. Refreshed 2026-10-16, after Old Roads.
 
 **Hue is no longer a useful column, and that's success, not a gap.** Every
 piece now reports hue 240 — that's not a real colour, it's the ground's own
@@ -449,8 +454,10 @@ Ink, not hue, is now the axis that tells pieces apart.
 |---:|---:|---:|---:|---|
 | 240 | 0.13 | 0.00 | 0.006 | `rainfall` |
 | 240 | 0.13 | 0.00 | 0.029 | `grain-field` |
+| 240 | 0.03 | 0.00 | 0.036 | `beacons` |
 | 240 | 0.12 | 0.00 | 0.037 | `lacuna` |
 | 240 | 0.11 | 0.00 | 0.047 | `contrail` |
+| 240 | 0.06 | 0.00 | 0.052 | `old-road` |
 | 240 | 0.05 | 0.00 | 0.056 | `mooring` |
 | 240 | 0.03 | 0.00 | 0.059 | `dune` |
 | 240 | 0.05 | 0.00 | 0.064 | `relay` |
@@ -464,6 +471,7 @@ Ink, not hue, is now the axis that tells pieces apart.
 | 240 | 0.13 | 0.00 | 0.093 | `wireframe-lattice` |
 | 240 | 0.12 | 0.00 | 0.101 | `louvre` |
 | 240 | 0.09 | 0.00 | 0.108 | `flow-field` |
+| 240 | 0.13 | 0.00 | 0.109 | `high-pass` |
 | 240 | 0.12 | 0.00 | 0.116 | `driftwork` |
 | 240 | 0.05 | 0.00 | 0.118 | `pleat` |
 | 240 | 0.08 | 0.00 | 0.118 | `cipher-bloom` |
