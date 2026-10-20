@@ -27,7 +27,7 @@
   {
     "id": "space",
     "title": "Space",
-    "slugs": ["magnetosphere", "dust-lane", "tidal-bridge", "terminator", "dark-nebula"]
+    "slugs": ["magnetosphere", "dust-lane", "tidal-bridge", "terminator", "dark-nebula", "signal-sphere"]
   },
   {
     "id": "old-roads",

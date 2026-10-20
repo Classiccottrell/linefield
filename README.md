@@ -177,6 +177,7 @@ tooling" below and CONTRIBUTING.md.
 - `beacons` — one drawn mountain range at night in stipple and hairlines, where fires catch from summit to summit so the light walks along the chain and wraps round
 - `high-pass` — a jagged peak in cross-section, the wind tearing a plume of spindrift off its crest that sags into the lee and frays downwind in clumps
 - `old-road` — a pale track winding toward the viewer over dark moonlit moorland in fine stipple, dropping out of sight behind each rise and coming back in fragments toward the horizon on a slow walk up the road
+- `signal-sphere` — a very large night planet filling the bottom-right corner in stipple, its city lights and links drawing themselves along the edge that rolls into view and growing denser the longer you watch, under a shimmering airglow limb and a deep-space sky
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,
