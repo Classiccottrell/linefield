@@ -177,6 +177,7 @@ tooling" below and CONTRIBUTING.md.
 - `beacons` — one drawn mountain range at night in stipple and hairlines, where fires catch from summit to summit so the light walks along the chain and wraps round
 - `high-pass` — a jagged peak in cross-section, the wind tearing a plume of spindrift off its crest that sags into the lee and frays downwind in clumps
 - `old-road` — a pale track winding toward the viewer over dark moonlit moorland in fine stipple, dropping out of sight behind each rise and coming back in fragments toward the horizon on a slow walk up the road
+- `signal-sphere` — a very large night planet filling the bottom-right corner in stipple, its city lights and links drawing themselves along the edge that rolls into view and growing denser the longer you watch, under a shimmering airglow limb and a deep-space sky
 
 Every piece shares 14 visual controls (scale, speed, stroke, opacity,
 saturation, color mode, color A, color B, glow, angle, motion, phase,
@@ -333,6 +334,10 @@ inherits. The delivery log for earlier work is archived in
 All pieces hold 60fps at their default settings on ordinary hardware. The
 two heaviest were measured at their worst case — `relay` at density 2.0
 with reach 200, and `infall` at density 2.0 — and both held 60fps.
+`signal-sphere` is the exception by design: it draws a few hundred thousand
+stipple dots a frame, so it is capped at 30fps and at 1.3 million canvas
+pixels (a larger window is upscaled by CSS), and builds its scene in slices
+of about 10 ms so the page never freezes while it does.
 
 What costs the most, in order:
 

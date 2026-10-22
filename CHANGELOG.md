@@ -8,6 +8,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`signal-sphere`**, a sixth Space piece, bringing the collection to
+  thirty-three: a very large night planet filling the bottom-right corner,
+  its city lights and links made along the edge that rolls into view and
+  growing denser over the first few minutes, under a shimmering airglow limb
+  and a deep-space sky of stars, nebulae and galaxies, all in stipple (extra
+  controls Side, Land, Lights, Body, Stars and Nebula). Its stipple descends
+  from `terminator`. It passes `collection-check` and `audit-controls` with
+  every control live, builds its scene in slices of about 10 ms so the page
+  never freezes, and draws one still frame under reduced motion. It does
+  not loop: the densification is a one-way ramp. The default is thinner than
+  the full look to fit the ink band (0.140 at the thumbnail capture; the
+  `dense` preset restores the full look), and measures 0.16 to 0.21 once the
+  network has grown.
+
 - **An Old Roads collection**, three new pieces bringing the collection to
   thirty-two: mythic landscapes, drawn by evocation only. `beacons` is one
   drawn mountain range at night where fires catch from summit to summit, so

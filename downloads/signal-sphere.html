@@ -1,0 +1,2752 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<!-- Without this a phone uses a ~980px layout viewport, so the panel's
+     max-width:640px sheet rule never matches and the page renders zoomed
+     out — the controls become an unusable corner card. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>linefield — signal-sphere</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0d; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .lf-export-row { position: fixed; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 9999; }
+  .lf-export-row button { background: #222; color: #eee; border: 1px solid #444; border-radius: 4px;
+    padding: 4px 8px; font: 11px -apple-system, sans-serif; cursor: pointer; }
+</style>
+<style id="lf-panel-css">
+/* Fix round 1: the panel is a flex column so the scrollable middle
+   (.lf-body) can't push the footer (.lf-reset) off screen, and section
+   headers are now toggle buttons so the panel fits at rest. */
+.lf-panel { position: fixed; bottom: 12px; right: 12px; width: 300px;
+  background: #0b0b0f; color: #e8e8e8; font: 12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 16px;
+  z-index: 9999; max-height: 80vh; overflow: hidden; box-sizing: border-box;
+  display: flex; flex-direction: column; }
+.lf-panel.collapsed .lf-body, .lf-panel.collapsed .lf-reset { display: none; }
+.lf-panel h3 { margin: 0; padding: 14px 18px 12px; font: 700 11px/1 ui-monospace,Menlo,monospace;
+  text-transform: uppercase; letter-spacing: .12em; color: #5fa07c; flex: none;
+  display: flex; align-items: center; justify-content: space-between; cursor: grab;
+  user-select: none; touch-action: none; }
+.lf-panel h3:active { cursor: grabbing; }
+.lf-panel h3 .lf-status { display: flex; align-items: center; gap: 5px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; color: #8a8a9a; text-transform: none; }
+.lf-panel h3 .lf-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
+  box-shadow: 0 0 6px rgba(34,197,94,0.8); flex: none; }
+/* .lf-body is the ONLY scrolling region — header, footer and the mobile
+   handle sit outside it so they never scroll out of view. min-height: 0 is
+   load-bearing: without it a flex child won't shrink below its content size
+   and this scroller simply never activates. */
+.lf-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 18px 14px; }
+.lf-section-head { all: revert; appearance: none; background: none; border: none; padding: 0;
+  margin: 0 0 10px; width: 100%; box-sizing: border-box; text-align: left; cursor: pointer;
+  font: 700 10px/1 ui-monospace,Menlo,monospace; text-transform: uppercase; letter-spacing: .12em;
+  color: #5fa07c; display: flex; align-items: center; justify-content: space-between; }
+.lf-section-head:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 2px; }
+.lf-chevron { display: inline-block; font: 10px/1 ui-monospace,Menlo,monospace;
+  transition: transform .15s ease; }
+.lf-chevron::before { content: '\25be'; }
+.lf-section.lf-section-collapsed .lf-chevron { transform: rotate(-90deg); }
+.lf-section.lf-section-collapsed .lf-section-body { display: none; }
+.lf-section + .lf-section { margin-top: 14px; }
+.lf-divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 16px 0; }
+.lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.lf-row:last-child { margin-bottom: 0; }
+.lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
+.lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
+.lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
+.lf-row-checkbox label { order: -1; }
+
+.lf-row select { width: 100%; box-sizing: border-box; appearance: none; -webkit-appearance: none;
+  background: #141419 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%238a8a9a"/></svg>') no-repeat right 10px center;
+  color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+  padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
+
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+
+.lf-color-row { display: flex; align-items: center; gap: 8px; }
+.lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px; background: none; cursor: pointer; flex: none; }
+.lf-hex { font: 12px ui-monospace,Menlo,monospace; color: #c9c9d4; text-transform: uppercase; }
+
+.lf-segmented { display: flex; gap: 6px; margin-bottom: 8px; }
+.lf-seg-btn { flex: 1; background: #141419; color: #8a8a9a; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 7px 8px; font: 11px -apple-system,sans-serif; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; justify-content: center; }
+.lf-seg-btn::before { content: ''; width: 9px; height: 9px; border-radius: 50%; border: 1px solid #55556a; flex: none; }
+.lf-seg-btn.lf-seg-btn-active { color: #e8e8e8; border-color: #437057; }
+.lf-seg-btn.lf-seg-btn-active::before { border-color: #437057; background: #437057; }
+.lf-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Sticky footer (fix round 1, finding 1): a flex sibling of .lf-body, not a
+   child of it, so it never scrolls with the sections above it. Its own
+   background covers content scrolling underneath; its top border is the
+   hairline that reads it as a footer rather than a floating button. */
+.lf-reset { flex: none; width: 100%; box-sizing: border-box; margin: 0; background: #0b0b0f;
+  color: #e8e8e8; border: none; border-top: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0 0 16px 16px; padding: 12px 18px; cursor: pointer;
+  font: 11px -apple-system,sans-serif; }
+.lf-reset:hover { background: #141419; }
+.lf-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 14px; }
+.lf-chip { flex: 1 1 auto; background: #141419; color: #c9c9d4; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 5px 6px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.lf-chip:hover { color: #fff; border-color: #55556a; }
+.lf-chip[aria-pressed="true"] { background: #437057; color: #e8e8e8; border-color: #437057; }
+.lf-chip:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 1px; }
+
+/* Below ~640px: full-width sheet docked to the bottom edge, collapsed to a
+   handle by default so the artwork stays unobstructed. This is scoped
+   entirely to the media query and a separate in-memory flag — never the
+   persisted desktop 'collapsed' state — so it can't leak into desktop. */
+.lf-handle { display: none; }
+@media (max-width: 640px) {
+  .lf-panel { left: 0; right: 0; bottom: 0; width: 100%; max-height: 70vh;
+    border-radius: 16px 16px 0 0; border-bottom: none; }
+  .lf-handle { display: flex; flex: none; justify-content: center; padding: 8px 0; cursor: pointer; }
+  .lf-handle::before { content: ''; width: 36px; height: 4px; border-radius: 999px; background: #3a3a46; }
+  .lf-reset { border-radius: 0; }
+  .lf-panel.mobile-collapsed .lf-body,
+  .lf-panel.mobile-collapsed .lf-reset { display: none; }
+}
+</style></head>
+<body>
+<canvas id="canvas" width="1280" height="800"></canvas>
+
+<!--
+  signal-sphere — a night planet whose city-light network grows as it turns: a very large dark globe filling the
+  bottom-right corner, its lights, links and a few undersea cables made along the edge that rolls into view, under a
+  shimmering airglow limb with aurora curtains and a deep-space sky of stars, nebulae and galaxies, all in stipple.
+
+  Text-safe zone: the open sky, upper left. Only faint stars sit there by default (with Nebula up, grainy nebulae and a
+  few small galaxies too); the planet takes the lower right (Side mirrors both).
+  Anchor: the growth front on the upper-left limb, brightest where it meets the bottom edge. The surface streams in
+  over the whole visible limb, so new lights and links are always being made along it (a place's lights fade in over a
+  few seconds, its links draw on from the first node over 5-14 s), and the lights crowd together toward the horizon.
+
+  Technique (stipple): descends from terminator, same author. Every light, link and haze dot is a fixed point with a
+  fixed random threshold; per frame the globe turns, each visible dot is placed on screen and a bilinear splat adds it
+  into a float buffer of (light, light x colour class) per pixel. One pass turns that buffer into pixels through a
+  look-up table of colour class x level, so Saturation, the hues, Color Mode and Invert make a new table, never a new
+  render. The body, the nebulae and the galaxies are rendered once into a layer that seeds every frame (the sky with
+  a whole-pixel drift); the stars are splatted per frame.
+
+  The network is a pure function of the turn and the clock, so a paused, resized or still frame is always consistent.
+  Growth front: every place has an age, the time since it rolled over the entering limb (counted at the unslowed turn
+  rate, so the front rides the surface); behind the front the network is mature. Densification: links and nodes belong
+  to tiers (arteries, regional, local) and later tiers switch on one by one over the first ~4 minutes of the clock,
+  so it gets denser the longer you watch; a few local links re-draw on a slow cycle once it is mature, and a few
+  faint packets walk finished links. There is no seamless loop: the globe turns once in 170 s at Speed 1, but the
+  densification is a one-way ramp and the packets, the re-drawn links and the airglow waves share no period with the
+  turn. Everything random comes from seeded generators (never Math.random), so the same clock draws the same frame.
+
+  Build: the scene is built in slices of about 10 ms between frames, so the page never freezes (about a second at
+  1440x900, then again a moment after Scale, Angle, Density, Side, Land, Nebula or Body settle). The old frame stays
+  on screen until the new one is ready. The canvas is drawn at no more than 1.3 million pixels, capped at 30 fps, and
+  upscaled by CSS. Reduced motion draws one still frame, 200 s into the growth, and redraws it only when a control moves.
+
+  Controls: Scale zooms the camera about the frame's centre, from a half-size planet (0) to a close pass (2). Density
+  sets the dot counts, Stroke the network's dot weight, Angle rolls the globe's axis (the direction the surface
+  streams), Phase turns the globe by up to two whole turns. Speed runs the turn, the growth front, the densification
+  and the packets; Motion runs the airglow waves, the aurora, the twinkle and the sky's drift. Glow is the airglow,
+  the horizon bloom and the aurora. It is this piece's limb, so it ships at 0.9 rather than the house 0. Side puts the
+  planet in the bottom-left corner. Land is the share of the surface that is land, Lights the network's gain, Body
+  the planet's own faint tint, Stars the share of the starfield drawn and Nebula the gain of nebulae and galaxies.
+  The ink band (house look: 0.03-0.15 of the frame marked at thumbnail size) is what holds Density, Land, Nebula,
+  Stars, Body, Glow and Opacity below the full look by default; the dense preset puts it back.
+
+  Colour: the palette is a two-stop hue pair, the lights at stop A and the airglow, nebulae and sky towards stop B.
+  The default pair is 36 -> 214 (sodium orange to deep blue, shown by neon). Two more to try with Color A and B:
+  216 -> 250 and 326 -> 262.
+
+  SVG export: a capped, evenly sampled share of the dots in the current frame (at most 24,000: stars, lights, links,
+  airglow, aurora) as circles in canvas space, coloured through the same table. The nebulae, the galaxies and the
+  body's grain are raster, and so is the stipple's accumulated brightness: use PNG for those.
+-->
+
+
+
+
+
+
+<script>window.__LF_BAKED_VALUES__ = {"scale":1,"speed":1,"stroke":1,"opacity":0.85,"saturation":0,"colorMode":"gradient","colorA":"#ff9900","colorB":"#006eff","hue":36,"hueB":214,"invert":false,"glow":0.9,"angle":0,"motion":1,"phase":0,"density":0.5,"side":"right","land":0.28,"lights":1,"body":0.15,"stars":0.45,"nebula":0.2};
+// --- inlined: ../../shared/color.js ---
+// shared/color.js
+
+function hslToRgb(h, s, l) {
+  h = ((h % 360) + 360) % 360 / 360;
+  s = Math.min(1, Math.max(0, s));
+  l = Math.min(1, Math.max(0, l));
+
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+
+  const r = hue2rgb(p, q, h + 1 / 3);
+  const g = hue2rgb(p, q, h);
+  const b = hue2rgb(p, q, h - 1 / 3);
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function hueShift(h, degrees) {
+  return ((h + degrees) % 360 + 360) % 360;
+}
+
+function invertRgb(r, g, b) {
+  return [255 - r, 255 - g, 255 - b];
+}
+
+// Extracts ONLY hue from a hex colour — the picker's own saturation/lightness
+// are discarded, because rendering always sources chroma from the piece's
+// shared `saturation` slider, never from the swatch a user happened to pick.
+// This is a one-way, lossy read (8-bit RGB quantizes hue), used exactly once
+// per user pick — never in a render loop, and never applied to a piece's own
+// seeded defaults, which keep their exact authored degree value untouched.
+// A grey/white/black pick (max === min) has no hue at all; callers must keep
+// the previous hue rather than let this return a meaningless 0 (red).
+function hexToHue(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return null; // achromatic — caller must preserve prior hue
+  const d = max - min;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  return h < 0 ? h + 360 : h;
+}
+
+// The shared 0-1 ramp position -> {h, s} for a piece's two-stop palette.
+// Solid mode ignores `f` and always returns stop A; gradient mode lerps hue
+// between the two stops exactly as every piece's own per-element interpolation
+// did before this control existed (`hue + (hueB - hue) * f`). `s` is always
+// the piece's single shared saturation control — colour stops never carry
+// their own saturation. `hue`/`hueB` are the exact, hidden numeric palette
+// values (see shared/controls.js); `colorA`/`colorB` are their hex *view*
+// only and are never read here.
+function paletteHsl(values, f) {
+  const s = values.saturation;
+  if (values.colorMode === 'solid') return { h: values.hue, s };
+  return { h: values.hue + (values.hueB - values.hue) * f, s };
+}
+
+
+// --- inlined: ../../shared/controls.js ---
+// shared/controls.js
+
+// `category` routes a control to one of the panel's tiers — 'interaction',
+// 'color', or the default 'visual' — and is presentation-only: it changes
+// which DOM section a row renders in, never __LF_SPECS__'s declaration
+// order, which every gate that isn't the panel itself still reads flat.
+const SHARED_CONTROLS = [
+  { name: 'scale', label: 'Scale', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'speed', label: 'Speed', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'stroke', label: 'Stroke', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1, category: 'color' },
+  // House look default is 0 (docs/house-look.md #1 — monochrome first); a
+  // piece pins its own saturation in its `defaults` block regardless.
+  { name: 'saturation', label: 'Saturation', type: 'range', min: 0, max: 1, step: 0.01, default: 0, category: 'color' },
+  // Solid/gradient palette. `colorA`/`colorB` are the authored controls a
+  // user actually sees and drags; `hue`/`hueB` are hidden (no panel row) —
+  // the exact numeric degrees every piece's render math still reads. Picking
+  // a colour writes the hidden field via `linkedHue` (see setValue below);
+  // the reverse never happens, so a piece's own seeded default hue is never
+  // round-tripped through 8-bit hex and stays exactly what the piece declares.
+  { name: 'colorMode', label: 'Color Mode', type: 'select', options: ['solid', 'gradient'], default: 'gradient', category: 'color' },
+  { name: 'colorA', label: 'Color A', type: 'color', default: '#00aaff', linkedHue: 'hue', category: 'color' },
+  { name: 'colorB', label: 'Color B', type: 'color', default: '#aa00ff', linkedHue: 'hueB', category: 'color' },
+  { name: 'hue', label: 'Hue', type: 'hidden', default: 200 },
+  { name: 'hueB', label: 'Hue B', type: 'hidden', default: 280 },
+  { name: 'invert', label: 'Invert', type: 'checkbox', default: false, category: 'color' },
+  { name: 'glow', label: 'Glow', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
+  { name: 'angle', label: 'Angle', type: 'range', min: 0, max: 360, step: 1, default: 0 },
+  { name: 'motion', label: 'Motion', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
+  { name: 'phase', label: 'Phase', type: 'range', min: 0, max: 2, step: 0.01, default: 0 },
+  { name: 'density', label: 'Density', type: 'range', min: 0.1, max: 2, step: 0.01, default: 1 },
+];
+
+// The shared preset vocabulary. Every piece declares all five; the names mean
+// the same intent everywhere, the values differ per piece. Exported so a
+// future verifier (e.g. tools/build.mjs) can check a piece's presets against
+// this set instead of hardcoding it a second time.
+const PRESET_NAMES = ['whisper', 'ink', 'neon', 'drift', 'dense'];
+
+// Stage C: sectioned, styled panel. Structure is from mock 1 (Interactions /
+// divider / Color+Visual / divider / Reset); appearance is from mock 2 (dark
+// rounded card, mono accent headers, gradient-fill sliders). The
+// PREVIEW_PLANE + VISUAL telemetry boxes in mock 2 are deferred — no data
+// feed for them yet — everything else about its styling is applied.
+const PANEL_CSS = `
+/* Fix round 1: the panel is a flex column so the scrollable middle
+   (.lf-body) can't push the footer (.lf-reset) off screen, and section
+   headers are now toggle buttons so the panel fits at rest. */
+.lf-panel { position: fixed; bottom: 12px; right: 12px; width: 300px;
+  background: #0b0b0f; color: #e8e8e8; font: 12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 16px;
+  z-index: 9999; max-height: 80vh; overflow: hidden; box-sizing: border-box;
+  display: flex; flex-direction: column; }
+.lf-panel.collapsed .lf-body, .lf-panel.collapsed .lf-reset { display: none; }
+.lf-panel h3 { margin: 0; padding: 14px 18px 12px; font: 700 11px/1 ui-monospace,Menlo,monospace;
+  text-transform: uppercase; letter-spacing: .12em; color: #5fa07c; flex: none;
+  display: flex; align-items: center; justify-content: space-between; cursor: grab;
+  user-select: none; touch-action: none; }
+.lf-panel h3:active { cursor: grabbing; }
+.lf-panel h3 .lf-status { display: flex; align-items: center; gap: 5px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; color: #8a8a9a; text-transform: none; }
+.lf-panel h3 .lf-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
+  box-shadow: 0 0 6px rgba(34,197,94,0.8); flex: none; }
+/* .lf-body is the ONLY scrolling region — header, footer and the mobile
+   handle sit outside it so they never scroll out of view. min-height: 0 is
+   load-bearing: without it a flex child won't shrink below its content size
+   and this scroller simply never activates. */
+.lf-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 18px 14px; }
+.lf-section-head { all: revert; appearance: none; background: none; border: none; padding: 0;
+  margin: 0 0 10px; width: 100%; box-sizing: border-box; text-align: left; cursor: pointer;
+  font: 700 10px/1 ui-monospace,Menlo,monospace; text-transform: uppercase; letter-spacing: .12em;
+  color: #5fa07c; display: flex; align-items: center; justify-content: space-between; }
+.lf-section-head:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 2px; }
+.lf-chevron { display: inline-block; font: 10px/1 ui-monospace,Menlo,monospace;
+  transition: transform .15s ease; }
+.lf-chevron::before { content: '\\25be'; }
+.lf-section.lf-section-collapsed .lf-chevron { transform: rotate(-90deg); }
+.lf-section.lf-section-collapsed .lf-section-body { display: none; }
+.lf-section + .lf-section { margin-top: 14px; }
+.lf-divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 16px 0; }
+.lf-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.lf-row:last-child { margin-bottom: 0; }
+.lf-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.lf-row label { font: 10px/1 ui-monospace,Menlo,monospace; letter-spacing: .08em; text-transform: uppercase; color: #8a8a9a; }
+.lf-readout { font: 600 11px/1 ui-monospace,Menlo,monospace; color: #79af91; }
+.lf-row-checkbox { flex-direction: row; align-items: center; justify-content: space-between; }
+.lf-row-checkbox label { order: -1; }
+
+.lf-row select { width: 100%; box-sizing: border-box; appearance: none; -webkit-appearance: none;
+  background: #141419 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%238a8a9a"/></svg>') no-repeat right 10px center;
+  color: #e8e8e8; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+  padding: 7px 28px 7px 10px; font: 12px -apple-system,sans-serif; }
+
+/* Ruler-style slider (own design, ROADMAP 3.3): a thin band of tick marks
+   — a repeating-gradient track, minor ticks every 6.25% and a brighter
+   major tick every 25% — with the FILLED portion washed in the accent via
+   a second gradient layer sized by --lf-pct (same custom property
+   setRangeFill already writes on every value change, human-dragged or
+   gate-driven). The thumb is a hairline: a slim bar, not a dot, so it
+   reads as a position marker on the ruler rather than a ball riding a
+   pill. Hit area stays a generous 20px tall — only the drawn band is
+   thin — so touch/pointer accuracy doesn't suffer for the thinner look. */
+.lf-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: pointer; }
+.lf-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.lf-row input[type=range]::-moz-range-track { height: 3px; margin-top: 8px; border-radius: 0;
+  background-color: #24242b;
+  background-image:
+    linear-gradient(90deg, #7fa88c 0 var(--lf-pct, 0%), transparent 0),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.4) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 1px, transparent 1px 25%);
+}
+.lf-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 2px; height: 18px; margin-top: -8.5px; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7);
+  cursor: pointer; }
+.lf-row input[type=range]::-moz-range-thumb { width: 2px; height: 18px; border: none; border-radius: 0;
+  background: #fff; box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 6px rgba(255,255,255,.7); cursor: pointer; }
+.lf-row input[type=range]:focus-visible { outline: none; }
+.lf-row input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+.lf-row input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px rgba(10,10,13,.9), 0 0 0 4px rgba(111,180,201,.55); }
+
+.lf-color-row { display: flex; align-items: center; gap: 8px; }
+.lf-color-row input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px; background: none; cursor: pointer; flex: none; }
+.lf-hex { font: 12px ui-monospace,Menlo,monospace; color: #c9c9d4; text-transform: uppercase; }
+
+.lf-segmented { display: flex; gap: 6px; margin-bottom: 8px; }
+.lf-seg-btn { flex: 1; background: #141419; color: #8a8a9a; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 7px 8px; font: 11px -apple-system,sans-serif; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; justify-content: center; }
+.lf-seg-btn::before { content: ''; width: 9px; height: 9px; border-radius: 50%; border: 1px solid #55556a; flex: none; }
+.lf-seg-btn.lf-seg-btn-active { color: #e8e8e8; border-color: #437057; }
+.lf-seg-btn.lf-seg-btn-active::before { border-color: #437057; background: #437057; }
+.lf-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Sticky footer (fix round 1, finding 1): a flex sibling of .lf-body, not a
+   child of it, so it never scrolls with the sections above it. Its own
+   background covers content scrolling underneath; its top border is the
+   hairline that reads it as a footer rather than a floating button. */
+.lf-reset { flex: none; width: 100%; box-sizing: border-box; margin: 0; background: #0b0b0f;
+  color: #e8e8e8; border: none; border-top: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0 0 16px 16px; padding: 12px 18px; cursor: pointer;
+  font: 11px -apple-system,sans-serif; }
+.lf-reset:hover { background: #141419; }
+.lf-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 14px; }
+.lf-chip { flex: 1 1 auto; background: #141419; color: #c9c9d4; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 5px 6px; font: 500 10px/1 ui-monospace,Menlo,monospace;
+  letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.lf-chip:hover { color: #fff; border-color: #55556a; }
+.lf-chip[aria-pressed="true"] { background: #437057; color: #e8e8e8; border-color: #437057; }
+.lf-chip:focus-visible { outline: 2px solid #6fb4c9; outline-offset: 1px; }
+
+/* Below ~640px: full-width sheet docked to the bottom edge, collapsed to a
+   handle by default so the artwork stays unobstructed. This is scoped
+   entirely to the media query and a separate in-memory flag — never the
+   persisted desktop 'collapsed' state — so it can't leak into desktop. */
+.lf-handle { display: none; }
+@media (max-width: 640px) {
+  .lf-panel { left: 0; right: 0; bottom: 0; width: 100%; max-height: 70vh;
+    border-radius: 16px 16px 0 0; border-bottom: none; }
+  .lf-handle { display: flex; flex: none; justify-content: center; padding: 8px 0; cursor: pointer; }
+  .lf-handle::before { content: ''; width: 36px; height: 4px; border-radius: 999px; background: #3a3a46; }
+  .lf-reset { border-radius: 0; }
+  .lf-panel.mobile-collapsed .lf-body,
+  .lf-panel.mobile-collapsed .lf-reset { display: none; }
+}
+`;
+
+function kindOf(spec) {
+  if (spec.type === 'checkbox') return 'boolean';
+  if (spec.type === 'color') return 'color';
+  if (spec.type === 'select') return 'enum';
+  if (spec.type === 'hidden') return 'hidden';
+  return 'number';
+}
+
+function injectCss() {
+  if (document.getElementById('lf-panel-css')) return;
+  const style = document.createElement('style');
+  style.id = 'lf-panel-css';
+  style.textContent = PANEL_CSS;
+  document.head.appendChild(style);
+}
+
+function createControlPanel({ pieceId, onChange, extraControls = [], defaults: defaultOverrides = {}, presets = {} }) {
+  injectCss();
+
+  // Gallery preview iframes load pieces with ?preview=1: same-origin means
+  // they'd otherwise read (and, on interaction, overwrite) the viewer's own
+  // localStorage:<pieceId> — showing a hovered card's saved tuning instead
+  // of its defaults. Under this flag we neither read nor write it. A piece
+  // opened directly, with no query string, is completely unaffected.
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+
+  const storageKey = `linefield:${pieceId}`;
+  const allSpecs = [...SHARED_CONTROLS, ...extraControls];
+  const specByName = {};
+  // kind is the discriminant every gate must branch on, never `type`: a gate
+  // that switches on the type-name string would silently fall a new type
+  // into whichever branch it doesn't match. 'hidden' (hue/hueB) has no panel
+  // row at all and is excluded from control gates entirely — it is not a
+  // user-facing control, just the exact numeric value colorA/colorB drive.
+  for (const spec of allSpecs) {
+    spec.kind = kindOf(spec);
+    specByName[spec.name] = spec;
+  }
+  const defaults = {};
+  for (const spec of allSpecs) {
+    defaults[spec.name] = spec.name in defaultOverrides ? defaultOverrides[spec.name] : spec.default;
+  }
+
+  let saved = {};
+  if (!isPreview) {
+    try {
+      saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    } catch {
+      saved = {};
+    }
+  }
+
+  const values = { ...defaults, ...saved.values };
+  // Saved values bypass setValue(), so validate enum membership on load.
+  // An option removed or renamed since the save falls back to the control's
+  // resolved default, keeping the rendered select and values in sync.
+  for (const spec of allSpecs) {
+    if (spec.kind === 'enum' && !spec.options.includes(values[spec.name])) {
+      values[spec.name] = defaults[spec.name];
+    }
+  }
+  let collapsed = saved.collapsed || false;
+  let panelPosition = saved.position && Number.isFinite(saved.position.left) && Number.isFinite(saved.position.top)
+    ? saved.position
+    : null;
+  // Mobile-sheet collapse is a separate, unpersisted flag: it starts
+  // collapsed every load (handle-only, per the brief) and is scoped to the
+  // <=640px media query in CSS, so toggling it can never affect (or be
+  // affected by) the desktop `collapsed` state above.
+  let mobileCollapsed = true;
+  // Fix round 1, finding 2: sections collapse independently, persisted
+  // alongside `collapsed`/`values`. Interactions starts open (the thing the
+  // separation was for); Color and Visual start closed, so the panel fits
+  // on screen at rest. `saved.sections ?? {}` is deliberately defensive — a
+  // blob written before this change has no `sections` key at all, and
+  // reading it without the fallback would throw on spread below.
+  const DEFAULT_SECTION_OPEN = { interaction: true, color: false, visual: false };
+  const sectionOpen = { ...DEFAULT_SECTION_OPEN, ...(saved.sections ?? {}) };
+
+  const panel = document.createElement('div');
+  panel.className = 'lf-panel mobile-collapsed' + (collapsed ? ' collapsed' : '');
+  panel.setAttribute('data-lf-panel', '');
+
+  // Mobile-only drag handle (CSS hides it above the breakpoint). Tapping it
+  // expands/collapses the bottom sheet without touching desktop's own
+  // click-to-collapse heading below.
+  const handle = document.createElement('div');
+  handle.className = 'lf-handle';
+  handle.addEventListener('click', () => {
+    mobileCollapsed = !mobileCollapsed;
+    panel.classList.toggle('mobile-collapsed', mobileCollapsed);
+  });
+  panel.appendChild(handle);
+
+  const heading = document.createElement('h3');
+  const headingLabel = document.createElement('span');
+  headingLabel.textContent = 'Controls';
+  const status = document.createElement('span');
+  status.className = 'lf-status';
+  status.innerHTML = '<span class="lf-dot"></span>live';
+  heading.append(headingLabel, status);
+  heading.title = 'Drag to move · click to collapse';
+  let dragState = null;
+  let suppressHeadingClick = false;
+  heading.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || window.innerWidth <= 640) return;
+    const rect = panel.getBoundingClientRect();
+    dragState = { id: event.pointerId, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, moved: false };
+    heading.setPointerCapture(event.pointerId);
+  });
+  heading.addEventListener('pointermove', (event) => {
+    if (!dragState || event.pointerId !== dragState.id) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    if (!dragState.moved && Math.hypot(dx, dy) < 4) return;
+    dragState.moved = true;
+    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+    panel.style.left = `${Math.min(maxLeft, Math.max(0, dragState.left + dx))}px`;
+    panel.style.top = `${Math.min(maxTop, Math.max(0, dragState.top + dy))}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  });
+  function finishPanelDrag(event) {
+    if (!dragState || event.pointerId !== dragState.id) return;
+    if (heading.hasPointerCapture(event.pointerId)) heading.releasePointerCapture(event.pointerId);
+    if (dragState.moved) {
+      panelPosition = { left: parseFloat(panel.style.left), top: parseFloat(panel.style.top) };
+      suppressHeadingClick = true;
+      persist();
+    }
+    dragState = null;
+  }
+  heading.addEventListener('pointerup', finishPanelDrag);
+  heading.addEventListener('pointercancel', finishPanelDrag);
+  heading.addEventListener('click', () => {
+    if (suppressHeadingClick) {
+      suppressHeadingClick = false;
+      return;
+    }
+    collapsed = !collapsed;
+    panel.classList.toggle('collapsed', collapsed);
+    persist();
+  });
+  panel.appendChild(heading);
+
+  const body = document.createElement('div');
+  body.className = 'lf-body';
+  panel.appendChild(body);
+
+  // The panel configures artwork visuals: camera angles in Interactions,
+  // palette in Color, and the remaining rendering parameters in Visual.
+  // Each section is a toggle-button header plus a body a category routes
+  // rows into — `sectionOf` below is the single place that mapping lives.
+  // Collapsing hides `.lf-section-body` via CSS only: rows stay in the DOM
+  // (never removed), so a gate that drives a control by name or by
+  // `row.querySelector` still finds it whether its section is open or not.
+  function makeSection(key, title) {
+    const section = document.createElement('div');
+    section.className = 'lf-section';
+
+    const headBtn = document.createElement('button');
+    headBtn.type = 'button';
+    headBtn.className = 'lf-section-head';
+    const headLabel = document.createElement('span');
+    headLabel.textContent = title;
+    const chevron = document.createElement('span');
+    chevron.className = 'lf-chevron';
+    headBtn.append(headLabel, chevron);
+
+    const sectionBody = document.createElement('div');
+    sectionBody.className = 'lf-section-body';
+    section.append(headBtn, sectionBody);
+
+    function applyOpenState() {
+      const open = sectionOpen[key];
+      headBtn.setAttribute('aria-expanded', String(open));
+      section.classList.toggle('lf-section-collapsed', !open);
+    }
+    applyOpenState();
+    headBtn.addEventListener('click', () => {
+      sectionOpen[key] = !sectionOpen[key];
+      applyOpenState();
+      persist();
+    });
+
+    return { el: section, body: sectionBody };
+  }
+  const secInteraction = makeSection('interaction', 'Interactions');
+  const secColor = makeSection('color', 'Color');
+  const secVisual = makeSection('visual', 'Visual');
+  body.appendChild(secInteraction.el);
+  body.appendChild(document.createElement('hr')).className = 'lf-divider';
+  body.appendChild(secColor.el);
+  body.appendChild(secVisual.el);
+
+  // category is optional and defaults to 'visual'. Only 'interaction' and
+  // 'color' route a control out of Visual — 'motion'/'form'/'ink' (the
+  // piece-extra sub-tags called out in the brief) are metadata for a future
+  // stage and land in Visual today, same as an uncategorised control.
+  function sectionOf(spec) {
+    if (spec.category === 'interaction') return secInteraction.body;
+    if (spec.category === 'color') return secColor.body;
+    return secVisual.body;
+  }
+
+  // Per-control render hook. Covers <input type=range|checkbox|color> and
+  // <select> uniformly; a future widget that isn't a bare input/select would
+  // register its own render(v) instead, so setValue below stays agnostic to
+  // what is actually on screen.
+  const controllers = {};
+
+  // Clamp to the spec's declared range where numeric, then snap to its step
+  // the same way <input type=range> snaps on a programmatic .value set. That
+  // browser-side snap is exactly what the old DOM round-trip captured (set
+  // .value, then read it back post-sanitization); setValue writes values[]
+  // directly and never reads the DOM back, so without this step a control's
+  // displayed slider position and its rendered value can disagree — the
+  // Pitch/Yaw divergence this stage exists to remove, reintroduced. Not
+  // applied to booleans (kind === 'boolean') or to a name with no known spec.
+  function clampValue(spec, v) {
+    // Enum membership is not optional: a value outside spec.options must be
+    // rejected rather than written, or __LF_VALUES__ and the rendered <select>
+    // diverge (the <select> silently ignores an out-of-range .value while
+    // the state object keeps whatever was passed in). Falls back to the
+    // control's current value, the same "previous value stands" rule a
+    // number's clamp already applies at its min/max.
+    if (spec?.kind === 'enum') {
+      return spec.options.includes(v) ? v : values[spec.name];
+    }
+    if (!spec || spec.kind !== 'number' || typeof spec.min !== 'number' || typeof spec.max !== 'number') {
+      return v;
+    }
+    const clamped = Math.min(spec.max, Math.max(spec.min, v));
+    const step = Number(spec.step);
+    if (!(step > 0)) return clamped;
+    const snapped = spec.min + Math.round((clamped - spec.min) / step) * step;
+    const decimals = (String(step).split('.')[1] || '').length;
+    return decimals ? Number(snapped.toFixed(decimals)) : snapped;
+  }
+
+  // THE write path. Every value change — a drag, a preset, Reset, or a gate
+  // script driving the panel with no DOM at all — goes through this and only
+  // this, so a value set by an audit renders identically to the same value
+  // set by a human: clamp -> write -> render -> clear active chip -> fire
+  // onChange exactly once -> persist if asked.
+  function setValue(name, value, { persist: shouldPersist = true } = {}) {
+    const spec = specByName[name];
+    const v = clampValue(spec, value);
+    values[name] = v;
+    // A colour control's spec names the hidden numeric field it drives
+    // (colorA -> hue, colorB -> hueB). This is the ONLY place that hex gets
+    // decoded — once per pick, never in a render loop — and it never runs
+    // for a programmatic write to the hidden field itself (see applyValues,
+    // which reasserts hue/hueB after this fires so a preset/reset always
+    // lands on the exact declared number, not a lossy decode of colorA/
+    // colorB). An achromatic pick (grey/white/black) has no hue to extract;
+    // hexToHue returns null and the previous hue is left untouched.
+    if (spec?.linkedHue) {
+      const decoded = hexToHue(v);
+      if (decoded !== null) values[spec.linkedHue] = decoded;
+    }
+    controllers[name]?.render(v);
+    if (name === 'colorMode') controllers.colorB?.setRowVisible?.(v === 'gradient');
+    setActiveChip(null);
+    onChange(name, v, values);
+    if (shouldPersist) persist();
+  }
+
+  // Same decimals rule clampValue's step-snap uses, so a slider's readout
+  // never shows more precision than the control itself actually holds.
+  function formatNumber(spec, v) {
+    const decimals = (String(spec.step).split('.')[1] || '').length;
+    return decimals ? Number(v).toFixed(decimals) : String(v);
+  }
+
+  // Mock 2's slider fill is a gradient over the FILLED portion only, unfilled
+  // remainder flat grey — not achievable in pure CSS for a native <input
+  // type=range> (no fill-percentage selector exists), so render() also
+  // writes this custom property every time a value changes, human-dragged or
+  // gate-driven, and the two-stop `background-size` trick in PANEL_CSS reads it.
+  function setRangeFill(input, spec, v) {
+    const pct = spec.max > spec.min ? ((v - spec.min) / (spec.max - spec.min)) * 100 : 0;
+    input.style.setProperty('--lf-pct', `${pct}%`);
+  }
+
+  // Mock 2's "(•) Solid ( ) Gradient" radio pair, without a second real
+  // <input> in colorMode's row: the row's one real control stays the
+  // <select> buildRow already built (kept in the DOM, driven exactly the way
+  // test-interactions.mjs dispatches a real DOM `input` event), visually
+  // hidden, with a composite pair of buttons layered in front of it that
+  // call setValue the same way any other control does. This is the
+  // registration hook, not a second write path: the buttons never touch
+  // `values` themselves.
+  function enhanceColorModeToggle(row, select, spec) {
+    select.classList.add('lf-visually-hidden');
+    const seg = document.createElement('div');
+    seg.className = 'lf-segmented';
+    const buttons = {};
+    for (const opt of spec.options) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'lf-seg-btn';
+      btn.textContent = opt.charAt(0).toUpperCase() + opt.slice(1);
+      btn.addEventListener('click', () => setValue(spec.name, opt));
+      buttons[opt] = btn;
+      seg.appendChild(btn);
+    }
+    row.insertBefore(seg, select);
+    const baseRender = controllers[spec.name].render;
+    controllers[spec.name].render = (v) => {
+      baseRender(v);
+      for (const [opt, btn] of Object.entries(buttons)) btn.classList.toggle('lf-seg-btn-active', opt === v);
+    };
+    controllers[spec.name].render(values[spec.name]);
+  }
+
+  function buildRow(spec) {
+    // 'hidden' (hue/hueB) is not a control — no row, no input, no DOM at all.
+    // It stays in allSpecs/defaults/values so the rest of the machinery
+    // (defaults composition, presets, persistence) treats it like any other
+    // value; it is simply never rendered or driven directly.
+    if (spec.type === 'hidden') return;
+
+    const row = document.createElement('div');
+    row.className = 'lf-row';
+    let input;
+    let readoutEl = null;
+    let hexEl = null;
+
+    if (spec.type === 'checkbox') {
+      // Compact single line — label and box side by side, matching mock 2's
+      // "Invert [ ]" — rather than the label-above-control layout every
+      // other control below uses.
+      row.classList.add('lf-row-checkbox');
+      const label = document.createElement('label');
+      label.textContent = spec.label;
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!values[spec.name];
+      row.append(label, input);
+    } else {
+      const head = document.createElement('div');
+      head.className = 'lf-row-head';
+      const label = document.createElement('label');
+      label.textContent = spec.label;
+      head.appendChild(label);
+
+      if (spec.type === 'color') {
+        input = document.createElement('input');
+        input.type = 'color';
+        input.value = values[spec.name];
+        row.appendChild(head);
+        const colorRow = document.createElement('div');
+        colorRow.className = 'lf-color-row';
+        hexEl = document.createElement('span');
+        hexEl.className = 'lf-hex';
+        hexEl.textContent = values[spec.name];
+        colorRow.append(input, hexEl);
+        row.appendChild(colorRow);
+      } else if (spec.type === 'select') {
+        input = document.createElement('select');
+        for (const opt of spec.options) {
+          const o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          input.appendChild(o);
+        }
+        input.value = values[spec.name];
+        row.append(head, input);
+      } else {
+        readoutEl = document.createElement('span');
+        readoutEl.className = 'lf-readout';
+        readoutEl.textContent = formatNumber(spec, values[spec.name]);
+        head.appendChild(readoutEl);
+        input = document.createElement('input');
+        input.type = 'range';
+        input.min = spec.min;
+        input.max = spec.max;
+        input.step = spec.step;
+        input.value = values[spec.name];
+        row.append(head, input);
+        setRangeFill(input, spec, values[spec.name]);
+      }
+    }
+
+    // Thin adapter: read the raw DOM value and hand it to setValue. It must
+    // not touch values/onChange/persistence itself — setValue is the only
+    // write path (see above).
+    input.addEventListener('input', () => {
+      const v = spec.type === 'checkbox' ? input.checked
+        : (spec.type === 'color' || spec.type === 'select') ? input.value
+        : parseFloat(input.value);
+      setValue(spec.name, v);
+    });
+
+    controllers[spec.name] = {
+      render(v) {
+        if (spec.type === 'checkbox') { input.checked = v; return; }
+        input.value = v;
+        if (readoutEl) readoutEl.textContent = formatNumber(spec, v);
+        if (hexEl) hexEl.textContent = v;
+        if (spec.type !== 'color' && spec.type !== 'select') setRangeFill(input, spec, v);
+      },
+      setRowVisible(visible) {
+        row.style.display = visible ? '' : 'none';
+      },
+    };
+
+    if (spec.name === 'colorMode') enhanceColorModeToggle(row, input, spec);
+
+    sectionOf(spec).appendChild(row);
+  }
+
+  // Presets are the same operation the reset button already performed: write
+  // every control, update its input, fire onChange, persist. The only
+  // difference is which map is written. Composing over `defaults` is what
+  // makes a partial preset safe — a control the preset omits lands on the
+  // piece's own default rather than keeping the previous preset's value.
+  function applyValues(map) {
+    const next = { ...defaults, ...map };
+    for (const spec of allSpecs) setValue(spec.name, next[spec.name], { persist: false });
+    // setValue(colorA/colorB, ...) above may have just overwritten hue/hueB
+    // with a lossy hex decode — order-dependent otherwise, since 'hidden'
+    // specs are plain entries in the same allSpecs array. The exact value
+    // `next` already carries always wins on a programmatic write (preset,
+    // Reset, ?preset= on load): reassert it directly, no side effects, so
+    // these paths render at exactly the declared number, never an
+    // approximation of it.
+    for (const spec of allSpecs) {
+      if (spec.kind === 'hidden') values[spec.name] = next[spec.name];
+    }
+    persist();
+  }
+
+  const presetNames = Object.keys(presets);
+  let chipRow = null;
+  const chips = {};
+
+  function setActiveChip(name) {
+    for (const [n, el] of Object.entries(chips)) {
+      el.setAttribute('aria-pressed', String(n === name));
+    }
+  }
+
+  if (presetNames.length) {
+    chipRow = document.createElement('div');
+    chipRow.className = 'lf-presets';
+    for (const name of presetNames) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'lf-chip';
+      chip.dataset.preset = name;
+      chip.textContent = name;
+      chip.setAttribute('aria-pressed', 'false');
+      chip.addEventListener('click', () => {
+        applyValues(presets[name]);
+        setActiveChip(name);
+      });
+      chips[name] = chip;
+      chipRow.appendChild(chip);
+    }
+    // Presets sit above every section, ahead of the two tiers built earlier
+    // in this function — insertBefore rather than appendChild, since the
+    // section containers are already in `body` by this point.
+    body.insertBefore(chipRow, secInteraction.el);
+  }
+
+  for (const spec of allSpecs) buildRow(spec);
+  // colorB's row only makes sense in gradient mode; setValue toggles it on
+  // every subsequent change, this sets the correct initial state.
+  controllers.colorB?.setRowVisible?.(values.colorMode === 'gradient');
+
+  // Reset is a sticky footer (fix round 1, finding 1): a sibling of `body`,
+  // not a child of it, so the flex layout in PANEL_CSS keeps it pinned to
+  // the panel's bottom edge regardless of how far `body` is scrolled. Still
+  // inside `panel`, which carries `data-lf-panel` — the hard constraint is
+  // about that attribute, not about which direct child holds a row.
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'lf-reset';
+  resetBtn.textContent = 'Reset to defaults';
+  resetBtn.addEventListener('click', () => {
+    applyValues(defaults);
+    setActiveChip(null);
+  });
+  panel.appendChild(resetBtn);
+
+  document.body.appendChild(panel);
+
+  function applyPanelPosition() {
+    if (window.innerWidth <= 640 || !panelPosition) {
+      panel.style.removeProperty('left');
+      panel.style.removeProperty('top');
+      panel.style.removeProperty('right');
+      panel.style.removeProperty('bottom');
+      return;
+    }
+    const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+    panelPosition.left = Math.min(maxLeft, Math.max(0, panelPosition.left));
+    panelPosition.top = Math.min(maxTop, Math.max(0, panelPosition.top));
+    panel.style.left = `${panelPosition.left}px`;
+    panel.style.top = `${panelPosition.top}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+  applyPanelPosition();
+  window.addEventListener('resize', applyPanelPosition);
+
+  function persist() {
+    if (isPreview) return;
+    localStorage.setItem(storageKey, JSON.stringify({ collapsed, values, sections: sectionOpen, position: panelPosition }));
+  }
+
+  // Declared, uncomposed. tools/build.mjs reads this off the loaded page
+  // instead of regex-parsing the HTML, so there is no second copy of the
+  // preset data to drift out of sync.
+  window.__LF_PRESETS__ = presets;
+  // The resolved control specs (name/type/min/max/step), for gate scripts that
+  // need to validate preset values against declared ranges without parsing HTML.
+  window.__LF_SPECS__ = allSpecs;
+  // The live value object, for gate scripts. Same reference the panel mutates.
+  window.__LF_VALUES__ = values;
+  // The write path itself, for gate scripts that need to drive controls with
+  // no DOM query at all — e.g. tools/audit-controls.mjs, which otherwise
+  // depends on positional row indices no future widget need honour.
+  window.__LF_PANEL__ = { setValue };
+
+  // Highest precedence on load: an explicit ?preset= beats saved localStorage,
+  // which beats the piece's defaults. Applied after every row exists so the
+  // inputs are there to update. An unknown name is ignored deliberately — a
+  // stale shared link should open the piece, not break it.
+  const requested = new URLSearchParams(location.search).get('preset');
+  if (requested && requested in presets) {
+    applyValues(presets[requested]);
+    setActiveChip(requested);
+  }
+
+  return {
+    values,
+    el: panel,
+    setValue,
+    addControl(spec) {
+      spec.kind = kindOf(spec);
+      specByName[spec.name] = spec;
+      allSpecs.push(spec);
+      defaults[spec.name] = spec.default;
+      // Route through setValue — THE write path (see above) — rather than
+      // writing `values` directly. setValue's own render() optional-chains
+      // through `controllers[name]` (undefined until buildRow below runs),
+      // so calling it first is a harmless no-op render and leaves `values`
+      // holding the exact number buildRow then reads for the row's initial
+      // DOM state. Same precedence `{ ...defaults, ...saved.values }` uses
+      // at panel construction: a value already in `values` (e.g. restored
+      // from localStorage before this control existed) wins over the spec's
+      // own default, never silently overwritten.
+      setValue(spec.name, spec.name in values ? values[spec.name] : spec.default);
+      buildRow(spec);
+    },
+  };
+}
+
+
+// --- inlined: ../../shared/anim.js ---
+// shared/anim.js
+
+// Max per-frame dt (seconds) after a tab-switch/GC stall, so a single huge
+// frame doesn't fling particles across the canvas. Ported from
+// cc-webgl/src/core/FrameScheduler.ts's DT_CLAMP_SECONDS.
+const ANIM_DT_CLAMP_SECONDS = 0.1;
+
+function createLoop({ onFrame, speed = 1 }) {
+  let running = false;
+  let paused = false;
+  let lastTime = 0;
+  let elapsed = 0;
+  let rafId = null;
+  let currentSpeed = speed;
+
+  function tick(now) {
+    if (!running || paused) return;
+    const rawDt = lastTime ? (now - lastTime) / 1000 : 0;
+    const clampedDt = Math.min(Math.max(rawDt, 0), ANIM_DT_CLAMP_SECONDS);
+    lastTime = now;
+    const scaledDt = clampedDt * currentSpeed;
+    elapsed += scaledDt;
+    onFrame(scaledDt, elapsed);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined') return;
+    if (document.hidden) {
+      paused = true;
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    } else if (running && paused) {
+      paused = false;
+      // Reset the sentinel instead of computing a real dt, so resume doesn't
+      // produce a giant catch-up frame — same reasoning as start()'s reset.
+      lastTime = 0;
+      rafId = requestAnimationFrame(tick);
+    }
+  }
+
+  return {
+    start() {
+      if (running) return;
+      running = true;
+      paused = false;
+      lastTime = 0;
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
+      rafId = requestAnimationFrame(tick);
+    },
+    stop() {
+      running = false;
+      paused = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    },
+    setSpeed(n) {
+      currentSpeed = n;
+    },
+    get isRunning() {
+      return running;
+    },
+  };
+}
+
+
+// --- inlined: ../../shared/export.js ---
+// shared/export.js
+
+function download(filename, blobOrUrl, mime) {
+  const url = blobOrUrl instanceof Blob ? URL.createObjectURL(blobOrUrl) : blobOrUrl;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if (blobOrUrl instanceof Blob) URL.revokeObjectURL(url);
+}
+
+function exportPng(canvas, { multiplier = 1 } = {}) {
+  if (multiplier === 1) {
+    canvas.toBlob((blob) => download('linefield.png', blob), 'image/png');
+    return;
+  }
+  const scaled = document.createElement('canvas');
+  scaled.width = canvas.width * multiplier;
+  scaled.height = canvas.height * multiplier;
+  const ctx = scaled.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+  scaled.toBlob((blob) => download('linefield.png', blob), 'image/png');
+}
+
+// `texts` is optional and additive — glyph-mark pieces (matrix-code) pass
+// SVG native <text> elements instead of polylines, since a glyph has no
+// meaningful line-segment geometry to export. Stroke-path pieces never pass
+// it, so their output is byte-identical to before this option existed.
+function exportSvg(paths, { width = 800, height = 600, texts = [], polygons = [], circles = [] } = {}) {
+  const polylines = paths
+    .map((pts) => {
+      const pointsAttr = pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+      return `<polyline points="${pointsAttr}" fill="none" stroke="black" stroke-width="1" />`;
+    })
+    .join('\n');
+
+  const textEls = texts
+    .map(({ x, y, ch, size, fontFamily, anchor, baseline, rotation, strokeWidth }) => {
+      const safeCh = String(ch).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const safeFont = String(fontFamily || 'monospace').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const placement = `${['start', 'middle', 'end'].includes(anchor) ? ` text-anchor="${anchor}"` : ''}${['central', 'middle', 'alphabetic', 'hanging'].includes(baseline) ? ` dominant-baseline="${baseline}"` : ''}${Number.isFinite(rotation) ? ` transform="rotate(${rotation} ${x} ${y})"` : ''}`;
+      const stroke = Number.isFinite(strokeWidth) && strokeWidth > 0 ? ` stroke="black" stroke-width="${strokeWidth}"` : '';
+      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${safeFont}" font-size="${size.toFixed(2)}" fill="black"${placement}${stroke}>${safeCh}</text>`;
+    })
+    .join('\n');
+
+  // Filled-mark pieces supply already-transformed corners; existing path
+  // and text callers retain their exact serialization when this is empty.
+  const polygonEls = polygons.map(({ points, fill = 'black', opacity = 1 }) => {
+    const pointsAttr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<polygon points="${pointsAttr}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  // Halftone pieces pass filled dots as circles. Every other caller leaves
+  // this empty, so its serialization is byte-identical to before.
+  const circleEls = circles.map(({ cx, cy, r, fill = 'black', opacity = 1 }) => {
+    const safeFill = String(fill).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alpha = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+    return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${safeFill}" opacity="${alpha.toFixed(4)}" />`;
+  }).join('\n');
+  const marks = [polylines, textEls, polygonEls, circleEls].filter(Boolean).join('\n');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${marks}\n</svg>`;
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  download('linefield.svg', blob);
+}
+
+async function exportSource({ filename = 'linefield-source.html' } = {}) {
+  const url = location.href.split(/[?#]/)[0];
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`exportSource: could not fetch source (${res.status})`);
+  const blob = await res.blob();
+  download(filename, blob);
+  return blob;
+}
+
+// The piece's own import statements are the registration. A hand-maintained
+// list is a silent-failure surface: omit an entry and the baked file is
+// valid, loads without error, and renders nothing. That shipped once.
+const SHARED_IMPORT_RE =
+  /^\s*import\s*\{[^}]*\}\s*from\s*['"](\.\.\/\.\.\/shared\/[^'"]+\.js)['"];?\s*$/gm;
+
+// A shared module importing ANOTHER shared module (e.g. controls.js reading
+// hexToHue from color.js) addresses it as './color.js' — same directory,
+// different relative base than the piece's '../../shared/color.js'. Matched
+// separately and normalised back to the piece-style path below so the same
+// `seen` dedupe applies to both forms of the same file.
+const INNER_SHARED_IMPORT_RE =
+  /^\s*import\s*\{[^}]*\}\s*from\s*['"]\.\/([^'"]+\.js)['"];?\s*$/gm;
+
+function stripExports(src) {
+  // `export function foo` / `export const foo` -> drop the `export ` keyword.
+  return src.replace(/^export\s+/gm, '');
+}
+
+function stripInnerImports(src) {
+  return src.replace(INNER_SHARED_IMPORT_RE, '');
+}
+
+// Topological sort (post-order DFS) over the shared-module import graph, not
+// just the piece's own top-level imports, and NOT discovery (BFS) order.
+// Scanning only the piece script is exactly the hand-maintained-list failure
+// this function's own comment already warns about, one level removed: a
+// shared module's OWN imports were invisible to it, so a new cross-shared-
+// module import survived verbatim into a classic (non-module) inline script.
+//
+// BFS discovery order is not enough once a shared module reads another
+// shared module's binding at TOP LEVEL (module-evaluation time), not just
+// inside a function body called later. controls.js is always a piece's
+// first import, so BFS always placed it first in the concatenated output —
+// fine for `hexToHue` (from color.js), which is only called inside
+// `setValue`, deferred to call time. A shared module that reads an imported
+// binding at top level instead must have that dependency emitted first.
+//
+// A post-order DFS guarantees every module's dependencies appear before it
+// in the emitted output, independent of whether the consumer reads the
+// dependency's binding at top level or lazily inside a function — the
+// general fix, not a per-call-site workaround. See
+// skills/building-generative-backgrounds/SKILL.md, "Inlining and bundling".
+async function inlineSharedModules(pieceScriptSrc) {
+  const strippedPieceSrc = pieceScriptSrc.replace(SHARED_IMPORT_RE, '');
+  const initial = [...pieceScriptSrc.matchAll(SHARED_IMPORT_RE)].map((m) => m[1]);
+  if (!initial.length) {
+    throw new Error('bakeHtml: the piece imports no shared modules — refusing to bake a file that would render blank');
+  }
+
+  const srcByPath = new Map();
+  const order = []; // post-order: a module's dependencies land before it
+  const done = new Set();
+  const visiting = new Set(); // cycle guard — a real cycle would recurse forever otherwise
+
+  async function visit(path) {
+    if (done.has(path)) return;
+    if (visiting.has(path)) {
+      throw new Error(`bakeHtml: circular shared-module import detected at ${path}`);
+    }
+    visiting.add(path);
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`bakeHtml: could not fetch ${path} (${res.status})`);
+    const src = await res.text();
+    srcByPath.set(path, src);
+    // Normalise './foo.js' found INSIDE a shared module to the same
+    // '../../shared/foo.js' form the piece-level regex produces, so a module
+    // reached both ways (e.g. color.js: directly by the piece, and via
+    // controls.js) is only ever inlined once.
+    const inner = [...src.matchAll(INNER_SHARED_IMPORT_RE)].map((m) => `../../shared/${m[1]}`);
+    for (const p of inner) await visit(p);
+    visiting.delete(path);
+    done.add(path);
+    order.push(path);
+  }
+
+  for (const path of initial) await visit(path);
+
+  const bodies = order.map((path) => {
+    const src = srcByPath.get(path);
+    return `// --- inlined: ${path} ---\n${stripInnerImports(stripExports(src))}`;
+  });
+
+  return `${bodies.join('\n\n')}\n\n// --- piece script ---\n${strippedPieceSrc}`;
+}
+
+async function bakeHtml({ sourceHtml, values }) {
+  const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
+  doc.querySelectorAll('[data-lf-panel]').forEach((el) => el.remove());
+
+  const pieceScript = doc.querySelector('script[type="module"]');
+  const pieceScriptSrc = pieceScript ? pieceScript.textContent : '';
+  if (pieceScript) pieceScript.remove();
+
+  const inlinedSrc = await inlineSharedModules(pieceScriptSrc);
+
+  const safeJson = JSON.stringify(values).replace(/</g, '\\u003c');
+  const inject = doc.createElement('script');
+  inject.textContent = `window.__LF_BAKED_VALUES__ = ${safeJson};\n${inlinedSrc}`;
+  doc.body.appendChild(inject);
+
+  const baked = `<!doctype html>\n${doc.documentElement.outerHTML}`;
+  const blob = new Blob([baked], { type: 'text/html' });
+  download('linefield-baked.html', blob);
+  return baked;
+}
+
+function describeForAI({ pieceName, values }) {
+  const parts = Object.entries(values)
+    .map(([k, v]) => `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`)
+    .join(', ');
+  const text = `A generative line-art background piece called "${pieceName}", rendered on an HTML canvas with parameters: ${parts}.`;
+  if (navigator.clipboard) navigator.clipboard.writeText(text);
+  return text;
+}
+
+
+// --- inlined: ../../shared/resize.js ---
+// shared/resize.js
+//
+// Ported from cc-webgl/src/input/ResizeManager.ts's batch-then-evaluate
+// pattern: a ResizeObserver only sets a pending flag; the actual work runs
+// from `evaluate()`, which callers invoke once per frame tick (no own rAF).
+// Keeps the `clientWidth === 0 || clientHeight === 0` bail.
+
+/** onResize({ width, height, dpr, aspect }) is called from evaluate(), never
+ * from the ResizeObserver callback directly. */
+function createResizeBatcher(container, onResize, maxDPR = 2) {
+  let pending = true; // evaluate once on construction
+  let currentMaxDPR = maxDPR;
+
+  const observer = new ResizeObserver(() => {
+    pending = true;
+  });
+  observer.observe(container);
+
+  return {
+    setMaxDPR(next) {
+      currentMaxDPR = next;
+    },
+    // Call once per frame tick; only does work if a resize is pending.
+    evaluate() {
+      if (!pending) return;
+      pending = false;
+      const { clientWidth, clientHeight } = container;
+      if (clientWidth === 0 || clientHeight === 0) return;
+      const dpr = Math.min(window.devicePixelRatio, currentMaxDPR);
+      onResize({ width: clientWidth, height: clientHeight, dpr, aspect: clientWidth / clientHeight });
+    },
+    destroy() {
+      observer.disconnect();
+    },
+  };
+}
+
+
+// --- inlined: ../../shared/quality.js ---
+// shared/quality.js
+//
+// Ported from cc-webgl/src/core/QualityManager.ts's tier/hysteresis state
+// machine, adapted from THREE.js render settings (maxDPR/postProcessing/
+// shadows) to a density/particle-count multiplier for canvas-2D pieces.
+// Same FULL/REDUCED/FALLBACK tier vocabulary as cc-webgl.
+
+const QUALITY_PROFILES = {
+  FULL: { tier: 'FULL', particleScale: 1, throttleHidden: false },
+  REDUCED: { tier: 'REDUCED', particleScale: 0.5, throttleHidden: true },
+  FALLBACK: { tier: 'FALLBACK', particleScale: 0, throttleHidden: true },
+};
+
+// Consecutive samples required before a tier downgrade/upgrade, so a single
+// fast/slow frame doesn't flip tiers.
+const QUALITY_HYSTERESIS_SAMPLES = 5;
+const QUALITY_SLOW_FRAME_MS = 32; // ~30fps
+const QUALITY_FAST_FRAME_MS = 14; // ~70fps, headroom before upgrading
+
+/** capabilityProbe: () => boolean, false => low-end/no-canvas2d signal.
+ * reducedMotion: boolean, prefers-reduced-motion; clamps to REDUCED and
+ * suspends automatic upgrade back to FULL. */
+function createQualityManager({ capabilityProbe, reducedMotion = false } = {}) {
+  const hasCapability = capabilityProbe ? capabilityProbe() : true;
+  let tier = hasCapability ? 'FULL' : 'FALLBACK';
+  let reduced = reducedMotion;
+  let consecutiveSlow = 0;
+  let consecutiveFast = 0;
+  let overridden = false;
+
+  if (reduced && tier === 'FULL') tier = 'REDUCED';
+
+  function setTier(next) {
+    tier = next;
+  }
+
+  return {
+    get tier() {
+      return tier;
+    },
+    get profile() {
+      return QUALITY_PROFILES[tier];
+    },
+    setReducedMotion(matches) {
+      reduced = matches;
+      if (reduced && tier === 'FULL') {
+        consecutiveSlow = 0;
+        consecutiveFast = 0;
+        setTier('REDUCED');
+      }
+    },
+    // Manually pin the tier (e.g. a demo/debug UI). Latches: reportFrameTime()
+    // no-ops until releaseOverride() is called.
+    forceTier(next) {
+      overridden = true;
+      consecutiveSlow = 0;
+      consecutiveFast = 0;
+      setTier(next);
+    },
+    releaseOverride() {
+      overridden = false;
+    },
+    // Feed a frame time in ms; returns the (possibly unchanged) tier after
+    // hysteresis.
+    reportFrameTime(ms) {
+      if (overridden) return tier;
+      if (tier === 'FALLBACK') return tier; // not exited by frame timing
+      if (reduced && tier === 'REDUCED') return tier; // reduced-motion pins at REDUCED
+
+      if (ms >= QUALITY_SLOW_FRAME_MS) {
+        consecutiveSlow += 1;
+        consecutiveFast = 0;
+      } else if (ms <= QUALITY_FAST_FRAME_MS) {
+        consecutiveFast += 1;
+        consecutiveSlow = 0;
+      } else {
+        consecutiveSlow = 0;
+        consecutiveFast = 0;
+      }
+
+      if (consecutiveSlow >= QUALITY_HYSTERESIS_SAMPLES && tier === 'FULL') {
+        setTier('REDUCED');
+        consecutiveSlow = 0;
+      } else if (
+        consecutiveFast >= QUALITY_HYSTERESIS_SAMPLES &&
+        tier === 'REDUCED' &&
+        !reduced
+      ) {
+        setTier('FULL');
+        consecutiveFast = 0;
+      }
+      return tier;
+    },
+  };
+}
+
+/** True if the environment signals prefers-reduced-motion:reduce. Returns
+ * false (not "unknown") when matchMedia is unavailable. */
+function prefersReducedMotion() {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
+
+// --- piece script ---
+
+
+
+
+
+
+  const PIECE_ID = 'signal-sphere';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // <core>
+
+  // ---------- values: the shared control names plus the piece's own ------------------------------------
+  // Read from the live `values` object; the ones that change what is built (scale, angle, density, side, land,
+  // nebula, body) are watched by the page code below, which rebuilds the scene once they settle. The rest take
+  // effect on the next frame.
+  //   scale    build   camera zoom about the frame centre (1 = the designed framing)
+  //   speed    frame   clock multiplier: the turn, the growth front, the densification and the packets all ride it
+  //   stroke   frame   network dot weight (the dots stay one pixel, bilinear)
+  //   opacity  frame   overall gain
+  //   saturation, hue, hueB, colorMode, invert   the palette (paletteHsl) and the pale-ground variant
+  //   glow     frame   airglow, horizon bloom and aurora strength
+  //   angle    build   extra roll of the globe's axis, degrees
+  //   motion   frame   rate of the secondary animation (limb waves, aurora, twinkle, sky drift)
+  //   phase    frame   offset into the turn, 0..1 of a full turn
+  //   density  build   dot counts
+  //   side     build   which side of the frame the globe sits on ("right" or "left", mirrored)
+  //   land     build   land fraction of the surface
+  //   lights   frame   city-light / network gain
+  //   stars    frame   share of the starfield drawn
+  //   nebula   build   nebula + galaxy gain
+  //   body     build   presence of the dark body (ground tint and rim falloff)
+
+  // The two grounds: the house ground, and the pale one `invert` flips to.
+  const GROUND_DARK = [10, 10, 13], GROUND_LIGHT = [242, 242, 244];
+
+  // Colour classes. Every dot carries a coordinate c = index / (N - 1) on one ramp; a pixel's colour is the ramp at the
+  // light-weighted mean of its dots' coordinates. Classes that overlap on screen sit next to each other on the ramp.
+  // [name, f along hue -> hueB, saturation factor, lightness dark, lightness light]
+  const ROLES = [
+    ["ground", 1.0, 0.9, 0.5, 0.36],
+    ["glowTop", 0.8, 0.85, 0.5, 0.5],
+    ["glowMid", 0.55, 0.85, 0.46, 0.48],
+    ["glowLo", 0.3, 0.7, 0.42, 0.46],
+    ["aurora", 0.52, 1.0, 0.58, 0.48],
+    ["lightHot", 0.0, 0.3, 0.95, 0.14],
+    ["light", 0.0, 0.85, 0.72, 0.22],
+    ["net", 0.05, 0.9, 0.62, 0.26],
+    ["glowWarm", -0.12, 0.95, 0.6, 0.48],
+    ["nebA", 1.0, 0.85, 0.52, 0.44],
+    ["nebB", 0.78, 0.85, 0.52, 0.44],
+    ["galaxy", 0.08, 0.4, 0.84, 0.34],
+    ["starCool", 0.96, 0.4, 0.92, 0.2],
+    ["starWhite", 0.5, 0.08, 0.96, 0.18],
+    ["starWarm", 0.0, 0.55, 0.92, 0.2],
+  ];
+  const NR = ROLES.length;
+  const roleC = (name) => ROLES.findIndex((r) => r[0] === name) / (NR - 1);
+  const C_GROUND = roleC("ground"), C_AURORA = roleC("aurora"), C_HOT = roleC("lightHot"), C_LIGHT = roleC("light"), C_NET = roleC("net");
+  const C_NEBA = roleC("nebA"), C_NEBB = roleC("nebB"), C_GALAXY = roleC("galaxy");
+  const C_STAR0 = roleC("starCool"), C_STAR1 = roleC("starWarm");
+
+  const CS = 64; // colour-coordinate steps in the LUT
+  const LEVELS = 512, LMAX = 1.5; // light levels in the LUT; the top of the range is the overexposed (white-hot) end
+  const SAT_DARK = 1.2; // the lighter ink on the dark ground needs more saturation to keep its tint
+  const DARK_GAIN = 1.4, LIGHT_GAIN = 1.5; // the pass multiplies light by DARK_GAIN; the pale variant's LUT bakes in the difference so both share one pass
+
+  // The look-up table that turns (colour class x light level) into a pixel: one pass of paint() serves every
+  // palette and both grounds, so a colour change is a new table, never a new render.
+  const INK = new Float64Array(NR * 3);
+  function buildLut(v, lut) {
+    for (let i = 0; i < NR; i++) {
+      const [, f, sk, ld, ll] = ROLES[i];
+      const { h, s } = paletteHsl(v, f);
+      const rgb = hslToRgb(h, Math.min(1, s * sk * (v.invert ? 1 : SAT_DARK)), v.invert ? ll : ld);
+      INK[i * 3] = rgb[0]; INK[i * 3 + 1] = rgb[1]; INK[i * 3 + 2] = rgb[2];
+    }
+    const ground = v.invert ? GROUND_LIGHT : GROUND_DARK;
+    const g0 = ground[0], g1 = ground[1], g2 = ground[2], inv = v.invert, tone = inv ? LIGHT_GAIN / DARK_GAIN : 1;
+    for (let ci = 0; ci < CS; ci++) {
+      const k = (ci / (CS - 1)) * (NR - 1), i0 = Math.min(NR - 2, Math.floor(k)), t = k - i0;
+      const r = INK[i0 * 3] + (INK[i0 * 3 + 3] - INK[i0 * 3]) * t, g = INK[i0 * 3 + 1] + (INK[i0 * 3 + 4] - INK[i0 * 3 + 1]) * t, b = INK[i0 * 3 + 2] + (INK[i0 * 3 + 5] - INK[i0 * 3 + 2]) * t;
+      for (let li = 0; li < LEVELS; li++) {
+        const a = (li / (LEVELS - 1)) * LMAX * tone * (inv ? 1 + 1.5 * Math.max(0, 1 - ci / 5) : 1), m = a > 1 ? 1 : a, hot = sstep(1.0, LMAX, a);
+        let R, G, B;
+        if (inv) { R = g0 + (r - g0) * m - r * 0.3 * hot; G = g1 + (g - g1) * m - g * 0.3 * hot; B = g2 + (b - g2) * m - b * 0.3 * hot; }
+        else { R = g0 + r * m + (255 - r) * 0.5 * hot; G = g1 + g * m + (255 - g) * 0.5 * hot; B = g2 + b * m + (255 - b) * 0.5 * hot; }
+        lut[ci * LEVELS + li] = (255 << 24) | ((B < 0 ? 0 : B > 255 ? 255 : (B + 0.5) | 0) << 16) | ((G < 0 ? 0 : G > 255 ? 255 : (G + 0.5) | 0) << 8) | (R < 0 ? 0 : R > 255 ? 255 : (R + 0.5) | 0);
+      }
+    }
+  }
+
+  // ---------- small helpers -----------------------------------------------------------------------------------
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+  function sstep(a, b, v) { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); }
+  const TAU = Math.PI * 2;
+  const wrapPi = (x) => x - TAU * Math.round(x / TAU);
+  const SIN = new Float32Array(256);
+  for (let i = 0; i < 256; i++) SIN[i] = Math.sin((i / 256) * TAU);
+
+  // Improved Perlin gradient noise in 3D, roughly -1..1.
+  function noise3(r) {
+    const perm = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) perm[i] = i;
+    for (let i = 255; i > 0; i--) { const j = (r() * (i + 1)) | 0; const t = perm[i]; perm[i] = perm[j]; perm[j] = t; }
+    const P = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) P[i] = perm[i & 255];
+    const grad = (h, x, y, z) => {
+      const g = h & 15, u = g < 8 ? x : y, v = g < 4 ? y : g === 12 || g === 14 ? x : z;
+      return ((g & 1) === 0 ? u : -u) + ((g & 2) === 0 ? v : -v);
+    };
+    const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+    return (x, y, z) => {
+      const fx = Math.floor(x), fy = Math.floor(y), fz = Math.floor(z);
+      const X = fx & 255, Y = fy & 255, Z = fz & 255;
+      x -= fx; y -= fy; z -= fz;
+      const u = fade(x), v = fade(y), w = fade(z);
+      const A = P[X] + Y, AA = P[A] + Z, AB = P[A + 1] + Z, B = P[X + 1] + Y, BA = P[B] + Z, BB = P[B + 1] + Z;
+      const l0 = grad(P[AA], x, y, z), l1 = grad(P[BA], x - 1, y, z), l2 = grad(P[AB], x, y - 1, z), l3 = grad(P[BB], x - 1, y - 1, z);
+      const l4 = grad(P[AA + 1], x, y, z - 1), l5 = grad(P[BA + 1], x - 1, y, z - 1), l6 = grad(P[AB + 1], x, y - 1, z - 1), l7 = grad(P[BB + 1], x - 1, y - 1, z - 1);
+      const a0 = l0 + (l1 - l0) * u, a1 = l2 + (l3 - l2) * u, a2 = l4 + (l5 - l4) * u, a3 = l6 + (l7 - l6) * u;
+      const b0 = a0 + (a1 - a0) * v, b1 = a2 + (a3 - a2) * v;
+      return b0 + (b1 - b0) * w;
+    };
+  }
+
+  // ---------- tunables -----------------------------------------------------------------------------------
+  const SEED = 20261019;
+  const PERIOD = 119; // seconds per full turn of a globe of the design size (radius 0.56 of the frame height) at speed 1 and ROTATION_PACE 1
+  // The turn rate is scaled by this: 0.7 = 30% slower, so a design-size globe takes PERIOD / 0.7 = 170 s per turn and the surface drifts about 15 px/s across the middle of the disc at 1440x900 at speed 1
+  // (7.7 px/s at speed 0.5). The growth front rides the surface and slows with it (updateNet counts a place's age at the unslowed rate, so the front keeps its width in px and draws on 1 / 0.7 times slower).
+  // What runs on the clock keeps its pace: densification, packets, airglow waves, aurora, twinkle, sky drift. Folded into OMEGA.
+  const ROTATION_PACE = 0.7;
+  const OMEGA = (TAU / PERIOD) * ROTATION_PACE; // a bigger globe turns slower by the same factor (see makeCamera's ang), so the surface speed in px/s does not depend on its size; sc.om / OMEGA stays = ang
+  const START_TURN = 6.1; // radians into the turn at the start: a continent with a network in the right strip, and more along the bottom
+  const TILT = (14 * Math.PI) / 180, TAN_T = Math.tan(TILT); // the axis tips this far toward the viewer
+  const LEAN = (62 * Math.PI) / 180; // roll of the axis in the picture plane: the pole points off to the right, and the surface streams toward the lower right, in over the whole visible limb (fastest at its upper-left, a touch slower at both ends)
+  const DESIGN_R = 448; // globe radius (px) of the design: 0.56 of an 800 px frame; sizes in px scale with R / DESIGN_R
+  // Placement: radius as a share of the frame height (capped at rW of the width), centre this far in from the right edge
+  // (in globe radii), and this far below the bottom edge (also in radii): the centre sits just beyond the bottom corner.
+  const PLANET = { r: 0.95, rW: 1.0, inX: 0.37, belowY: 0.063 };
+  const DESIGN_FRAME = { r: 0.56, rW: 0.62 }; // the framing the network was designed at: px sizes (lights, glow, sky) and the surface speed in px/s follow this, not the globe's size
+  const LAT0 = (-76 * Math.PI) / 180, LAT1 = (76 * Math.PI) / 180; // latitude band of the land texture
+  const SIN_N0 = Math.sin((-72 * Math.PI) / 180), SIN_N1 = Math.sin((72 * Math.PI) / 180); // network sits between these (sin lat)
+
+  // network
+  const HUBS_SR = 62.4, MINORS_SR = 343; // nodes requested per steradian of the visible latitude band at the design scale; a larger globe has more surface per screen pixel, so it gets more (x 1 / ang^2) to keep the same lights per pixel
+  const HUB_SEP = (5 * Math.PI) / 180, MIN_SEP = (2.1 * Math.PI) / 180;
+  const CUT_H = (20 * Math.PI) / 180, CUT_HM = (11 * Math.PI) / 180, CUT_M = (8.5 * Math.PI) / 180; // longest hub-hub, hub-minor and minor-minor link
+  const LINK_STEP = 2.3; // px between the dots of a dotted link
+  const LINK_A = 0.42;
+  const NODE_SLOPE = 4, LINK_SLOPE = 10; // activation per unit of dot threshold: how soft the bloom-in (node) or the drawing head (link) is
+  const TIER1 = [-100, 100], TIER2 = [-5, 190]; // seconds into the clock when regional and local nodes switch on (some regional ones are up from the start)
+  const EPH_FRAC = 0.03; // share of local links that re-draw on a slow cycle once the network is mature
+  const PK_MAX = 5, PK_A = 0.7; // at most this many packets alive at once, kept faint
+  const PK_V = [5.8, 9.4]; // packet speed along a link, design px/s at speed 1 (it runs on the speed clock, so Speed scales it)
+  const PK_GAP = [2.5, 5]; // seconds between packet spawns at speed 1
+  const CABLES = 6; // undersea cables: a few dim long arcs
+
+  // limb
+  const NB = 720; // angle bins around the limb
+  // Depth of the secondary effects, softened by about a fifth for a very subtle look (the old values are in the comments).
+  const SHIM = 0.17; // grain shimmer, +/- of a dot's brightness (independent per dot, so it averages out; the waves do not). Was 0.22
+  const WAVE_AMP = 0.78; // scale on the limb waves' amplitudes (BANDS[].amp). Was 1
+  const TWINKLE = [0.11, 0.23]; // star twinkle depth, bright stars (soft blobs) and dim ones. Was 0.14 and 0.3
+  // Each band's waves all travel one way (the bands alternate), at different speeds: m = waves around the circle, om = rad/s.
+  const BANDS = [
+    { n: 14000, d0: -1.2, tau: 2.2, sg: 0, a: 0.13, role: "glowLo", m: [9, 21, 47], amp: [0.14, 0.1, 0.06], om: [0.22, 0.46, 0.8], ph: [0.4, 2.1, 4.0] },
+    { n: 12000, d0: 1.5, tau: 4.6, sg: 0, a: 0.1, role: "glowMid", m: [7, 17, 39], amp: [0.13, 0.11, 0.06], om: [-0.2, -0.38, -0.66], ph: [1.7, 0.2, 5.1] },
+    { n: 11000, d0: 6, tau: 7, sg: 0, a: 0.1, role: "glowTop", m: [5, 13, 31], amp: [0.14, 0.1, 0.06], om: [0.16, 0.3, 0.55], ph: [3.3, 4.4, 1.0] },
+    { n: 3600, d0: 19, tau: 0, sg: 3, a: 0.16, role: "glowWarm", m: [6, 15, 33], amp: [0.16, 0.08, 0.05], om: [-0.14, -0.26, -0.45], ph: [5.5, 1.1, 2.9] },
+  ];
+  const BLOOM_N = 16000, BLOOM_A = 0.15;
+  const AUR_CURTAINS = 4, AUR_RAYS = 36, AUR_DOTS = 60, AUR_A = 0.1;
+
+  // body
+  const BODY_A = 0.022; // light of the ground at its brightest, at body = 1 (about 5% brightness)
+
+  // sky
+  const STARS = 4600;
+  const DRIFT = [3, 6, 10]; // star-layer drift amplitude, design px (far layer slowest)
+  const DRIFT_T = [260, 190, 140];
+  const SKY_DRIFT = 7; // nebula/galaxy drift amplitude, design px
+
+  // ---------- splatting into the interleaved (light, light x coordinate) accumulator ---------------------------
+  // The SVG export sets `sink` to an array for one frame: every dot that lands on the canvas is also listed there.
+  let sink = null;
+  function splat(buf, W, H, x, y, a, c) {
+    const x0 = Math.floor(x - 0.5), y0 = Math.floor(y - 0.5);
+    if (x0 < 0 || y0 < 0 || x0 >= W - 1 || y0 >= H - 1) return;
+    if (sink !== null) sink.push(x, y, a, c);
+    const tx = x - 0.5 - x0, ty = y - 0.5 - y0;
+    const k = (y0 * W + x0) * 2;
+    const w00 = a * (1 - tx) * (1 - ty), w10 = a * tx * (1 - ty), w01 = a * (1 - tx) * ty, w11 = a * tx * ty;
+    buf[k] += w00; buf[k + 1] += w00 * c; buf[k + 2] += w10; buf[k + 3] += w10 * c;
+    const k2 = k + 2 * W;
+    buf[k2] += w01; buf[k2 + 1] += w01 * c; buf[k2 + 2] += w11; buf[k2 + 3] += w11 * c;
+  }
+  // A soft round blob (centre plus four neighbours), total weight a.
+  function blob(buf, W, H, x, y, a, c) {
+    splat(buf, W, H, x, y, a * 0.46, c);
+    splat(buf, W, H, x - 1, y, a * 0.135, c); splat(buf, W, H, x + 1, y, a * 0.135, c);
+    splat(buf, W, H, x, y - 1, a * 0.135, c); splat(buf, W, H, x, y + 1, a * 0.135, c);
+  }
+
+  // ---------- camera -------------------------------------------------------------------------------------------
+
+  // Planet frame: a point at longitude h, latitude phi is cos(phi)cos(h) L + cos(phi)sin(h) E + sin(phi) A; the globe turns
+  // about A, so a surface point's world longitude is its own plus the turn. E points across the picture (the surface moves
+  // along it: in over the left limb, out over the right), L toward the viewer, A is the pole, tipped TILT toward the viewer.
+  function makeCamera(W, H, v) {
+    const k = 0.5 + 0.5 * v.scale;
+    const Rb = Math.min(PLANET.r * H, PLANET.rW * W);
+    let cx = W - PLANET.inX * Rb, cy = H + PLANET.belowY * Rb; // centre just beyond the bottom corner
+    const R = Rb * k;
+    cx = W / 2 + (cx - W / 2) * k; cy = H / 2 + (cy - H / 2) * k;
+    const sgn = v.side === "left" ? -1 : 1;
+    if (sgn < 0) cx = W - cx;
+    const th = LEAN + (v.angle * Math.PI) / 180, ca = Math.cos(th), sa = Math.sin(th);
+    const sT = Math.sin(TILT), cT = Math.cos(TILT);
+    const rot = (a) => [sgn * (a[0] * ca - a[1] * sa), a[0] * sa + a[1] * ca, a[2]];
+    const E = rot([1, 0, 0]), L = rot([0, sT, cT]), A = rot([0, -cT, sT]);
+    let sLo = 1, sHi = -1;
+    for (let y = 0; y < H; y += 4) for (let x = 0; x < W; x += 4) {
+      const px = (x - cx) / R, py = (y - cy) / R, rr = px * px + py * py;
+      if (rr >= 1) continue;
+      const pz = Math.sqrt(1 - rr), s = px * A[0] + py * A[1] + pz * A[2];
+      if (s < sLo) sLo = s;
+      if (s > sHi) sHi = s;
+    }
+    if (sHi < sLo) { sLo = -0.3; sHi = 0.9; }
+    const R0 = Math.min(DESIGN_FRAME.r * H, DESIGN_FRAME.rW * W);
+    return { cx, cy, R, zs: (R0 * k) / DESIGN_R, ang: R0 / Rb, L, E, A, sLo, sHi };
+  }
+
+  // ---------- world: land texture that does not depend on the canvas size ----------------------------------------
+  // Built once per page. It keeps the histogram of its heights, so the Land control only moves a threshold
+  // (landThreshold) and never costs a new texture.
+
+  function* buildWorld() {
+    const r = rng(SEED + 11);
+    const nA = noise3(r), nB = noise3(r);
+    const TW = 1024, TH = Math.round((TW * (LAT1 - LAT0)) / TAU);
+    const land = new Uint8Array((TW + 1) * (TH + 1));
+    yield;
+    const hist = new Float64Array(256);
+    const F0 = 1.9, WARP = 0.5;
+    for (let row = 0; row <= TH; row++) {
+      if ((row & 3) === 0) yield;
+      const lat = LAT0 + (row / TH) * (LAT1 - LAT0), cl = Math.cos(lat), sl = Math.sin(lat);
+      for (let col = 0; col <= TW; col++) {
+        const lon = (col / TW) * TAU;
+        const x = cl * Math.cos(lon), y = cl * Math.sin(lon), z = sl;
+        const wx = nB(x * 1.7 + 11.1, y * 1.7 + 3.3, z * 1.7 + 5.7), wy = nB(x * 1.7 + 7.2, y * 1.7 + 21.4, z * 1.7 + 1.9), wz = nB(x * 1.7 + 2.6, y * 1.7 + 9.8, z * 1.7 + 17.3);
+        const px = x * F0 + wx * WARP, py = y * F0 + wy * WARP, pz = z * F0 + wz * WARP;
+        let s = 0, amp = 1, norm = 0, f = 1;
+        for (let o = 0; o < 6; o++) { s += amp * nA(px * f + o * 5.3, py * f + o * 3.1, pz * f + o * 7.7); norm += amp; amp *= 0.52; f *= 2.05; }
+        const bias = 0.2 * Math.exp(-(((lat - 0.61) / 0.45) ** 2)); // more land in the northern temperate belt, as on Earth
+        const b = Math.max(0, Math.min(255, Math.round(((s / norm) * 1.35 + bias) * 0.5 * 255 + 127.5)));
+        land[row * (TW + 1) + col] = b;
+        if (col < TW) hist[b] += cl;
+      }
+    }
+    yield;
+    return { TW, TH, land, hist };
+  }
+
+  // The land byte threshold that gives the requested land fraction of the sphere's area.
+  function landThreshold(w, frac) {
+    let tot = 0; for (let i = 0; i < 256; i++) tot += w.hist[i];
+    let acc = 0, thr = 255;
+    for (let i = 255; i >= 0; i--) { acc += w.hist[i]; if (acc / tot >= frac) { thr = i; break; } }
+    return thr;
+  }
+
+  // Bilinear land value (0..255) at a unit vector in the planet frame.
+  function landValue(w, x, y, z) {
+    let lon = Math.atan2(y, x);
+    if (lon < 0) lon += TAU;
+    const lat = Math.asin(z < -1 ? -1 : z > 1 ? 1 : z);
+    const u = (lon / TAU) * w.TW, vv = clamp01((lat - LAT0) / (LAT1 - LAT0)) * 0.9999 * w.TH;
+    const u0 = u | 0, fu = u - u0, v0 = vv | 0, fv = vv - v0, k = v0 * (w.TW + 1) + u0, s = w.TW + 1;
+    const a0 = w.land[k], a2 = w.land[k + s];
+    return (a0 + (w.land[k + 1] - a0) * fu) * (1 - fv) + (a2 + (w.land[k + s + 1] - a2) * fu) * fv;
+  }
+
+  // ---------- scene ----------------------------------------------------------------------------------------------
+
+  function* buildScene(world, W, H, v) {
+    const r = rng(SEED);
+    const cam = makeCamera(W, H, v);
+    const { R, cx, cy, zs, ang, L, E, A } = cam;
+    const zq = Math.min(1.35, Math.max(0.8, zs)); // px sizes of lights follow the globe's size, within reason
+    yield;
+
+    // ---- network: hubs and minor nodes on land (preferring coasts and populous places), links over land, radial spokes and
+    // a few undersea cables. Nodes and links carry timing (see updateNet); the dots they own are made below.
+    const rn = rng(SEED + 31), thr = landThreshold(world, v.land);
+    const popN = noise3(rng(SEED + 5));
+    const popAt = (x, y, z) => 0.5 + 0.5 * (0.65 * popN(x * 3.1 + 1.3, y * 3.1 + 7.1, z * 3.1 + 2.9) + 0.35 * popN(x * 7.7 + 4.4, y * 7.7 + 0.5, z * 7.7 + 8.8));
+    const sLoN = Math.max(SIN_N0, cam.sLo - 0.05), sHiN = Math.min(SIN_N1, cam.sHi + 0.03);
+    const px = [], py = [], pz = [], phub = [], ppop = [];
+    const GN = 20, gHead = new Int32Array(GN * GN * GN).fill(-1), gNext = []; // grid for the separation test: cells of 0.1, wider than a hub gap
+    const gi = (x) => Math.min(GN - 1, Math.max(0, ((x + 1) * (GN / 2)) | 0));
+    const crowded = (x, y, z, minCos) => {
+      const ix = gi(x), iy = gi(y), iz = gi(z);
+      for (let a = Math.max(0, ix - 1); a <= Math.min(GN - 1, ix + 1); a++) for (let b = Math.max(0, iy - 1); b <= Math.min(GN - 1, iy + 1); b++) for (let c = Math.max(0, iz - 1); c <= Math.min(GN - 1, iz + 1); c++) {
+        for (let j = gHead[(a * GN + b) * GN + c]; j >= 0; j = gNext[j]) if (px[j] * x + py[j] * y + pz[j] * z > minCos) return true;
+      }
+      return false;
+    };
+    const tryNode = (minCos, hubby) => {
+      for (let tries = 0; tries < 60; tries++) {
+        const lon = rn() * TAU, s = sLoN + rn() * (sHiN - sLoN), cp = Math.sqrt(1 - s * s);
+        const x = cp * Math.cos(lon), y = cp * Math.sin(lon), z = s;
+        const f = landValue(world, x, y, z);
+        if (f < thr - 2) continue;
+        const cs = Math.exp(-(((f - thr) / 16) ** 2)), pop = popAt(x, y, z);
+        const score = (0.28 + 0.72 * pop) * (hubby ? 0.4 + 1.0 * cs : 0.5 + 0.7 * cs);
+        if (rn() > Math.pow(score, hubby ? 1.3 : 0.9)) continue;
+        if (crowded(x, y, z, minCos)) continue;
+        const id = px.length, cell = (gi(x) * GN + gi(y)) * GN + gi(z);
+        gNext.push(gHead[cell]); gHead[cell] = id;
+        px.push(x); py.push(y); pz.push(z); phub.push(hubby ? 1 : 0); ppop.push(pop);
+        return;
+      }
+    };
+    const area = (TAU * (sHiN - sLoN) * v.density) / (ang * ang);
+    const nHubs = Math.round(HUBS_SR * area), nMin = Math.round(MINORS_SR * area);
+    for (let k = 0; k < nHubs; k++) { if ((k & 7) === 0) yield; tryNode(Math.cos(HUB_SEP * ang), true); }
+    for (let k = 0; k < nMin; k++) { if ((k & 7) === 0) yield; tryNode(Math.cos(MIN_SEP * ang), false); }
+    const nNodes = px.length;
+
+    // Node timing. A node's age is the time since it rolled over the entering limb: its world longitude minus the longitude
+    // of the limb at its latitude (the limb is where L.z cos(lat) cos(lon) + A.z sin(lat) = 0), so age = ((turn + off) mod 2pi) / omega.
+    // It is visible for a span uv of that angle; a place that has left is reset while hidden (see updateNet).
+    const nodeOff = new Float32Array(nNodes), nodeUv = new Float32Array(nNodes), nodeS = new Float32Array(nNodes), nodeWd = new Float32Array(nNodes);
+    const nodeTier = new Uint8Array(nNodes), nodeD = new Float32Array(nNodes);
+    const minorPops = [];
+    for (let i = 0; i < nNodes; i++) if (!phub[i]) minorPops.push(ppop[i]);
+    minorPops.sort((a, b) => a - b);
+    const popCut = minorPops.length ? minorPops[Math.floor(minorPops.length * 0.62)] : 1; // the more populous 38% of minors are regional, the rest local
+    for (let i = 0; i < nNodes; i++) {
+      const lat = Math.asin(pz[i]), Ln = Math.acos(Math.max(-1, Math.min(1, -TAN_T * Math.tan(lat))));
+      nodeOff[i] = Math.atan2(py[i], px[i]) + Ln;
+      nodeUv[i] = 2 * Ln;
+      const tier = phub[i] ? 0 : ppop[i] >= popCut ? 1 : 2;
+      nodeTier[i] = tier;
+      if (tier === 0) { nodeS[i] = 0.6 + 2.4 * rn(); nodeWd[i] = 3 + 2.5 * rn(); nodeD[i] = -20 + 40 * rn(); }
+      else if (tier === 1) { nodeS[i] = 1 + 3.5 * rn(); nodeWd[i] = 2.5 + 2.5 * rn(); nodeD[i] = TIER1[0] + (TIER1[1] - TIER1[0]) * Math.pow(rn(), 1.1); }
+      else { nodeS[i] = 1.5 + 5 * rn(); nodeWd[i] = 2.5 + 2.5 * rn(); nodeD[i] = TIER2[0] + (TIER2[1] - TIER2[0]) * rn(); }
+    }
+
+    const dotN = (i, j) => px[i] * px[j] + py[i] * py[j] + pz[i] * pz[j];
+    const slerpAt = (ax, ay, az, bx, by, bz, om, t) => {
+      const so = Math.sin(om) || 1e-6, sa = Math.sin((1 - t) * om) / so, sb = Math.sin(t * om) / so;
+      return [sa * ax + sb * bx, sa * ay + sb * by, sa * az + sb * bz];
+    };
+    const landArc = (ax, ay, az, bx, by, bz, om, need) => {
+      for (let q = 1; q <= 4; q++) { const p = slerpAt(ax, ay, az, bx, by, bz, om, q / 5); if (landValue(world, p[0], p[1], p[2]) < thr - need) return false; }
+      return true;
+    };
+    // Which end a link grows from: a hub before a minor, a regional node before a local one, else whichever rolled into view first.
+    const startOf = (i, j) => {
+      if (phub[i] !== phub[j]) return phub[i] ? [i, j] : [j, i];
+      if (nodeTier[i] !== nodeTier[j]) return nodeTier[i] < nodeTier[j] ? [i, j] : [j, i];
+      return wrapPi(nodeOff[j] - nodeOff[i]) > 0 ? [j, i] : [i, j];
+    };
+    // kind: 0 link, 1 spoke, 2 cable
+
+    const lks = [];
+    const mk = (i, j, om, w, step, tier, kind, ex) => {
+      const [a, b] = startOf(i, j);
+      lks.push({ a, b, x0: px[a], y0: py[a], z0: pz[a], x1: ex ? ex[0] : px[b], y1: ex ? ex[1] : py[b], z1: ex ? ex[2] : pz[b], om, w, step, tier, kind });
+    };
+    const deg = new Uint8Array(nNodes), degA = new Uint8Array(nNodes);
+    const candA = [], candB = [];
+    for (let i = 0; i < nNodes; i++) {
+      if ((i & 15) === 0) yield;
+      for (let j = i + 1; j < nNodes; j++) {
+        const dp = dotN(i, j), hh = phub[i] && phub[j], cut = (hh ? CUT_H : (phub[i] || phub[j]) ? CUT_HM : CUT_M) * ang;
+        if (dp < Math.cos(cut)) continue;
+        (hh ? candA : candB).push([i, j, Math.acos(Math.min(1, dp))]);
+      }
+    }
+    candA.sort((p, q) => p[2] - q[2]);
+    yield;
+    // candB is the long list (tens of thousands of pairs): order it by length with a radix sort on the float bits (positive
+    // floats sort as their bit patterns), one 11-bit digit per step, so no single step is long
+    const nB = candB.length, keyB = new Float32Array(nB), bitsB = new Uint32Array(keyB.buffer);
+    for (let q = 0; q < nB; q++) keyB[q] = candB[q][2];
+    let ordB = new Uint32Array(nB), tmpB = new Uint32Array(nB);
+    for (let q = 0; q < nB; q++) ordB[q] = q;
+    for (let pass = 0; pass < 3; pass++) {
+      const shift = pass * 11, count = new Uint32Array(2049);
+      for (let q = 0; q < nB; q++) count[((bitsB[q] >>> shift) & 2047) + 1]++;
+      for (let d = 0; d < 2048; d++) count[d + 1] += count[d];
+      for (let q = 0; q < nB; q++) { const o = ordB[q]; tmpB[count[(bitsB[o] >>> shift) & 2047]++] = o; }
+      const t = ordB; ordB = tmpB; tmpB = t;
+      yield;
+    }
+    // arteries first (hub to hub, a few per hub), so the short links around a hub cannot use its degree up; then the rest
+    let nCand = 0;
+    for (const [i, j, om] of candA) {
+      if ((nCand++ & 255) === 0) yield;
+      if (degA[i] >= 4 || degA[j] >= 4) continue;
+      if (!landArc(px[i], py[i], pz[i], px[j], py[j], pz[j], om, 3)) continue;
+      degA[i]++; degA[j]++; deg[i]++; deg[j]++;
+      mk(i, j, om, 1, LINK_STEP, 0, 0);
+    }
+    yield;
+    const capOf = (i) => (phub[i] ? 7 : 3);
+    for (let q = 0; q < nB; q++) {
+      if ((nCand++ & 255) === 0) yield;
+      const [i, j, om] = candB[ordB[q]];
+      if (deg[i] >= capOf(i) || deg[j] >= capOf(j)) continue;
+      if (!landArc(px[i], py[i], pz[i], px[j], py[j], pz[j], om, 3)) continue;
+      deg[i]++; deg[j]++;
+      // regional links reach out of a hub or between regional nodes, the rest is local
+      const tier = (phub[i] || phub[j] || (nodeTier[i] === 1 && nodeTier[j] === 1)) ? 1 : 2;
+      mk(i, j, om, tier === 1 ? 0.85 : 0.7, LINK_STEP, tier, 0);
+    }
+    yield;
+    // radial spokes out of hubs, stopping at the coast (local)
+    for (let i = 0; i < nNodes; i++) {
+      if (!phub[i] || rn() > 0.78) continue;
+      const ns = 2 + ((rn() * 3) | 0);
+      for (let q = 0; q < ns; q++) {
+        let tx = rn() - 0.5, ty = rn() - 0.5, tz = rn() - 0.5;
+        const d = tx * px[i] + ty * py[i] + tz * pz[i];
+        tx -= d * px[i]; ty -= d * py[i]; tz -= d * pz[i];
+        const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+        const len = ((14 + 36 * rn()) * zq * (0.7 + 0.6 * ppop[i])) / R;
+        let ex = px[i], ey = py[i], ez = pz[i], good = 0;
+        for (let k = 1; k <= 6; k++) {
+          const s = (len * k) / 6, x = px[i] * Math.cos(s) + tx * Math.sin(s), y = py[i] * Math.cos(s) + ty * Math.sin(s), z = pz[i] * Math.cos(s) + tz * Math.sin(s);
+          if (landValue(world, x, y, z) < thr - 4) break;
+          ex = x; ey = y; ez = z; good = k;
+        }
+        if (good < 2) continue;
+        const om = (len * good) / 6;
+        lks.push({ a: i, b: i, x0: px[i], y0: py[i], z0: pz[i], x1: ex, y1: ey, z1: ez, om, w: 0.8, step: LINK_STEP, tier: 2, kind: 1 });
+      }
+    }
+    // undersea cables: a few dim long arcs between coastal hubs across open water (present from the start)
+    const hubIdx = [];
+    for (let i = 0; i < nNodes; i++) if (phub[i]) hubIdx.push(i);
+    for (let i = hubIdx.length - 1; i > 0; i--) { const j = (rn() * (i + 1)) | 0; const t = hubIdx[i]; hubIdx[i] = hubIdx[j]; hubIdx[j] = t; }
+    const cosLo = Math.cos((6 * Math.PI) / 180), cosHi = Math.cos((15 * Math.PI) / 180);
+    let cables = 0;
+    for (let n = 0; n < hubIdx.length && cables < CABLES; n++) {
+      const i = hubIdx[n];
+      if (landValue(world, px[i], py[i], pz[i]) > thr + 30) continue; // coastal hubs only
+      for (let m = 0; m < hubIdx.length; m++) {
+        const j = hubIdx[(n + 1 + m) % hubIdx.length], dp = dotN(i, j);
+        if (j === i || dp > cosLo || dp < cosHi || landValue(world, px[j], py[j], pz[j]) > thr + 30) continue;
+        const om = Math.acos(dp);
+        if (landArc(px[i], py[i], pz[i], px[j], py[j], pz[j], om, 12)) continue; // all land: a highway, not a cable
+        mk(i, j, om, 0.5, 2.8, 0, 2);
+        cables++;
+        break;
+      }
+    }
+    const nLinks = lks.length;
+    yield;
+
+    // Link timing: it starts a little after its first node has lit up and grows over its own time; regional and local links
+    // also wait for the densification clock (after both their nodes are up). A few local links keep re-drawing.
+    const lkA = new Uint16Array(nLinks), lkP = new Float32Array(nLinks * 6), lkOm = new Float32Array(nLinks), lkS = new Float32Array(nLinks), lkDur = new Float32Array(nLinks);
+    const lkTier = new Uint8Array(nLinks), lkD = new Float32Array(nLinks), lkCyc = new Float32Array(nLinks), lkPh = new Float32Array(nLinks);
+    const locals = [];
+    for (let e = 0; e < nLinks; e++) {
+      const k = lks[e], a = k.a, b = k.b;
+      lkA[e] = a; lkOm[e] = k.om; lkTier[e] = k.tier;
+      lkP[e * 6] = k.x0; lkP[e * 6 + 1] = k.y0; lkP[e * 6 + 2] = k.z0; lkP[e * 6 + 3] = k.x1; lkP[e * 6 + 4] = k.y1; lkP[e * 6 + 5] = k.z1;
+      if (k.kind === 2) { lkS[e] = Math.max(nodeS[a], nodeS[b]) + 4 + 5 * rn(); lkDur[e] = 12 + 4 * rn(); }
+      else if (k.kind === 1) { lkS[e] = nodeS[a] + 0.4 * nodeWd[a] + 1 + 5 * rn(); lkDur[e] = 4 + 4 * rn(); }
+      else if (k.tier === 0) { lkS[e] = nodeS[a] + 0.4 * nodeWd[a] + 0.5 + 2.5 * rn(); lkDur[e] = 8 + 6 * rn(); }
+      else if (k.tier === 1) { lkS[e] = nodeS[a] + 0.3 * nodeWd[a] + 0.5 + 3.5 * rn(); lkDur[e] = 7 + 5 * rn(); }
+      else { lkS[e] = nodeS[a] + 0.3 * nodeWd[a] + 0.5 + 4.5 * rn(); lkDur[e] = 5 + 4 * rn(); }
+      lkD[e] = k.tier > 0 ? Math.max(nodeD[a], nodeD[b]) + 2 + 16 * rn() : -1e4;
+      if (k.tier === 2 && k.kind === 0) locals.push(e);
+    }
+    const nEph = Math.min(locals.length, Math.max(20, Math.round(locals.length * EPH_FRAC)));
+    for (let q = 0; q < nEph; q++) {
+      const j = q + ((rn() * (locals.length - q)) | 0), t = locals[q]; locals[q] = locals[j]; locals[j] = t;
+      lkCyc[locals[q]] = 55 + 40 * rn(); lkPh[locals[q]] = rn() * lkCyc[locals[q]];
+    }
+    yield;
+
+    // ---- network dots, contiguous per owner: nodes first, then links
+    const dX = [], dY = [], dZ = [], dT = [], dA = [], dC = [], dO = [];
+    const put = (x, y, z, t, a, c, o) => {
+      const l = Math.sqrt(x * x + y * y + z * z);
+      dX.push(x / l); dY.push(y / l); dZ.push(z / l); dT.push(t); dA.push(a); dC.push(c); dO.push(o);
+    };
+    const gauss = () => Math.sqrt(-2 * Math.log(1 - rn())) * Math.cos(TAU * rn());
+    const eps = 1.0 / R;
+    // satellite towns: tiny specks on land around a node (the carpet of small lights round every city); the late ones (threshold
+    // above 1) only light up as the node's densification runs
+    const addTowns = (i, count, rMin, rMax, aMin, aMax) => {
+      for (let q = 0; q < count; q++) {
+        const rho = ((rMin + (rMax - rMin) * Math.pow(rn(), 1.5)) * zq) / R, ang = TAU * rn();
+        let tx = rn() - 0.5, ty = rn() - 0.5, tz = rn() - 0.5;
+        const d = tx * px[i] + ty * py[i] + tz * pz[i];
+        tx -= d * px[i]; ty -= d * py[i]; tz -= d * pz[i];
+        const tl = Math.hypot(tx, ty, tz) || 1;
+        const ux = tx / tl, uy = ty / tl, uz = tz / tl;
+        const vx = py[i] * uz - pz[i] * uy, vy = pz[i] * ux - px[i] * uz, vz = px[i] * uy - py[i] * ux;
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+        const dx = ux * ca + vx * sa, dy = uy * ca + vy * sa, dz = uz * ca + vz * sa;
+        const x = px[i] * Math.cos(rho) + dx * Math.sin(rho), y = py[i] * Math.cos(rho) + dy * Math.sin(rho), z = pz[i] * Math.cos(rho) + dz * Math.sin(rho);
+        if (landValue(world, x, y, z) < thr - 1) continue;
+        const t = rn() < 0.4 ? 1.0 + 0.6 * rn() : 0.12 + 0.88 * rn();
+        put(x, y, z, t, aMin + (aMax - aMin) * rn(), C_LIGHT, i);
+      }
+    };
+    for (let i = 0; i < nNodes; i++) {
+      if ((i & 15) === 0) yield;
+      const pop = ppop[i], hub = phub[i] === 1, size = hub ? 0.7 + 0.9 * pop + 0.5 * rn() : 0.7 + 0.5 * rn();
+      const g1 = ((hub ? 1.5 : 1.0) * size * zq) / R, g2 = ((hub ? 3.6 : 2.2) * size * zq) / R, g3 = (10 * size * zq) / R, g4 = (22 * size * zq) / R;
+      put(px[i], py[i], pz[i], 0, hub ? 1.6 : 0.85, C_HOT, i);
+      for (let q = 0, n = hub ? 10 : 4; q < n; q++) put(px[i] + gauss() * g1, py[i] + gauss() * g1, pz[i] + gauss() * g1, 0.04 + 0.35 * rn(), hub ? 0.95 : 0.55, hub ? (C_HOT + C_LIGHT) / 2 : C_LIGHT, i);
+      for (let q = 0, n = hub ? 40 : 9; q < n; q++) put(px[i] + gauss() * g2, py[i] + gauss() * g2, pz[i] + gauss() * g2, 0.2 + 0.7 * rn(), hub ? 0.55 : 0.38, C_LIGHT, i);
+      if (hub) {
+        for (let q = 0; q < 36; q++) put(px[i] + gauss() * g3, py[i] + gauss() * g3, pz[i] + gauss() * g3, 0.35 + 0.65 * rn(), 0.14, (C_LIGHT + C_NET) / 2, i);
+        for (let q = 0; q < 22; q++) put(px[i] + gauss() * g4, py[i] + gauss() * g4, pz[i] + gauss() * g4, 0.5 + 0.5 * rn(), 0.05, C_NET, i);
+        addTowns(i, 45 + ((pop * 100) | 0), 5, 50, 0.18, 0.55);
+      } else addTowns(i, 10 + ((pop * 24) | 0), 3, 30, 0.14, 0.4);
+    }
+    for (let e = 0; e < nLinks; e++) {
+      if ((e & 31) === 0) yield;
+      const k = lks[e];
+      const n = Math.max(4, Math.round((k.om * R) / k.step));
+      // a gentle sideways bend (roads are not great circles); the axis is perpendicular to the arc's plane
+      let ax = k.y0 * k.z1 - k.z0 * k.y1, ay = k.z0 * k.x1 - k.x0 * k.z1, az = k.x0 * k.y1 - k.y0 * k.x1;
+      const al = Math.hypot(ax, ay, az) || 1; ax /= al; ay /= al; az /= al;
+      const b1 = k.w < 0.6 ? 0 : (rn() - 0.5) * 0.34 * k.om, b2 = k.w < 0.6 ? 0 : (rn() - 0.5) * 0.16 * k.om, bph = rn() * TAU;
+      for (let q = 0; q < n; q++) {
+        const t = (q + 0.5 + (rn() - 0.5) * 0.5) / n, p = slerpAt(k.x0, k.y0, k.z0, k.x1, k.y1, k.z1, k.om, t);
+        const bend = b1 * Math.sin(Math.PI * t) + b2 * Math.sin(2 * Math.PI * t + bph);
+        put(p[0] + ax * bend + (rn() - 0.5) * 2 * eps, p[1] + ay * bend + (rn() - 0.5) * 2 * eps, p[2] + az * bend + (rn() - 0.5) * 2 * eps, t, LINK_A * k.w * (0.7 + 0.6 * rn()), C_NET, nNodes + e);
+      }
+    }
+    const nNet = dX.length;
+    const nOwn = nNodes + nLinks;
+    const ownStart = new Uint32Array(nOwn + 1); // dots are contiguous per owner
+    for (let i = 0; i < nNet; i++) ownStart[dO[i] + 1]++;
+    yield;
+    for (let o = 0; o < nOwn; o++) ownStart[o + 1] += ownStart[o];
+    // per-owner cull data: the owner's centre, and how far its dots stray from it (so a whole node or link behind the limb
+    // or off the frame costs one test instead of one per dot)
+    const oX = new Float32Array(nOwn), oY = new Float32Array(nOwn), oZ = new Float32Array(nOwn), oS = new Float32Array(nOwn), oR = new Float32Array(nOwn);
+    for (let o = 0; o < nOwn; o++) {
+      let x, y, z;
+      if (o < nNodes) { x = px[o]; y = py[o]; z = pz[o]; }
+      else { const e = o - nNodes; x = lkP[e * 6] + lkP[e * 6 + 3]; y = lkP[e * 6 + 1] + lkP[e * 6 + 4]; z = lkP[e * 6 + 2] + lkP[e * 6 + 5]; if (lks[e].kind === 1) { x = lkP[e * 6]; y = lkP[e * 6 + 1]; z = lkP[e * 6 + 2]; } }
+      const l = Math.hypot(x, y, z) || 1;
+      oX[o] = x / l; oY[o] = y / l; oZ[o] = z / l; oS[o] = 1;
+    }
+    yield;
+    const cosMin = new Float32Array(nOwn).fill(1);
+    const dXf = Float32Array.from(dX); yield;
+    const dYf = Float32Array.from(dY); yield;
+    const dZf = Float32Array.from(dZ); yield;
+    const dTf = Float32Array.from(dT); yield;
+    const dAf = Float32Array.from(dA); yield;
+    const dCf = Float32Array.from(dC); yield;
+    for (let o = 0; o < nOwn; o++) {
+      if ((o & 255) === 0) yield;
+      for (let i = ownStart[o], end = ownStart[o + 1]; i < end; i++) { const c = dXf[i] * oX[o] + dYf[i] * oY[o] + dZf[i] * oZ[o]; if (c < cosMin[o]) cosMin[o] = c; }
+      const ang = Math.acos(Math.max(-1, Math.min(1, cosMin[o])));
+      oS[o] = ang < 1.5 ? Math.sin(ang) + 0.01 : 1;
+      oR[o] = ang * R + 4;
+    }
+    yield;
+
+    // ---- limb: airglow bands, city-light bloom pool, aurora curtains (all around the arc that is in frame)
+    const arcList = [];
+    for (let b = 0; b < NB; b++) {
+      const th = ((b + 0.5) / NB) * TAU - Math.PI, x = cx + R * Math.cos(th), y = cy + R * Math.sin(th);
+      if (x > -70 && x < W + 70 && y > -70 && y < H + 70) arcList.push(b);
+    }
+    const arcN = arcList.length;
+    const arcPx = (arcN / NB) * TAU * R;
+    const sgn = v.side === "left" ? -1 : 1;
+    const thBright = Math.atan2(-0.7, -sgn); // the limb facing the open sky, upper left (right of the frame when mirrored), glows a little more
+    const litAt = (th) => 0.5 + 0.5 * Math.cos(th - thBright);
+    const gaussL = () => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(TAU * r());
+    const limbPos = () => arcList[(r() * arcN) | 0] + r(); // continuous bin position
+    const nLimbAll = arcN ? BANDS.reduce((s, b) => s + Math.round(b.n * (arcPx / 1700) * v.density), 0) : 0;
+    const limbPosArr = new Float32Array(nLimbAll), limbBand = new Uint8Array(nLimbAll);
+    {
+      let k = 0;
+      for (let bi = 0; bi < BANDS.length && arcN; bi++) { const n = Math.round(BANDS[bi].n * (arcPx / 1700) * v.density); for (let q = 0; q < n; q++) { limbPosArr[k] = limbPos(); limbBand[k] = bi; k++; } }
+    }
+    const limbIdx = new Uint32Array(nLimbAll);
+    {
+      const start = new Uint32Array(NB + 1);
+      for (let i = 0; i < nLimbAll; i++) start[Math.min(NB - 1, limbPosArr[i] | 0) + 1]++;
+      for (let b = 0; b < NB; b++) start[b + 1] += start[b];
+      for (let i = 0; i < nLimbAll; i++) limbIdx[start[Math.min(NB - 1, limbPosArr[i] | 0)]++] = i;
+    }
+    yield;
+    const nLimb = nLimbAll;
+    const lBin = new Uint16Array(nLimb), lCos = new Float32Array(nLimb), lSin = new Float32Array(nLimb), lD = new Float32Array(nLimb), lA = new Float32Array(nLimb), lC = new Float32Array(nLimb);
+    const lBand = new Uint8Array(nLimb), lPh = new Uint8Array(nLimb);
+    const bandC = BANDS.map((b) => roleC(b.role));
+    for (let i = 0; i < nLimb; i++) {
+      if ((i & 2047) === 0) yield;
+      const src = limbIdx[i], b = BANDS[limbBand[src]], pos = limbPosArr[src];
+      const th = (pos / NB) * TAU - Math.PI, lit = litAt(th);
+      const d = b.sg > 0 ? b.d0 + b.sg * gaussL() : b.d0 - b.tau * Math.log(1 - 0.995 * r());
+      lBin[i] = Math.min(NB - 1, pos | 0); lCos[i] = Math.cos(th); lSin[i] = Math.sin(th); lD[i] = d * zs;
+      lA[i] = b.a * (0.38 + 0.5 * lit) * (0.75 + 0.5 * r());
+      lC[i] = bandC[limbBand[src]];
+      lBand[i] = limbBand[src]; lPh[i] = (r() * 256) | 0;
+    }
+    // bloom pool: dots hugging the horizon whose brightness follows the lights just below them
+    const nBloom = arcN ? Math.round(BLOOM_N * (arcPx / 1700) * v.density) : 0;
+    const bloomPos = new Float32Array(nBloom);
+    for (let i = 0; i < nBloom; i++) bloomPos[i] = limbPos();
+    bloomPos.sort();
+    const mBin = new Uint16Array(nBloom), mCos = new Float32Array(nBloom), mSin = new Float32Array(nBloom), mD = new Float32Array(nBloom), mA = new Float32Array(nBloom), mC = new Float32Array(nBloom);
+    for (let i = 0; i < nBloom; i++) {
+      const pos = bloomPos[i], th = (pos / NB) * TAU - Math.PI, d = 1 - 16 * Math.log(1 - 0.99 * r());
+      mBin[i] = Math.min(NB - 1, pos | 0); mCos[i] = Math.cos(th); mSin[i] = Math.sin(th); mD[i] = d * zs;
+      mA[i] = BLOOM_A * (0.6 + 0.8 * r()); mC[i] = C_LIGHT + (bandC[0] - C_LIGHT) * clamp01(d / 40);
+    }
+    // aurora: curtains of vertical rays standing on the limb, spread along the arc in frame
+    const nCurt = arcN > 6 ? AUR_CURTAINS : 0;
+    const nRays = nCurt * AUR_RAYS, nAur = nRays * AUR_DOTS;
+    const rayTh = new Float32Array(nRays), rayPh = new Float32Array(nRays), rayAmp = new Float32Array(nRays);
+    const aRay = new Uint16Array(nAur), aS = new Float32Array(nAur), aA = new Float32Array(nAur), aJ = new Float32Array(nAur);
+    for (let c = 0; c < nCurt; c++) {
+      const slot = Math.min(arcN - 1, Math.floor(((c + 0.5 + (r() - 0.5) * 0.7) / nCurt) * arcN));
+      const cb = arcList[slot] + r(), cth = (cb / NB) * TAU - Math.PI, wth = (0.045 + 0.07 * r()) * (1000 / R), hgt = (60 + 90 * r()) * zs;
+      for (let q = 0; q < AUR_RAYS; q++) {
+        const ri = c * AUR_RAYS + q;
+        rayTh[ri] = cth + gaussL() * wth * 0.5; rayPh[ri] = r() * TAU; rayAmp[ri] = 0.45 + 0.55 * r();
+        const h = hgt * (0.55 + 0.45 * r());
+        for (let j = 0; j < AUR_DOTS; j++) {
+          const k = ri * AUR_DOTS + j;
+          aRay[k] = ri; aS[k] = Math.min(h, -h * 0.42 * Math.log(1 - 0.995 * r())); aA[k] = AUR_A * (0.6 + 0.8 * r()); aJ[k] = gaussL() * 1.3 * zs;
+        }
+      }
+    }
+    yield;
+
+    // ---- sky and body: one big buffer = accumulator | padding | pre-rendered layer | padding. The layer holds the dark body
+    // inside the disc and the nebulae and galaxies outside it (they never overlap), so one pass of copies seeds a frame.
+    const M = Math.ceil(SKY_DRIFT * zs) + 3;
+    const accLen = W * H * 2, pad = 2 * W * (M + 2), skyOff = accLen + pad;
+    const big = new Float32Array(skyOff + accLen + pad);
+    const sky = big.subarray(skyOff, skyOff + accLen);
+    // the dark body: a faint deep-tinted ground, brighter toward the open-sky side and a thin haze at the rim, with grain
+    // so 8-bit steps do not band. It does not turn (the lights do), so it is baked once.
+    if (v.body > 0) {
+      const y0 = Math.max(0, Math.floor(cy - R) - 1), y1 = Math.min(H - 1, Math.ceil(cy + R) + 1);
+      const lx = -0.52 * sgn, ly = -0.42, lz = 0.74;
+      for (let y = y0; y <= y1; y++) {
+        if (((y - y0) & 15) === 0) yield;
+        const dy = y + 0.5 - cy, half = R * R - dy * dy;
+        if (half <= 0) continue;
+        const xa = Math.max(0, Math.floor(cx - Math.sqrt(half)) - 1), xb = Math.min(W - 1, Math.ceil(cx + Math.sqrt(half)) + 1);
+        for (let x = xa; x <= xb; x++) {
+          const dx = x + 0.5 - cx, rp = Math.sqrt(dx * dx + dy * dy), cov = clamp01(R - rp + 0.5);
+          if (cov <= 0) continue;
+          const nx = dx / R, ny = dy / R, nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+          const dir = clamp01(nx * lx + ny * ly + nz * lz);
+          const g = (0.15 + 0.85 * Math.pow(nz, 0.6)) * (0.2 + 0.8 * Math.pow(dir, 1.2)) + 0.9 * Math.exp(-nz / 0.14);
+          const t = BODY_A * v.body * g * cov * (0.6 + 0.8 * r()), k = (y * W + x) * 2;
+          sky[k] = t; sky[k + 1] = t * C_GROUND;
+        }
+      }
+    }
+    yield;
+    const ex = (x) => sstep(0, M + 4, x) * sstep(0, M + 4, W - 1 - x);
+    const discMask = (x, y) => sstep(R + 16 * zs, R + 90 * zs, Math.hypot(x - cx, y - cy));
+    const mx = (f) => (sgn < 0 ? 1 - f : f);
+    const nz = noise3(rng(SEED + 41)), nzT = noise3(rng(SEED + 43));
+    // [centre x, centre y as frame fractions, radii as fractions of H, rotation, dot count, gain, colour A, colour B, noise seed]
+    const NEBULAE = [
+      { fx: 0.07, fy: 0.42, rx: 0.5, ry: 0.34, rot: -0.3, n: 100000, a: 0.034, cA: C_NEBA, cB: C_NEBB, seed: 3.1 },
+      { fx: 0.4, fy: 0.035, rx: 0.62, ry: 0.11, rot: 0.06, n: 60000, a: 0.031, cA: C_NEBB, cB: C_NEBA, seed: 11.7 },
+      { fx: 0.06, fy: 0.9, rx: 0.34, ry: 0.2, rot: 0.2, n: 40000, a: 0.031, cA: C_NEBA, cB: C_NEBB, seed: 23.3 },
+      { fx: 0.7, fy: 0.02, rx: 0.34, ry: 0.07, rot: 0.04, n: 24000, a: 0.027, cA: C_NEBB, cB: C_NEBA, seed: 31.9 },
+      { fx: 0.3, fy: 0.2, rx: 0.4, ry: 0.22, rot: 0.5, n: 40000, a: 0.023, cA: C_NEBB, cB: C_NEBA, seed: 41.3 },
+    ];
+    for (const nb of NEBULAE) {
+      const n0 = Math.round(nb.n * v.nebula * Math.min(1.4, (W * H) / (1440 * 900))), gx = mx(nb.fx) * W, gy = nb.fy * H, rx = nb.rx * H, ry = nb.ry * H;
+      const cr = Math.cos(nb.rot * sgn), sr = Math.sin(nb.rot * sgn);
+      let done = 0;
+      for (let tries = 0; done < n0 && tries < n0 * 12; tries++) {
+        if ((tries & 2047) === 0) yield;
+        const g = Math.sqrt(-2 * Math.log(1 - 0.98 * r())) * 0.5, an = TAU * r(), ux = g * Math.cos(an) * rx, uy = g * Math.sin(an) * ry;
+        const x = gx + ux * cr - uy * sr, y = gy + ux * sr + uy * cr;
+        if (x < 0 || x >= W || y < 0 || y >= H) continue;
+        const q = H * 0.2, n1 = nz(x / q + nb.seed, y / q, 0.37), n2 = nz((x * 2.7) / q, (y * 2.7) / q + nb.seed, 1.9);
+        const f = Math.pow(clamp01(0.5 + 0.85 * n1 + 0.25 * n2), 1.7);
+        if (r() > f) continue;
+        const m = discMask(x, y) * ex(x);
+        if (m <= 0.01) continue;
+        const tint = clamp01(0.5 + 0.9 * nzT(x / (0.5 * H) + nb.seed, y / (0.5 * H), 0.9));
+        splat(sky, W, H, x, y, nb.a * v.nebula * (0.6 + 0.8 * r()) * m, nb.cA + (nb.cB - nb.cA) * tint);
+        done++;
+      }
+    }
+    // galaxies: spirals with a hint of arms and a dust lane, and ellipticals
+    const GALAXIES = [
+      { fx: 0.06, fy: 0.25, size: 100, q: 0.92, ang: 0.42, spiral: true, n: 40000, a: 0.1 },
+      { fx: 0.085, fy: 0.8, size: 82, q: 0.6, ang: -0.5, spiral: true, n: 26000, a: 0.1 },
+      { fx: 0.31, fy: 0.05, size: 46, q: 0.55, ang: 0.3, spiral: false, n: 7000, a: 0.1 },
+      { fx: 0.028, fy: 0.64, size: 60, q: 0.24, ang: 0.15, spiral: true, n: 14000, a: 0.1 },
+      { fx: 0.16, fy: 0.46, size: 40, q: 0.45, ang: -0.8, spiral: false, n: 5600, a: 0.1 },
+      { fx: 0.64, fy: 0.045, size: 34, q: 0.34, ang: -0.2, spiral: true, n: 8000, a: 0.1 },
+      { fx: 0.15, fy: 0.12, size: 24, q: 0.7, ang: 1.1, spiral: true, n: 3600, a: 0.1 },
+      { fx: 0.07, fy: 0.95, size: 22, q: 0.5, ang: 0.2, spiral: false, n: 2000, a: 0.1 },
+    ];
+    for (const gal of GALAXIES) {
+      const gx = mx(gal.fx) * W, gy = gal.fy * H, size = gal.size * zs, ang = gal.ang * sgn, ca = Math.cos(ang), sa = Math.sin(ang);
+      const nG = Math.round(gal.n * v.nebula);
+      for (let k = 0; k < nG; k++) {
+        if ((k & 1023) === 0) yield;
+        let ux, uy, bulge = false, arm = 0;
+        if (r() < 0.14) { ux = gaussL() * 0.1 * size; uy = gaussL() * 0.1 * size; bulge = true; }
+        else if (gal.spiral) {
+          const rad = -size * 0.3 * (Math.log(1 - 0.995 * r()) + Math.log(1 - 0.995 * r())), th0 = TAU * r(); // an exponential disc: finite in the middle
+          arm = 0.5 + 0.5 * Math.cos(2 * (th0 - 1.9 * Math.log(1 + rad / (0.18 * size))));
+          if (rad > size * 1.5 || r() > 0.08 + 0.92 * arm * arm) continue;
+          ux = rad * Math.cos(th0); uy = rad * Math.sin(th0);
+        } else { const rad = size * 0.4 * Math.pow(Math.abs(gaussL()), 1.35), th0 = TAU * r(); ux = rad * Math.cos(th0); uy = rad * Math.sin(th0); }
+        uy *= gal.q;
+        if (gal.spiral && gal.q < 0.5 && Math.abs(uy) < 0.04 * size && Math.abs(ux) < 0.8 * size && r() < 0.75) continue; // dust lane (edge-on ones)
+        const x = gx + ux * ca - uy * sa, y = gy + ux * sa + uy * ca;
+        const m = discMask(x, y) * ex(x);
+        if (m <= 0.01) continue;
+        splat(sky, W, H, x, y, gal.a * v.nebula * (bulge ? 0.3 : 0.55) * (0.6 + 0.8 * r()) * m, bulge ? C_GALAXY : C_GALAXY + (C_NEBA - C_GALAXY) * 0.65 * arm);
+      }
+    }
+    // the rows to copy straight (the body) and the ones to copy with the sky's drift: the disc, with a margin the drift cannot reach into
+    const segL = new Int16Array(H), segR = new Int16Array(H);
+    for (let y = 0; y < H; y++) {
+      const dy = y - cy, rr = R + M + 2;
+      if (Math.abs(dy) >= rr) { segL[y] = W; segR[y] = W; continue; }
+      const half = Math.sqrt(rr * rr - dy * dy);
+      segL[y] = Math.max(0, Math.min(W, Math.floor(cx - half))); segR[y] = Math.max(0, Math.min(W, Math.ceil(cx + half)));
+    }
+    yield;
+
+    // stars: a few thousand points of varied magnitude and colour temperature, a faint band of extra density, a few with spikes
+    const sXs = [], sYs = [], sAs = [], sCs = [], sPs = [], sLs = [];
+    const bandD = (x, y) => { const ax = mx(0.0) * W, ay = 0.95 * H, bx = mx(0.62) * W, by = 0.0 * H, dx = bx - ax, dy = by - ay; return Math.abs((x - ax) * dy - (y - ay) * dx) / Math.hypot(dx, dy); };
+    const nStarsMain = Math.round(STARS * Math.min(1.5, (W * H) / (1440 * 900)));
+    const bright = [];
+    for (let tries = 0; sXs.length < nStarsMain && tries < nStarsMain * 8; tries++) {
+      const x = r() * W, y = r() * H;
+      if (Math.hypot(x - cx, y - cy) < R + 3) continue;
+      if (r() > 0.55 + 0.6 * Math.exp(-((bandD(x, y) / (0.2 * H)) ** 2))) continue;
+      const u = r(), a = 0.09 + 0.91 * Math.pow(u, 3.4), temp = Math.pow(r(), 1.2);
+      if (a > 0.72 && bright.length < 18) bright.push(sXs.length);
+      sXs.push(x); sYs.push(y); sAs.push(a); sCs.push(C_STAR0 + (C_STAR1 - C_STAR0) * temp); sPs.push((r() * 256) | 0); sLs.push(a > 0.45 ? 2 : a > 0.2 ? 1 : 0);
+    }
+    for (const b of bright) { // diffraction spikes: short dim arms that twinkle with their star
+      for (let arm = 0; arm < 4; arm++) for (let q = 1; q <= 3; q++) {
+        const d = q * 2.3 * zs, ca = Math.cos((arm * Math.PI) / 2), sa = Math.sin((arm * Math.PI) / 2);
+        sXs.push(sXs[b] + d * ca); sYs.push(sYs[b] + d * sa); sAs.push(sAs[b] * 0.17 / q); sCs.push(sCs[b]); sPs.push(sPs[b]); sLs.push(sLs[b]);
+      }
+    }
+    const nStars = sXs.length;
+    return {
+      W, H, cx, cy, R, zs, om: OMEGA * ang, L, E, A,
+      nNodes, nodeOff, nodeUv, nodeS, nodeWd, nodeTier, nodeD,
+      nLinks, lkA, lkP, lkOm, lkS, lkDur, lkTier, lkD, lkCyc, lkPh,
+      nNet, ownStart, nX: dXf, nY: dYf, nZ: dZf, nT: dTf, nA: dAf, nC: dCf,
+      oX, oY, oZ, oS, oR,
+      arcBins: Uint16Array.from(arcList),
+      nLimb, lBin, lCos, lSin, lD, lA, lC, lBand, lPh,
+      nBloom, mBin, mCos, mSin, mD, mA, mC,
+      nRays, rayTh, rayPh, rayAmp, nAur, aRay, aS, aA, aJ,
+      nStars, sX: Float32Array.from(sXs), sY: Float32Array.from(sYs), sA: Float32Array.from(sAs), sC: Float32Array.from(sCs), sPh: Uint8Array.from(sPs), sLy: Uint8Array.from(sLs),
+      big, acc: big.subarray(0, accLen), skyOff, segL, segR,
+    };
+  }
+
+  // ---------- per-frame state shared by the draw functions ------------------------------------------------------------
+
+  // The network's state, a pure function of the turn and the clock. A node's age is the time since it rolled over the
+  // entering limb: its lights fade in from its birth delay (hubs first), over a few seconds, and fall back to dark once it
+  // is hidden behind the far limb, so it starts from dark again when it rolls into view (no pop at either limb). A link
+  // draws on from its first node over its own time once that node is lit. Regional and local nodes and links also wait for
+  // the densification clock, anywhere on the globe, and a few local links re-draw on a slow cycle.
+  function updateNet(sc, fr) {
+    const { nNodes, nodeOff, nodeUv, nodeS, nodeWd, nodeTier, nodeD, nLinks, lkA, lkS, lkDur, lkTier, lkD, lkCyc, lkPh } = sc;
+    const { D, ec, act, omul, ageN, uN } = fr;
+    const invOm = ROTATION_PACE / sc.om; // seconds per radian of turn at the unslowed rate: the front rides the surface, so it keeps its width in px and slows with the globe
+    for (let n = 0; n < nNodes; n++) {
+      let u = (D + nodeOff[n]) % TAU;
+      if (u < 0) u += TAU;
+      uN[n] = u;
+      const age = u * invOm;
+      ageN[n] = age;
+      const uv = nodeUv[n], d0 = nodeD[n];
+      let a = sstep(nodeS[n], nodeS[n] + nodeWd[n], age) * (1 - sstep(uv + 0.3, uv + 0.5, u));
+      if (nodeTier[n] > 0) a *= sstep(d0, d0 + 10, ec);
+      act[n] = a * (1 + 0.6 * sstep(d0, d0 + 150, ec)); // up to 1.6: the late towns come in with the densification
+      omul[n] = 1;
+    }
+    for (let e = 0; e < nLinks; e++) {
+      const n = lkA[e];
+      let p = (ageN[n] - lkS[e]) / lkDur[e];
+      p = p < 0 ? 0 : p > 1 ? 1 : p;
+      p *= 1 - sstep(nodeUv[n] + 0.35, nodeUv[n] + 0.55, uN[n]);
+      if (lkTier[e] > 0) { let q = (ec - lkD[e]) / lkDur[e]; q = q < 0 ? 0 : q > 1 ? 1 : q; if (q < p) p = q; }
+      let m = 1;
+      const cyc = lkCyc[e];
+      if (cyc > 0) {
+        const s = (ec + lkPh[e]) % cyc;
+        let q = s / lkDur[e]; q = q > 1 ? 1 : q;
+        if (q < p) p = q;
+        m = 1 - sstep(cyc - 4, cyc, s);
+      }
+      act[nNodes + e] = p * p * (3 - 2 * p);
+      omul[nNodes + e] = m;
+    }
+  }
+
+  // The network dots: each dot is owned by a node or a link and is visible while the owner's activation exceeds the dot's
+  // own t (cluster dots bloom in, link dots draw on from their first node, the head a little brighter). Dots near the limb
+  // also feed the horizon bloom.
+  function drawNet(sc, fr, ownFrom, ownTo) {
+    const { W, H, cx, cy, R, L, E, A, nNodes, nX, nY, nZ, nT, nA, nC, ownStart, oX, oY, oZ, oS, oR, acc } = sc;
+    const { cN, sN, act, omul, lights, gStroke, limbL } = fr;
+    const Lz = L[2], Ez = E[2], Az = A[2];
+    const RLx = R * L[0], RLy = R * L[1], REx = R * E[0], REy = R * E[1], RAx = R * A[0], RAy = R * A[1];
+    const xMax = W - 2, yMax = H - 2, nbk = NB / TAU, gain = lights * gStroke;
+    for (let o = ownFrom; o < ownTo; o++) {
+      const a = act[o];
+      if (a <= 0) continue; // an owner that is not lit yet costs one test, not one per dot
+      const x0 = oX[o], y0 = oY[o], z0 = oZ[o], xc = x0 * cN - y0 * sN, yc = y0 * cN + x0 * sN;
+      if (Lz * xc + Ez * yc + Az * z0 < -oS[o]) continue; // all of it is behind the limb
+      const Xc = cx + RLx * xc + REx * yc + RAx * z0, Yc = cy + RLy * xc + REy * yc + RAy * z0, m = oR[o];
+      if (Xc < -m || Xc > W + m || Yc < -m || Yc > H + m) continue; // or off the frame
+      const link = o >= nNodes, slope = link ? LINK_SLOPE : NODE_SLOPE, mul = gain * omul[o], head = link && a < 0.999;
+      for (let i = ownStart[o], end = ownStart[o + 1]; i < end; i++) {
+        const d = a - nT[i];
+        if (d <= 0) continue;
+        let w = d * slope;
+        if (w > 1) w = 1;
+        if (head) { const hb = 1 - d * 14; if (hb > 0) w *= 1 + 1.4 * hb; }
+        const x = nX[i], y = nY[i], z = nZ[i];
+        const xr = x * cN - y * sN, yr = y * cN + x * sN;
+        const X = cx + RLx * xr + REx * yr + RAx * z, Y = cy + RLy * xr + REy * yr + RAy * z;
+        if (X < 1 || Y < 1 || X >= xMax || Y >= yMax) continue;
+        const mu = Lz * xr + Ez * yr + Az * z;
+        if (mu <= 0.02) continue;
+        let wt = nA[i] * w * mul;
+        if (mu < 0.5) {
+          wt *= 1 + 0.9 * Math.exp(-mu * 8); // lights crowd together toward the horizon
+          if (mu < 0.3) {
+            wt *= mu > 0.08 ? 1 : (mu - 0.02) * 16.7; // and wink out into the haze right at the limb
+            if (yr > 0) wt *= 0.65 + 0.35 * (mu / 0.3); // a little dimmer going out over the far limb
+          }
+        }
+        splat(acc, W, H, X, Y, wt, nC[i]);
+        if (mu < 0.3) {
+          const bin = ((Math.atan2(Y - cy, X - cx) + Math.PI) * nbk) | 0;
+          if (bin >= 0 && bin < NB) limbL[bin] += wt;
+        }
+      }
+    }
+  }
+
+  // Wave tables for the airglow bands: a few sines per band around the limb, different wavelengths and speeds.
+  function updateWaves(sc, fr, tm) {
+    const { arcBins } = sc;
+    const wave = fr.wave;
+    for (let bi = 0; bi < BANDS.length; bi++) {
+      const b = BANDS[bi], o = bi * NB;
+      for (let j = 0; j < arcBins.length; j++) {
+        const bin = arcBins[j], th = ((bin + 0.5) / NB) * TAU - Math.PI;
+        wave[o + bin] = 1 + WAVE_AMP * (b.amp[0] * Math.sin(b.m[0] * th - b.om[0] * tm + b.ph[0]) + b.amp[1] * Math.sin(b.m[1] * th - b.om[1] * tm + b.ph[1]) + b.amp[2] * Math.sin(b.m[2] * th - b.om[2] * tm + b.ph[2]));
+      }
+    }
+  }
+
+  // Horizon bloom: smooth the lights that sit near the limb along the limb, so the haze above them follows.
+  function updateBloom(sc, fr) {
+    const { arcBins } = sc;
+    const { limbL, bloomT, tmpL } = fr;
+    for (let pass = 0; pass < 2; pass++) {
+      const src = pass === 0 ? limbL : tmpL, dst = pass === 0 ? tmpL : bloomT;
+      for (let j = 0; j < arcBins.length; j++) {
+        const b = arcBins[j];
+        let s = 0;
+        for (let k = -4; k <= 4; k++) { const q = b + k; if (q >= 0 && q < NB) s += src[q]; }
+        dst[b] = s / 9;
+      }
+    }
+    for (let j = 0; j < arcBins.length; j++) { const b = arcBins[j]; bloomT[b] = 1 - Math.exp(-bloomT[b] * 3.2); }
+  }
+
+  function drawLimb(sc, fr) {
+    const { W, H, cx, cy, R, nLimb, lBin, lCos, lSin, lD, lA, lC, lBand, lPh, acc } = sc;
+    const { wave, glow, shA, shB } = fr;
+    for (let i = 0; i < nLimb; i++) {
+      const w = wave[lBand[i] * NB + lBin[i]], ph = lPh[i];
+      const sh = 1 + SHIM * SIN[(ph + ((ph & 1) ? shA : shB)) & 255];
+      const rr = R + lD[i] * (1 + 1.5 * (w - 1));
+      splat(acc, W, H, cx + rr * lCos[i], cy + rr * lSin[i], lA[i] * w * sh * glow, lC[i]);
+    }
+  }
+
+  function drawBloom(sc, fr) {
+    const { W, H, cx, cy, R, nBloom, mBin, mCos, mSin, mD, mA, mC, acc } = sc;
+    const { bloomT, glow } = fr;
+    for (let i = 0; i < nBloom; i++) {
+      const g = bloomT[mBin[i]];
+      if (g < 0.02) continue;
+      const rr = R + mD[i] * (1 + 0.35 * g);
+      splat(acc, W, H, cx + rr * mCos[i], cy + rr * mSin[i], mA[i] * g * glow, mC[i]);
+    }
+  }
+
+  function drawAurora(sc, fr, tm) {
+    const { W, H, cx, cy, R, nRays, rayTh, rayPh, rayAmp, nAur, aRay, aS, aA, aJ, acc } = sc;
+    const { rayC, rayS, rayB, glow } = fr;
+    for (let q = 0; q < nRays; q++) {
+      const th = rayTh[q] + 0.02 * Math.sin(tm * 0.31 + rayPh[q]) + 0.011 * Math.sin(tm * 0.67 + 2.3 * rayPh[q]);
+      rayC[q] = Math.cos(th); rayS[q] = Math.sin(th);
+      const f = 0.55 + 0.45 * Math.sin(tm * 0.43 + 1.9 * rayPh[q]);
+      rayB[q] = rayAmp[q] * f * f;
+    }
+    for (let i = 0; i < nAur; i++) {
+      const q = aRay[i], rr = R + aS[i];
+      splat(acc, W, H, cx + rr * rayC[q] - aJ[i] * rayS[q], cy + rr * rayS[q] + aJ[i] * rayC[q], aA[i] * rayB[q] * glow, C_AURORA);
+    }
+  }
+
+  // Stars: positions drift on slow bounded orbits (three depth layers), brightness twinkles on a hashed phase and one of
+  // four rates, the brightest are soft round blobs. Hidden behind the planet.
+  function drawStars(sc, fr) {
+    const { W, H, cx, cy, R, nStars, sX, sY, sA, sC, sPh, sLy, acc } = sc;
+    const { twIdx, dx, dy, stars } = fr;
+    const n = Math.min(nStars, Math.floor(nStars * stars));
+    const ro2 = (R - 1) * (R - 1);
+    for (let i = 0; i < n; i++) {
+      const ly = sLy[i], X = sX[i] + dx[ly], Y = sY[i] + dy[ly];
+      const ddx = X - cx, ddy = Y - cy;
+      if (ddx * ddx + ddy * ddy < ro2) continue;
+      const a = sA[i], ph = sPh[i];
+      const w = a * (1 + (a > 0.45 ? TWINKLE[0] : TWINKLE[1]) * SIN[(ph + twIdx[ph & 3]) & 255]);
+      if (a > 0.45) blob(acc, W, H, X, Y, w, sC[i]);
+      else splat(acc, W, H, X, Y, w, sC[i]);
+    }
+  }
+
+  // Seed the accumulator: the pre-rendered layer outside the disc is shifted by a whole-pixel drift (the sky), inside it is
+  // copied as is (the body). The three copies per row cover every pixel, so nothing needs clearing.
+  function copyLayers(sc, ox, oy) {
+    const { W, H, big, skyOff, segL, segR } = sc;
+    const shift = (oy * W + ox) * 2;
+    for (let y = 0; y < H; y++) {
+      const row = y * W * 2, l = segL[y], rg = segR[y];
+      if (l > 0) big.copyWithin(row, skyOff + row + shift, skyOff + row + shift + l * 2);
+      if (rg > l) big.copyWithin(row + l * 2, skyOff + row + l * 2, skyOff + row + rg * 2);
+      if (rg < W) big.copyWithin(row + rg * 2, skyOff + row + rg * 2 + shift, skyOff + row + W * 2 + shift);
+    }
+  }
+
+  // ---------- paint: light -> pixels --------------------------------------------------------------------------------
+  function paint(acc, u32, from, to, lut, ground, gain) {
+    const lv = (LEVELS - 1) / LMAX, cs = CS - 1;
+    for (let i = from, j = from * 2; i < to; i++, j += 2) {
+      const t = acc[j];
+      if (t < 0.0004) { u32[i] = ground; continue; }
+      let vv = t * gain;
+      if (vv > LMAX) vv = LMAX;
+      u32[i] = lut[(((acc[j + 1] / t) * cs + 0.5) | 0) * LEVELS + ((vv * lv) | 0)];
+    }
+  }
+
+  // ---------- renderer ------------------------------------------------------------------------------------------------
+  // One renderer per scene. `v` is the live values object, read on every frame. The colour table is rebuilt only when
+  // a palette value moves; there is no cross-fade, since the palette is a set of sliders and should land at once.
+
+  function createRenderer(sc, out, v) {
+    const lut = new Uint32Array(CS * LEVELS);
+    let lutKey = '', ground = 0;
+    const ensureLut = () => {
+      const key = `${v.hue},${v.hueB},${v.saturation},${v.colorMode},${v.invert}`;
+      if (key !== lutKey) { lutKey = key; buildLut(v, lut); ground = lut[0]; }
+    };
+    const nAct = sc.nNodes + sc.nLinks;
+    const fr = {
+      D: 0, ec: 0, cN: 1, sN: 0,
+      gStroke: 1, glow: 1, lights: 1, stars: 1,
+      wave: new Float32Array(BANDS.length * NB).fill(1), limbL: new Float32Array(NB), bloomT: new Float32Array(NB), tmpL: new Float32Array(NB),
+      shA: 0, shB: 0, twIdx: new Int32Array(4), dx: new Float32Array(3), dy: new Float32Array(3),
+      rayC: new Float32Array(sc.nRays), rayS: new Float32Array(sc.nRays), rayB: new Float32Array(sc.nRays),
+      act: new Float32Array(nAct), omul: new Float32Array(nAct), ageN: new Float32Array(sc.nNodes), uN: new Float32Array(sc.nNodes),
+    };
+
+    // Packets: a few slow, dim pulses walking links that are fully drawn. State is preallocated.
+    const pkRng = rng(SEED + 7);
+    const pkOn = new Uint8Array(PK_MAX), pkDir = new Int8Array(PK_MAX), pkLink = new Uint16Array(PK_MAX);
+    const pkS = new Float32Array(PK_MAX), pkV = new Float32Array(PK_MAX);
+    let nextSpawn = PK_GAP[0], lastEc = -1;
+    let cands = new Uint16Array(0);
+    const spawnPacket = () => {
+      let slot = -1;
+      for (let k = 0; k < PK_MAX; k++) if (!pkOn[k]) { slot = k; break; }
+      if (slot < 0 || sc.nLinks === 0) return;
+      if (cands.length < sc.nLinks) cands = new Uint16Array(sc.nLinks);
+      const { W, H, cx, cy, R, L, E, A, lkP, nNodes } = sc;
+      const { cN, sN, act, omul } = fr;
+      const minLen = sc.om / OMEGA; // = ang: the 2.6 degrees of the design-size globe, in this globe's angle
+      let n = 0;
+      for (let e = 0; e < sc.nLinks; e++) {
+        if (act[nNodes + e] < 0.999 || omul[nNodes + e] < 0.95 || sc.lkOm[e] < 0.045 * minLen) continue; // finished links 23 px (design size) or longer: long enough to watch
+        const x = lkP[e * 6] + lkP[e * 6 + 3], y = lkP[e * 6 + 1] + lkP[e * 6 + 4], z = lkP[e * 6 + 2] + lkP[e * 6 + 5], ml = Math.hypot(x, y, z) || 1;
+        const xr = (x * cN - y * sN) / ml, yr = (y * cN + x * sN) / ml, zz = z / ml;
+        const X = cx + R * (L[0] * xr + E[0] * yr + A[0] * zz), Y = cy + R * (L[1] * xr + E[1] * yr + A[1] * zz);
+        if (L[2] * xr + E[2] * yr + A[2] * zz > 0.3 && X > 0.04 * W && X < 0.96 * W && Y > 0.04 * H && Y < 0.96 * H) cands[n++] = e;
+      }
+      if (!n) { nextSpawn = 0.5; return; }
+      pkOn[slot] = 1; pkLink[slot] = cands[(pkRng() * n) | 0]; pkDir[slot] = pkRng() < 0.5 ? 1 : -1;
+      pkS[slot] = 0; pkV[slot] = ((PK_V[0] + (PK_V[1] - PK_V[0]) * pkRng()) * sc.zs) / sc.R; // rad/s along the link
+    };
+    const stepPackets = (dt) => {
+      for (let k = 0; k < PK_MAX; k++) {
+        if (!pkOn[k]) continue;
+        pkS[k] += (pkV[k] * dt) / sc.lkOm[pkLink[k]];
+        if (pkS[k] >= 1 || fr.act[sc.nNodes + pkLink[k]] < 0.5 || fr.omul[sc.nNodes + pkLink[k]] < 0.6) pkOn[k] = 0;
+      }
+      nextSpawn -= dt;
+      if (nextSpawn <= 0) { nextSpawn = PK_GAP[0] + (PK_GAP[1] - PK_GAP[0]) * pkRng(); spawnPacket(); }
+    };
+    const drawPackets = () => {
+      const { W, H, cx, cy, R, L, E, A, lkP, lkOm, acc } = sc;
+      const { cN, sN } = fr;
+      for (let k = 0; k < PK_MAX; k++) {
+        if (!pkOn[k]) continue;
+        const e = pkLink[k], om = lkOm[e], so = Math.sin(om) || 1e-6;
+        const f = pkDir[k] > 0 ? 0 : 3, g = pkDir[k] > 0 ? 3 : 0;
+        const p = pkS[k], env = sstep(0, 0.14, p) * sstep(1, 0.86, p) * fr.omul[sc.nNodes + e];
+        for (let j = 0; j < 8; j++) {
+          const t = p - (j * 0.0075) / om;
+          if (t < 0) break;
+          const sa = Math.sin((1 - t) * om) / so, sb = Math.sin(t * om) / so;
+          const x = sa * lkP[e * 6 + f] + sb * lkP[e * 6 + g], y = sa * lkP[e * 6 + f + 1] + sb * lkP[e * 6 + g + 1], z = sa * lkP[e * 6 + f + 2] + sb * lkP[e * 6 + g + 2];
+          const xr = x * cN - y * sN, yr = y * cN + x * sN;
+          const mu = L[2] * xr + E[2] * yr + A[2] * z;
+          if (mu < 0.06) continue;
+          const X = cx + R * (L[0] * xr + E[0] * yr + A[0] * z), Y = cy + R * (L[1] * xr + E[1] * yr + A[1] * z);
+          blob(acc, W, H, X, Y, PK_A * env * Math.pow(0.62, j) * sstep(0.04, 0.3, mu) * fr.lights, C_HOT);
+        }
+      }
+    };
+
+    // ec: the clock the turn, growth and packets ride (seconds x Speed); tm: the clock of the secondary motion
+    // (seconds x Motion). `turn` adds radians to the turn: only the reduced-motion still uses it.
+    function* steps(ec, tm, chunks, turn) {
+      ensureLut();
+      const D = START_TURN + ec * sc.om + v.phase * TAU + turn;
+      fr.D = D; fr.ec = ec; fr.cN = Math.cos(D); fr.sN = Math.sin(D);
+      fr.gStroke = 0.55 + 0.45 * v.stroke; fr.glow = v.glow; fr.lights = v.lights; fr.stars = v.stars;
+      fr.shA = (tm * 90) | 0; fr.shB = (tm * 150) | 0;
+      fr.twIdx[0] = (tm * 73) | 0; fr.twIdx[1] = (tm * 56) | 0; fr.twIdx[2] = (tm * 43) | 0; fr.twIdx[3] = (tm * 35) | 0;
+      for (let ly = 0; ly < 3; ly++) {
+        fr.dx[ly] = DRIFT[ly] * sc.zs * Math.sin((TAU * tm) / DRIFT_T[ly] + ly * 1.7);
+        fr.dy[ly] = DRIFT[ly] * 0.6 * sc.zs * Math.sin((TAU * tm) / (DRIFT_T[ly] * 1.37) + ly * 2.9 + 0.8);
+      }
+      const dt = lastEc < 0 ? 0 : Math.min(0.25, Math.max(0, ec - lastEc)); lastEc = ec;
+      const ox = Math.round(SKY_DRIFT * sc.zs * 0.95 * Math.sin((TAU * tm) / 310 + 0.6)), oy = Math.round(SKY_DRIFT * sc.zs * 0.5 * Math.sin((TAU * tm) / 410 + 2.2));
+      copyLayers(sc, ox, oy);
+      fr.limbL.fill(0);
+      drawStars(sc, fr);
+      if (chunks) yield;
+      updateNet(sc, fr);
+      const nn = chunks ? 4 : 1;
+      const nOwn = sc.nNodes + sc.nLinks;
+      for (let k = 0; k < nn; k++) { drawNet(sc, fr, Math.floor((nOwn * k) / nn), Math.floor((nOwn * (k + 1)) / nn)); if (chunks) yield; }
+      stepPackets(dt); drawPackets();
+      updateWaves(sc, fr, tm); updateBloom(sc, fr);
+      drawLimb(sc, fr); drawBloom(sc, fr); drawAurora(sc, fr, tm);
+      if (chunks) yield;
+      const n = sc.W * sc.H, np = chunks ? 4 : 1;
+      for (let k = 0; k < np; k++) { paint(sc.acc, out, Math.floor((n * k) / np), Math.floor((n * (k + 1)) / np), lut, ground, v.opacity * DARK_GAIN); if (chunks) yield; }
+    }
+    return {
+      /** The pixel (as r, g, b text) and light level the table gives a dot of colour class c and weight a. */
+      pixel(c, a) {
+        ensureLut();
+        let l = a * v.opacity * DARK_GAIN; if (l > LMAX) l = LMAX;
+        const p = lut[((c * (CS - 1) + 0.5) | 0) * LEVELS + ((l * (LEVELS - 1) / LMAX) | 0)];
+        return { level: l, rgb: `rgb(${p & 255},${(p >> 8) & 255},${(p >> 16) & 255})` };
+      },
+      /** One frame at clocks (ec, tm), drawn into `out`. */
+      frame(ec, tm, turn = 0) { steps(ec, tm, false, turn).next(); },
+      /** The same frame as a generator that pauses between pieces of work (each a few ms), for a cold first frame. */
+      frameChunks(ec, tm, turn = 0) { return steps(ec, tm, true, turn); },
+    };
+  }
+  // </core>
+
+  // <page>
+
+  // ---------- controls ---------------------------------------------------------------------------------------------
+  // The five presets, tuned by eye with `node tools/preset-sheet.mjs signal-sphere`. Build-time values (scale, density,
+  // land, nebula, body) rebuild the scene a moment after they land; the rest apply on the next frame.
+  const PRESETS = {
+    whisper: { opacity: 0.75, stroke: 0.7, density: 0.5, lights: 0.55, stars: 0.5, nebula: 0.15, glow: 0.45 },
+    ink:     { opacity: 1, stroke: 1.5, lights: 1.5, glow: 0.2, body: 0, nebula: 0.25, saturation: 0 },
+    neon:    { saturation: 0.8, glow: 1.25, lights: 1.2, nebula: 0.8 },
+    drift:   { speed: 0.4, motion: 1.8, density: 0.7, lights: 0.8, scale: 1.25, nebula: 0.5, phase: 0.6 },
+    dense:   { opacity: 1, density: 1, land: 0.36, lights: 1.15, nebula: 1, stars: 1, body: 1, glow: 1 },
+  };
+
+  let dirty = true; // a value moved: redraw (the reduced-motion still only draws when this is set)
+  const baked = window.__LF_BAKED_VALUES__;
+  const panel = baked ? null : createControlPanel({
+    pieceId: PIECE_ID,
+    presets: PRESETS,
+    onChange: () => { dirty = true; },
+    extraControls: [
+      // Which bottom corner the planet takes; the open sky is the other side.
+      { name: 'side', label: 'Side', type: 'select', options: ['right', 'left'], default: 'right', category: 'form' },
+      // Land fraction of the surface: more continents, more places for the network to grow.
+      { name: 'land', label: 'Land', type: 'range', min: 0.1, max: 0.6, step: 0.01, default: 0.28, category: 'form' },
+      // City-light and link gain (the dots are the same, only brighter or fainter).
+      { name: 'lights', label: 'Lights', type: 'range', min: 0, max: 2, step: 0.01, default: 1, category: 'ink' },
+      // The planet's own faint tint and rim haze. From about 0.8 the tint is bright enough to count as ink over the whole disc.
+      { name: 'body', label: 'Body', type: 'range', min: 0, max: 2, step: 0.01, default: 0.15, category: 'ink' },
+      // Share of the starfield drawn.
+      { name: 'stars', label: 'Stars', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45, category: 'ink' },
+      // Nebula and galaxy gain.
+      { name: 'nebula', label: 'Nebula', type: 'range', min: 0, max: 2, step: 0.01, default: 0.2, category: 'ink' },
+    ],
+    // City lights: sodium orange to deep blue. Saturation 0 hides the pair until someone raises it or picks neon.
+    // Two more pairs from the same design, to try with Color A / Color B: 216 -> 250 (blue hour), 326 -> 262 (violet).
+    defaults: { hue: 36, hueB: 214, saturation: 0, scale: 1, opacity: 0.85, density: 0.5, glow: 0.9, colorMode: 'gradient', colorA: '#ff9900', colorB: '#006eff' },
+  });
+  const currentValues = baked || panel.values;
+
+  // ---------- the page: build in slices, draw, follow the window ---------------------------------------------------------
+  const PIXEL_CAP = 1.3e6; // canvas px: a larger viewport renders smaller and the CSS upscales it
+  const MAX_FPS = 30;
+  const SLICE_MS = 10; // longest stretch of scene-build work before yielding back to the browser
+  const HOLD_MS = 150; // how long a build-time value must hold before the scene is rebuilt
+  const STILL_T = 200; // reduced motion: seconds into the growth the single frame is taken at
+
+  let world = null; // the land texture: independent of the canvas size, built once per page
+  let scene = null, renderer = null, img = null, liveKey = ''; // what is on the canvas
+  let build = null; // the scene being built, in slices: { key, gen }
+  let hold = { key: '', since: 0 };
+  let want = { W: 0, H: 0 }; // the canvas size the viewport asks for
+  let ec = 0, tm = 0, sinceDraw = 0; // the two clocks (see steps()), and time since the last frame drawn
+  let reduced = prefersReducedMotion();
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener?.('change', (e) => { reduced = e.matches; dirty = true; });
+
+  // Canvas px per CSS px: sharp on a dense display, never below 1 (a zoomed-out page or a half-scale capture builds the
+  // same scene), and capped so a very large window renders smaller.
+  function sizeFor({ width, height, dpr }) {
+    const k = Math.min(Math.max(1, dpr), 1.5, Math.sqrt(PIXEL_CAP / (width * height)));
+    want = { W: Math.max(2, Math.round(width * k)), H: Math.max(2, Math.round(height * k)) };
+  }
+  const resizer = createResizeBatcher(document.body, sizeFor, 1.5);
+  resizer.evaluate();
+
+  // What forces a new scene: the canvas size and the build-time values.
+  const keyOf = (v) => [want.W, want.H, v.scale, v.angle, v.density, v.side, v.land, v.nebula, v.body].join();
+
+  // The clocks a frame is drawn at. Reduced motion pins them, so there is one still frame, grown in; the turn is put
+  // back by what ROTATION_PACE takes off, so the still shows the face a full-pace turn would have reached by then.
+  function clocksFor(sc) {
+    const v = currentValues;
+    if (!reduced) return [ec, tm, 0];
+    const e = STILL_T * v.speed;
+    return [e, STILL_T * v.motion, e * sc.om * (1 / ROTATION_PACE - 1)];
+  }
+
+  // Everything a new scene needs, in slices: the texture (once), the scene, the renderer and a first frame (itself drawn
+  // in pieces, since a cold first frame is the slowest). Swapping it in afterwards is cheap.
+  function* buildAll(key, W, H, snap) {
+    const w = world || (yield* buildWorld());
+    const sc = yield* buildScene(w, W, H, snap);
+    yield;
+    const image = new ImageData(W, H);
+    const rd = createRenderer(sc, new Uint32Array(image.data.buffer), currentValues);
+    yield;
+    yield* rd.frameChunks(...clocksFor(sc));
+    return { key, W, H, world: w, scene: sc, renderer: rd, img: image };
+  }
+
+  // Swap a finished scene in within one task: resizing the canvas clears it, so the prepared frame goes up at once and
+  // no blank frame shows. Until then the old scene keeps drawing, stretched by the CSS.
+  function adopt(p) {
+    canvas.width = p.W; canvas.height = p.H;
+    ctx.putImageData(p.img, 0, 0);
+    world = p.world; scene = p.scene; renderer = p.renderer; img = p.img; liveKey = p.key;
+    sinceDraw = 0; dirty = true;
+  }
+
+  // Resume the build for about SLICE_MS. Called from every frame, which is also what steps it under a manual clock; a
+  // message keeps it going between frames, so a cold build isn't limited to one slice per frame. One message at a time,
+  // so the frames' own calls never stack up a queue of slices that would starve input.
+  let chan = null, queued = false;
+  function kick() {
+    if (queued) return;
+    if (!chan) { chan = new MessageChannel(); chan.port1.onmessage = () => { queued = false; pump(); }; }
+    queued = true;
+    chan.port2.postMessage(0);
+  }
+  function pump() {
+    const b = build;
+    if (!b) return;
+    const t0 = performance.now();
+    for (;;) {
+      const step = b.gen.next();
+      if (step.done) { build = null; adopt(step.value); return; }
+      if (performance.now() - t0 >= SLICE_MS) break;
+    }
+    kick();
+  }
+
+  // Which scene should be on screen: the first one at once, later ones once the value that asked for them has held.
+  function steer(v) {
+    const key = keyOf(v), coming = build ? build.key : liveKey;
+    if (key === coming) { hold.key = ''; return; }
+    if (build && key === liveKey) { build = null; hold.key = ''; return; } // asked for what is already showing
+    const now = performance.now();
+    if (scene || build) {
+      if (hold.key !== key) { hold = { key, since: now }; return; }
+      if (now - hold.since < HOLD_MS) return;
+    }
+    build = { key, gen: buildAll(key, want.W, want.H, { ...v }) };
+    hold.key = '';
+  }
+
+  function drawNow() {
+    renderer.frame(...clocksFor(scene));
+    ctx.putImageData(img, 0, 0);
+    sinceDraw = 0; dirty = false;
+  }
+
+  function onFrame(dt) {
+    resizer.evaluate();
+    const v = currentValues;
+    if (want.W >= 2) steer(v);
+    if (build) pump();
+    if (!scene) return;
+    if (reduced) { if (dirty) drawNow(); return; }
+    // The clocks run only while a scene is on screen, so every run starts its growth from the first frame.
+    ec += dt * v.speed; tm += dt * v.motion;
+    sinceDraw += dt;
+    if (sinceDraw >= 1 / MAX_FPS - 0.002) drawNow();
+  }
+
+  const loop = createLoop({ onFrame });
+  loop.start();
+
+  // SVG export: a capped, evenly sampled share of the dots in the current frame (stars, lights, links, airglow, aurora)
+  // as circles in canvas space, coloured through the same table. The nebulae, the galaxies and the body's grain are
+  // raster, and so is the stipple's accumulated brightness: use PNG for those.
+  const SVG_CAP = 24000;
+  function svgCircles() {
+    if (!renderer) return [];
+    const got = [];
+    sink = got;
+    try { renderer.frame(...clocksFor(scene)); } finally { sink = null; }
+    const lit = [];
+    for (let i = 0; i < got.length; i += 4) {
+      const px = renderer.pixel(got[i + 3], got[i + 2]);
+      if (px.level >= 0.04) lit.push(got[i], got[i + 1], px.rgb);
+    }
+    const n = lit.length / 3, stride = Math.max(1, Math.ceil(n / SVG_CAP)), out = [];
+    for (let i = 0; i < n; i += stride) out.push({ cx: lit[i * 3], cy: lit[i * 3 + 1], r: 0.55, fill: lit[i * 3 + 2], opacity: 1 });
+    return out;
+  }
+
+  document.getElementById('btn-png-2x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 2 }));
+  document.getElementById('btn-png-4x')?.addEventListener('click', () => exportPng(canvas, { multiplier: 4 }));
+  document.getElementById('btn-svg')?.addEventListener('click', () => exportSvg([], { width: canvas.width, height: canvas.height, circles: svgCircles() }));
+  document.getElementById('btn-baked')?.addEventListener('click', () => {
+    bakeHtml({ sourceHtml: document.documentElement.outerHTML, values: panel.values }).catch((err) => console.error('bakeHtml failed', err));
+  });
+  document.getElementById('btn-source')?.addEventListener('click', () => {
+    exportSource().catch((err) => console.error('exportSource failed', err));
+  });
+  document.getElementById('btn-prompt')?.addEventListener('click', () => {
+    describeForAI({ pieceName: PIECE_ID, values: panel.values });
+  });
+</script></body></html>

@@ -384,6 +384,19 @@ review) before merge, not after.
     thin a haze or a starfield to pass. Run `collection-check` on sketches
     before the owner picks one, so the version they approve is one that
     can ship as is.
+  - **`signal-sphere` (2026-10-20):** a sixth Space piece: a very large night
+    planet filling the bottom-right corner, its city lights and links made
+    along the edge that rolls into view and growing denser over the first few
+    minutes, under an airglow limb and a deep-space sky. Its stipple descends
+    from `terminator`. The lesson above applied late and hard: the full look
+    (the `dense` preset) measures 0.72 at thumbnail size, nearly all of it the
+    dark body, the nebulae and the network, so Density, Land, Nebula, Stars,
+    Body, Glow and Opacity ship below it and the default measures 0.140 at
+    the capture, with no override. The gate only sees that first frame. Once
+    the growth has run the default measures 0.16 to 0.21 (clock 120 s, 240 s
+    and 300 s: 0.208, 0.164, 0.213), because the later tiers of the network
+    switch on and a different face turns into view; for the same reason the
+    piece does not loop.
 - **Next series, in order: Old Roads, Weather, Deep sea.** The owner's
   pick (2026-10-15), each run the way the space series was: concepts and
   names checked against the private avoid-list first, a throwaway sketch
@@ -443,7 +456,7 @@ review) before merge, not after.
 Every row is **generated**, not hand-recorded. Run `npm run collection-metrics`
 and paste its output here verbatim; it prints this exact table, already
 sorted by ink. Rebuild thumbnails (`npm run build`) first, because it
-measures the committed PNGs. Refreshed 2026-10-16, after Old Roads.
+measures the committed PNGs. Refreshed 2026-10-20, after signal-sphere.
 
 **Hue is no longer a useful column, and that's success, not a gap.** Every
 piece now reports hue 240 — that's not a real colour, it's the ground's own
@@ -482,6 +495,7 @@ Ink, not hue, is now the axis that tells pieces apart.
 | 240 | 0.12 | 0.00 | 0.138 | `parallax` |
 | 240 | 0.03 | 0.00 | 0.138 | `dust-lane` |
 | 240 | 0.13 | 0.00 | 0.139 | `dark-nebula` |
+| 240 | 0.12 | 0.00 | 0.140 | `signal-sphere` |
 | 240 | 0.08 | 0.00 | 0.141 | `moire` |
 | 240 | 0.05 | 0.00 | 0.142 | `terminator` |
 
