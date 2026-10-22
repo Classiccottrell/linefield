@@ -289,3 +289,12 @@ A pale track winding toward the viewer over dark moonlit moorland in fine stippl
 - **Text-safe zone:** the sky above the horizon, the top 40%
 - **Anchor:** the near road at the foot of the frame, lower centre
 - **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Relief
+
+## Signal Sphere
+
+A very large night planet filling the bottom-right corner in stipple: its city lights and links draw themselves along the edge that rolls into view and keep growing denser, under a shimmering airglow limb and a deep-space sky of stars, nebulae and galaxies.
+
+- **Tags:** grain, depth, celestial, network
+- **Text-safe zone:** the open sky, upper left
+- **Anchor:** the growth front on the upper-left limb, brightest where it meets the bottom edge
+- **Controls:** Scale, Speed, Stroke, Opacity, Saturation, Color Mode, Color A, Color B, Hue, Hue B, Invert, Glow, Angle, Motion, Phase, Density, Side, Land, Lights, Body, Stars, Nebula

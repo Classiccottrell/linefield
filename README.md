@@ -334,6 +334,10 @@ inherits. The delivery log for earlier work is archived in
 All pieces hold 60fps at their default settings on ordinary hardware. The
 two heaviest were measured at their worst case — `relay` at density 2.0
 with reach 200, and `infall` at density 2.0 — and both held 60fps.
+`signal-sphere` is the exception by design: it draws a few hundred thousand
+stipple dots a frame, so it is capped at 30fps and at 1.3 million canvas
+pixels (a larger window is upscaled by CSS), and builds its scene in slices
+of about 10 ms so the page never freezes while it does.
 
 What costs the most, in order:
 
