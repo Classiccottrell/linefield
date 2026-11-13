@@ -34,6 +34,7 @@
   import { createCamera } from '../../shared/project.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createOrbit } from '../../shared/pointer.js';
+  import { createCompanion } from '../../shared/companion.js';
 
   // funnel — a funnel seen from the side: ninety stacked hairline
   // ellipses narrowing down to a point, slowly twisting, with the tip as the
@@ -119,6 +120,39 @@
 
   const camera = createCamera({ fov: 900 });
 
+  // The page current (shared/current.js): when a Forma object shares the
+  // page it hovers in the funnel's mouth, and the pull down the throat is
+  // published so the object's matter is drawn into the well as it comes
+  // apart. Alone, none of this runs.
+  const companion = createCompanion({ canvas });
+  const well = { mx: 0, my: 0, tx: 0, ty: 0, mouth: 1, flare: 1, turn: 1 }; // mouth and tip on screen
+  let infall = 0; // extra spin accumulated while matter is falling in
+  // The flow others on the page see: down the throat toward the tip,
+  // spiralling the way the rings turn, strongest near the axis.
+  function publishedFlow(x, y, out) {
+    const ax = well.tx - well.mx, ay = well.ty - well.my;
+    const len2 = ax * ax + ay * ay || 1;
+    const sRaw = ((x - well.mx) * ax + (y - well.my) * ay) / len2;
+    const s = Math.max(0, Math.min(1, sRaw));
+    const px = well.mx + ax * s, py = well.my + ay * s;
+    const off = Math.hypot(x - px, y - py);
+    // The throat's own radius at this depth. Inside it, matter goes down the
+    // axis; outside it (or above the mouth), it is first gathered to the
+    // mouth, so nothing slides down the outside of the funnel.
+    const throat = well.mouth * Math.pow(1 - s, well.flare) + well.mouth * 0.04;
+    const inside = sRaw < 0 ? 0 : Math.max(0, Math.min(1, 1.6 - off / throat));
+    const aim = Math.min(1, s + 0.3) * inside;
+    let dx = well.mx + ax * aim - x, dy = well.my + ay * aim - y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-3) { out[0] = 0; out[1] = 0; return; }
+    dx /= d; dy /= d;
+    const swirl = 0.5 * (1 - s) * inside * well.turn;
+    const c = Math.cos(swirl), sn = Math.sin(swirl);
+    const m = (0.35 + 0.65 * inside) * Math.min(1, d / (well.mouth * 0.15));
+    out[0] = (dx * c - dy * sn) * m;
+    out[1] = (dx * sn + dy * c) * m;
+  }
+
   // Splits one projected ring into front and back runs. A point is "front"
   // when its perspective scale beats the ring centre's, so the near half of
   // every ellipse can draw brighter than the far half and the stack reads
@@ -184,7 +218,12 @@
     // above 1 it pinches into a trumpet.
     const flareExp = 0.8 + values.flare * 0.9;
     const t = elapsed * values.speed;
-    const spin = (t / SPIN_PERIOD) * Math.PI * 2;
+    // An object on the page. As it comes apart the funnel turns faster and
+    // a band of brightness runs down the throat: matter going in.
+    const body = companion.step();
+    const falling = body ? body.disperse * body.presence : 0;
+    infall += (dt || 0) * values.speed * falling * 0.9;
+    const spin = (t / SPIN_PERIOD) * Math.PI * 2 + infall;
     const twistTotal = values.twist * Math.PI * 1.25;
     const phaseOff = values.phase * Math.PI * 0.8;
     const swayAmp = S * 0.045 * values.motion * size;
@@ -213,6 +252,27 @@
         swayAmp * 0.8 * w * Math.cos(swayT * 0.8 - u * 1.7 + phaseOff),
       ];
     };
+
+    if (body) {
+      // Slide the whole funnel so its mouth sits under the object, which
+      // then rests in it like a stopper.
+      const m0 = camera.project(...axisAt(0));
+      const k = body.presence;
+      camera.set({
+        cx: W / 2 + 0.06 * S + (body.x - m0.x) * k,
+        cy: H / 2 + (body.y + body.r * 0.7 - m0.y) * k,
+      });
+      const m = camera.project(...axisAt(0));
+      const tp = camera.project(...axisAt(1));
+      well.mx = m.x; well.my = m.y; well.tx = tp.x; well.ty = tp.y;
+      well.mouth = Math.max(1, mouth * m.scale);
+      well.turn = values.speed < 0 ? -1 : 1;
+      well.flare = flareExp;
+      companion.field(publishedFlow);
+      const a = paletteHsl(values, 0), b = paletteHsl(values, 1);
+      companion.palette(hslToRgb(a.h, a.s, light), hslToRgb(b.h, b.s, light), !values.invert);
+    }
+    const bandAt = (t * 0.22) % 1;
 
     let tip = null;
     for (let i = 0; i < rings; i++) {
@@ -243,7 +303,11 @@
 
       const { h, s } = paletteHsl(values, u);
       const rgb = hslToRgb(h, s, light);
-      const alphaFront = baseAlpha * (0.7 + 0.3 * u);
+      let alphaFront = baseAlpha * (0.7 + 0.3 * u);
+      if (falling > 0) {
+        const off = Math.abs(((u - bandAt + 1.5) % 1) - 0.5);
+        alphaFront *= 1 + 0.9 * falling * Math.max(0, 1 - off / 0.12);
+      }
       if (values.glow > 0) {
         strokeRuns(front, alphaFront * values.glow * 0.2, lineWidth + values.glow * 2.2, rgb);
       }

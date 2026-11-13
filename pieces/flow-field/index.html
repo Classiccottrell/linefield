@@ -32,6 +32,7 @@
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
   import { simplex2 } from '../../shared/noise.js';
+  import { createCompanion } from '../../shared/companion.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
   import { createResizeBatcher } from '../../shared/resize.js';
 
@@ -55,6 +56,10 @@
   // shorter trails, and a full clear each frame (see drawFrame) so trails
   // never accumulate brightness across frames under `lighter`, only within
   // one frame where paths actually cross.
+  // The page current (shared/current.js): when a Forma object shares the
+  // page it sits in this piece's quiet void, and the flow is published so its
+  // particles ride the same current. Alone, none of this does anything.
+  const companion = createCompanion({ canvas });
   const BASE_COUNT = 580;
   const TRAIL_MAX = 40; // points captured per particle; also the ink budget
   let particles = [];
@@ -95,8 +100,33 @@
     };
   }
 
-  function particleCount(values) {
-    return Math.round(BASE_COUNT * values.density * frameOf(values.scale).count);
+  // With an object on the page, the void becomes the space that object
+  // occupies: centred on it and just clear of its edge, with the ring at its
+  // usual proportion around it. As the object comes apart (disperse -> 1) the
+  // void closes and the lines run through where it stood. `presence` eases
+  // the whole reframing in and out, so at 0 this returns `f` untouched.
+  function frameAround(f, body, width, height) {
+    if (!body) return f;
+    const r = Math.min(width, height);
+    const full = (body.r * 1.12) / (VOID_R * r);
+    const open = full * (1 - 0.8 * body.disperse);
+    const ring = Math.max(1, full * 0.78);
+    const k = body.presence;
+    const mix = (a, b) => a + (b - a) * k;
+    return {
+      x: mix(f.x, body.x / width),
+      y: mix(f.y, body.y / height),
+      ex: mix(f.ex, ring),
+      ey: mix(f.ey, ring),
+      v: mix(f.v, Math.max(0.05, open)),
+      count: mix(f.count, Math.min(2.4, Math.max(1, ring * 0.9))),
+    };
+  }
+  let liveFrame = null; // the frame last drawn, for the published field
+  let liveElapsed = 0;
+
+  function particleCount(values, f = frameOf(values.scale)) {
+    return Math.round(BASE_COUNT * values.density * f.count);
   }
 
   function maskValue(x, y, width, height, f) {
@@ -192,6 +222,16 @@
     return current + n * 0.9 + (values.angle * Math.PI) / 180;
   }
 
+  // The flow as others on the page see it: the same direction the lines
+  // take, full strength in the ring and a slower drift outside it.
+  const CURSOR_PULL = 150; // px/s at the cursor's full strength
+  function publishedFlow(x, y, out) {
+    const a = fieldAngle(x, y, liveElapsed, currentValues);
+    const m = 0.35 + 0.65 * maskValue(x, y, canvas.width, canvas.height, liveFrame);
+    out[0] = Math.cos(a) * m;
+    out[1] = Math.sin(a) * m;
+  }
+
   function drawFrame(dt, elapsed, values) {
     const W = canvas.width, H = canvas.height;
     const light = values.invert ? 0.14 : 0.86 - 0.24 * values.saturation;
@@ -218,10 +258,14 @@
     // 90px/s already clears displacement-over-stroke-width by a wide margin.
     const lineWidth = 0.4 + values.stroke * 0.5;
     const baseAlpha = values.opacity * (values.invert ? 0.42 : 0.32);
-    const f = frameOf(values.scale);
+    const body = companion.step();
+    const f = frameAround(frameOf(values.scale), body, W, H);
+    liveFrame = f; liveElapsed = elapsed;
+    companion.field(publishedFlow);
+    companion.palette([r, g, b], [rB, gB, bB], !values.invert);
     // Scale changes the count without a reseed, so dragging it tops up or
     // trims the field instead of wiping every trail at once.
-    const want = particleCount(values);
+    const want = particleCount(values, f);
     while (particles.length < want) particles.push(spawn(f));
     if (particles.length > want) particles.length = want;
 
@@ -231,8 +275,11 @@
       const m = maskValue(p.x, p.y, W, H, f);
       const angle = fieldAngle(p.x, p.y, elapsed, values);
       const speed = 90 * values.speed * (dt || 0.016);
-      const nx = p.x + Math.cos(angle) * speed;
-      const ny = p.y + Math.sin(angle) * speed;
+      // The cursor's pull, in the modes the object's own particles obey
+      // (zero unless an object shares the page).
+      const pull = companion.cursor(p.x, p.y);
+      const nx = p.x + Math.cos(angle) * speed + pull[0] * CURSOR_PULL * (dt || 0.016);
+      const ny = p.y + Math.sin(angle) * speed + pull[1] * CURSOR_PULL * (dt || 0.016);
 
       if (m > 0) p.trail.push([p.x, p.y]);
       if (p.trail.length > TRAIL_MAX) p.trail.shift();

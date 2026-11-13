@@ -27,6 +27,12 @@ jobs:
       - name: Verify manifest
         run: npm run verify
 
+      # The page current (shared/current.js): the contract shared verbatim
+      # with Forma. Plain node, no browser; also pins the file's hash so it
+      # cannot drift from Forma's copy unnoticed.
+      - name: Test the page current contract
+        run: npm run test-current
+
       # The house look (docs/house-look.md): default saturation and ink
       # coverage, measured from the committed thumbs/. No browser, so it
       # runs early. Like the baked-export gate, it judges what's committed:

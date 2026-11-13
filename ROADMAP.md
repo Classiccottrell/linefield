@@ -358,6 +358,17 @@ review) before merge, not after.
   history).
 - **Forma alignment.** A shared design system with `Projects/Forma`. Phase
   3.2's type system is the first real step.
+  - **The page current, 2026-11-13.** The two now meet on the page rather
+    than in one codebase (Forma's V2 Phase 5). `shared/current.js` is shared
+    verbatim with Forma and pinned by hash in both repos
+    (`npm run test-current`). `flow-field`, `grain-field` and `funnel` take
+    part; the other pieces work as plain backgrounds. Rules for the next
+    piece that joins: go through `shared/companion.js`, do nothing at all
+    when `step()` returns null (check with a build: thumbnails must not
+    change), and never give `current.js` a top-level name without the
+    `current`/`CURRENT_` prefix, because the bake inlines every shared
+    module into one script. Not done: Wake does not yet answer Forma's Wake
+    cursor mode, and only three pieces publish a flow.
 - **ASCII art brought to life.** This builds on the glyph-mark capability
   in `cipher-bloom`.
 - **A space series.** The owner's idea (2026-10-10): a run of compositions

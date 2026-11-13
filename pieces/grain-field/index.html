@@ -31,6 +31,7 @@
   import { createControlPanel } from '../../shared/controls.js';
   import { createLoop } from '../../shared/anim.js';
   import { hslToRgb, paletteHsl } from '../../shared/color.js';
+  import { createCompanion } from '../../shared/companion.js';
   import { simplex2 } from '../../shared/noise.js';
   import { exportPng, exportSvg, bakeHtml, exportSource, describeForAI } from '../../shared/export.js';
 
@@ -61,6 +62,24 @@
   // resize never needs a reseed; only a change in grain COUNT (Density, or
   // Scale above 1) does, and the fixed seed makes a larger count a superset
   // of a smaller one.
+  // The page current (shared/current.js): when a Forma object shares the
+  // page, the dust gathers around it — parted by the object while it is
+  // whole, closing in as it thins to gas — and the cloud's slow turn is
+  // published so the gas drifts with the dust. Alone, none of this runs.
+  const companion = createCompanion({ canvas });
+  const live = { cx: 0, cy: 0, reach: 1, elapsed: 0 };
+  // The cloud's flow as others on the page see it: a slow turn about its
+  // centre, wandering, and fading with distance.
+  function publishedFlow(x, y, out) {
+    const dx = x - live.cx, dy = y - live.cy;
+    const d = Math.hypot(dx, dy) || 1;
+    const a = Math.atan2(dy, dx) + Math.PI * 0.5
+      + simplex2(x * 0.0028, y * 0.0028 + live.elapsed * 0.06) * 1.2;
+    const m = 0.3 + 0.7 * Math.exp(-d / live.reach);
+    out[0] = Math.cos(a) * m;
+    out[1] = Math.sin(a) * m;
+  }
+  const CURSOR_NUDGE = 34; // px a grain is displaced at the cursor's full strength
   const BASE_COUNT = 5600;
   // Cloud anchor, normalized to the frame. Right of centre, clear of the
   // hero copy's wider-than-a-third reach.
@@ -148,7 +167,21 @@
     // the anchor), so at 2 the grain runs off every edge instead of a bigger
     // blob. Every term is zero at Scale 1: the default render is unchanged.
     const hi = Math.max(0, values.scale - 1);
-    const cx = W * (CLOUD.x + hi * (0.5 - CLOUD.x)), cy = H * (CLOUD.y + hi * (0.5 - CLOUD.y));
+    let cx = W * (CLOUD.x + hi * (0.5 - CLOUD.x)), cy = H * (CLOUD.y + hi * (0.5 - CLOUD.y));
+    // An object on the page: the cloud centres on it, and `shell` is the
+    // radius the dust is parted to (the object's edge while whole, closing
+    // as it disperses). Both are scaled by `presence`, so they ease in.
+    const body = companion.step();
+    let shell2 = 0, stir = 1;
+    if (body) {
+      cx += (body.x - cx) * body.presence;
+      cy += (body.y - cy) * body.presence;
+      const shell = body.r * 1.05 * Math.pow(1 - body.disperse, 1.6) * body.presence;
+      shell2 = shell * shell;
+      stir = 1 + 0.9 * body.disperse * body.presence;
+    }
+    live.cx = cx; live.cy = cy; live.reach = SPREAD * S * 2.2; live.elapsed = elapsed;
+    companion.field(publishedFlow);
     const scaleMul = 0.5 + 0.5 * values.scale;
     const sx = 1 + hi * 2.6, sy = 1 + hi * 1.7;
     const untail = 1 + hi * (1 / TEXT_TAIL - 1);
@@ -165,7 +198,11 @@
     // two stay independent, as do both from Phase, which offsets every
     // grain's cycle uniformly.
     const rate = elapsed * 0.6 * values.speed;
-    const amp = (0.006 + 0.02 * values.motion) * S;
+    const amp = (0.006 + 0.02 * values.motion) * S * stir;
+    {
+      const a = paletteHsl(values, 0), b = paletteHsl(values, 1);
+      companion.palette(hslToRgb(a.h, a.s, light), hslToRgb(b.h, b.s, light), !values.invert);
+    }
 
     for (const gr of grains) {
       const ph = rate + gr.j + values.phase * Math.PI * 2;
@@ -178,8 +215,24 @@
         hx *= flat;
         hy *= flat;
       }
-      const x = cx + hx * S * scaleMul * sx + wx;
-      const y = cy + hy * S * scaleMul * sy + wy;
+      let x = cx + hx * S * scaleMul * sx + wx;
+      let y = cy + hy * S * scaleMul * sy + wy;
+      if (body) {
+        // Part the dust around the object: a grain at distance d from its
+        // centre moves out to sqrt(d^2 + shell^2). Continuous everywhere,
+        // nothing left inside the shell, and the displaced grains pile up
+        // just outside it as a soft rim.
+        const dx = x - cx, dy = y - cy;
+        const d2 = dx * dx + dy * dy;
+        if (shell2 > 0 && d2 > 1e-6) {
+          const k = Math.sqrt((d2 + shell2) / d2);
+          x = cx + dx * k;
+          y = cy + dy * k;
+        }
+        const pull = companion.cursor(x, y);
+        x += pull[0] * CURSOR_NUDGE;
+        y += pull[1] * CURSOR_NUDGE;
+      }
       const a = ph * 0.5 + angleRad;
 
       const mix = (Math.sin(gr.j + elapsed * 0.1) + 1) / 2;
