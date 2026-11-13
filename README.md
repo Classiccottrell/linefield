@@ -59,6 +59,28 @@ Take `pieces/<name>/` and `shared/`, keeping their relative positions, and
 host both. Most control, most files. Useful if you intend to modify the
 piece rather than just use it.
 
+## Sharing a page with a Forma object
+
+Three pieces (`flow-field`, `grain-field`, `funnel`) can share a page with a
+3D object from [Forma](https://classiccottrell.github.io/forma/), and the two
+then move as one: the lines make room for the object, and whatever the
+object sheds as it comes apart rides the lines' flow, in their colour.
+
+Nothing is imported in either direction, and linefield stays Canvas 2D with
+no dependencies. Both sides carry the same small file, `shared/current.js`
+("the page current"), which keeps one object on the page that each joins,
+publishes to and reads from: the pointer, what the cursor does, where the
+object is and how far apart it has come, the palette, and the flow. The
+contract is written out at the top of that file.
+
+A piece alone on a page behaves exactly as if the file were not there: no
+listeners, nothing published, the same pixels. That is checked: the three
+pieces' thumbnails and stills are byte-identical with and without it.
+
+Forma's editor builds the combined page for you (Export, "On a linefield
+background"): one HTML file with a baked piece as the background and the
+object over it.
+
 ## Configuring a piece without the control panel
 
 A piece checks for `window.__LF_BAKED_VALUES__` before it builds its control

@@ -8,6 +8,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The page current: three pieces can share a page with a Forma object.**
+  `shared/current.js` is a dependency-free contract (pointer, cursor mode,
+  object, palette, flow) that linefield and Forma each ship verbatim and
+  join on the page; `shared/companion.js` is a piece's side of it.
+  `flow-field` opens its quiet void around the object and closes it as the
+  object disperses; `grain-field` parts its dust around the object's edge
+  and stirs as it turns to gas; `funnel` slides its mouth under the object,
+  turns faster and runs a bright band down its throat as matter falls in.
+  Each publishes its flow, so the object's dispersed matter moves along it,
+  and follows the cursor in the same Push, Attract and Vortex modes. Alone
+  on a page a piece is unchanged (thumbnails and stills byte-identical).
+  New gate: `npm run test-current`, which also pins the file's hash against
+  Forma's copy.
+
 - **`signal-sphere`**, a sixth Space piece, bringing the collection to
   thirty-three: a very large night planet filling the bottom-right corner,
   its city lights and links made along the edge that rolls into view and

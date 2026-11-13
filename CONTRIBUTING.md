@@ -142,6 +142,25 @@ naturally onto your piece's visuals, find a reasonable interpretation (e.g.
 distinct from `speed`, `colorB`/stop B can drive a second color family)
 rather than skipping it.
 
+## Sharing a page with Forma (the page current)
+
+`shared/current.js` is a contract shared byte for byte with Forma, so that a
+piece and a Forma object on the same page move together. Do not edit it
+here alone: a change must land identically in Forma
+(`src/bridge/current.js`), with both hash pins updated, and anything that
+changes meaning bumps `CURRENT_VERSION`. `npm run test-current` enforces
+the pin and that every top-level name is prefixed (the bake inlines all
+shared modules into one script, where a common name is a redeclaration
+error).
+
+A piece joins through `shared/companion.js`, as `flow-field`, `grain-field`
+and `funnel` do: `const body = companion.step()` first thing each frame,
+`companion.field(fn)` to publish its flow, `companion.palette(a, b, dark)`
+for its colours, `companion.cursor(x, y)` for what the cursor does at a
+point. When `step()` returns null the piece is alone and must draw exactly
+what it draws without the module. Prove it with `npm run build`: the
+piece's thumbnail and still must not change.
+
 ## Piece-specific controls (`extraControls`)
 
 Pass an `extraControls` array to `createControlPanel({ ... extraControls })`
