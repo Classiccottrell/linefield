@@ -51,9 +51,21 @@
   let paths = [];
 
   function seedNodes(count) {
+    const normal = () => (Math.random() + Math.random() + Math.random() + Math.random() - 2);
+    const clamp = (value) => Math.max(0.03, Math.min(0.97, value));
     nodes = Array.from({ length: count }, () => {
-      const x = Math.random() * canvas.width;
-      const y = Math.random() * canvas.height;
+      const band = Math.random();
+      // Two node bodies and a narrower connecting neck make the default
+      // read as one synaptic event instead of uniform low-contrast clutter.
+      const u = Math.random();
+      const nx = band < 0.38 ? 0.27 + normal() * 0.16
+        : band < 0.76 ? 0.73 + normal() * 0.16
+          : 0.27 + u * 0.46 + normal() * 0.045;
+      const ny = band < 0.38 ? 0.45 + normal() * 0.22
+        : band < 0.76 ? 0.55 + normal() * 0.22
+          : 0.45 + u * 0.1 + Math.sin(u * Math.PI) * 0.05 + normal() * 0.065;
+      const x = clamp(nx) * canvas.width;
+      const y = clamp(ny) * canvas.height;
       return {
         x, y,
         homeX: x, homeY: y, // anchor: noise-field drift wanders around this,
@@ -67,11 +79,11 @@
   // connection-based: cost scales with node count x reach, so `dense` is
   // held at 1.8, not the control max of 2, to protect frame rate.
   const PRESETS = {
-    whisper: { opacity: 0.5, stroke: 1.6, density: 0.7, saturation: 0.05, glow: 0, reach: 130 },
-    ink:     { opacity: 1, stroke: 1.7, density: 1.3, saturation: 0, glow: 0, reach: 150 },
-    neon:    { opacity: 0.9, stroke: 0.9, density: 1.1, saturation: 0.95, glow: 1.1 },
-    drift:   { opacity: 0.55, stroke: 0.9, density: 0.85, speed: 0.3, motion: 1.7, reach: 140 },
-    dense:   { opacity: 0.62, stroke: 0.65, density: 1.8, speed: 0.8, reach: 105 },
+    whisper: { opacity: 0.7, stroke: 1, density: 0.65, saturation: 0.08, glow: 0, reach: 105 },
+    ink:     { opacity: 0.95, stroke: 1.35, density: 1, saturation: 0, glow: 0, reach: 118 },
+    neon:    { opacity: 0.95, stroke: 1.1, density: 1.1, saturation: 0.95, glow: 0.75, reach: 125 },
+    drift:   { opacity: 0.8, stroke: 1, density: 0.82, speed: 0.3, motion: 1.7, reach: 140, angle: 35 },
+    dense:   { opacity: 0.82, stroke: 0.8, density: 1.45, speed: 0.8, reach: 95, scale: 1.4 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -82,7 +94,7 @@
       if (name === 'density') seedNodes(Math.max(8, Math.round(BASE_COUNT * values.density)));
     },
     extraControls: [
-      { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 90, category: 'visual' },
+      { name: 'reach', label: 'Reach', type: 'range', min: 20, max: 200, step: 1, default: 105, category: 'visual' },
     ],
     defaults: { hue: 75, hueB: 45, saturation: 0.7, colorMode: 'gradient', colorA: '#bfff00', colorB: '#ffbf00' },
   });
@@ -112,8 +124,8 @@
     // nodes approach that radius, not how far they get).
     const wanderRadius = 4 + values.scale * 80;
     const pull = (18 * values.speed) / wanderRadius; // per-second return-to-home rate
-    const light = values.invert ? 0.35 : 0.62;
-    const lineWidth = 0.25 + values.stroke * 0.8;
+    const light = values.invert ? 0.28 : 0.78;
+    const lineWidth = 0.7 + values.stroke * 1.15;
     ctx.lineWidth = lineWidth;
 
     // Drift the nodes on a noise field, wrapping at the edges.
@@ -188,7 +200,7 @@
                 const cr = r0 + (r1 - r0) * mix;
                 const cg = g0 + (g1 - g0) * mix;
                 const cb = b0 + (b1 - b0) * mix;
-                const alpha = Math.min(1, values.opacity * closeness * (0.25 + pulse * 0.75));
+                const alpha = Math.min(1, values.opacity * Math.sqrt(closeness) * (0.45 + pulse * 0.55));
 
                 ctx.strokeStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${alpha})`;
                 ctx.lineWidth = lineWidth;

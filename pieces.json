@@ -51,7 +51,7 @@
   {
     "slug": "synapse",
     "title": "Synapse",
-    "blurb": "Drifting nodes wired to their neighbours, pulsing.",
+    "blurb": "Two drifting node clouds joined by a pulsing synaptic bridge.",
     "tags": ["network", "dense"],
     "hue": 75, "hueB": 45, "saturation": 0.7
   },

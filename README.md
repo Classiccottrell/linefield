@@ -152,7 +152,7 @@ tooling" below and CONTRIBUTING.md.
 - `grain-field` — fine drifting grain, the subtlest piece; good behind text
 - `wireframe-lattice` — rigid 3D wireframe grid rippling in perspective
 - `meridian` — seven long ribbons sweeping the full width
-- `synapse` — drifting nodes wired to their neighbours, pulsing
+- `synapse` — two drifting node clouds joined by a pulsing synaptic bridge
 - `accretion` — matter spiralling inward to a bright core
 - `tether` — heavy cables mooring to a single converging point
 - `event-horizon` — a polar grid bent inward by a gravity well

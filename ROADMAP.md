@@ -49,6 +49,16 @@ Only focused Pleat implementation checks were run for the first chunk.
 The user's request to skip the extra QA round remains in effect; a passing
 build or control check is not user visual acceptance.
 
+### 2026-11-26 — focused Synapse polish, ready for visual review
+
+Synapse's uniformly scattered, faint node web has been shaped into two
+connected node clouds with a visible bridge. The five presets now span a quiet
+version, monochrome Ink, brighter Neon, offset Drift, and a denser network.
+Its gallery copy, thumbnail, and baked download were refreshed. The preset
+sheet, preset checks, build, and Synapse-only control audit passed; all fifteen
+controls registered a visible change. Owner visual acceptance and the
+collection-wide release pass remain open.
+
 ## Delivery rules
 
 - Work on one named chunk at a time. Each ends with its own preview, a short
@@ -913,20 +923,24 @@ committed PNGs, not the live piece.
 | 19 | 0.24 | 0.133 | `pleat` |
 | 21 | 0.49 | 0.043 | `accretion` |
 | 24 | 0.42 | 0.048 | `contour-grid` |
-| 54 | 0.30 | 0.047 | `synapse` |
+| 57 | 0.25 | 0.163 | `synapse` |
 | 59 | 0.11 | 0.043 | `cipher-bloom` |
 | 122 | 0.33 | 0.043 | `globe` |
 | 166 | 0.48 | 0.073 | `meridian` |
 | 177 | 0.12 | 0.035 | `grain-field` |
 | 200 | 0.34 | 0.108 | `wireframe-lattice` |
-| 216 | 0.13 | 0.008 | `rainfall` |
+| 219 | 0.19 | 0.007 | `rainfall` |
 | 220 | 0.25 | 0.028 | `lacuna` |
-| 237 | 0.23 | 0.079 | `tether` |
-| 239 | 0.86 | 0.222 | `flow-field` |
+| 237 | 0.23 | 0.067 | `tether` |
 | 247 | 0.51 | 0.195 | `event-horizon` |
+| 253 | 0.80 | 0.270 | `flow-field` |
 | 253 | 0.17 | 0.120 | `driftwork` |
 | 254 | 0.58 | 0.318 | `interference` |
 | 305 | 0.48 | 0.096 | `orbital-veil` |
+
+Regenerated 2026-11-26 after Synapse's new thumbnail. Its measured ink rose
+from 0.047 to 0.163. The few other changed rows reflect the current committed
+thumbnails; the historical chunk comparisons below refer to earlier captures.
 
 Chunk 17 moved three rows: `rainfall` ink 0.010 → 0.008 (down — the veil-drift
 and correlated-sway rework dims some previously-bright pixels below the
