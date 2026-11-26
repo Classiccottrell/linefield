@@ -1,7 +1,7 @@
 # Roadmap
 
 Active delivery roadmap, followed by previously recorded limitations and
-deferred ideas. Updated 2026-09-19.
+deferred ideas. Updated 2026-11-26.
 
 **This file is the canonical, version-controlled roadmap.** The Google Doc
 ("Linefield - product" tab) that previously governed this queue is
@@ -17,15 +17,10 @@ is none of those things to an agent working from the checked-out tree.
 
 ## Current position
 
-Work is tracked as **PR #5** (`codex/collection-redesign-wake` → `main`,
-draft — not ready to merge). The five replacement pages, gallery cards,
-thumbnails, and baked downloads exist and are committed on that branch.
-Pleat, Driftwork, and Cipher Bloom are implemented and ready for visual
-review; Parallax is in progress (Speed is now wired independently of
-Motion, see `tools/test-parallax.mjs`; depth/occlusion tuning remains);
-Lacuna remains a draft. Their generated assets and targeted checks passed;
-the collection-wide release pass remains deferred.
-Cursor separation and Wake are already in the branch's committed history.
+The collection redesign has advanced beyond the original draft PR #5:
+`main` includes the chunk 18 design round through PR #17. Lacuna's focused
+revision is ready for owner visual review on `codex/lacuna-art-direction`.
+The collection-wide release pass remains deferred.
 
 The agreed direction remains
 [Collection Redesign and Wake](docs/superpowers/specs/2026-09-12-collection-redesign-and-wake-design.md).
@@ -40,14 +35,13 @@ Source inspection shows why more work remains:
 - All fourteen Pleat controls passed targeted checks. Cipher Bloom's formerly
   dead Stroke control is now live; Parallax's renderer still does not use
   Speed.
-- Lacuna rotates its arcs around a fixed centre; the design calls for Angle
-  to move the calm zone around the frame.
+- Lacuna previously rotated its arcs around a fixed centre. The focused
+  revision moves the calm zone with Angle.
 - Wake needs the outstanding stationary-pointer fade concern resolved.
 - Documentation and collection measurements still describe removed pieces.
 
-Only focused Pleat implementation checks were run for the first chunk.
-The user's request to skip the extra QA round remains in effect; a passing
-build or control check is not user visual acceptance.
+Lacuna's focused preset and control checks passed. A passing build or control
+check is not user visual acceptance.
 
 ## Delivery rules
 
@@ -185,13 +179,20 @@ zone, gathering on one side and opening on the other.
 
 **Scope:** `pieces/lacuna/index.html` and its generated assets/copy.
 
-- [ ] Bring Angle's calm-zone placement and wave interference into line
+- [x] Bring Angle's calm-zone placement and wave interference into line
   with the agreed direction; keep arc reach, drift, and phase distinct.
-- [ ] Tune the quiet region and five presets at the actual gallery capture
+- [x] Tune the quiet region and five presets at the actual gallery capture
   viewport. Refresh assets and hand off.
 
 **Finish line:** The composition reads clearly at card size and its controls
 describe the intended form. Keep changes bounded to Lacuna.
+
+**2026-11-26 handoff:** Lacuna's arcs now derive from two moving wave sources,
+Angle moves the calm zone, and the five presets have distinct footprints at
+gallery size. The source, thumbnail, and baked download are refreshed. The
+preset sheet, preset checks, build, and Lacuna-only control audit passed; all
+fourteen controls registered a visible change. Visual acceptance remains with
+the owner. Collection-wide release QA remains deferred.
 
 ## Chunk 6 — Wake: an independent delivery
 

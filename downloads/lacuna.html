@@ -1210,15 +1210,15 @@ function describeForAI({ pieceName, values }) {
   resize();
 
   const BASE_FRONTS = 18;
-  const SEG = 88;
+  const SEG = 132;
   let paths = [];
 
   const PRESETS = {
-    whisper: { opacity: 0.18, stroke: 0.45, density: 0.55, saturation: 0.05, glow: 0 },
-    ink:     { opacity: 0.88, stroke: 1.25, density: 0.72, saturation: 0, angle: 18 },
-    neon:    { opacity: 0.72, stroke: 0.72, density: 1.12, saturation: 0.68, glow: 1.05 },
-    drift:   { opacity: 0.34, stroke: 0.55, density: 0.68, speed: 0.28, motion: 1.55, phase: 0.7 },
-    dense:   { opacity: 0.58, stroke: 0.48, density: 1.65, speed: 0.62, angle: 338 },
+    whisper: { opacity: 0.58, stroke: 0.65, density: 0.55, saturation: 0.04, glow: 0, scale: 0.7, angle: 0 },
+    ink:     { opacity: 1, stroke: 1.6, density: 0.82, saturation: 0, glow: 0, angle: 70, scale: 1.12, phase: 0.18 },
+    neon:    { opacity: 0.9, stroke: 1, density: 1.05, saturation: 0.85, glow: 0.85, phase: 0.4, angle: 340, scale: 1.15 },
+    drift:   { opacity: 0.78, stroke: 0.9, density: 0.78, speed: 0.28, motion: 1.55, phase: 0.72, angle: 195, scale: 1.06 },
+    dense:   { opacity: 0.9, stroke: 1.05, density: 1.65, speed: 0.62, angle: 280, scale: 1.4, phase: 0.55 },
   };
 
   const baked = window.__LF_BAKED_VALUES__;
@@ -1237,52 +1237,66 @@ function describeForAI({ pieceName, values }) {
     paths = [];
     const W = canvas.width;
     const H = canvas.height;
-    const cx = W * 0.62;
-    const cy = H * 0.48;
+    const unit = Math.min(W, H);
     const theta = values.angle * Math.PI / 180;
+    // Angle steers the empty eye through the frame. Rotating the arc geometry
+    // around a fixed centre left the composition unchanged at every setting.
+    const cx = W * (0.48 + 0.22 * Math.cos(theta));
+    const cy = H * (0.5 + 0.2 * Math.sin(theta));
     const fronts = Math.max(4, Math.round(BASE_FRONTS * values.density));
-    const light = values.invert ? 0.35 : 0.62;
-    const baseWidth = 0.35 + values.stroke * 0.9;
+    const light = values.invert ? 0.22 : 0.88 - values.saturation * 0.24;
+    const baseWidth = 1.3 + values.stroke * 1.5;
+    const waveTime = elapsed * values.speed * 0.75;
+    const sourceTime = elapsed * values.motion * 0.1;
+    const sourceA = [unit * (-0.2 + 0.06 * Math.sin(sourceTime)), unit * (-0.1 + 0.05 * Math.cos(sourceTime * 0.7))];
+    const sourceB = [unit * (0.18 + 0.05 * Math.cos(sourceTime * 0.8)), unit * (0.12 + 0.05 * Math.sin(sourceTime * 0.9))];
 
     for (let front = 0; front < fronts; front++) {
       const segments = [];
       let current = [];
-      const phase = front * 0.71;
+      const depth = front / Math.max(1, fronts - 1);
+      const baseRadius = (0.14 + front * 0.035) * unit * values.scale;
       for (let s = 0; s <= SEG; s++) {
         const u = s / SEG;
-        const a = (-0.9 + u * 1.8) * Math.PI;
-        const drift = elapsed * values.motion * 0.08;
-        const wave = Math.sin(a * 3 + phase - elapsed * values.speed * 0.9 + values.phase * Math.PI * 2);
-        const radius = (70 + front * 15) * values.scale + wave * (5 + front * 0.12);
-        const keep = Math.sin(a * 2.3 + front * 0.8 + drift) > -0.18;
+        const a = -Math.PI + u * Math.PI * 2;
+        const ex = Math.cos(a) * baseRadius;
+        const ey = Math.sin(a) * baseRadius * 0.67;
+        const dA = Math.hypot(ex - sourceA[0], ey - sourceA[1]) / unit;
+        const dB = Math.hypot(ex - sourceB[0], ey - sourceB[1]) / unit;
+        const waveA = Math.sin(dA * 16 - waveTime + front * 0.17 + values.phase * Math.PI * 2);
+        const waveB = Math.sin(dB * 21 - waveTime * 0.72 - front * 0.11 - values.phase * Math.PI);
+        const interference = waveA + waveB * 0.7;
+        // The arcs gather to the right of the eye and open on the left.
+        // Coherent fragments remain; the rejected samples break the contours.
+        const gather = 0.5 + 0.5 * Math.cos(a - 0.3);
+        const keep = gather > 0.19 && interference > -0.62;
         if (!keep) {
           if (current.length > 1) segments.push(current);
           current = [];
           continue;
         }
-        const ex = Math.cos(a) * radius;
-        const ey = Math.sin(a) * radius * 0.58;
-        const x = cx + ex * Math.cos(theta) - ey * Math.sin(theta);
-        const y = cy + ex * Math.sin(theta) + ey * Math.cos(theta);
+        const radius = baseRadius + interference * unit * (0.012 + depth * 0.012);
+        const x = cx + Math.cos(a) * radius;
+        const y = cy + Math.sin(a) * radius * 0.67;
         current.push([x, y]);
       }
       if (current.length > 1) segments.push(current);
 
-      const stop = paletteHsl(values, fronts === 1 ? 0.5 : front / (fronts - 1));
+      const stop = paletteHsl(values, depth);
       const [r, g, b] = hslToRgb(stop.h, stop.s, light);
-      const frontAlpha = values.opacity * (0.42 + 0.58 * (front / fronts));
+      const frontAlpha = values.opacity * (0.62 + 0.34 * depth);
       for (const segment of segments) {
         const meanX = segment.reduce((sum, point) => sum + point[0], 0) / segment.length;
-        const quiet = Math.max(0.16, Math.min(1, (meanX / W + 0.08) / 0.92));
-        const alpha = frontAlpha * quiet;
+        const gatherWeight = Math.max(0.55, Math.min(1, (meanX - cx + unit * 0.2) / (unit * 0.55)));
+        const alpha = frontAlpha * gatherWeight;
         ctx.beginPath();
         ctx.moveTo(segment[0][0], segment[0][1]);
         for (let i = 1; i < segment.length; i++) ctx.lineTo(segment[i][0], segment[i][1]);
         ctx.lineCap = 'round';
         ctx.lineWidth = baseWidth;
         ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
-        if (values.glow > 0 && alpha > values.opacity * 0.46) {
-          ctx.globalAlpha = values.glow * 0.18;
+        if (values.glow > 0 && alpha > values.opacity * 0.48) {
+          ctx.globalAlpha = values.glow * 0.13;
           ctx.lineWidth = baseWidth + values.glow * 2.4;
           ctx.stroke();
           ctx.globalAlpha = 1;
