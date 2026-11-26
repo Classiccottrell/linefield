@@ -1,7 +1,7 @@
 # Roadmap
 
 Active delivery roadmap, followed by previously recorded limitations and
-deferred ideas. Updated 2026-09-19.
+deferred ideas. Updated 2026-11-26.
 
 **This file is the canonical, version-controlled roadmap.** The Google Doc
 ("Linefield - product" tab) that previously governed this queue is
@@ -15,17 +15,69 @@ is none of those things to an agent working from the checked-out tree.
 
 ---
 
+## React Bits research backlog (proposed 2026-11-26)
+
+This is a proposed production pass after the active named chunks. Keep the
+one-piece-at-a-time delivery rule below. Lacuna's new composition is in [draft
+PR #29](https://github.com/Classiccottrell/linefield/pull/29), so its thumbnail
+and preset review belong to that handoff before any further Lacuna work.
+
+The research sample is deliberately bounded: React Bits source at
+[`37f53df`](https://github.com/DavidHDev/react-bits/tree/37f53df7efb61238b0fea9ea8be74e3cce62b959),
+including [Aurora](https://github.com/DavidHDev/react-bits/blob/37f53df7efb61238b0fea9ea8be74e3cce62b959/src/content/Backgrounds/Aurora/Aurora.jsx),
+[Silk](https://github.com/DavidHDev/react-bits/blob/37f53df7efb61238b0fea9ea8be74e3cce62b959/src/content/Backgrounds/Silk/Silk.jsx),
+[Letter Glitch](https://github.com/DavidHDev/react-bits/blob/37f53df7efb61238b0fea9ea8be74e3cce62b959/src/content/Backgrounds/LetterGlitch/LetterGlitch.jsx),
+[Floating Lines](https://github.com/DavidHDev/react-bits/blob/37f53df7efb61238b0fea9ea8be74e3cce62b959/src/content/Backgrounds/FloatingLines/FloatingLines.jsx),
+[Click Spark](https://github.com/DavidHDev/react-bits/blob/37f53df7efb61238b0fea9ea8be74e3cce62b959/src/content/Animations/ClickSpark/ClickSpark.jsx),
+and [Spotlight Card](https://github.com/DavidHDev/react-bits/blob/37f53df7efb61238b0fea9ea8be74e3cce62b959/src/content/Components/SpotlightCard/SpotlightCard.jsx).
+The lesson is the combination of a specific visual idea, controls that change
+that idea, curated looks, contextual preview, and explicit motion states. This
+is a sample across component types, not an audit of the entire site. Linefield
+already has five presets, tested controls, baked HTML, PNG/SVG, hover previews,
+and a visibility-aware loop. Preserve those strengths and the dependency-free
+Canvas 2D delivery contract.
+
+**Quality contract for every piece handoff:** review the default and all five
+presets at the 240×150 gallery card, a 1280×800 stage, and a narrow phone stage;
+record the visual intention and one sentence for each control's effect; inspect
+an idle frame, motion, pointer response if present, and reduced motion; check
+that baked HTML and exported still match the authored composition. A passing
+pixel-variance or control-diff gate alone does not establish visual quality.
+
+The current contact sheet gives this **provisional** piece order; review each
+full-size animation and preset sheet before treating a visual diagnosis as
+final:
+
+| Visual family | Pieces | First quality question |
+| --- | --- | --- |
+| Quiet detail | `grain-field`, `rainfall`, `cipher-bloom`, `synapse` | Can the default be recognized at card size while Whisper stays text-safe? |
+| Fields and ribbons | `flow-field`, `meridian`, `parallax` | Do their path rhythm, focal space and motion read as three different ideas? |
+| Rings and voids | `interference`, `orbital-veil`, `lacuna` | Is each calm zone or optical center compositionally distinct? |
+| Spatial structures | `wireframe-lattice`, `event-horizon`, `globe` | Does depth survive a small preview and a phone crop? |
+| Authored silhouettes | `contour-grid`, `accretion`, `tether`, `driftwork`, `pleat` | Does each have a clear shape and avoid an arbitrary cropped fragment? |
+
+| Order | Backlog item and scope | Acceptance evidence |
+| --- | --- | --- |
+| L0 | **Reconcile the bridge catalog.** Decide whether `funnel` returns as a published piece or Forma's `Into the Well` scene is re-authored against `event-horizon`; then align the manifest, baked downloads, Forma scene registry, and homepage fallback. | A composed scene resolves against a published Linefield slug and reacts to the shared current without a stale vendored-only path. Resolve before more cross-project showcase work. |
+| L1 | **Gallery contrast pass, one piece per PR:** `grain-field`, `rainfall`, `cipher-bloom`, and `synapse`. Keep quiet variants, but make each default legible at card size, with a defined focus and a visibly different Ink/Neon option. | Before/after card captures and five-preset sheets; owner can identify the piece at card size. The quiet preset remains useful behind text. |
+| L2 | **Separate neighboring visual ideas, one piece per PR:** `flow-field` versus `meridian` versus `parallax`; `interference` versus `orbital-veil` versus `lacuna`; then `driftwork` and `pleat`. Specify each piece's silhouette, spatial rhythm, focal region, and motion before tuning numbers. | Contact sheet shows distinct compositions even in grayscale. Each preset changes structure or placement as well as palette. Lacuna's PR #29 is reviewed first. |
+| L3 | **Piece-native controls.** Keep the fourteen shared controls live, then add only controls that explain a piece's identity: e.g. band spacing for `contour-grid`, well reach for `event-horizon`, strand convergence for `tether`, rain length for `rainfall`. Group basic versus advanced settings in the panel. | A user can recreate each preset with named controls; every added control passes the focused audit and has a perceptible effect at normal preview size. |
+| L4 | **Motion grammar.** Define intro, idle, pointer, click, pause/replay, and reduced-motion behavior per piece, with click omitted where it adds no visual meaning. Keep Wake as an optional separate mechanism. | No offscreen work, stale pointer state, or time jump on resume; reduced motion gives a useful still; repeat interactions settle rather than accumulating indefinitely. |
+| L5 | **Context previews.** Add landing, card, and phone preview frames with sample text and foreground contrast, plus pause/replay and snapshot controls. Keep the existing static gallery thumbnail and keyboard-focus live preview. | The same preset can be judged behind real content in all three contexts; panel/export chrome stays out of captures; keyboard and touch access work. |
+| L6 | **Deterministic delivery.** Give the baked page an explicit host API for pause, time, resize, and pointer enablement; add a repeatable still-capture time. Consider looping WebM/MP4 only after that clock contract is stable. | Standalone bake and embed render the same selected look; a saved still is reproducible; an offscreen embed stops drawing. Current HTML, PNG, SVG, and source exports continue to work. |
+| L7 | **Release gate.** Run per-piece visual sheets, export and reduced-motion checks during each chunk; after all chunks, run the full browser, baked-file, interaction, and performance matrix on desktop and an actual phone. | No blank or broken preset/export; documented frame-time and memory results; owner visual sign-off for the full contact sheet. |
+
+**Positioning to retain:** Linefield is a focused library of self-hosted line-art
+backgrounds whose authored, dependency-free HTML can be used without React.
+React Bits is a broad React component and creative-tool library. The useful
+benchmark is its finish and preview workflow, not matching its catalog size.
+
 ## Current position
 
-Work is tracked as **PR #5** (`codex/collection-redesign-wake` → `main`,
-draft — not ready to merge). The five replacement pages, gallery cards,
-thumbnails, and baked downloads exist and are committed on that branch.
-Pleat, Driftwork, and Cipher Bloom are implemented and ready for visual
-review; Parallax is in progress (Speed is now wired independently of
-Motion, see `tools/test-parallax.mjs`; depth/occlusion tuning remains);
-Lacuna remains a draft. Their generated assets and targeted checks passed;
-the collection-wide release pass remains deferred.
-Cursor separation and Wake are already in the branch's committed history.
+The collection redesign has advanced beyond the original draft PR #5:
+`main` includes the chunk 18 design round through PR #17. Lacuna's focused
+revision is pending owner review in draft PR #29. The collection-wide release
+pass remains deferred.
 
 The agreed direction remains
 [Collection Redesign and Wake](docs/superpowers/specs/2026-09-12-collection-redesign-and-wake-design.md).
@@ -33,21 +85,11 @@ This roadmap replaces the open-ended execution queue with seven bounded
 deliverables. Existing detailed implementation plans are reference material;
 their task order must not cause a finished chunk to expand into the next.
 
-Source inspection shows why more work remains:
+The detailed chunk notes below preserve earlier implementation findings.
+Recheck those findings against `main` before acting on them; for example,
+Parallax now uses Speed and PR #29 addresses Lacuna's calm-zone Angle.
 
-- Pleat now uses filled rectangular folds. Driftwork now uses alternating
-  tangent-aligned ellipses following two crossing currents.
-- All fourteen Pleat controls passed targeted checks. Cipher Bloom's formerly
-  dead Stroke control is now live; Parallax's renderer still does not use
-  Speed.
-- Lacuna rotates its arcs around a fixed centre; the design calls for Angle
-  to move the calm zone around the frame.
-- Wake needs the outstanding stationary-pointer fade concern resolved.
-- Documentation and collection measurements still describe removed pieces.
-
-Only focused Pleat implementation checks were run for the first chunk.
-The user's request to skip the extra QA round remains in effect; a passing
-build or control check is not user visual acceptance.
+A passing build or control check is not user visual acceptance.
 
 ## Delivery rules
 
@@ -56,7 +98,7 @@ build or control check is not user visual acceptance.
 - Preserve the current drafts in a local checkpoint before further renderer
   edits. Stage only this redesign's files; do not discard the dirty worktree.
 - Reuse the existing controls, color helpers, animation loop, and export
-  paths. Keep seventeen artworks and a separate optional Wake mechanism.
+  paths. Keep the current eighteen artworks and a separate optional Wake mechanism.
 - Each artwork chunk owns its source, five presets, manifest/README copy,
   and generated thumbnail/download. Rebuild generated assets for handoff;
   do not edit baked HTML manually.
